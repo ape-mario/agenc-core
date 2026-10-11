@@ -106,6 +106,7 @@ vi.mock("./execute-tools.js", () => ({
 
 import {
   streamModel,
+  buildProviderOptions,
   type StreamModelRequestContract,
   StreamModelError,
 } from "./stream-model.js";
@@ -539,6 +540,19 @@ describe("streamModel — live assistant text sanitization", () => {
       serviceTier: "priority",
       parallelToolCalls: false,
     });
+  });
+
+  test("forwards the captured distinction between default and explicitly disabled summaries", () => {
+    const ctx = mkCtx("chat");
+    const { session } = mkSession(mkProvider(async () => ({
+      content: "ok", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      model: "test-model", finishReason: "stop",
+    })));
+    const request = mkRequest([{ role: "user", content: "hello" }]);
+    const signal = new AbortController().signal;
+    expect(buildProviderOptions(request, ctx, signal, session).reasoningSummaryIsDefault).toBeUndefined();
+    (ctx as TurnContext & { reasoningSummaryIsDefault?: true }).reasoningSummaryIsDefault = true;
+    expect(buildProviderOptions(request, ctx, signal, session).reasoningSummaryIsDefault).toBe(true);
   });
 
   test("routes every provider request with the session conversation id as the prompt cache key", async () => {

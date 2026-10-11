@@ -97,6 +97,24 @@ function requestBody(
 }
 
 describe("OpenAIProvider encrypted reasoning replay (AGENC_OPENAI_REASONING_REPLAY)", () => {
+  test.each([false, true])("requests automatic Luna max summaries in the replay experiment (stream=%s)", async (stream) => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(stream
+      ? toolTurnStream([REASONING, SERVER_CALL])
+      : new Response(JSON.stringify({ status: "completed", output: [REASONING, SERVER_CALL] }),
+        { headers: { "content-type": "application/json" } }));
+    const provider = new OpenAIProvider({ apiKey: "sk-test", model: "gpt-6-luna", fetchImpl });
+    const messages: LLMMessage[] = [{ role: "user", content: "read a" }];
+    const options = { reasoningEffort: "max" as const, maxOutputTokens: 8192 };
+    const response = await withReplaySwitch("1", () => stream
+      ? provider.chatStream(messages, () => {}, options)
+      : provider.chat(messages, options));
+
+    expect(requestBody(fetchImpl, 0).reasoning).toEqual({ effort: "max", summary: "auto" });
+    expect(requestBody(fetchImpl, 0).include).toEqual(["reasoning.encrypted_content"]);
+    expect(requestBody(fetchImpl, 0).max_output_tokens).toBe(8192);
+    expect(response.providerReasoningProvenance).toEqual({ provider: "openai", model: "gpt-6-luna" });
+  });
+
   test.each([
     ["the completion lists its output", [REASONING, SERVER_CALL]],
     ["the completion has an empty output, as on the ChatGPT backend", []],

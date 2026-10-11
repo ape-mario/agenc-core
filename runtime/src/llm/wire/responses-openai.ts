@@ -539,15 +539,22 @@ export function buildOpenAIResponsesRequest(
       effort: input.options.reasoningEffort,
     };
   }
-  if (
-    input.options?.reasoningSummary !== undefined &&
-    input.options.reasoningSummary !== "none"
-  ) {
+  // The replay experiment should retain the provider's summary as well as
+  // its encrypted reasoning. Match stateless reasoning clients that ask for
+  // `auto`, but keep an explicit summary choice (including `none`) authoritative.
+  // Replay is opt-in; the default wire and non-reasoning requests stay unchanged.
+  const useReplaySummaryDefault = replayProvider !== undefined &&
+    input.options?.reasoningEffort !== undefined &&
+    input.options.reasoningEffort !== "none" &&
+    (input.options.reasoningSummary === undefined ||
+      input.options.reasoningSummaryIsDefault === true);
+  const reasoningSummary = useReplaySummaryDefault ? "auto" : input.options?.reasoningSummary;
+  if (reasoningSummary !== undefined && reasoningSummary !== "none") {
     body.reasoning = {
       ...(body.reasoning && typeof body.reasoning === "object"
         ? (body.reasoning as Record<string, unknown>)
         : {}),
-      summary: input.options.reasoningSummary,
+      summary: reasoningSummary,
     };
   }
   if (nativeVerbosity && input.options?.modelVerbosity !== undefined) {
