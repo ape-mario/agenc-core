@@ -116,6 +116,13 @@ OAuth sign-in. Neither explicit selection silently obtains managed credentials.
 These values are captured with the session environment and do not delete saved
 credentials or change another session's selection.
 
+`AGENC_DEEPSEEK_REASONING_ONLY_REPLAY` (boolean-like, off by default)
+preserves matching native DeepSeek reasoning-only assistant messages when
+tools are available and thinking is enabled. This includes output-cap
+reasoning after thinking-off recovery. It increases replay input, is included in token
+admission, and can change model strategy or reach a task budget sooner.
+See [Direct DeepSeek](../providers/deepseek-direct.md) for the experiment.
+
 `AGENC_OPENAI_REASONING_REPLAY` (boolean-like, on by default) controls whether
 the `openai` provider keeps encrypted reasoning from Responses reasoning calls
 and sends it back. Set it to `0`, `false`, `no` or `off` to disable retention

@@ -19,6 +19,22 @@ for messages with matching provider and model provenance. Tool arguments
 must finish streaming before execution. Images remain unsupported on these
 two text model entries.
 
+`AGENC_DEEPSEEK_REASONING_ONLY_REPLAY=1` is an experimental, default-off
+switch for the native provider. With tools available and thinking enabled, it preserves
+provider-owned assistant reasoning whose visible body is empty, including a
+reasoning-only output-cap response followed by recovery and re-enabled thinking. Generic message
+normalization otherwise drops that empty assistant message. Only matching
+provider and model provenance permits retention; the returned text is sent
+unchanged as `reasoning_content`. Thinking-off recovery omits this additional
+replay because a four-call acceptance probe found that the provider did not
+count its reasoning text as input in that mode. Effort, output caps,
+tool validation and retry limits keep their existing behavior. Token
+admission includes the retained reasoning. The extra input may exhaust task
+budgets sooner, and retained partial reasoning may reinforce a mistaken plan.
+This is a continuity experiment, with no measured solve-preserving benefit.
+The session captures the switch at ingress; it does not read mutable process
+environment during a turn.
+
 On Node, native DeepSeek uses HTTP/1.1 through the existing dispatcher without
 changing its TLS or proxy policy. The HTTP/2 fetch path can queue a POST body
 behind another streaming response: a Low request was observed waiting 44 seconds

@@ -234,6 +234,7 @@ export const HERMETIC_AGENC_STATE_ENV_VARS = Object.freeze([
   'AGENC_PROVIDER_MANAGED_BY_HOST',
   // opt-in provider wire changes (tests that need one set it explicitly)
   'AGENC_OPENAI_REASONING_REPLAY',
+  'AGENC_DEEPSEEK_REASONING_ONLY_REPLAY',
   // session request-layout switch (a test that needs it sets it explicitly)
   'AGENC_SHARED_PREFIX_TAIL',
   // MCP process injection, mutation, OAuth, and sizing overrides

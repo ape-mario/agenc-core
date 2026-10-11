@@ -9,6 +9,7 @@
 import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { oneShotFastModeActive } from "../one-shot-fast-mode.js";
+import { deepSeekReasoningOnlyReplayProvenance } from "./deepseek-reasoning-only-replay.js";
 
 import { LLMContextWindowExceededError } from "./errors.js";
 import { getTokenizerConfigForProvider } from "./token-estimation.js";
@@ -1038,6 +1039,9 @@ function prepareAccountingRequest(
     const normalizedMessages = prepareMessagesForWire(
       snapshot.messages,
       snapshot.options,
+      (snapshot.options.tools?.length ?? 0) > 0 && snapshot.options.disableThinkingForRecovery !== true
+        ? { preserveReasoningOnlyFor: deepSeekReasoningOnlyReplayProvenance(snapshot.provider, snapshot.model) }
+        : undefined,
     );
     const toolResultImagePolicy =
       chatCompletionsCapabilityHintsForProvider(
