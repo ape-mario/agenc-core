@@ -1033,6 +1033,7 @@ describe("AnthropicProvider", () => {
     expect(response.finishReason).toBe("tool_calls");
     // Cache reads and writes sit outside input_tokens (#2772).
     expect(response.usage).toEqual({
+      cacheInputExcludedFromPrompt: true,
       promptTokens: 11,
       completionTokens: 3,
       totalTokens: 24,

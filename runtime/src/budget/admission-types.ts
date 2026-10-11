@@ -32,6 +32,8 @@ export interface AdmissionBudgetScope {
   readonly maxCostUsd?: number;
   /** Undefined means this scope has no token allocation. */
   readonly maxTokens?: number;
+  /** Physical model calls, including unknown outcomes; shared with descendants. */
+  readonly maxModelCalls?: number;
 }
 
 export interface RuntimeAdmissionRequest extends AdmissionRequest {
@@ -109,6 +111,15 @@ export interface AdmissionUsageSummary extends AdmissionUsageTotals {
   })[];
 }
 
+/** Immutable observation at one admission revision, materialized at publication. */
+export interface AdmissionUsageSnapshot {
+  readonly runId: string;
+  readonly sequence: number;
+  /** Equality of all displayed fields, excluding the journal sequence. */
+  readonly signature: string;
+  read(): AdmissionUsageSummary;
+}
+
 /** Durable allow result produced by the SQLite repository. */
 export interface AdmissionGrant {
   readonly decision: "allow";
@@ -177,6 +188,7 @@ export type AdmissionClaimResult =
         | "not_queued"
         | "deadline_expired"
         | "budget_exceeded"
+        | "model_call_budget_exceeded"
         | "unpriced_under_hard_cap"
         | "allocation_blocked"
         | "cancelled";

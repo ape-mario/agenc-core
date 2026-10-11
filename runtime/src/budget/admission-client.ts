@@ -7,6 +7,7 @@ import type {
   AdmissionReconcileResult,
   AdmissionUsage,
   AdmissionUsageSummary,
+  AdmissionUsageSnapshot,
 } from "./admission-types.js";
 
 export interface AdmissionClientScope {
@@ -21,6 +22,7 @@ export interface AdmissionClientScope {
   readonly deadlineAt?: string;
   readonly maxCostUsd?: number;
   readonly maxTokens?: number;
+  readonly maxModelCalls?: number;
   /** Durable assignment identity when a keep-alive worker has a task cap. */
   readonly taskId?: string;
   /** Any run or period allocation imposes a hard monetary ceiling. */
@@ -127,6 +129,7 @@ export interface ExecutionAdmissionClient {
     /** Additional cap for this child run, or for taskId when supplied. */
     readonly maxCostUsd?: number;
     readonly maxTokens?: number;
+    readonly maxModelCalls?: number;
     /** Stable assignment identity. Rebinding it preserves spent and held usage. */
     readonly taskId?: string;
   }): ExecutionAdmissionClient;
@@ -138,6 +141,8 @@ export interface ExecutionAdmissionClient {
    */
   subscribeCritical?(
     listener: (event: AdmissionJournalEvent) => void,
+    /** Flush this projection before an ordinary observer sees its event. */
+    beforeObserve?: () => void,
   ): () => void;
   /** Bounded catch-up for canonical projection after attach/re-attach. */
   replayJournal?(options?: {
@@ -145,6 +150,8 @@ export interface ExecutionAdmissionClient {
     readonly limit?: number;
   }): readonly AdmissionJournalEvent[];
   getUsageSummary?(): AdmissionUsageSummary;
+  /** Root task spend, including dispatched attempts whose usage remains unknown. */
+  getTaskBudgetUsage?(): { readonly tokens: number; readonly calls: number };
   /** This bound run/task's usage only, excluding delegated descendants. */
   getDirectUsageSummary?(): AdmissionUsageSummary;
   /** Snapshot only. Minimum remaining dollars across durable task, ancestor
@@ -152,6 +159,8 @@ export interface ExecutionAdmissionClient {
    * no monetary cap. Dispatch still needs an atomic admission lease. */
   getRemainingCostUsd?(): number | undefined;
   subscribeUsage?(listener: (summary: AdmissionUsageSummary) => void): () => void;
+  /** Canonical observer; immutable numeric snapshots may be published after send. */
+  subscribeUsageSnapshot?(listener: (snapshot: AdmissionUsageSnapshot) => void): () => void;
   subscribe(listener: (event: AdmissionJournalEvent) => void): () => void;
 }
 

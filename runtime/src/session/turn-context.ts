@@ -357,6 +357,7 @@ export interface SessionConfiguration {
    * `sandbox.allow_gpu`). Kernel attack surface — off by default.
    */
   readonly sandboxAllowGpu?: boolean;
+  readonly sandboxPersistentSession?: boolean;
   readonly collaborationMode: CollaborationMode;
   /**
    * True once the session's reasoning effort was cleared on purpose
@@ -474,6 +475,7 @@ export type SessionSource =
 
 /** The original config blob (large). */
 export interface Config {
+  readonly bypassFastMode?: boolean;
   readonly reasoningCapPolicy?: "off" | "streak2";
   readonly agents?: import("../config/schema.js").AgentsConfig;
   readonly model: string;
@@ -520,6 +522,9 @@ export interface Config {
   readonly maxTurns?: number;
   /** Canonical per-session USD cap; checked before every sampling iteration. */
   readonly maxBudgetUsd?: number;
+  readonly taskTokenBudget?: number;
+  readonly taskMaxCalls?: number;
+  readonly experimentalTaskBudgetProgress?: string;
   /** Canonical durable checkpoint/resume policy captured for this session. */
   readonly durableTurns?: DurableTurnsConfig;
   /** Completion gate policy for non-interactive verification rounds. */
