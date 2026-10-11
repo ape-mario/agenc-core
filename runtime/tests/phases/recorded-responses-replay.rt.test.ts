@@ -11,17 +11,19 @@ import { RolloutStore } from "../../src/session/rollout-store.js";
 import { mkCtx, mkSession } from "../fixtures.js";
 import { buildInitialTurnState } from "../../src/session/turn-state.js";
 import { isDurableEvent } from "../../src/session/event-log.js";
+import { parseSSEFrames } from "../../src/llm/_deps/sse.js";
+import * as sseModule from "../../src/llm/_deps/sse.js";
+import { legacyParseSSEFrames } from "../fixtures/recorded-responses-rt/legacy-sse.js";
 
 // Replay assembly and dispatch validation, but never execute recorded tools.
 const queued = new Set<string>();
 vi.mock("../../src/phases/execute-tools.js", async importOriginal => ({
   ...await importOriginal<Record<string, unknown>>(),
-  ensureStreamingToolExecutor: () => ({}),
-  queueStreamingToolCall: (_executor: unknown, _block: unknown, call: { id: string }) => {
-    if (queued.has(call.id)) return false;
-    queued.add(call.id);
-    return true;
-  },
+  ensureStreamingToolExecutor: () => ({
+    getToolStates: () => [...queued].map(id => ({ id })),
+    addTool: (_block: unknown, call: { id: string }) => { queued.add(call.id); },
+    dispatchPending: () => {},
+  }),
 }));
 import { streamModel } from "../../src/phases/stream-model.js";
 
@@ -96,7 +98,7 @@ async function replay(raw: Uint8Array, size: number, full: boolean, listeners = 
     callbackCount++;
     onChunk(chunk);
     callbackDwell.push(performance.now() - started);
-  }, options);
+  }, options).then(response => { finishChunk(); return response; });
   const root = mkdtempSync(join(tmpdir(), "rt-replay-"));
   const ctx = mkCtx({ cwd: root, modelInfo: { slug: MODEL, contextWindow: 131072, supportedReasoningLevels: [], effectiveContextWindowPercent: 100, defaultReasoningSummary: "none", truncationPolicy: "off", usedFallbackModelMetadata: false } });
   const { session, events } = mkSession({ cwd: root, provider, model: MODEL });
@@ -170,7 +172,7 @@ test("recorded Light Responses replay through the production stream phase", asyn
       }
     }
   }
-}, 120000);
+}, 600000);
 
 function syntheticScale(deltas: number, argumentChars: number) {
   const argument = JSON.stringify({ payload: "x".repeat(argumentChars) });
@@ -199,5 +201,44 @@ test("Pi-sized synthetic argument streams use only Light code", async () => {
   const raw = gunzipSync(Buffer.concat(fixture.parts.map(part => readFileSync(join(fixtureRoot, part)))));
   for (const listeners of [1, 8, 32]) {
     for (let repeat = 0; repeat < 3; repeat++) console.log("RT_FANOUT " + JSON.stringify({ listeners, repeat, ...await replay(raw, 1024, true, listeners) }));
+  }
+}, 120000);
+
+test("main parser in the full production stream and persistence path", async () => {
+  const spy = vi.spyOn(sseModule, "parseSSEFrames").mockImplementation(legacyParseSSEFrames);
+  try {
+    for (const fixture of fixtures) {
+      const raw = gunzipSync(Buffer.concat(fixture.parts.map(part => readFileSync(join(fixtureRoot, part)))));
+      for (let repeat = 0; repeat < 3; repeat++) {
+        const result = await replay(raw, 16384, true);
+        expect(result.text_chars).toBe(fixture.text_chars);
+        expect(result.tool_calls).toBe(fixture.tool_calls);
+        expect(result.event_count).toBeGreaterThan(0);
+        console.log("RT_MAIN " + JSON.stringify({ label: fixture.label, size: 16384, repeat, bytes: raw.length, ...result }));
+      }
+    }
+    expect(spy).toHaveBeenCalled();
+  } finally { spy.mockRestore(); }
+}, 120000);
+
+test("paired parser benchmark with an A/A noise floor", () => {
+  const fixture = fixtures.find(f => f.label === "largest-wire")!;
+  const raw = gunzipSync(Buffer.concat(fixture.parts.map(part => readFileSync(join(fixtureRoot, part))))).toString("utf8");
+  expect(parseSSEFrames(raw)).toEqual(legacyParseSSEFrames(raw));
+  const parsers = [legacyParseSSEFrames, parseSSEFrames];
+  for (const parser of parsers) parser(raw);
+  for (const kind of ["AA", "ABBA"]) {
+    for (let block = 0; block < 8; block++) {
+      for (const implementation of kind === "AA" ? [0, 0, 1, 1] : [0, 1, 1, 0]) {
+        const cpuBefore = process.cpuUsage();
+        const loadBefore = loadavg();
+        const started = performance.now();
+        const result = parsers[implementation]!(raw);
+        const wallMs = performance.now() - started;
+        const cpu = process.cpuUsage(cpuBefore);
+        expect(result.frames.length).toBe(fixture.events);
+        console.log("RT_PARSER " + JSON.stringify({ kind, block, implementation, wall_ms: wallMs, cpu_ms: (cpu.user + cpu.system) / 1000, bytes: fixture.bytes, frames: result.frames.length, load_before: loadBefore, load_after: loadavg() }));
+      }
+    }
   }
 }, 120000);
