@@ -125,6 +125,13 @@ that message's function calls, or before its text when it called none. A model
 or provider switch drops it. Requests with `store: true` and other providers
 on the Responses wire are unchanged.
 
+With replay enabled and a non-`none` reasoning effort explicitly selected,
+an unset `reasoning_summary` requests `auto`. An explicit summary setting,
+including `none`, takes precedence. This is an opt-in experiment for preserving
+reasoning between tool steps, not a measured reduction in time or tokens.
+It can increase replayed input and retained history. Provider output limits
+still depend on what the backend accepts and enforces.
+
 Gemini project identity has one ordered surface: `GEMINI_PROJECT_ID` wins over
 `GOOGLE_CLOUD_PROJECT`. Other Google project-name aliases are not consumed.
 `GEMINI_AUTH_MODE` restricts resolution to exactly the named method and rejects

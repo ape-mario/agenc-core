@@ -128,6 +128,42 @@ function mkProvider(): LLMProvider {
   } as unknown as LLMProvider;
 }
 
+describe("reasoning summary default provenance", () => {
+  test.each([undefined, "none", "auto"] as const)("preserves whether %s was explicitly selected", (summary) => {
+    const provider = { ...mkProvider(), name: "openai" } as LLMProvider;
+    const sc: SessionConfiguration = {
+      ...mkSessionConfiguration(),
+      collaborationMode: { model: "gpt-6-luna", reasoningEffort: "max" },
+      ...(summary !== undefined ? { modelReasoningSummary: summary } : {}),
+    };
+    const ctx = buildTurnContext({
+      config: { ...mkConfig(), model: "gpt-6-luna" },
+      sessionConfiguration: sc,
+      modelInfo: {
+        ...mkModelInfo(), slug: "gpt-6-luna", defaultReasoningSummary: "none",
+        supportedReasoningLevels: ["none", "low", "medium", "high", "max"],
+      },
+      provider,
+      subId: "summary-default-test",
+      conversationId: "summary-default-conversation",
+    });
+    expect(ctx.reasoningSummary).toBe(summary ?? "none");
+    expect(ctx.reasoningSummaryIsDefault).toBe(summary === undefined ? true : undefined);
+    const messages = [{ role: "user" as const, content: "solve" }];
+    const options = buildProviderOptions({
+      input: messages, tools: [], baseInstructions: "", maxOutputTokens: 8192,
+    }, ctx, new AbortController().signal, {
+      services: { provider }, sessionConfiguration: sc,
+    } as unknown as Session);
+    const wire = buildOpenAIResponsesRequest({
+      model: "gpt-6-luna", messages, tools: [], options, reasoningReplayProvider: "openai",
+    });
+    expect(wire.reasoning).toEqual({
+      effort: "max", ...(summary === "none" ? {} : { summary: "auto" }),
+    });
+  });
+});
+
 function mkNetworkProxy(): NetworkProxy {
   return {
     httpsProxy: "http://127.0.0.1:9050",
