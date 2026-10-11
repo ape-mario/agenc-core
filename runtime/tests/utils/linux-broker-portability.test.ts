@@ -68,7 +68,8 @@ describe.runIf(process.platform === "linux" && process.arch === "x64")("portable
     expect(() => portableBrokerDockerArgs("/runtime,other", "/out")).toThrow("commas");
   });
   it("builds the unchanged broker source with sealed namespace init and explicit PIE", () => {
-    const output = temporary();
+    // The native sealed-init admission intentionally requires a dist directory.
+    const output = join(temporary(), "dist");
     buildLinuxProcessBroker(resolve(import.meta.dirname, "../.."), output);
     const broker = join(output, "agenc-process-broker");
     expect(childProcess.execFileSync(broker, ["--describe-protocol-v3"], { encoding: "utf8" })).toContain("sealed-static-init-ro-artifact-v1");
