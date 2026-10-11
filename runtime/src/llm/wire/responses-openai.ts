@@ -63,6 +63,13 @@ export interface OpenAIResponsesRequestOptions {
    * requests only: a stored response keeps its reasoning server side.
    */
   readonly reasoningReplayProvider?: string;
+  /**
+   * The item id the provider issued for a call id (see
+   * `responses-function-call-ids.ts`). A `function_call` history item carries
+   * the id this returns and no id when it returns none; the wire never
+   * invents one.
+   */
+  readonly functionCallItemId?: (callId: string) => string | undefined;
 }
 
 // A type alias rather than an interface so an item is a plain wire record.
@@ -181,33 +188,34 @@ function positiveInteger(value: number | undefined): number | undefined {
   return normalized > 0 ? normalized : undefined;
 }
 
-function normalizeFunctionCallId(toolCallId: string | undefined): {
-  readonly id: string;
-  readonly callId: string;
-} {
+/**
+ * The `call_id` a history item answers. A tool call id that is itself an
+ * item id (`fc_...`, kept when a provider omitted `call_id`) maps to the call
+ * id derived from it, as before.
+ */
+function normalizeFunctionCallCallId(toolCallId: string | undefined): string {
   const value = (toolCallId ?? "").trim();
-  if (!value) {
-    return {
-      id: "fc_unknown",
-      callId: "call_unknown",
-    };
-  }
-  if (value.startsWith("call_")) {
-    return {
-      id: `fc_${value.slice("call_".length)}`,
-      callId: value,
-    };
-  }
-  if (value.startsWith("fc_")) {
-    return {
-      id: value,
-      callId: `call_${value.slice("fc_".length)}`,
-    };
-  }
-  return {
-    id: `fc_${value}`,
-    callId: value,
-  };
+  if (!value) return "call_unknown";
+  if (value.startsWith("fc_")) return `call_${value.slice("fc_".length)}`;
+  return value;
+}
+
+/**
+ * The item id a `function_call` history item carries: one the provider
+ * issued, or none. It is never derived from the call id, because such an id
+ * names an item the provider did not issue (see
+ * `responses-function-call-ids.ts` for what that costs).
+ */
+function issuedFunctionCallItemId(
+  input: OpenAIResponsesRequestOptions,
+  toolCallId: string | undefined,
+  callId: string,
+): string | undefined {
+  const value = (toolCallId ?? "").trim();
+  // A provider that omitted call_id left its own item id as the tool call id.
+  if (value.startsWith("fc_")) return value;
+  const id = input.functionCallItemId?.(callId);
+  return typeof id === "string" && id.length > 0 ? id : undefined;
 }
 
 
@@ -419,11 +427,12 @@ export function buildOpenAIResponsesRequest(
       }
       if (toolCalls.length > 0) responseInput.push(...reasoning);
       for (const toolCall of toolCalls) {
-        const normalizedId = normalizeFunctionCallId(toolCall.id);
+        const callId = normalizeFunctionCallCallId(toolCall.id);
+        const itemId = issuedFunctionCallItemId(input, toolCall.id, callId);
         responseInput.push({
           type: "function_call",
-          id: normalizedId.id,
-          call_id: normalizedId.callId,
+          ...(itemId !== undefined ? { id: itemId } : {}),
+          call_id: callId,
           // Internal `mcp.<server>.<tool>` form has dots; the
           // strict-regex `function_call.name` rejects them. Encode at
           // the wire boundary; the response parser decodes back.
@@ -437,7 +446,7 @@ export function buildOpenAIResponsesRequest(
     if (message.role === "tool") {
       responseInput.push({
         type: "function_call_output",
-        call_id: normalizeFunctionCallId(message.toolCallId).callId,
+        call_id: normalizeFunctionCallCallId(message.toolCallId),
         output: toResponsesToolOutput(message.content),
       });
       continue;

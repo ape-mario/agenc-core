@@ -78,7 +78,6 @@ const assistant = (text: string) => ({
 });
 const call = (id: string, path: string) => ({
   type: "function_call",
-  id: `fc_${id}`,
   call_id: `call_${id}`,
   name: "read",
   arguments: JSON.stringify({ path }),

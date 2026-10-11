@@ -78,6 +78,7 @@ import {
   parseOpenAIResponsesResponse,
   parseOpenAIResponsesUsage,
 } from "../../wire/responses-openai.js";
+import { responsesFunctionCallItemIds } from "../../wire/responses-function-call-ids.js";
 import { assertKimiRequestPayloadSize } from "../../wire/kimi-contract.js";
 import {
   assertProviderStructuredOutputCompatibility,
@@ -984,6 +985,7 @@ export class OpenAIProvider implements LLMProvider {
             wireApi: "responses",
           });
           const reasoningReplay = this.reasoningReplayOptions();
+          const functionCallItemId = this.functionCallItemIdOptions();
           const request = buildOpenAIResponsesRequest({
             model,
             messages,
@@ -993,6 +995,7 @@ export class OpenAIProvider implements LLMProvider {
             maxOutputTokens: this.resolveRequestMaxTokens(options),
             ...(this.isChatGptBackend() ? { chatgptBackend: true as const } : {}),
             ...reasoningReplay,
+            ...functionCallItemId,
           });
           const response = await session.requestJson<Record<string, unknown>>({
             api: "responses",
@@ -1010,6 +1013,10 @@ export class OpenAIProvider implements LLMProvider {
           }).catch(error => {
             throw this.initialHttpRejection(error, options?.singleWireAttempt);
           });
+          responsesFunctionCallItemIds.rememberAll(
+            this.name,
+            response.data.output,
+          );
           return parseOpenAIResponsesResponse(
             model,
             response.data,
@@ -1021,6 +1028,7 @@ export class OpenAIProvider implements LLMProvider {
               store: this.config.store,
               maxOutputTokens: this.resolveRequestMaxTokens(options),
               ...reasoningReplay,
+              ...functionCallItemId,
             },
           );
         }
@@ -1534,6 +1542,18 @@ export class OpenAIProvider implements LLMProvider {
       : {};
   }
 
+  /**
+   * History function calls go back with the item ids this provider issued
+   * for them (recorded as responses arrive), or with none.
+   */
+  private functionCallItemIdOptions(): {
+    readonly functionCallItemId: (callId: string) => string | undefined;
+  } {
+    return {
+      functionCallItemId: responsesFunctionCallItemIds.lookupFor(this.name),
+    };
+  }
+
   private managedRequestHeaders(
     options: LLMChatOptions | undefined,
   ): Readonly<Record<string, string>> | undefined {
@@ -1582,6 +1602,7 @@ export class OpenAIProvider implements LLMProvider {
       maxOutputTokens: this.resolveRequestMaxTokens(options),
       ...(this.isChatGptBackend() ? { chatgptBackend: true as const } : {}),
       ...this.reasoningReplayOptions(),
+      ...this.functionCallItemIdOptions(),
     };
     assertProviderStructuredOutputCompatibility({
       providerName: this.name,
@@ -1712,6 +1733,8 @@ export class OpenAIProvider implements LLMProvider {
               // A done item can still belong to an output-limited response.
               // Wait for the terminal status before validating or publishing it.
               streamedFunctionItems.push(item);
+              // Keep the issued item id for the call's next appearance in history.
+              responsesFunctionCallItemIds.remember(this.name, item);
               const id = String(item.call_id ?? item.id ?? "").trim();
               const name = String(item.name ?? "").trim();
               const args = String(item.arguments ?? "");
@@ -1886,6 +1909,7 @@ export class OpenAIProvider implements LLMProvider {
       }
       const terminalOutput = Array.isArray(completedResponse.output)
         ? completedResponse.output as Record<string, unknown>[] : [];
+      responsesFunctionCallItemIds.rememberAll(this.name, terminalOutput);
       // Some Responses backends omit streamed items in the terminal payload.
       // Preserve their identities for recovery as well as completed calls.
       const responseWithStreamedCalls = {
