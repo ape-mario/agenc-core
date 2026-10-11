@@ -20,6 +20,14 @@ it("rejects invalid choices without saving", async () => {
   expect(await budgetCommand.execute(context("bad"))).toMatchObject({ kind: "error" });
   expect(mocks.update).not.toHaveBeenCalled();
 });
+it("reports an unavailable live allocation when the session has no config", async () => {
+  const ctx = { argsRaw: "", configStore: {}, session: {} } as SlashCommandContext;
+  expect(await budgetCommand.execute(ctx)).toMatchObject({
+    kind: "text",
+    text: expect.stringContaining("Current session budget: unavailable"),
+  });
+  expect(mocks.update).not.toHaveBeenCalled();
+});
 it("reports failed saves", async () => {
   mocks.update.mockResolvedValueOnce({ error: new Error("read-only") });
   expect(await budgetCommand.execute(context("balanced"))).toMatchObject({ kind: "error", message: expect.stringContaining("read-only") });

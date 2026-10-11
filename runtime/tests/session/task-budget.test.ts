@@ -32,6 +32,16 @@ describe("task allocation", () => {
     expect(taskBudgetOf(session({ taskTokenBudget: 0, taskMaxCalls: 0 }))).toBeUndefined();
     expect(taskBudgetOf(session({ taskTokenBudget: 0, taskMaxCalls: 2 }))).toMatchObject({ limit: undefined, maxCalls: 2 });
     expect(taskBudgetOf(session({ taskTokenBudget: 5, taskMaxCalls: 0 }))).toMatchObject({ limit: 5, maxCalls: undefined });
+    expect(taskBudgetOf({ services: {} } as Session)).toBeUndefined();
+  });
+  it("latches after an explicit stop so a kernel denial cannot dispatch another local call", async () => {
+    const b = new TaskBudget(1000);
+    b.stop();
+    expect(b.reached).toBe(true);
+    expect(b.tokens).toBe(0);
+    let called = false;
+    await expect(b.invoke(1, async () => { called = true; return response(); })).rejects.toThrow("Task budget");
+    expect(called).toBe(false);
   });
   it.each([-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])("rejects invalid config budget %s", value => {
     for (const key of ["task_token_budget", "task_max_calls"] as const) {
