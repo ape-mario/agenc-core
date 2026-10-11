@@ -62,10 +62,17 @@ async function replay(raw: Uint8Array, size: number, full: boolean, listeners = 
   queued.clear();
   const chunks = split(raw, size);
   const chunkDwell: number[] = [];
+  const chunkCpu: number[] = [];
   const callbackDwell: number[] = [];
   let delivered = 0, mark: number | undefined;
+  let cpuMark: ReturnType<typeof process.cpuUsage> | undefined;
   const finishChunk = () => {
-    if (mark !== undefined) { chunkDwell.push(performance.now() - mark); mark = undefined; }
+    if (mark !== undefined) {
+      chunkDwell.push(performance.now() - mark);
+      const cpu = process.cpuUsage(cpuMark);
+      chunkCpu.push((cpu.user + cpu.system) / 1000);
+      mark = undefined;
+    }
   };
   let fetches = 0;
   const fetchImpl: typeof fetch = async () => {
@@ -75,6 +82,7 @@ async function replay(raw: Uint8Array, size: number, full: boolean, listeners = 
         finishChunk();
         if (delivered === chunks.length) { controller.close(); return; }
         mark = performance.now();
+        cpuMark = process.cpuUsage();
         controller.enqueue(chunks[delivered++]!);
       },
       cancel() { finishChunk(); },
@@ -127,7 +135,7 @@ async function replay(raw: Uint8Array, size: number, full: boolean, listeners = 
     const cpu = process.cpuUsage(cpuBefore);
     expect(fetches).toBe(1);
     return { wall_ms: wallMs, cpu_ms: (cpu.user + cpu.system) / 1000, cpu_user_ms: cpu.user / 1000, cpu_system_ms: cpu.system / 1000,
-      load_before: loadBefore, load_after: loadavg(), chunks: quantiles(chunkDwell), callbacks: quantiles(callbackDwell), callback_count: callbackCount,
+      load_before: loadBefore, load_after: loadavg(), chunks: quantiles(chunkDwell), chunk_cpu: quantiles(chunkCpu), callbacks: quantiles(callbackDwell), callback_count: callbackCount,
       flushes, flush_ms: flushMs, event_count: events.length, durable_events: events.filter(isDurableEvent).length, emitted_bytes: emittedBytes,
       text_chars: content.length, tool_calls: tools, queued_calls: queued.size };
   } finally {
@@ -178,8 +186,8 @@ function syntheticScale(deltas: number, argumentChars: number) {
 
 test("Pi-sized synthetic argument streams use only Light code", async () => {
   for (const multiplier of [.25, .5, 1, 2]) {
-    const raw = syntheticScale(Math.round(10574 * multiplier), Math.round(42000 * multiplier));
-    for (const size of [1024, 16384, 65536]) {
+    const raw = syntheticScale(Math.round(10574 * multiplier), Math.round(32376 * multiplier));
+    for (const size of [1024, 16384, 65536, raw.length]) {
       for (let repeat = 0; repeat < 3; repeat++) {
         const result = await replay(raw, size, true);
         expect(result.tool_calls).toBe(1);
