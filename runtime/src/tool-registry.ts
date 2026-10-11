@@ -107,6 +107,11 @@ import {
 } from "./tools/router.js";
 import { resolvePerToolConfig, toolConfigAllowsTool } from "./tools/config.js";
 import {
+  sessionToolPolicyAllowsTool,
+  toolPolicyRefusalMessage,
+  type SessionToolPolicy,
+} from "./permissions/session-tool-policy.js";
+import {
   attachSandboxExecutionBroker,
   type SandboxExecutionBrokerLike,
 } from "./sandbox/execution-broker.js";
@@ -168,6 +173,12 @@ export interface ToolRegistry {
   ): Promise<ToolDispatchResult>;
   getDiscoveredToolNames?(): ReadonlySet<string>;
   discoverToolNames?(toolNames: readonly string[]): void;
+  /**
+   * The session's fixed tool allowlist, when it has one. Tools outside it were
+   * never built, so they are in neither `tools` nor dispatch; routers use this
+   * to answer a call to one with an explicit refusal.
+   */
+  readonly toolPolicy?: SessionToolPolicy;
 }
 
 /**
@@ -637,6 +648,14 @@ export interface BuildToolRegistryOptions {
    */
   readonly toolsConfig?: ToolsConfig;
   /**
+   * Session tool policy (`agent.create` `toolPolicy`). Tools outside
+   * `enabledTools` are never built, so they are absent from the model-visible
+   * catalog and from dispatch by name, whatever `toolsConfig` says. It composes
+   * with `toolsConfig` by intersection: a tool must pass both. Its
+   * `deferMcpTools` takes precedence over the option of the same name.
+   */
+  readonly toolPolicy?: SessionToolPolicy;
+  /**
    * `[providers.grok]` capability profile. Passed through to model-facing
    * LIVE tools (XSearch) so Pattern A one-shots can gate on config.
    */
@@ -1025,6 +1044,7 @@ export function buildToolRegistry(
     },
   ]);
   function applyConfiguredTool(tool: Tool): Tool | null {
+    if (!sessionToolPolicyAllowsTool(options.toolPolicy, tool.name)) return null;
     if (!toolConfigAllowsTool(options.toolsConfig, tool.name)) return null;
     const config = resolvePerToolConfig(options.toolsConfig, tool.name);
     if (config.defaultPermissionMode === undefined) return tool;
@@ -1073,6 +1093,8 @@ export function buildToolRegistry(
   );
   const staticTools: Tool[] = [...defaultBuiltinTools, ...extraTools];
 
+  const deferMcpTools = options.toolPolicy?.deferMcpTools ?? options.deferMcpTools ?? true;
+
   // T7: tag each registered tool with its ConcurrencyClass + flags.
   // Tools without explicit metadata get sensible defaults:
   //   - readFile/listDir/stat/glob/grep → SharedRead + isReadOnly
@@ -1089,7 +1111,7 @@ export function buildToolRegistry(
           withMetadata(tool, {
             source: "mcp",
             family: "mcp",
-            deferred: options.deferMcpTools ?? true,
+            deferred: deferMcpTools,
           }),
           serverId ? { serverId } : {},
         );
@@ -1229,6 +1251,7 @@ export function buildToolRegistry(
       ...(options.parallelMcpServerNames !== undefined
         ? { parallelMcpServerNames: options.parallelMcpServerNames }
         : {}),
+      ...(options.toolPolicy !== undefined ? { toolPolicy: options.toolPolicy } : {}),
     });
   }
 
@@ -1254,7 +1277,11 @@ export function buildToolRegistry(
         (options.lightMode === true
           ? (lightEditsWithApplyPatch(options.getSession?.()?.services?.provider?.name)
             ? LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES : LIGHT_INITIAL_TOOL_NAMES).has(spec.tool.name) ||
-            (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined)
+            (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined) ||
+            // A policy that opts out of MCP deferral wants its allowlisted MCP
+            // tools in front of the model with no search step; Light mode is
+            // the small-model profile that most needs that.
+            (deferMcpTools === false && spec.tool.metadata?.source === "mcp" && !isDeferredSpec(spec))
           : !isDeferredSpec(spec)) || discoveredToolNames.has(spec.tool.name),
     );
   }
@@ -1356,6 +1383,7 @@ export function buildToolRegistry(
   }
 
   return {
+    ...(options.toolPolicy !== undefined ? { toolPolicy: options.toolPolicy } : {}),
     get tools(): readonly Tool[] {
       return allSpecs().map((spec) => spec.tool);
     },
@@ -1389,6 +1417,9 @@ export function buildToolRegistry(
       const router = buildRouter();
       const spec = router.findSpec(toolCall.name);
       if (!spec) {
+        if (!sessionToolPolicyAllowsTool(options.toolPolicy, toolCall.name)) {
+          return { content: safeStringify({ error: toolPolicyRefusalMessage(toolCall.name) }), isError: true };
+        }
         if (dispatchOptions?.advertisedToolNames === undefined) {
           return { content: safeStringify({ error: `unknown tool: ${toolCall.name}` }), isError: true };
         }
@@ -1443,7 +1474,14 @@ export function buildToolRegistry(
       const router = buildRouter();
       const spec = router.findSpec(toolCall.name);
       if (!spec) {
-        return { content: safeStringify({ error: `unknown tool: ${toolCall.name}` }), isError: true };
+        return {
+          content: safeStringify({
+            error: sessionToolPolicyAllowsTool(options.toolPolicy, toolCall.name)
+              ? `unknown tool: ${toolCall.name}`
+              : toolPolicyRefusalMessage(toolCall.name),
+          }),
+          isError: true,
+        };
       }
       if (spec.unavailable === true) return unavailableToolResult(spec.tool.name);
       if (!canDirectDispatchFromCodeMode(spec.tool)) {

@@ -12632,3 +12632,137 @@ describe("managedTokenUsage shape bridging", () => {
     ).toEqual({ inputTokens: 7, outputTokens: 3, totalTokens: 10 });
   });
 });
+
+describe("session toolPolicy in the background runner", () => {
+  const POLICY = {
+    enabledTools: ["FileRead", "mcp.desktop.read_file"],
+    frozenPermissionMode: true,
+    deferMcpTools: false,
+  } as const;
+  const POLICY_METADATA = {
+    toolPolicy: {
+      enabledTools: [...POLICY.enabledTools],
+      frozenPermissionMode: true,
+      deferMcpTools: false,
+    },
+  };
+
+  function withCeilingSpy(harness: ReturnType<typeof makeTopLevelRunner>) {
+    const freezeModeCeiling = vi.fn();
+    Object.assign(harness.permissionModeRegistry, { freezeModeCeiling });
+    return freezeModeCeiling;
+  }
+
+  function bootstrapOptions(harness: ReturnType<typeof makeTopLevelRunner>) {
+    return (harness.bootstrap.mock.calls[0] as unknown as [
+      { toolRegistryOptions?: { toolPolicy?: unknown } },
+    ])[0];
+  }
+
+  it("builds the registry with the policy and keeps the session's mode while denying the rest", async () => {
+    const harness = makeTopLevelRunner({ conversationId: "session-policy-start" });
+    const freezeModeCeiling = withCeilingSpy(harness);
+
+    const started = await harness.runner.startAgent({
+      objective: "restricted task",
+      toolPolicy: POLICY,
+    } as never);
+
+    expect(bootstrapOptions(harness).toolRegistryOptions).toEqual({ toolPolicy: POLICY });
+    const context = harness.permissionModeRegistry.current();
+    // Nothing about approvals changed: the session is not turned unattended.
+    expect(context.mode).toBe("default");
+    expect(context.unattendedPolicy?.enabledTools).toEqual(POLICY.enabledTools);
+    expect(context.unattendedPolicy?.allowlist).toEqual([]);
+    expect(freezeModeCeiling).toHaveBeenCalledWith("default");
+    expect(started.toolPolicyModeCeiling).toBe("default");
+  });
+
+  it("leaves a session without a policy untouched", async () => {
+    const harness = makeTopLevelRunner({ conversationId: "session-no-policy" });
+    const freezeModeCeiling = withCeilingSpy(harness);
+    const started = await harness.runner.startAgent({ objective: "ordinary task" } as never);
+    expect(bootstrapOptions(harness)).not.toHaveProperty("toolRegistryOptions");
+    expect(harness.permissionModeRegistry.current().unattendedPolicy).toBeUndefined();
+    expect(freezeModeCeiling).not.toHaveBeenCalled();
+    expect(started).not.toHaveProperty("toolPolicyModeCeiling");
+  });
+
+  it("does not freeze a policy that does not ask for it", async () => {
+    const harness = makeTopLevelRunner({ conversationId: "session-policy-unfrozen" });
+    const freezeModeCeiling = withCeilingSpy(harness);
+    const started = await harness.runner.startAgent({
+      objective: "restricted task",
+      toolPolicy: { enabledTools: ["FileRead"] },
+    } as never);
+    expect(harness.permissionModeRegistry.current().unattendedPolicy?.enabledTools).toEqual(["FileRead"]);
+    expect(freezeModeCeiling).not.toHaveBeenCalled();
+    expect(started).not.toHaveProperty("toolPolicyModeCeiling");
+  });
+
+  it("restores the same policy and ceiling from the stored metadata", async () => {
+    const harness = makeTopLevelRunner({ conversationId: "session-policy-restore" });
+    const freezeModeCeiling = withCeilingSpy(harness);
+
+    await expect(
+      harness.runner.restoreAgent({
+        agentId: "session-policy-restore",
+        objective: "restricted task",
+        explicitColdResume: true,
+        metadata: { ...POLICY_METADATA, toolPolicyModeCeiling: "acceptEdits" },
+      }),
+    ).resolves.toBe(true);
+
+    expect(bootstrapOptions(harness).toolRegistryOptions).toEqual({ toolPolicy: POLICY });
+    expect(harness.permissionModeRegistry.current().unattendedPolicy?.enabledTools).toEqual(
+      POLICY.enabledTools,
+    );
+    // The recorded ceiling wins over the mode the session happens to restore in.
+    expect(freezeModeCeiling).toHaveBeenCalledWith("acceptEdits");
+  });
+
+  it("restores a session recorded without a policy exactly as before", async () => {
+    const harness = makeTopLevelRunner({ conversationId: "session-restore-no-policy" });
+    const freezeModeCeiling = withCeilingSpy(harness);
+    await expect(
+      harness.runner.restoreAgent({
+        agentId: "session-restore-no-policy",
+        objective: "ordinary task",
+        explicitColdResume: true,
+      }),
+    ).resolves.toBe(true);
+    expect(bootstrapOptions(harness)).not.toHaveProperty("toolRegistryOptions");
+    expect(harness.permissionModeRegistry.current().unattendedPolicy).toBeUndefined();
+    expect(freezeModeCeiling).not.toHaveBeenCalled();
+  });
+
+  it("fails the restore closed on a stored policy it cannot read, before bootstrapping", async () => {
+    const harness = makeTopLevelRunner({ conversationId: "session-policy-corrupt" });
+    await expect(
+      harness.runner.restoreAgent({
+        agentId: "session-policy-corrupt",
+        objective: "restricted task",
+        explicitColdResume: true,
+        metadata: { toolPolicy: { enabledTools: [] } },
+      }),
+    ).rejects.toThrow(/invalid toolPolicy/);
+    expect(harness.bootstrap).not.toHaveBeenCalled();
+    await expect(harness.runner.getAgentSnapshot("session-policy-corrupt")).resolves.toBeNull();
+  });
+
+  it("refuses a restore whose mode is already wider than the recorded ceiling", async () => {
+    const harness = makeTopLevelRunner({ conversationId: "session-policy-wide" });
+    withCeilingSpy(harness);
+    await harness.permissionModeRegistry.update(
+      createEmptyToolPermissionContext({ mode: "bypassPermissions", isBypassPermissionsModeAvailable: true }),
+    );
+    await expect(
+      harness.runner.restoreAgent({
+        agentId: "session-policy-wide",
+        objective: "restricted task",
+        explicitColdResume: true,
+        metadata: { ...POLICY_METADATA, toolPolicyModeCeiling: "default" },
+      }),
+    ).rejects.toThrow(/frozen by this session's toolPolicy/);
+  });
+});

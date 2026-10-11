@@ -1,0 +1,197 @@
+/**
+ * Session tool policy: a fixed tool allowlist chosen by the client that
+ * creates a daemon session (`agent.create` `toolPolicy`).
+ *
+ * The policy is enforced in three independent places so no single layer is
+ * the only thing between a model and a forbidden tool:
+ *   1. the tool registry never builds a tool outside `enabledTools`, so it is
+ *      absent from the model-visible catalog AND from dispatch by name;
+ *   2. the router refuses a call to such a name with an explicit message;
+ *   3. the permission evaluator denies it as a bypass-immune unattended-policy
+ *      rule (see `UnattendedPermissionPolicy.enabledTools`).
+ *
+ * It is persisted in the agent metadata under {@link TOOL_POLICY_METADATA_KEY}
+ * so a restored session keeps exactly the policy it was created with.
+ *
+ * @module
+ */
+
+import { isPermissionMode, type PermissionMode } from "./types.js";
+
+export interface SessionToolPolicy {
+  /**
+   * Exact dispatch names of the only tools the session may expose or run
+   * (built-in names such as `FileRead`, MCP names such as `mcp.<server>.<tool>`).
+   */
+  readonly enabledTools: readonly string[];
+  /**
+   * The session permission mode may never become wider than it was at
+   * creation, and permission rules / session-wide approvals that widen access
+   * are refused.
+   */
+  readonly frozenPermissionMode?: boolean;
+  /**
+   * Whether MCP tools stay behind `system.searchTools` discovery. `false`
+   * advertises the allowlisted MCP tools directly; omitted keeps the default.
+   */
+  readonly deferMcpTools?: boolean;
+}
+
+/** Metadata key under which a session's policy is persisted and restored. */
+export const TOOL_POLICY_METADATA_KEY = "toolPolicy";
+/** Metadata key for the permission-mode ceiling of a frozen session. */
+export const TOOL_POLICY_MODE_CEILING_METADATA_KEY = "toolPolicyModeCeiling";
+
+export const MAX_SESSION_TOOL_POLICY_TOOLS = 256;
+const MAX_SESSION_TOOL_NAME_LENGTH = 128;
+/**
+ * Dispatch names are letters, digits and `_ . : -`: dots namespace built-ins
+ * and MCP tools, colons appear in plugin-scoped MCP server ids.
+ */
+const SESSION_TOOL_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/u;
+
+const TOOL_POLICY_KEYS: ReadonlySet<string> = new Set([
+  "enabledTools",
+  "frozenPermissionMode",
+  "deferMcpTools",
+]);
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Describe the first problem with a candidate policy, or `undefined` when it
+ * is well formed: non-empty, well-formed names, no duplicates, known keys.
+ */
+export function sessionToolPolicyIssue(value: unknown): string | undefined {
+  if (!isPlainRecord(value)) return "must be an object";
+  for (const key of Object.keys(value)) {
+    if (!TOOL_POLICY_KEYS.has(key)) return `does not accept '${key}'`;
+  }
+  const { enabledTools, frozenPermissionMode, deferMcpTools } = value;
+  if (!Array.isArray(enabledTools)) return "enabledTools must be an array of strings";
+  if (enabledTools.length === 0) return "enabledTools must not be empty";
+  if (enabledTools.length > MAX_SESSION_TOOL_POLICY_TOOLS) {
+    return `enabledTools must have at most ${MAX_SESSION_TOOL_POLICY_TOOLS} entries`;
+  }
+  const seen = new Set<string>();
+  for (const name of enabledTools) {
+    if (typeof name !== "string") return "enabledTools must be an array of strings";
+    if (
+      name.length > MAX_SESSION_TOOL_NAME_LENGTH ||
+      !SESSION_TOOL_NAME_PATTERN.test(name)
+    ) {
+      return `enabledTools entry ${JSON.stringify(name.slice(0, 64))} is not a well-formed tool name`;
+    }
+    if (seen.has(name)) return `enabledTools lists ${JSON.stringify(name)} more than once`;
+    seen.add(name);
+  }
+  if (frozenPermissionMode !== undefined && typeof frozenPermissionMode !== "boolean") {
+    return "frozenPermissionMode must be a boolean";
+  }
+  if (deferMcpTools !== undefined && typeof deferMcpTools !== "boolean") {
+    return "deferMcpTools must be a boolean";
+  }
+  return undefined;
+}
+
+/** Copy a validated policy into its frozen canonical shape. */
+export function normalizeSessionToolPolicy(value: unknown): SessionToolPolicy {
+  const issue = sessionToolPolicyIssue(value);
+  if (issue !== undefined) throw new Error(`invalid toolPolicy: ${issue}`);
+  const policy = value as SessionToolPolicy;
+  return Object.freeze({
+    enabledTools: Object.freeze([...policy.enabledTools]),
+    ...(policy.frozenPermissionMode !== undefined
+      ? { frozenPermissionMode: policy.frozenPermissionMode }
+      : {}),
+    ...(policy.deferMcpTools !== undefined
+      ? { deferMcpTools: policy.deferMcpTools }
+      : {}),
+  });
+}
+
+/**
+ * Read the persisted policy out of agent metadata. An absent key means the
+ * session has no policy. A present but malformed one throws: dropping it
+ * would silently widen a restored session.
+ */
+export function sessionToolPolicyFromMetadata(
+  metadata: Readonly<Record<string, unknown>> | undefined,
+): SessionToolPolicy | undefined {
+  const raw = metadata?.[TOOL_POLICY_METADATA_KEY];
+  if (raw === undefined) return undefined;
+  return normalizeSessionToolPolicy(raw);
+}
+
+/**
+ * The permission-mode ceiling recorded for a frozen session. Absent means none
+ * was recorded; an unrecognized value throws so a restore cannot lose it.
+ */
+export function retainedToolPolicyModeCeiling(
+  metadata: Readonly<Record<string, unknown>> | undefined,
+): PermissionMode | undefined {
+  const raw = metadata?.[TOOL_POLICY_MODE_CEILING_METADATA_KEY];
+  if (raw === undefined) return undefined;
+  if (!isPermissionMode(raw)) {
+    throw new Error("invalid toolPolicy permission mode ceiling");
+  }
+  return raw;
+}
+
+export function sessionToolPolicyAllowsTool(
+  policy: SessionToolPolicy | undefined,
+  toolName: string,
+): boolean {
+  return policy === undefined || policy.enabledTools.includes(toolName);
+}
+
+/** Whether two policies grant exactly the same authority. */
+export function sameSessionToolPolicy(
+  left: SessionToolPolicy,
+  right: SessionToolPolicy,
+): boolean {
+  return (
+    left.frozenPermissionMode === right.frozenPermissionMode &&
+    left.deferMcpTools === right.deferMcpTools &&
+    left.enabledTools.length === right.enabledTools.length &&
+    left.enabledTools.every((name) => right.enabledTools.includes(name))
+  );
+}
+
+export function toolPolicyRefusalMessage(toolName: string): string {
+  return `tool ${JSON.stringify(toolName)} is not enabled for this session`;
+}
+
+// Higher rank = more authority. `plan` can only read; `dontAsk` refuses
+// whatever would ask; `default`/`unattended`/`bubble` ask or pause; the rest
+// run without asking for progressively more.
+const PERMISSION_MODE_RANK: Readonly<Record<PermissionMode, number>> = {
+  plan: 0,
+  dontAsk: 1,
+  default: 2,
+  unattended: 2,
+  bubble: 2,
+  acceptEdits: 3,
+  auto: 4,
+  bypassPermissions: 5,
+};
+
+/** Whether switching from `ceiling` to `target` would grant more authority. */
+export function isWiderPermissionMode(
+  target: PermissionMode,
+  ceiling: PermissionMode,
+): boolean {
+  return PERMISSION_MODE_RANK[target] > PERMISSION_MODE_RANK[ceiling];
+}
+
+export function frozenPermissionModeMessage(
+  target: string,
+  ceiling: string,
+): string {
+  return (
+    `permission mode is frozen by this session's toolPolicy: cannot switch to ` +
+    `${JSON.stringify(target)}, which is wider than ${JSON.stringify(ceiling)}`
+  );
+}

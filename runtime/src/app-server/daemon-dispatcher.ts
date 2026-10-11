@@ -98,6 +98,13 @@ import { normalizeDaemonClientEnvOverrides } from "./client-env-snapshot.js";
 import { MAX_SESSION_PERMISSION_RULE_UTF8_BYTES } from "../permissions/session-rule-buckets.js";
 import { PermissionRuleMutationPrecommitError } from "../permissions/permission-updates.js";
 import {
+  TOOL_POLICY_METADATA_KEY,
+  TOOL_POLICY_MODE_CEILING_METADATA_KEY,
+  normalizeSessionToolPolicy,
+  sessionToolPolicyIssue,
+  type SessionToolPolicy,
+} from "../permissions/session-tool-policy.js";
+import {
   validateAndDedupeAdditionalWorkingDirectoryInputs,
 } from "../contracts/additional-working-directories.js";
 import {
@@ -583,6 +590,8 @@ export interface AgenCDaemonDispatcherOptions {
     readonly setSessionHooksDisabled?: AgenCDaemonAgentManager["setSessionHooksDisabled"];
     readonly updateSessionGoal?: AgenCDaemonAgentManager["updateSessionGoal"];
     readonly getLiveSessionPermission?: AgenCDaemonAgentManager["getLiveSessionPermission"];
+    readonly getSessionToolPolicy?: AgenCDaemonAgentManager["getSessionToolPolicy"];
+    readonly peekRoutineSessionId?: AgenCDaemonAgentManager["peekRoutineSessionId"];
     readonly isLiveSessionToolCallExecuting?: AgenCDaemonAgentManager["isLiveSessionToolCallExecuting"];
   };
   readonly initializeAuthenticator?: (
@@ -715,6 +724,8 @@ export class AgenCDaemonJsonRpcDispatcher {
     readonly setSessionHooksDisabled?: AgenCDaemonAgentManager["setSessionHooksDisabled"];
     readonly updateSessionGoal?: AgenCDaemonAgentManager["updateSessionGoal"];
     readonly getLiveSessionPermission?: AgenCDaemonAgentManager["getLiveSessionPermission"];
+    readonly getSessionToolPolicy?: AgenCDaemonAgentManager["getSessionToolPolicy"];
+    readonly peekRoutineSessionId?: AgenCDaemonAgentManager["peekRoutineSessionId"];
     readonly isLiveSessionToolCallExecuting?: AgenCDaemonAgentManager["isLiveSessionToolCallExecuting"];
   };
   readonly #initializeAuthenticator:
@@ -1925,13 +1936,12 @@ export class AgenCDaemonJsonRpcDispatcher {
             },
           ),
         );
-      case "tool.approve":
-        return successResponse(
-          id,
-          await this.#agentManager.approveTool(
-            validateToolApproveParams(params),
-          ),
-        );
+      case "tool.approve": {
+        const validated = validateToolApproveParams(params);
+        const unbound = await this.#approverBindingError(id, connection, method, validated.sessionId);
+        if (unbound !== undefined) return unbound;
+        return successResponse(id, await this.#agentManager.approveTool(validated));
+      }
       case "tool.deny":
         return successResponse(
           id,
@@ -1942,13 +1952,12 @@ export class AgenCDaemonJsonRpcDispatcher {
           id,
           await this.#agentManager.cancelTool(validateToolCancelParams(params)),
         );
-      case "elicitation.respond":
-        return successResponse(
-          id,
-          await this.#agentManager.respondToElicitation(
-            validateElicitationRespondParams(params),
-          ),
-        );
+      case "elicitation.respond": {
+        const validated = validateElicitationRespondParams(params);
+        const unbound = await this.#approverBindingError(id, connection, method, validated.sessionId);
+        if (unbound !== undefined) return unbound;
+        return successResponse(id, await this.#agentManager.respondToElicitation(validated));
+      }
       case "permission.list":
         if (this.#agentManager.listPermissions === undefined) {
           return methodNotImplementedResponse(id, method);
@@ -2121,6 +2130,48 @@ export class AgenCDaemonJsonRpcDispatcher {
         ...validated,
         reviewer: trustedReviewer(connection.daemonSocketIdentity, ownClientId),
       }),
+    );
+  }
+
+  /**
+   * A session created with a `toolPolicy` belongs to the client that attached
+   * to it: a tool approval or an elicitation answer can unlock what the model
+   * does next, so it must come from a connection holding an attached client of
+   * that very session, as `session.resolveToolCall` already requires. Another
+   * local client that only knows the ids is refused.
+   *
+   * Sessions without a policy keep their historic behaviour, because
+   * `agenc permissions approve` answers a pending request from a connection
+   * that never attached. Remote connections are authorized by their own grant
+   * (remote/access.ts) and hold no tracked client ids.
+   */
+  async #approverBindingError(
+    id: RequestId,
+    connection: AgenCDaemonJsonRpcConnection,
+    method: "tool.approve" | "elicitation.respond",
+    sessionId: string,
+  ): Promise<AgenCDaemonResponse | undefined> {
+    if (connection.remoteAccess !== undefined) return undefined;
+    if (this.#agentManager.getSessionToolPolicy?.(sessionId) === undefined) return undefined;
+    // The caller may name the session or its agent; attachments are per session.
+    const candidates = new Set([
+      sessionId,
+      this.#agentManager.peekRoutineSessionId?.(sessionId) ?? sessionId,
+    ]);
+    for (const candidate of candidates) {
+      const attachedClientIds =
+        this.#clientMultiplexer === undefined
+          ? []
+          : await this.#clientMultiplexer.attachedClientIds(candidate);
+      if (connection.trackedClientIds.some((clientId) => attachedClientIds.includes(clientId))) {
+        return undefined;
+      }
+    }
+    return errorResponse(
+      id,
+      -32000,
+      `${method} requires a client attached to session ${sessionId} on this connection`,
+      { code: "SESSION_NOT_ATTACHED" },
     );
   }
 
@@ -3027,6 +3078,7 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
       "envOverrides",
       "runtimeOptions",
       "resumeSourceProof",
+      "toolPolicy",
     ],
     valueFields: [
       "taskTokenBudget",
@@ -3036,6 +3088,21 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
       "initialDisplayUserMessage",
     ],
   });
+  let toolPolicy: SessionToolPolicy | undefined;
+  if (validated.toolPolicy !== undefined) {
+    const issue = sessionToolPolicyIssue(validated.toolPolicy);
+    if (issue !== undefined) {
+      throw invalidParams(`agent.create param 'toolPolicy' ${issue}`);
+    }
+    toolPolicy = normalizeSessionToolPolicy(validated.toolPolicy);
+  }
+  // The daemon persists the policy in agent metadata under these keys; a
+  // client-supplied copy would be indistinguishable from the real one.
+  for (const key of [TOOL_POLICY_METADATA_KEY, TOOL_POLICY_MODE_CEILING_METADATA_KEY]) {
+    if (isPlainJsonObject(validated.metadata) && Object.hasOwn(validated.metadata, key)) {
+      throw invalidParams(`agent.create param 'metadata.${key}' is reserved; use the 'toolPolicy' param`);
+    }
+  }
   for (const key of ["taskTokenBudget", "taskMaxCalls"] as const) {
     const value = validated[key];
     if (value !== undefined &&
@@ -3219,6 +3286,7 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
     envOverrides,
     runtimeOptions,
     ...(addDirs !== undefined ? { addDirs } : {}),
+    ...(toolPolicy !== undefined ? { toolPolicy } : {}),
   } as AgentCreateParams;
 }
 

@@ -447,6 +447,67 @@ Required checks are unchanged and a verifier's PASS label cannot override a
 failing required command. Correcting the requirements requires an explicit
 new Goal; the frozen specification is not modified.
 
+#### Session tool policy (protocol 1.32)
+
+`agent.create` accepts an optional `toolPolicy` that fixes the tools a session
+may use. A client that opens a restricted session, for example a marketplace
+task that may only call a few tools from one MCP server, sends:
+
+```json
+{
+  "toolPolicy": {
+    "enabledTools": ["FileRead", "mcp.desktop.read_file", "mcp.desktop.submit_work"],
+    "frozenPermissionMode": true,
+    "deferMcpTools": false
+  }
+}
+```
+
+- `enabledTools` is required: non-empty, at most 256 exact dispatch names,
+  each matching `[A-Za-z0-9][A-Za-z0-9._:-]*` (at most 128 characters), no
+  duplicates. Built-ins use their dispatch name (`FileRead`); MCP tools use
+  `mcp.<server>.<tool>`. Anything else is a `-32602` invalid-params error. An older daemon
+  rejects the unknown `toolPolicy` param, so a client that needs the
+  restriction fails closed instead of running unrestricted.
+- A tool outside `enabledTools` is never built. It is absent from the
+  model-visible catalog and from `system.searchTools`, and a call to it by name
+  is refused with `tool "<name>" is not enabled for this session`. Role
+  allowlists and `spawn_agent` children start from this filtered set, so they
+  cannot reach a removed tool. MCP servers that connect later are filtered the
+  same way. The permission evaluator also denies every tool outside the list in
+  all modes, including `bypassPermissions`. `toolPolicy` composes with
+  `tools_config` by intersection.
+- Removing `system.searchTools` removes discovery. With the default deferred
+  MCP catalog (`deferMcpTools` omitted or `true`) the allowlisted MCP tools are
+  then unreachable, so a policy that omits `system.searchTools` should set
+  `deferMcpTools: false`. That advertises the allowlisted MCP tools directly,
+  with no search step, which also suits small models and Light mode.
+- `frozenPermissionMode: true` pins the session's permission mode at its mode
+  when created: it can narrow (for example to `plan`) and return, never widen.
+  `tool.approve` with `allowAllToolsForSession`, a wider `session.setPermissionMode`
+  (including `bypassPermissions`), and `session.permissions.mutateRule` calls
+  that could widen access (adding `allow`, removing `deny` or `ask`) answer
+  `INVALID_ARGUMENT`. The permission registry also refuses every other path to
+  a wider mode (ExitPlanMode, a restore override), so none can bypass those
+  checks.
+- The policy is stored in the agent's metadata, survives a daemon restart and a
+  resume, and cannot be changed afterwards. A resume that names a different
+  policy is refused; naming one for a session that had none restricts it from
+  then on. Stored policy that cannot be read fails the restore instead of
+  bringing the session back unrestricted.
+- For a session with a `toolPolicy`, `tool.approve` and `elicitation.respond`
+  must arrive on a connection that holds a client attached to that session,
+  the same rule `session.resolveToolCall` has. Another connection gets
+  `SESSION_NOT_ATTACHED`. `agent.create` does not attach: attach with
+  `agent.attach` or `session.attach` on the connection that will answer
+  prompts. Sessions without a policy, and remote connections (which carry their
+  own grant), are unchanged.
+- `session.shell.execute` runs the session's shell tool, so it answers
+  "not available" unless the policy lists it (`system.bash`, or `PowerShell` on
+  Windows).
+- `metadata.toolPolicy` and `metadata.toolPolicyModeCeiling` are reserved and
+  rejected in `agent.create`.
+
 #### Remote and Telegram methods
 
 These are **local management RPCs**, not methods that a paired browser or

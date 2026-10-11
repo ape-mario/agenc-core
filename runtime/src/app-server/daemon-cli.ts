@@ -265,6 +265,10 @@ import { classifyUntrustedToolResult, frameUntrustedToolHistoryMessages, frameUn
 import { logForDebugging } from "../utils/debug.js";
 
 import { installAgenCDaemonErrorLogSink } from "./daemon-error-log.js";
+import {
+  TOOL_POLICY_METADATA_KEY,
+  TOOL_POLICY_MODE_CEILING_METADATA_KEY,
+} from "../permissions/session-tool-policy.js";
 
 import { startHeapWatchdog } from "../services/heapWatchdog/heapWatchdog.js";
 import { scheduleDaemonCompileCacheFlush } from "../bin/compile-cache.js";
@@ -3319,6 +3323,15 @@ function recoveryMetadataForRun(
   return {
     ...(typeof run.metadata?.routineId === "string" ? { routineId: run.metadata.routineId } : {}),
     ...(typeof run.metadata?.routineRunId === "string" ? { routineRunId: run.metadata.routineRunId } : {}),
+    // The published agent's metadata is what later snapshots persist, so a
+    // session's tool policy has to survive the restart or the next snapshot
+    // would erase it.
+    ...(run.metadata?.[TOOL_POLICY_METADATA_KEY] !== undefined
+      ? { [TOOL_POLICY_METADATA_KEY]: run.metadata[TOOL_POLICY_METADATA_KEY] }
+      : {}),
+    ...(run.metadata?.[TOOL_POLICY_MODE_CEILING_METADATA_KEY] !== undefined
+      ? { [TOOL_POLICY_MODE_CEILING_METADATA_KEY]: run.metadata[TOOL_POLICY_MODE_CEILING_METADATA_KEY] }
+      : {}),
     ...(canonicalSource !== undefined
       ? {
           agentPath: canonicalSource.agentPath,
