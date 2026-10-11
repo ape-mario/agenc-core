@@ -425,8 +425,10 @@ export interface MarketplaceCliProtocolConfig {
   readonly adapter: ProtocolAdapterKind;
   /**
    * Trusted local path override for the `agenc-marketplace` binary.
-   * Resolution order: this value → `AGENC_MARKETPLACE_CLI` env →
-   * `node_modules/.bin/agenc-marketplace`. `npx` is never used.
+   * Resolution order: this value → `AGENC_MARKETPLACE_CLI` env → the
+   * installer's own `~/.agenc/bin/agenc-marketplace` (owned by the current
+   * user, not world-writable). The working directory is never searched and
+   * `npx` is never used.
    */
   readonly cli_path?: string;
 }

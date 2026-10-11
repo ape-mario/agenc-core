@@ -42,6 +42,26 @@ export const TOOL_POLICY_METADATA_KEY = "toolPolicy";
 /** Metadata key for the permission-mode ceiling of a frozen session. */
 export const TOOL_POLICY_MODE_CEILING_METADATA_KEY = "toolPolicyModeCeiling";
 
+/** Dispatch name of the tool that discovers deferred (MCP) tools. */
+export const SEARCH_TOOLS_TOOL_NAME = "system.searchTools";
+/** Dispatch name of the tool that loads skills. */
+export const SKILL_TOOL_NAME = "Skill";
+/**
+ * An `enabledTools` entry `Skill:<name>` explicitly enables the one bundled
+ * skill `<name>`. A bundled skill ships inside the runtime; a session with a
+ * policy offers none of them unless it is named this way, and the `Skill`
+ * tool itself must be enabled too.
+ */
+export const BUNDLED_SKILL_ENTRY_PREFIX = "Skill:";
+/**
+ * Bundled skills that no policy can enable. The kit installer tells the model
+ * to download and run an installer script, which a session working through
+ * untrusted content must never be able to reach.
+ */
+export const NEVER_ENABLED_BUNDLED_SKILLS: readonly string[] = Object.freeze([
+  "agenc-marketplace-kit-installer",
+]);
+
 export const MAX_SESSION_TOOL_POLICY_TOOLS = 256;
 const MAX_SESSION_TOOL_NAME_LENGTH = 128;
 /**
@@ -92,6 +112,31 @@ export function sessionToolPolicyIssue(value: unknown): string | undefined {
   }
   if (deferMcpTools !== undefined && typeof deferMcpTools !== "boolean") {
     return "deferMcpTools must be a boolean";
+  }
+  const tools = enabledTools as readonly string[];
+  const enabledSkills = tools.filter((name) => name.startsWith(BUNDLED_SKILL_ENTRY_PREFIX));
+  for (const entry of enabledSkills) {
+    const skill = entry.slice(BUNDLED_SKILL_ENTRY_PREFIX.length);
+    if (skill.length === 0) return `enabledTools entry ${JSON.stringify(entry)} names no skill`;
+    if (NEVER_ENABLED_BUNDLED_SKILLS.includes(skill)) {
+      return `enabledTools entry ${JSON.stringify(entry)} is not allowed: that skill can never be enabled for a session with a toolPolicy`;
+    }
+  }
+  if (enabledSkills.length > 0 && !tools.includes(SKILL_TOOL_NAME)) {
+    return `enabledTools lists ${JSON.stringify(enabledSkills[0])} but not ${JSON.stringify(SKILL_TOOL_NAME)}, so no skill could be loaded`;
+  }
+  // MCP tools behind deferral are reached only through `system.searchTools`.
+  // A policy that defers them, or that leaves deferral at its default while
+  // naming MCP tools, and does not enable the search tool makes them
+  // unreachable: refuse it instead of creating a session that cannot work.
+  const defersMcpTools =
+    deferMcpTools === true ||
+    (deferMcpTools === undefined && tools.some((name) => name.startsWith("mcp.")));
+  if (defersMcpTools && !tools.includes(SEARCH_TOOLS_TOOL_NAME)) {
+    return (
+      `enabledTools must include ${JSON.stringify(SEARCH_TOOLS_TOOL_NAME)} when MCP tools are deferred, ` +
+      `or MCP tools could never be discovered; add it, or set deferMcpTools to false`
+    );
   }
   return undefined;
 }
@@ -146,6 +191,43 @@ export function sessionToolPolicyAllowsTool(
 ): boolean {
   return policy === undefined || policy.enabledTools.includes(toolName);
 }
+
+/**
+ * Whether a session may offer or run the bundled skill `skillName`. Without a
+ * policy every bundled skill is available. With one, a bundled skill needs an
+ * explicit `Skill:<name>` entry beside the `Skill` tool, and the kit installer
+ * is never available.
+ */
+export function sessionToolPolicyAllowsBundledSkill(
+  policy: SessionToolPolicy | undefined,
+  skillName: string,
+): boolean {
+  if (policy === undefined) return true;
+  if (NEVER_ENABLED_BUNDLED_SKILLS.includes(skillName)) return false;
+  return (
+    policy.enabledTools.includes(SKILL_TOOL_NAME) &&
+    policy.enabledTools.includes(`${BUNDLED_SKILL_ENTRY_PREFIX}${skillName}`)
+  );
+}
+
+export function bundledSkillRefusalMessage(skillName: string): string {
+  return `skill ${JSON.stringify(skillName)} is not enabled for this session`;
+}
+
+/**
+ * The `/claim`, `/delegate`, `/proof`, `/settle` and `/stake` commands and the
+ * marketplace CLI adapter behind them run a local binary against marketplace
+ * data. A session with a policy has a fixed tool surface, so none of that is
+ * part of it.
+ */
+export function sessionToolPolicyAllowsProtocolCommands(
+  policy: SessionToolPolicy | undefined,
+): boolean {
+  return policy === undefined;
+}
+
+export const PROTOCOL_COMMANDS_REFUSAL_MESSAGE =
+  "AgenC protocol commands are not available in a session with a toolPolicy. No command was executed.";
 
 /** Whether two policies grant exactly the same authority. */
 export function sameSessionToolPolicy(

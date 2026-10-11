@@ -503,7 +503,17 @@ describe("AgenC daemon protocol surface", () => {
     const corpus: readonly unknown[] = [
       { enabledTools: ["FileRead"] },
       { enabledTools: ["FileRead", "mcp.desktop.read_file"], frozenPermissionMode: true, deferMcpTools: false },
+      { enabledTools: ["mcp.plugin:srv.tool-1"], deferMcpTools: false },
+      // MCP tools that deferral would leave unreachable, and the ways out.
       { enabledTools: ["mcp.plugin:srv.tool-1"] },
+      { enabledTools: ["FileRead"], deferMcpTools: true },
+      { enabledTools: ["FileRead", "system.searchTools"], deferMcpTools: true },
+      { enabledTools: ["mcp.plugin:srv.tool-1", "system.searchTools"] },
+      // Bundled skills: Skill:<name> needs the Skill tool, and the installer is never allowed.
+      { enabledTools: ["Skill", "Skill:browser-automation"] },
+      { enabledTools: ["FileRead", "Skill:browser-automation"] },
+      { enabledTools: ["Skill", "Skill:"] },
+      { enabledTools: ["Skill", "Skill:agenc-marketplace-kit-installer"] },
       { enabledTools: [] },
       { enabledTools: ["FileRead", "FileRead"] },
       { enabledTools: ["File Read"] },
@@ -525,6 +535,15 @@ describe("AgenC daemon protocol surface", () => {
         sessionToolPolicyIssue(candidate) === undefined,
       );
     }
+    // The cross-field rules are published, not only enforced by the daemon.
+    expect(validatePolicy({ enabledTools: ["mcp.plugin:srv.tool-1"] })).toBe(false);
+    expect(validatePolicy({ enabledTools: ["FileRead"], deferMcpTools: true })).toBe(false);
+    expect(validatePolicy({ enabledTools: ["mcp.plugin:srv.tool-1", "system.searchTools"] })).toBe(true);
+    expect(validatePolicy({ enabledTools: ["Skill", "Skill:browser-automation"] })).toBe(true);
+    expect(validatePolicy({ enabledTools: ["FileRead", "Skill:browser-automation"] })).toBe(false);
+    expect(
+      validatePolicy({ enabledTools: ["Skill", "Skill:agenc-marketplace-kit-installer"] }),
+    ).toBe(false);
     expect(validateCreate({ cwd: "/work", toolPolicy: { enabledTools: ["FileRead"] } })).toBe(true);
     expect(validateCreate({ cwd: "/work", toolPolicy: { enabledTools: [] } })).toBe(false);
     expect(MAX_SESSION_TOOL_POLICY_TOOLS).toBe(256);

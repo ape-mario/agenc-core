@@ -477,11 +477,38 @@ task that may only call a few tools from one MCP server, sends:
   same way. The permission evaluator also denies every tool outside the list in
   all modes, including `bypassPermissions`. `toolPolicy` composes with
   `tools_config` by intersection.
-- Removing `system.searchTools` removes discovery. With the default deferred
-  MCP catalog (`deferMcpTools` omitted or `true`) the allowlisted MCP tools are
-  then unreachable, so a policy that omits `system.searchTools` should set
-  `deferMcpTools: false`. That advertises the allowlisted MCP tools directly,
-  with no search step, which also suits small models and Light mode.
+- Removing `system.searchTools` removes discovery, and with the default
+  deferred MCP catalog the allowlisted MCP tools would then be unreachable. So
+  a policy that defers MCP tools must list `system.searchTools`: `agent.create`
+  answers `-32602` when `deferMcpTools` is `true`, or omitted while `enabledTools`
+  names an `mcp.` tool, and `system.searchTools` is missing. Set
+  `deferMcpTools: false` to advertise the allowlisted MCP tools directly with no
+  search step, which also suits small models and Light mode. A policy that names
+  no MCP tool and leaves `deferMcpTools` omitted needs no search tool.
+- Bundled skills are skills that ship inside the daemon, such as
+  `browser-automation`. A session with a `toolPolicy` is offered none of them
+  unless `enabledTools` lists the `Skill` tool and names each skill as
+  `Skill:<name>`:
+
+  ```json
+  { "enabledTools": ["FileRead", "Skill", "Skill:browser-automation"] }
+  ```
+
+  A `Skill:<name>` entry without `Skill` is refused at `agent.create`. A skill
+  that is not named is absent from the per-session skill listing and from
+  `/skills`, and `Skill(<name>)` answers `skill "<name>" is not enabled for this
+  session`; the permission check denies it as well. `agenc-marketplace-kit-installer`
+  can never be enabled: it tells the model to download and run an installer, so
+  `Skill:agenc-marketplace-kit-installer` is refused at `agent.create` and the
+  skill is withheld even from a hand-built policy. A policy without the `Skill`
+  tool gets no skill listing at all. Skills that live in the workspace, the
+  user's home or a plugin are not bundled and follow the `Skill` tool as before.
+- The protocol slash commands `/claim`, `/delegate`, `/proof`, `/settle` and
+  `/stake` are unavailable in a session with a `toolPolicy`. They answer
+  `AgenC protocol · <verb>: AgenC protocol commands are not available in a
+  session with a toolPolicy. No command was executed.` before reading config or
+  starting any process, whatever the operator's `[protocol]` block says, so the
+  marketplace CLI adapter behind them never runs in such a session.
 - `frozenPermissionMode: true` pins the session's permission mode at its mode
   when created: it can narrow (for example to `plan`) and return, never widen.
   `tool.approve` with `allowAllToolsForSession`, a wider `session.setPermissionMode`

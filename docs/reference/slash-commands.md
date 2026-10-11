@@ -239,7 +239,7 @@ an unclassified path, or the journal predates that attestation. Operator detail:
 | Topic | Fact |
 | --- | --- |
 | Surfaces | Some commands declare `supportedSurfaces` (e.g. `/hooks` → `runtime`, `daemon-tui`); default is all surfaces when omitted |
-| Protocol verbs | Default: honest stub unless `[protocol] enabled = true` + `adapter = "marketplace-cli"`; mutating verbs stay owner-gated |
+| Protocol verbs | Default: honest stub unless `[protocol] enabled = true` + `adapter = "marketplace-cli"`; mutating verbs stay owner-gated. Never available in a session created with a `toolPolicy` (they refuse before any process starts) |
 | `/provider` vs config | Slash name `/provider`; persisted field `model_provider` |
 | Help groups | Presentation metadata in `runtime/src/commands/help-groups.ts` |
 | Plugin-added commands | Plugins can register additional commands outside this minimal registry (see [skills-plugins.md](skills-plugins.md)) |

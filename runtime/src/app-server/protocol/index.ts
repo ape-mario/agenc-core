@@ -1451,7 +1451,17 @@ export interface AgentRuntimeOptionsParams extends JsonObject {
  * cannot be changed after creation.
  */
 export interface AgentToolPolicy extends JsonObject {
-  /** Non-empty, well-formed, without duplicates. */
+  /**
+   * Non-empty, well-formed, without duplicates. Two rules apply:
+   * - Bundled skills (the ones that ship inside the daemon) are offered only
+   *   when named `Skill:<name>` beside `Skill`. `Skill:` entries without
+   *   `Skill` are refused, and `Skill:agenc-marketplace-kit-installer` is
+   *   always refused. The slash commands `/claim`, `/delegate`, `/proof`,
+   *   `/settle` and `/stake` are never available in such a session.
+   * - MCP tools behind deferral are reached only through
+   *   `system.searchTools`, so a policy that defers them (`deferMcpTools: true`,
+   *   or omitted while an `mcp.` tool is listed) must list it too.
+   */
   readonly enabledTools: readonly string[];
   /**
    * The session's permission mode may not become wider than it is at

@@ -9,14 +9,18 @@ import { freshDenialTracking } from "../../src/permissions/denial-tracking.js";
 import {
   PermissionModeRegistry,
 } from "../../src/permissions/permission-mode.js";
+import { AGENC_MARKETPLACE_KIT_INSTALLER_SKILL } from "../../src/skills/bundled/agencMarketplaceKitInstaller.js";
 import {
   MAX_SESSION_TOOL_POLICY_TOOLS,
+  NEVER_ENABLED_BUNDLED_SKILLS,
   TOOL_POLICY_METADATA_KEY,
   TOOL_POLICY_MODE_CEILING_METADATA_KEY,
   isWiderPermissionMode,
   normalizeSessionToolPolicy,
   retainedToolPolicyModeCeiling,
   sameSessionToolPolicy,
+  sessionToolPolicyAllowsBundledSkill,
+  sessionToolPolicyAllowsProtocolCommands,
   sessionToolPolicyAllowsTool,
   sessionToolPolicyFromMetadata,
   sessionToolPolicyIssue,
@@ -63,6 +67,64 @@ describe("sessionToolPolicyIssue", () => {
     [{ enabledTools: ["FileRead"], extra: true }, "does not accept 'extra'"],
   ])("rejects %j", (value, fragment) => {
     expect(sessionToolPolicyIssue(value)).toContain(fragment);
+  });
+
+  describe("MCP tools that deferral would leave unreachable", () => {
+    const SEARCH = "system.searchTools";
+
+    it("rejects a policy that defers MCP tools without the search tool", () => {
+      for (const policy of [
+        { enabledTools: ["FileRead"], deferMcpTools: true },
+        // Deferral is the default, so naming an MCP tool defers it.
+        { enabledTools: ["FileRead", "mcp.desktop.read_file"] },
+        { enabledTools: ["mcp.desktop.read_file"], deferMcpTools: true },
+      ]) {
+        const issue = sessionToolPolicyIssue(policy);
+        expect(issue, JSON.stringify(policy)).toContain(`must include "${SEARCH}"`);
+        expect(issue).toContain("deferMcpTools");
+        expect(() => normalizeSessionToolPolicy(policy)).toThrow(/invalid toolPolicy/);
+      }
+    });
+
+    it("accepts the search tool, direct MCP tools, and policies with no MCP tools", () => {
+      for (const policy of [
+        { enabledTools: ["FileRead", "mcp.desktop.read_file", SEARCH] },
+        { enabledTools: ["FileRead", SEARCH], deferMcpTools: true },
+        { enabledTools: ["FileRead", "mcp.desktop.read_file"], deferMcpTools: false },
+        // Nothing MCP-shaped is named and deferral is left at its default.
+        { enabledTools: ["FileRead"] },
+        { enabledTools: ["FileRead"], deferMcpTools: false },
+      ]) {
+        expect(sessionToolPolicyIssue(policy), JSON.stringify(policy)).toBeUndefined();
+      }
+    });
+
+    it("refuses a stored policy that violates it, so a restore cannot lose the check", () => {
+      expect(() =>
+        sessionToolPolicyFromMetadata({
+          [TOOL_POLICY_METADATA_KEY]: { enabledTools: ["mcp.desktop.read_file"] },
+        }),
+      ).toThrow(/system\.searchTools/);
+    });
+  });
+
+  describe("bundled skill entries", () => {
+    it("accepts Skill:<name> beside the Skill tool", () => {
+      expect(
+        sessionToolPolicyIssue({ enabledTools: ["Skill", "Skill:browser-automation"] }),
+      ).toBeUndefined();
+    });
+
+    it("rejects an entry without the Skill tool, an empty one, and the kit installer", () => {
+      expect(sessionToolPolicyIssue({ enabledTools: ["FileRead", "Skill:browser-automation"] }))
+        .toContain('but not "Skill"');
+      expect(sessionToolPolicyIssue({ enabledTools: ["Skill", "Skill:"] })).toContain("names no skill");
+      expect(
+        sessionToolPolicyIssue({
+          enabledTools: ["Skill", "Skill:agenc-marketplace-kit-installer"],
+        }),
+      ).toContain("can never be enabled");
+    });
   });
 
   it("caps the number of tools", () => {
@@ -112,6 +174,36 @@ describe("normalizeSessionToolPolicy and metadata", () => {
     expect(sessionToolPolicyAllowsTool(policy, "fileread")).toBe(false);
     expect(sessionToolPolicyAllowsTool(policy, "system.bash")).toBe(false);
     expect(sessionToolPolicyAllowsTool(undefined, "system.bash")).toBe(true);
+  });
+
+  it("offers a bundled skill to a policy session only when it names it beside the Skill tool", () => {
+    const named = normalizeSessionToolPolicy({ enabledTools: ["Skill", "Skill:browser-automation"] });
+    expect(sessionToolPolicyAllowsBundledSkill(named, "browser-automation")).toBe(true);
+    expect(sessionToolPolicyAllowsBundledSkill(named, "other-skill")).toBe(false);
+    // The Skill tool alone enables no bundled skill.
+    const toolOnly = normalizeSessionToolPolicy({ enabledTools: ["Skill"] });
+    expect(sessionToolPolicyAllowsBundledSkill(toolOnly, "browser-automation")).toBe(false);
+    // A named skill needs the tool too, even for a policy built without validation.
+    const noTool = { enabledTools: ["Skill:browser-automation"] };
+    expect(sessionToolPolicyAllowsBundledSkill(noTool, "browser-automation")).toBe(false);
+    // Without a policy nothing changes.
+    expect(sessionToolPolicyAllowsBundledSkill(undefined, "browser-automation")).toBe(true);
+    expect(sessionToolPolicyAllowsBundledSkill(undefined, "agenc-marketplace-kit-installer")).toBe(true);
+  });
+
+  it("never offers the kit installer to a policy session, even when named", () => {
+    expect(NEVER_ENABLED_BUNDLED_SKILLS).toContain(AGENC_MARKETPLACE_KIT_INSTALLER_SKILL.name);
+    const forced = {
+      enabledTools: ["Skill", `Skill:${AGENC_MARKETPLACE_KIT_INSTALLER_SKILL.name}`],
+    };
+    expect(sessionToolPolicyAllowsBundledSkill(forced, AGENC_MARKETPLACE_KIT_INSTALLER_SKILL.name))
+      .toBe(false);
+  });
+
+  it("allows the protocol commands only without a policy", () => {
+    expect(sessionToolPolicyAllowsProtocolCommands(undefined)).toBe(true);
+    expect(sessionToolPolicyAllowsProtocolCommands(normalizeSessionToolPolicy({ enabledTools: ["FileRead"] })))
+      .toBe(false);
   });
 
   it("compares policies by authority, not by order", () => {

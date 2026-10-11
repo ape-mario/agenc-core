@@ -2192,6 +2192,77 @@
       },
       "required": [
         "enabledTools"
+      ],
+      "allOf": [
+        {
+          "$comment": "MCP tools are deferred when deferMcpTools is true, or when it is omitted and enabledTools names an MCP tool. Deferred MCP tools are reached only through system.searchTools.",
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "deferMcpTools"
+                ],
+                "properties": {
+                  "deferMcpTools": {
+                    "const": true
+                  }
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "deferMcpTools"
+                  ]
+                },
+                "properties": {
+                  "enabledTools": {
+                    "contains": {
+                      "pattern": "^mcp\\."
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "enabledTools": {
+                "contains": {
+                  "const": "system.searchTools"
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Skill:<name> enables one bundled skill and needs the Skill tool. The kit installer can never be enabled.",
+          "if": {
+            "properties": {
+              "enabledTools": {
+                "contains": {
+                  "pattern": "^Skill:"
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "enabledTools": {
+                "contains": {
+                  "const": "Skill"
+                },
+                "not": {
+                  "contains": {
+                    "enum": [
+                      "Skill:",
+                      "Skill:agenc-marketplace-kit-installer"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
       ]
     },
     "AgentCreateParams": {

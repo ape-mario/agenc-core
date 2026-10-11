@@ -731,9 +731,9 @@ optional `headers`), `github` (`repo`, optional `ref`, `path`, `sparsePaths`),
 | `xaa_idp.issuer`, `xaa_idp.client_id` | HTTPS OIDC issuer and registered client ID. Loopback HTTP is accepted only for local development. |
 | `xaa_idp.callback_port` | Optional fixed loopback callback TCP port (`1..65535`). |
 | `protocol` | Marketplace protocol transport block. |
-| `protocol.enabled` | Boolean master switch, default false. |
+| `protocol.enabled` | Boolean master switch, default false. `true` also lists the bundled `agenc-marketplace-kit-installer` skill, which is unlisted otherwise. |
 | `protocol.adapter` | Must be `marketplace-cli` exactly when `protocol.enabled = true`; omit it when disabled. |
-| `protocol.cli_path` | Trusted local marketplace CLI path. |
+| `protocol.cli_path` | Trusted local marketplace CLI path. Without it (and without `AGENC_MARKETPLACE_CLI`) the adapter uses the installer's `~/.agenc/bin/agenc-marketplace` when that file and its directory belong to the current user and are not world-writable. The working directory is never searched. On Windows, where ownership cannot be checked, set `cli_path` or `AGENC_MARKETPLACE_CLI`. The binary runs with a minimal environment (`PATH`, `HOME`, locale, temp dirs, proxy and certificate settings, `AGENC_HOME`, `AGENC_RPC_URL`), never the full session environment. |
 
 ### Hooks
 

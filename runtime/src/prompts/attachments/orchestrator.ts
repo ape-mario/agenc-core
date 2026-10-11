@@ -23,6 +23,7 @@
  */
 
 import type { LLMMessage, LLMTool } from "../../llm/types.js";
+import type { SessionToolPolicy } from "../../permissions/session-tool-policy.js";
 import type { ToolPermissionContext } from "../../permissions/types.js";
 import type { AttachmentTrackingState } from "../../session/attachment-state.js";
 import { getAttachmentTrackingState } from "../../session/attachment-state.js";
@@ -165,6 +166,11 @@ export interface GetAttachmentsOptions {
       }>;
     }>;
   };
+  /**
+   * The session's fixed tool policy, when it has one (`agent.create`
+   * `toolPolicy`). Decides which bundled skills the skill listing may name.
+   */
+  readonly toolPolicy?: SessionToolPolicy;
   /** Current loaded config snapshot for config-gated skill/plugin discovery. */
   readonly config?: unknown;
   /** Current model context window, if known, for listing budget sizing. */
