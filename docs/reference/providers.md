@@ -320,8 +320,10 @@ that also called tools goes back with `phase: "commentary"`, as Meta's
 intermediate text before a function call.
 
 Muse Wonder takes `reasoning.effort` values `minimal`, `low`, `medium`, `high`,
-`xhigh`, and `max` (default `high`). Meta rejects `none`, so AgenC omits it and
-the model reasons at its own default level. An unset reasoning summary requests
+`xhigh`, and `max`. Its catalog default is `high`, which model pickers such as
+Desktop start at; a session that sets no effort uses the global
+`reasoning_effort` default (`medium`). Meta rejects `none`, so AgenC omits it
+and the model reasons at its own default level. An unset reasoning summary requests
 `auto`. Tool choice follows the same `auto`-only rule as Muse Spark, and
 structured output uses `text.format`. The model is registered with a
 1,048,576-token context window. Meta does not publish a separate output limit
