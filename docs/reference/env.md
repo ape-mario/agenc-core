@@ -40,6 +40,7 @@ Boolean-like values that go through `applyEnvOverrides` treat
 | `AGENC_PROVIDER_OUTAGE_WAIT_MS` | Overrides `provider_outage_wait_ms`: how long a turn keeps waiting for a provider outage to end after the reconnect ladder is spent. Unset keeps the `1800000` default; `0` ends the turn when the ladder is exhausted |
 | `AGENC_PROVIDER_OUTAGE_RETRY_MS` | Overrides `provider_outage_retry_ms`: the first slow-retry delay during a provider outage, doubling up to ten times the value. Unset keeps the `30000` default |
 | `AGENC_MARKETPLACE_CLI` | Path to marketplace-cli (`[protocol].cli_path`). Checked after `cli_path`; then `~/.agenc/bin/agenc-marketplace` if owned by you and not world-writable. `node_modules/.bin` is not searched |
+| `AGENC_RPC_URL` | Solana RPC endpoint for marketplace-cli. Core passes it through to the CLI, which uses it instead of its managed endpoint. Unset keeps the managed one |
 
 ## Provider credentials and endpoints
 
