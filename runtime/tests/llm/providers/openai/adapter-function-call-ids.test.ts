@@ -142,4 +142,40 @@ describe("OpenAIProvider function_call item ids in Responses history", () => {
       { type: "function_call", call_id: "call_1", name: "read", arguments: '{"path":"a"}' },
     ]);
   });
+  test("keeps identical call ids from separate same-name adapters isolated", async () => {
+    const fetchA = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(toolTurnStream("call_shared", ISSUED_STREAM_ID))
+      .mockResolvedValueOnce(answerStream());
+    const fetchB = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(toolTurnStream("call_shared", ISSUED_JSON_ID))
+      .mockResolvedValueOnce(answerStream());
+    const a = new OpenAIProvider({ apiKey: "sk-test", model: MODEL, fetchImpl: fetchA });
+    const b = new OpenAIProvider({ apiKey: "sk-test", model: MODEL, fetchImpl: fetchB });
+    const firstA = await inSession(() => a.chatStream([{ role: "user", content: "read a" }], () => {}));
+    const firstB = await inSession(() => b.chatStream([{ role: "user", content: "read b" }], () => {}));
+    await inSession(() => a.chatStream(history(firstA.toolCalls), () => {}));
+    await inSession(() => b.chatStream(history(firstB.toolCalls), () => {}));
+    expect(functionCallItems(requestText(fetchA, 1))[0]?.id).toBe(ISSUED_STREAM_ID);
+    expect(functionCallItems(requestText(fetchB, 1))[0]?.id).toBe(ISSUED_JSON_ID);
+  });
+
+  test("does not infer an issued item id from restored fc-prefixed history", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(answerStream());
+    const provider = new OpenAIProvider({ apiKey: "sk-test", model: MODEL, fetchImpl });
+    await inSession(() => provider.chatStream(history([
+      { id: "fc_legacy_or_foreign", name: "read", arguments: '{"path":"a"}' },
+    ]), () => {}));
+    expect(functionCallItems(requestText(fetchImpl, 0))[0]).not.toHaveProperty("id");
+  });
+
+  test("echoes the issued id even when the opaque call id starts with fc_", async () => {
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(toolTurnStream("fc_call_token", ISSUED_STREAM_ID))
+      .mockResolvedValueOnce(answerStream());
+    const provider = new OpenAIProvider({ apiKey: "sk-test", model: MODEL, fetchImpl });
+    const first = await inSession(() => provider.chatStream([{ role: "user", content: "read a" }], () => {}));
+    await inSession(() => provider.chatStream(history(first.toolCalls), () => {}));
+    expect(functionCallItems(requestText(fetchImpl, 1))[0]?.id).toBe(ISSUED_STREAM_ID);
+  });
+
 });
