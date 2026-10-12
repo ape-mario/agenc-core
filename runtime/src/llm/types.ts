@@ -776,6 +776,8 @@ export interface LLMChatOptions {
   readonly disableThinkingForRecovery?: true;
   /** Provider-facing reasoning-summary hint for APIs that expose it. */
   readonly reasoningSummary?: LLMReasoningSummary;
+  /** The summary hint came from model metadata, rather than an explicit user choice. */
+  readonly reasoningSummaryIsDefault?: true;
   /** Provider-facing output verbosity hint for APIs that expose it. */
   readonly modelVerbosity?: LLMModelVerbosity;
   /** Effective session response detail, used only for prompt fallback routes. */

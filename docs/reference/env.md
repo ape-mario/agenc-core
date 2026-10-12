@@ -115,15 +115,29 @@ OAuth sign-in. Neither explicit selection silently obtains managed credentials.
 These values are captured with the session environment and do not delete saved
 credentials or change another session's selection.
 
-`AGENC_OPENAI_REASONING_REPLAY` (boolean-like, off by default) makes the
-`openai` provider keep the encrypted reasoning of its Responses calls and send
-it back. A stateless request (`store: false`, which is always the case on a
+`AGENC_OPENAI_REASONING_REPLAY` (boolean-like, on by default) controls whether
+the `openai` provider keeps encrypted reasoning from Responses reasoning calls
+and sends it back. Set it to `0`, `false`, `no` or `off` to disable retention
+and replay. The setting is captured in the session environment and applies to
+both platform API keys and ChatGPT sign-in. A stateless request (`store: false`, which is always the case on a
 ChatGPT subscription) then asks for `reasoning.encrypted_content`. Each
 reasoning item a response returns stays with the assistant message it
 preceded. Later requests to the same provider and model replay it right before
 that message's function calls, or before its text when it called none. A model
 or provider switch drops it. Requests with `store: true` and other providers
-on the Responses wire are unchanged.
+on the Responses wire are unchanged. Non-reasoning models and calls with
+reasoning effort `none` do not enable replay. Models that default to no reasoning
+enable it only when a reasoning effort is selected. ChatGPT still requests
+encrypted content for its stateless backend contract when replay is disabled;
+the opt-out prevents retaining or replaying that content.
+
+With replay enabled, an unset `reasoning_summary` requests `auto`, including
+when the model's default effort already enables reasoning. An explicit summary
+setting, including `none`, takes precedence. Summary `none` suppresses summaries;
+it does not disable encrypted reasoning replay. Set the environment switch to
+`0` to disable replay as well. Replayed input and retained history can increase
+token usage and reach a task budget sooner. Provider output limits
+still depend on what the backend accepts and enforces.
 
 Gemini project identity has one ordered surface: `GEMINI_PROJECT_ID` wins over
 `GOOGLE_CLOUD_PROJECT`. Other Google project-name aliases are not consumed.

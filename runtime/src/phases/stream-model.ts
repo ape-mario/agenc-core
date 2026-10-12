@@ -314,6 +314,7 @@ export function buildProviderOptions(
       session.config?.model ?? ctx.modelInfo.slug,
     ) ? { disableThinkingForRecovery: true as const } : {}),
     reasoningSummary: ctx.reasoningSummary,
+    ...(ctx.reasoningSummaryIsDefault === true ? { reasoningSummaryIsDefault: true as const } : {}),
     modelVerbosity: ctx.modelVerbosity,
     responseDetailOverride: ctx.responseDetailOverride ?? undefined,
     serviceTier:

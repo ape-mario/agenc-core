@@ -631,6 +631,8 @@ export interface TurnContext {
 
   /** Reasoning summary mode. */
   readonly reasoningSummary: ReasoningSummary;
+  /** Preserve explicit summary choices when an opt-in provider experiment changes its default. */
+  readonly reasoningSummaryIsDefault?: true;
 
   /** Provider-facing output verbosity hint. */
   readonly modelVerbosity?: "low" | "medium" | "high";
@@ -1305,6 +1307,7 @@ export function buildTurnContext(opts: BuildTurnContextOptions): TurnContext {
     modelProviderId: providerBinding.provider,
     reasoningEffort,
     reasoningSummary,
+    ...(sc.modelReasoningSummary === undefined ? { reasoningSummaryIsDefault: true as const } : {}),
     modelVerbosity: sc.modelVerbosity,
     // Clearing the runtime override restores the configured level. Prompt
     // assembly and the concrete wire adapter decide whether to use this
