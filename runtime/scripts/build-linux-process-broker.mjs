@@ -5,14 +5,31 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { inspectLinuxBroker } from "./linux-broker-elf.mjs";
 
-export function buildLinuxProcessBroker(runtimeRoot, outputRoot = resolve(runtimeRoot, "dist"), compiler = process.env.CC?.trim() || "cc") {
+export function buildLinuxProcessBroker(runtimeRoot, outputRoot = resolve(runtimeRoot, "dist"), compiler = process.env.CC?.trim() || "cc", compilerArgs = []) {
   if (process.platform !== 'linux') return;
   mkdirSync(outputRoot, { recursive: true });
   const processBrokerSource = resolve(runtimeRoot, "native/agenc-process-broker.c");
   const processBrokerDist = resolve(outputRoot, "agenc-process-broker");
   const temporary = mkdtempSync(resolve(outputRoot, '.namespace-init-build-'));
   try {
+    // Older libc headers can omit SYS_close_range while the kernel supports it.
+    // Preserve an existing definition, prefer the kernel's __NR alias, and use
+    // the stable Linux UAPI number only on the supported native 64-bit ABIs.
+    const syscallHeader = resolve(temporary, 'syscall-compat.h');
+    writeFileSync(syscallHeader, `#include <sys/syscall.h>
+#ifndef SYS_close_range
+#ifdef __NR_close_range
+#define SYS_close_range __NR_close_range
+#elif (defined(__x86_64__) && !defined(__ILP32__)) || defined(__aarch64__)
+#define SYS_close_range 436
+#else
+#error "SYS_close_range is unavailable for this build architecture"
+#endif
+#endif
+`);
+    const compatibilityArgs = [...compilerArgs, '-include', syscallHeader];
     const sessionBuild = spawnSync(compiler, [
+      ...compatibilityArgs,
       '-Os', '-static', '-std=c11', '-Wall', '-Wextra', '-Werror',
       '-D_FORTIFY_SOURCE=2', '-fstack-protector-strong', '-Wl,-z,relro,-z,now',
       '-o', resolve(outputRoot, 'agenc-session-sandbox'),
@@ -23,6 +40,7 @@ export function buildLinuxProcessBroker(runtimeRoot, outputRoot = resolve(runtim
     chmodSync(resolve(outputRoot, 'agenc-session-sandbox'), 0o755);
     const helper = resolve(temporary, 'namespace-init');
     const staticBuild = spawnSync(compiler, [
+      ...compatibilityArgs,
       '-Os', '-static', '-std=c11', '-Wall', '-Wextra', '-Werror',
       '-D_FORTIFY_SOURCE=2', '-fstack-protector-strong', '-Wl,-z,relro,-z,now',
       '-o', helper, resolve(runtimeRoot, 'native/agenc-namespace-init.c'),
@@ -55,6 +73,7 @@ export function buildLinuxProcessBroker(runtimeRoot, outputRoot = resolve(runtim
     const result = spawnSync(
       compiler,
       [
+        ...compatibilityArgs,
         '-O2',
         '-fPIE',
         '-pie',

@@ -77,4 +77,15 @@ describe.runIf(process.platform === "linux" && process.arch === "x64")("portable
     expect(statSync(broker).mode & 0o777).toBe(0o755);
     expect(readFileSync(join(output, "agenc-namespace-init-entry"), "utf8")).toBe("AGENC_NAMESPACE_INIT_ENTRY_V1\n");
   }, 30_000);
+  it("builds and admits the broker when older libc headers omit SYS_close_range", () => {
+    const root = temporary();
+    const includes = join(root, "include");
+    mkdirSync(join(includes, "sys"), { recursive: true });
+    writeFileSync(join(includes, "sys/syscall.h"), "#pragma once\n#include_next <sys/syscall.h>\n#undef SYS_close_range\n");
+    const output = join(root, "dist");
+    buildLinuxProcessBroker(resolve(import.meta.dirname, "../.."), output, "cc", ["-I", includes]);
+    expect(childProcess.execFileSync(join(output, "agenc-process-broker"), ["--describe-protocol-v3"], { encoding: "utf8" }))
+      .toContain("sealed-static-init-ro-artifact-v1");
+    expect(statSync(join(output, "agenc-session-sandbox")).mode & 0o777).toBe(0o755);
+  }, 30_000);
 });

@@ -27,6 +27,11 @@ previous broker. `dist/linux-broker-build.json` records the immutable builder,
 compiler, ABI requirement and source/artifact hashes. This receipt is build
 evidence, not runtime authentication or a signature.
 
+The shared compiler also supplies a missing SYS_close_range alias for older
+libc headers, preferring the kernel header's __NR_close_range definition.
+This changes no syscall behavior. Unsupported kernels still fail the existing
+containment checks; the build does not provide an emulation fallback.
+
 The C sources, bootstrap protocol and runtime owner/mode trust check are
 unchanged. The broker remains dynamically linked, allowing system libc security
 updates; no extra statically linked libc or licensing requirement is introduced.
