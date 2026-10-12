@@ -165,8 +165,10 @@ describe("tool.approve and elicitation.respond are bound to an attached connecti
       clientMultiplexer: new AgenCDaemonClientMultiplexer({ sessionManager: sessions }),
       agentManager: {
         addMcpServerToSession, reconnectMcpServerOnSession, enableMcpServerOnSession, disableMcpServerOnSession,
-        getSessionToolPolicy: (id: string) => (id === "session_1" ? POLICY : undefined),
+        getSessionToolPolicy: (id: string) => (id === "session_1" || id === "session_live" ? POLICY : undefined),
         peekRoutineSessionId: (id: string) => id,
+        // One agent, two session ids: the one the client attached under and the live one.
+        peekOwnerSessionIds: (id: string) => (id === "session_1" || id === "session_live" ? ["session_1", "session_live"] : []),
       } as never,
     });
     const owner = dispatcher.createConnection({ sendNotification: () => {} });
@@ -188,6 +190,11 @@ describe("tool.approve and elicitation.respond are bound to an attached connecti
     expect(disableMcpServerOnSession).not.toHaveBeenCalled();
     expect(await call(owner, "session.mcp.addServer", add)).toMatchObject({ result: { success: true } });
     expect(addMcpServerToSession).toHaveBeenCalledTimes(1);
+    // The owner may name the agent's live session id; a stranger still may not.
+    const live = { ...add, sessionId: "session_live" };
+    expect(await call(owner, "session.mcp.addServer", live)).toMatchObject({ result: { success: true } });
+    expect(await call(stranger, "session.mcp.addServer", live)).toMatchObject({ error: { data: { code: "SESSION_NOT_ATTACHED" } } });
+    expect(addMcpServerToSession).toHaveBeenCalledTimes(2);
   });
 
   it("names the session in the error and does not echo the request", async () => {

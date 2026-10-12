@@ -4731,6 +4731,20 @@ export class AgenCDaemonAgentManager {
    * The tool policy of the session (or agent) `ownerId` names, if it has one.
    * Read-only and best effort: an unknown id has no policy to report.
    */
+  /**
+   * Every session id of the agent that owns `ownerId` (an agent id or one of
+   * its session ids). It only widens where an attachment is looked for; the
+   * attachment itself is the authority.
+   */
+  peekOwnerSessionIds(ownerId: string): readonly string[] {
+    return this.#state.peek((state) => {
+      const agent =
+        state.agents.get(ownerId) ??
+        [...state.agents.values()].find((candidate) => candidate.sessionIds.includes(ownerId));
+      return agent === undefined ? [] : [...agent.sessionIds];
+    });
+  }
+
   getSessionToolPolicy(ownerId: string): SessionToolPolicy | undefined {
     return this.#state.peek((state) => {
       const agent =

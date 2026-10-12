@@ -592,6 +592,7 @@ export interface AgenCDaemonDispatcherOptions {
     readonly getLiveSessionPermission?: AgenCDaemonAgentManager["getLiveSessionPermission"];
     readonly getSessionToolPolicy?: AgenCDaemonAgentManager["getSessionToolPolicy"];
     readonly peekRoutineSessionId?: AgenCDaemonAgentManager["peekRoutineSessionId"];
+    readonly peekOwnerSessionIds?: AgenCDaemonAgentManager["peekOwnerSessionIds"];
     readonly isLiveSessionToolCallExecuting?: AgenCDaemonAgentManager["isLiveSessionToolCallExecuting"];
   };
   readonly initializeAuthenticator?: (
@@ -726,6 +727,7 @@ export class AgenCDaemonJsonRpcDispatcher {
     readonly getLiveSessionPermission?: AgenCDaemonAgentManager["getLiveSessionPermission"];
     readonly getSessionToolPolicy?: AgenCDaemonAgentManager["getSessionToolPolicy"];
     readonly peekRoutineSessionId?: AgenCDaemonAgentManager["peekRoutineSessionId"];
+    readonly peekOwnerSessionIds?: AgenCDaemonAgentManager["peekOwnerSessionIds"];
     readonly isLiveSessionToolCallExecuting?: AgenCDaemonAgentManager["isLiveSessionToolCallExecuting"];
   };
   readonly #initializeAuthenticator:
@@ -2149,10 +2151,12 @@ export class AgenCDaemonJsonRpcDispatcher {
   ): Promise<AgenCDaemonResponse | undefined> {
     if (connection.remoteAccess !== undefined) return undefined;
     if (this.#agentManager.getSessionToolPolicy?.(sessionId) === undefined) return undefined;
-    // The caller may name the session or its agent; attachments are per session.
+    // The caller may name the session, its agent, or another session of that agent (a live
+    // session id next to the one the client attached under); attachments are per session.
     const candidates = new Set([
       sessionId,
       this.#agentManager.peekRoutineSessionId?.(sessionId) ?? sessionId,
+      ...(this.#agentManager.peekOwnerSessionIds?.(sessionId) ?? []),
     ]);
     for (const candidate of candidates) {
       const attachedClientIds =
