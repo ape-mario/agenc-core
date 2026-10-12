@@ -1,6 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { OpenAIProvider } from "../../../../src/llm/providers/openai/adapter.js";
-import { responsesFunctionCallItemIds } from "../../../../src/llm/wire/responses-function-call-ids.js";
 import type { LLMMessage, LLMResponse } from "../../../../src/llm/types.js";
 import { runWithStartupProviderSelection } from "../../../../src/utils/model/providers.js";
 
@@ -98,8 +97,6 @@ function requestBody(
 }
 
 describe("OpenAIProvider encrypted reasoning replay (AGENC_OPENAI_REASONING_REPLAY)", () => {
-  beforeEach(() => responsesFunctionCallItemIds.clear());
-
   test.each([
     ["the completion lists its output", [REASONING, SERVER_CALL]],
     ["the completion has an empty output, as on the ChatGPT backend", []],

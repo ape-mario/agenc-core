@@ -30,7 +30,6 @@ describe("ResponsesFunctionCallItemIds", () => {
   test.each([
     ["a reasoning item", { type: "reasoning", id: "rs_1", call_id: "call_a" }],
     ["a call without an item id", { type: "function_call", call_id: "call_a" }],
-    ["a call without a call id", { type: "function_call", id: "fc_1" }],
     ["an empty item id", call("call_a", "")],
     ["an item id with whitespace", call("call_a", "fc_ 1")],
     ["an item id with a control character", call("call_a", "fc_\u00071")],
@@ -42,6 +41,12 @@ describe("ResponsesFunctionCallItemIds", () => {
     ids.remember("openai", item);
 
     expect(ids.size).toBe(0);
+  });
+
+  test("uses an observed item id as the call token when call_id was omitted", () => {
+    const ids = new ResponsesFunctionCallItemIds();
+    ids.remember("openai", { type: "function_call", id: "fc_observed" });
+    expect(ids.get("openai", "fc_observed")).toBe("fc_observed");
   });
 
   test("records every function call of an output array and nothing else", () => {

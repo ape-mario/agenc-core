@@ -209,12 +209,10 @@ function normalizeFunctionCallCallId(toolCallId: string | undefined): string {
 function issuedFunctionCallItemId(
   input: OpenAIResponsesRequestOptions,
   toolCallId: string | undefined,
-  callId: string,
 ): string | undefined {
   const value = (toolCallId ?? "").trim();
-  // A provider that omitted call_id left its own item id as the tool call id.
-  if (value.startsWith("fc_")) return value;
-  const id = input.functionCallItemId?.(callId);
+  // Prefixes are not provenance. Restored or foreign calls may also use fc_.
+  const id = input.functionCallItemId?.(value);
   return typeof id === "string" && id.length > 0 ? id : undefined;
 }
 
@@ -428,7 +426,7 @@ export function buildOpenAIResponsesRequest(
       if (toolCalls.length > 0) responseInput.push(...reasoning);
       for (const toolCall of toolCalls) {
         const callId = normalizeFunctionCallCallId(toolCall.id);
-        const itemId = issuedFunctionCallItemId(input, toolCall.id, callId);
+        const itemId = issuedFunctionCallItemId(input, toolCall.id);
         responseInput.push({
           type: "function_call",
           ...(itemId !== undefined ? { id: itemId } : {}),

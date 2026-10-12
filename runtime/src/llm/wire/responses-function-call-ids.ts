@@ -9,9 +9,9 @@
  * (GPT-6 Luna on the ChatGPT backend: about 55 tokens/s with invented ids,
  * about 100 with the issued ones).
  *
- * Message history keeps only the call id, so the adapter records the issued
+ * Message history keeps only the call id, so each adapter records the issued
  * id of every call it receives here and the request builder looks it up. A
- * call this process has not seen, or no longer remembers, goes back without
+ * call this adapter has not seen, or no longer remembers, goes back without
  * an id.
  *
  * @module
@@ -56,8 +56,11 @@ export class ResponsesFunctionCallItemIds {
     if (item === null || typeof item !== "object" || Array.isArray(item)) return;
     const record = item as Record<string, unknown>;
     if (record.type !== "function_call") return;
-    if (!usableId(record.call_id) || !usableId(record.id)) return;
-    const key = ResponsesFunctionCallItemIds.key(provider, record.call_id);
+    // Some backends omit call_id; the parser then retains item.id as the
+    // tool-call token. It still needs observed provenance before replay.
+    const callId = record.call_id ?? record.id;
+    if (!usableId(callId) || !usableId(record.id)) return;
+    const key = ResponsesFunctionCallItemIds.key(provider, callId);
     this.ids.delete(key);
     this.ids.set(key, record.id);
     while (this.ids.size > Math.max(1, this.capacity)) {
@@ -91,6 +94,3 @@ export class ResponsesFunctionCallItemIds {
     this.ids.clear();
   }
 }
-
-/** Process-wide registry shared by every OpenAI Responses adapter instance. */
-export const responsesFunctionCallItemIds = new ResponsesFunctionCallItemIds();

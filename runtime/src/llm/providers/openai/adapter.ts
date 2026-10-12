@@ -78,7 +78,7 @@ import {
   parseOpenAIResponsesResponse,
   parseOpenAIResponsesUsage,
 } from "../../wire/responses-openai.js";
-import { responsesFunctionCallItemIds } from "../../wire/responses-function-call-ids.js";
+import { ResponsesFunctionCallItemIds } from "../../wire/responses-function-call-ids.js";
 import { assertKimiRequestPayloadSize } from "../../wire/kimi-contract.js";
 import {
   assertProviderStructuredOutputCompatibility,
@@ -883,6 +883,9 @@ export class OpenAIProvider implements LLMProvider {
   private readonly config: ResolvedOpenAIProviderConfig;
   private readonly client: ProviderHttpClient;
   private readonly auth: OpenAIAuthSession;
+  // Keep authority-local identities separate from other sessions/endpoints,
+  // including another adapter with the same provider name.
+  private readonly functionCallItemIds = new ResponsesFunctionCallItemIds();
   /**
    * Output reservation the last `output_reservation_squeezed` warning
    * reported, so a decaying run warns as it halves rather than on every
@@ -1013,7 +1016,7 @@ export class OpenAIProvider implements LLMProvider {
           }).catch(error => {
             throw this.initialHttpRejection(error, options?.singleWireAttempt);
           });
-          responsesFunctionCallItemIds.rememberAll(
+          this.functionCallItemIds.rememberAll(
             this.name,
             response.data.output,
           );
@@ -1550,7 +1553,7 @@ export class OpenAIProvider implements LLMProvider {
     readonly functionCallItemId: (callId: string) => string | undefined;
   } {
     return {
-      functionCallItemId: responsesFunctionCallItemIds.lookupFor(this.name),
+      functionCallItemId: this.functionCallItemIds.lookupFor(this.name),
     };
   }
 
@@ -1734,7 +1737,7 @@ export class OpenAIProvider implements LLMProvider {
               // Wait for the terminal status before validating or publishing it.
               streamedFunctionItems.push(item);
               // Keep the issued item id for the call's next appearance in history.
-              responsesFunctionCallItemIds.remember(this.name, item);
+              this.functionCallItemIds.remember(this.name, item);
               const id = String(item.call_id ?? item.id ?? "").trim();
               const name = String(item.name ?? "").trim();
               const args = String(item.arguments ?? "");
@@ -1909,7 +1912,7 @@ export class OpenAIProvider implements LLMProvider {
       }
       const terminalOutput = Array.isArray(completedResponse.output)
         ? completedResponse.output as Record<string, unknown>[] : [];
-      responsesFunctionCallItemIds.rememberAll(this.name, terminalOutput);
+      this.functionCallItemIds.rememberAll(this.name, terminalOutput);
       // Some Responses backends omit streamed items in the terminal payload.
       // Preserve their identities for recovery as well as completed calls.
       const responseWithStreamedCalls = {

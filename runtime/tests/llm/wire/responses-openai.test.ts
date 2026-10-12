@@ -332,7 +332,7 @@ describe("buildOpenAIResponsesRequest", () => {
     expect(wire).not.toContain("\"fc_unseen\"");
   });
 
-  test("keeps an item id that a provider left as the tool call id", () => {
+  test.each([false, true])("requires observed provenance for an item-id-shaped call token, observed=%s", (observed) => {
     const request = buildOpenAIResponsesRequest({
       model: "gpt-5",
       messages: [
@@ -341,11 +341,12 @@ describe("buildOpenAIResponsesRequest", () => {
         { role: "tool", toolCallId: "fc_only", toolName: "shell", content: "ok" },
       ],
       tools: TEST_TOOLS,
+      functionCallItemId: (id) => observed && id === "fc_only" ? "fc_only" : undefined,
     });
 
     expect(request.input).toEqual([
       { type: "message", role: "user", content: [{ type: "input_text", text: "run" }] },
-      { type: "function_call", id: "fc_only", call_id: "call_only", name: "shell", arguments: "{}" },
+      { type: "function_call", ...(observed ? { id: "fc_only" } : {}), call_id: "call_only", name: "shell", arguments: "{}" },
       { type: "function_call_output", call_id: "call_only", output: "ok" },
     ]);
   });

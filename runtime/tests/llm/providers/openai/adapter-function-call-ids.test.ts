@@ -1,6 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { OpenAIProvider } from "../../../../src/llm/providers/openai/adapter.js";
-import { responsesFunctionCallItemIds } from "../../../../src/llm/wire/responses-function-call-ids.js";
 import type { LLMMessage, LLMToolCall } from "../../../../src/llm/types.js";
 import { runWithStartupProviderSelection } from "../../../../src/utils/model/providers.js";
 
@@ -65,8 +64,6 @@ function inSession<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 describe("OpenAIProvider function_call item ids in Responses history", () => {
-  beforeEach(() => responsesFunctionCallItemIds.clear());
-
   test("echoes the item id the backend streamed for a call and invents none", async () => {
     const fetchImpl = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(toolTurnStream("call_1", ISSUED_STREAM_ID))
@@ -122,7 +119,9 @@ describe("OpenAIProvider function_call item ids in Responses history", () => {
   });
 
   test("does not hand one provider's item ids to another provider on this adapter", async () => {
-    responsesFunctionCallItemIds.remember("openai", streamedCall("call_1", ISSUED_STREAM_ID));
+    const sourceFetch = vi.fn<typeof fetch>().mockResolvedValue(toolTurnStream("call_1", ISSUED_STREAM_ID));
+    const source = new OpenAIProvider({ apiKey: "sk-test", model: MODEL, fetchImpl: sourceFetch });
+    await inSession(() => source.chatStream([{ role: "user", content: "read a" }], () => {}));
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(answerStream());
     const provider = new OpenAIProvider({
       apiKey: "sk-test",
@@ -176,6 +175,43 @@ describe("OpenAIProvider function_call item ids in Responses history", () => {
     const first = await inSession(() => provider.chatStream([{ role: "user", content: "read a" }], () => {}));
     await inSession(() => provider.chatStream(history(first.toolCalls), () => {}));
     expect(functionCallItems(requestText(fetchImpl, 1))[0]?.id).toBe(ISSUED_STREAM_ID);
+  });
+
+  test("remembers observed item ids when a backend omits call_id", async () => {
+    const item = { type: "function_call", id: ISSUED_STREAM_ID, name: "read", arguments: '{"path":"a"}' };
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(sse([
+        { type: "response.output_item.done", item },
+        { type: "response.completed", response: { status: "completed", model: MODEL, output: [] } },
+      ]))
+      .mockResolvedValueOnce(answerStream());
+    const provider = new OpenAIProvider({ apiKey: "sk-test", model: MODEL, fetchImpl });
+    const first = await inSession(() => provider.chatStream([{ role: "user", content: "read a" }], () => {}));
+    await inSession(() => provider.chatStream(history(first.toolCalls), () => {}));
+    expect(functionCallItems(requestText(fetchImpl, 1))[0]?.id).toBe(ISSUED_STREAM_ID);
+  });
+
+  test.each(["chat", "stream"] as const)("retains observed ids on the ChatGPT sign-in %s path", async (mode) => {
+    const fetchImpl = vi.fn<typeof fetch>();
+    if (mode === "stream") {
+      fetchImpl.mockResolvedValueOnce(toolTurnStream("call_oauth", ISSUED_STREAM_ID))
+        .mockResolvedValueOnce(answerStream());
+    } else {
+      fetchImpl.mockResolvedValueOnce(json({ status: "completed", model: MODEL, output: [streamedCall("call_oauth", ISSUED_STREAM_ID)] }))
+        .mockResolvedValueOnce(json({ status: "completed", model: MODEL, output: [] }));
+    }
+    const provider = new OpenAIProvider({
+      model: MODEL, authMode: "oauth", chatgptBackend: true, fetchImpl,
+      oauth: { accessToken: "fixture-access", refreshToken: "fixture-refresh",
+        refreshAccessToken: async () => ({ kind: "refreshed", accessToken: "fixture-next" }) },
+    });
+    const run = (messages: LLMMessage[]) => inSession(() => mode === "stream"
+      ? provider.chatStream(messages, () => {}) : provider.chat(messages));
+    const first = await run([{ role: "user", content: "read a" }]);
+    await run(history(first.toolCalls));
+    expect(functionCallItems(requestText(fetchImpl, 1))[0]?.id).toBe(ISSUED_STREAM_ID);
+    const init = fetchImpl.mock.calls[1]?.[1] as RequestInit;
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer fixture-access");
   });
 
 });

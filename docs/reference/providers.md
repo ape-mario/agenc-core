@@ -656,11 +656,11 @@ always pairs. The output text is an interrupted marker, not a fake
 success.
 
 A `function_call` in history goes back with the item id (`fc_...`) the
-provider issued for it, or with no `id` when this process has not seen
+provider issued for it, or with no `id` when this adapter has not seen
 the call (for example after a restart). The id is never derived from the
 call id: the OpenAI backend accepts such an id but serves the request on a
 much slower decode path. Issued ids are kept in a bounded in-memory map
-keyed by provider and call id
+owned by each adapter and keyed by provider and call id
 (`runtime/src/llm/wire/responses-function-call-ids.ts`).
 
 OpenAI requests carry no reasoning items unless
