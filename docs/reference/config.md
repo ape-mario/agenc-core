@@ -510,7 +510,7 @@ names; `[]` denotes an array entry. Open maps accept keys at the indicated
 | `model` | Configured startup model slug. A live session selection is separate. |
 | `model_provider` | Configured startup canonical provider slug. Strict v2 rejects the retired `xai`, `custom`, and `openai_compatible` selector spellings. |
 | `approval_policy` | `untrusted`, `on-failure`, `on-request`, or `never`. |
-| `sandbox_mode` | `read-only`, `workspace-write`, or `danger-full-access`. |
+| `sandbox_mode` | `read-only`, `workspace-write`, or `danger-full-access`. `read-only` and `workspace-write` reserve `AGENC_HOME` when it sits under a writable ancestor. `danger-full-access` skips the reservation. See [tools-permissions-sandbox.md](tools-permissions-sandbox.md#agenc-home-under-writable-sandbox-roots). |
 | `reasoning_effort` | `minimal`, `low`, `medium`, `high`, `xhigh`, or `none`. |
 | `reasoning_summary` | `auto`, `concise`, `detailed`, or `none`. |
 | `approvals_reviewer` | `user` or `auto_review`. |

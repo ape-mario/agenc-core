@@ -21,7 +21,7 @@ Boolean-like values that go through `applyEnvOverrides` treat
 
 | Var | Effect |
 | --- | --- |
-| `AGENC_HOME` | Config and daemon home. Must be an absolute path; relative input is rejected. Default `$HOME/.agenc` |
+| `AGENC_HOME` | Config and daemon home. Must be an absolute path; relative input is rejected. Default `$HOME/.agenc`. When this path sits under a writable sandbox ancestor, sandboxed children see it as reserved read-only; see [tools-permissions-sandbox.md](tools-permissions-sandbox.md#agenc-home-under-writable-sandbox-roots) |
 | `AGENC_INSTALL_PREFIX` | Absolute directory that contains `bin/agenc.cmd`. The Windows shim sets it from its own location when it is unset. `agenc daemon install-service` resolves the launcher only from this prefix |
 | `AGENC_WINSW_XML` | Absolute path for the generated WinSW 2.12.0 service definition. When unset, the definition is `<AGENC_INSTALL_PREFIX>\agenc-daemon.xml` |
 | `AGENC_WORKSPACE` | Workspace root override |
