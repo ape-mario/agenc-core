@@ -49,6 +49,7 @@ describe("agent.create toolPolicy validation", () => {
       enabledTools: ["FileRead", "mcp.desktop.read_file"],
       frozenPermissionMode: true,
       deferMcpTools: false,
+      noFsWriteTools: ["mcp.desktop.read_file"],
     };
     const response = await call(connection, "agent.create", { ...base, toolPolicy });
     expect(response).toMatchObject({ result: { agentId: "agent_1" } });
@@ -76,6 +77,8 @@ describe("agent.create toolPolicy validation", () => {
     ["an unknown key", { enabledTools: ["FileRead"], allowAll: true }, "does not accept 'allowAll'"],
     ["a non-boolean freeze", { enabledTools: ["FileRead"], frozenPermissionMode: "true" }, "frozenPermissionMode must be a boolean"],
     ["a non-boolean defer", { enabledTools: ["FileRead"], deferMcpTools: 1 }, "deferMcpTools must be a boolean"],
+    ["a no-write grant for a tool that is not enabled", { enabledTools: ["FileRead"], noFsWriteTools: ["mcp.desktop.read_file"] }, "not in enabledTools"],
+    ["a no-write grant for a built-in", { enabledTools: ["FileRead"], noFsWriteTools: ["FileRead"] }, "not an MCP tool name"],
   ])("rejects %s", async (_label, toolPolicy, fragment) => {
     const { connection, createAgent } = await connected();
     const response = (await call(connection, "agent.create", { ...base, toolPolicy })) as {

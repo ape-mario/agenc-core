@@ -35,6 +35,14 @@ export interface SessionToolPolicy {
    * advertises the allowlisted MCP tools directly; omitted keeps the default.
    */
   readonly deferMcpTools?: boolean;
+  /**
+   * MCP dispatch names (`mcp.<server>.<tool>`, each also in `enabledTools`)
+   * that the creating client vouches write nothing through Core: Core skips
+   * filesystem target inference for them. It applies only to servers attached
+   * to this session, never to configured or plugin servers, and only the
+   * client that creates the session can set it.
+   */
+  readonly noFsWriteTools?: readonly string[];
 }
 
 /** Metadata key under which a session's policy is persisted and restored. */
@@ -74,6 +82,7 @@ const TOOL_POLICY_KEYS: ReadonlySet<string> = new Set([
   "enabledTools",
   "frozenPermissionMode",
   "deferMcpTools",
+  "noFsWriteTools",
 ]);
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -89,7 +98,7 @@ export function sessionToolPolicyIssue(value: unknown): string | undefined {
   for (const key of Object.keys(value)) {
     if (!TOOL_POLICY_KEYS.has(key)) return `does not accept '${key}'`;
   }
-  const { enabledTools, frozenPermissionMode, deferMcpTools } = value;
+  const { enabledTools, frozenPermissionMode, deferMcpTools, noFsWriteTools } = value;
   if (!Array.isArray(enabledTools)) return "enabledTools must be an array of strings";
   if (enabledTools.length === 0) return "enabledTools must not be empty";
   if (enabledTools.length > MAX_SESSION_TOOL_POLICY_TOOLS) {
@@ -114,6 +123,19 @@ export function sessionToolPolicyIssue(value: unknown): string | undefined {
     return "deferMcpTools must be a boolean";
   }
   const tools = enabledTools as readonly string[];
+  if (noFsWriteTools !== undefined) {
+    if (!Array.isArray(noFsWriteTools)) return "noFsWriteTools must be an array of strings";
+    const granted = new Set<string>();
+    for (const name of noFsWriteTools) {
+      if (typeof name !== "string") return "noFsWriteTools must be an array of strings";
+      if (!/^mcp\.[^.]+\.[^.].*$/u.test(name)) {
+        return `noFsWriteTools entry ${JSON.stringify(name.slice(0, 64))} is not an MCP tool name (mcp.<server>.<tool>)`;
+      }
+      if (!tools.includes(name)) return `noFsWriteTools entry ${JSON.stringify(name)} is not in enabledTools`;
+      if (granted.has(name)) return `noFsWriteTools lists ${JSON.stringify(name)} more than once`;
+      granted.add(name);
+    }
+  }
   const enabledSkills = tools.filter((name) => name.startsWith(BUNDLED_SKILL_ENTRY_PREFIX));
   for (const entry of enabledSkills) {
     const skill = entry.slice(BUNDLED_SKILL_ENTRY_PREFIX.length);
@@ -154,7 +176,25 @@ export function normalizeSessionToolPolicy(value: unknown): SessionToolPolicy {
     ...(policy.deferMcpTools !== undefined
       ? { deferMcpTools: policy.deferMcpTools }
       : {}),
+    ...(policy.noFsWriteTools !== undefined
+      ? { noFsWriteTools: Object.freeze([...policy.noFsWriteTools]) }
+      : {}),
   });
+}
+
+/**
+ * The raw tool names of session MCP server `serverName` that the policy
+ * vouches write nothing through Core, or `undefined` when it names none.
+ */
+export function sessionToolPolicyNoFsWriteTools(
+  policy: SessionToolPolicy | undefined,
+  serverName: string,
+): readonly string[] | undefined {
+  const prefix = `mcp.${serverName}.`;
+  const tools = (policy?.noFsWriteTools ?? [])
+    .filter((name) => name.startsWith(prefix))
+    .map((name) => name.slice(prefix.length));
+  return tools.length === 0 ? undefined : Object.freeze(tools);
 }
 
 /**
@@ -234,11 +274,15 @@ export function sameSessionToolPolicy(
   left: SessionToolPolicy,
   right: SessionToolPolicy,
 ): boolean {
+  const leftNoFsWrite = left.noFsWriteTools ?? [];
+  const rightNoFsWrite = right.noFsWriteTools ?? [];
   return (
     left.frozenPermissionMode === right.frozenPermissionMode &&
     left.deferMcpTools === right.deferMcpTools &&
     left.enabledTools.length === right.enabledTools.length &&
-    left.enabledTools.every((name) => right.enabledTools.includes(name))
+    left.enabledTools.every((name) => right.enabledTools.includes(name)) &&
+    leftNoFsWrite.length === rightNoFsWrite.length &&
+    leftNoFsWrite.every((name) => rightNoFsWrite.includes(name))
   );
 }
 

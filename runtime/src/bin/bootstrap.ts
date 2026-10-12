@@ -39,6 +39,7 @@ import { isAutoModeGateEnabled } from "../permissions/classifier.js";
 import { ApprovalStore as RuntimeApprovalStore } from "../permissions/approval-cache.js";
 import { NetworkApprovalService as RuntimeNetworkApprovalService } from "../permissions/network-approval.js";
 import { initializeToolPermissionContext } from "../permissions/settings.js";
+import { sessionToolPolicyNoFsWriteTools } from "../permissions/session-tool-policy.js";
 import type { ToolPermissionContext } from "../permissions/types.js";
 import { buildTurnContext, type TurnContext } from "../session/turn-context.js";
 import { Session, type SessionState } from "../session/session.js";
@@ -1717,10 +1718,14 @@ async function bootstrapLocalRuntimeSessionScoped(
   let ctxForReturn: TurnContext | null = null;
   let conversationThreadManagerForReturn: ConversationThreadManager | null =
     null;
+  const sessionToolPolicy = options.toolRegistryOptions?.toolPolicy;
   const mcpService = createSessionMcpService(mcpManager, {
     authority: configStore,
     environment: sessionMcpRequestEnvironment,
     pluginStorageRoot: options.runtimeOptions.pluginStorageRoot,
+    ...(sessionToolPolicy?.noFsWriteTools !== undefined
+      ? { noFsWriteToolsFor: (serverName: string) => sessionToolPolicyNoFsWriteTools(sessionToolPolicy, serverName) }
+      : {}),
   });
   const bootstrapServices: BootstrapSessionServicesHandle =
     buildBootstrapSessionServices({

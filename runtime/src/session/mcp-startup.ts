@@ -122,6 +122,8 @@ export interface CreateSessionMcpServiceOptions {
   readonly authority: CanonicalSettingsAuthority;
   readonly environment: ProviderEnvironment;
   readonly pluginStorageRoot: string;
+  /** The session toolPolicy's no-filesystem-write grant for one attached server (`toolPolicy.noFsWriteTools`). */
+  readonly noFsWriteToolsFor?: (serverName: string) => readonly string[] | undefined;
 }
 
 export interface CreateSessionMcpManagerOptions {
@@ -833,10 +835,11 @@ export async function resolveSessionMcpPlan(
   enabledOverrides: ReadonlyMap<string, boolean> = new Map(),
   options: McpAuthorityRefreshOptions & {
     readonly pluginStorageRoot: string;
+    readonly noFsWriteToolsFor?: (serverName: string) => readonly string[] | undefined;
   },
 ): Promise<SessionMcpResolutionPlan> {
   const scopedSessionServers = Object.fromEntries(
-    Object.entries(sessionServers).map(([name, config]) => [
+    Object.entries(sessionServers).map(([name, { toolPolicyNoFsWriteTools: _runtimeOwned, ...config }]) => [
       name,
       toScopedMcpServerConfig({
         ...config,
@@ -868,6 +871,12 @@ export async function resolveSessionMcpPlan(
       // This restriction is runtime-owned, not a configurable permission grant.
       ...(sessionDispositions[name] === "active" && sessionServers[name]?.localOnly === true
         ? { localOnly: true, ...(sessionServers[name]?.desktopAuthorityGrant ? { desktopAuthorityGrant: sessionServers[name].desktopAuthorityGrant } : {}) } : {}),
+      // Also runtime-owned: the session's frozen toolPolicy grant, for a server attached to this session only.
+      ...(() => {
+        const granted = sessionDispositions[name] === "active" && sessionServers[name] !== undefined
+          ? options.noFsWriteToolsFor?.(name) : undefined;
+        return granted === undefined ? {} : { toolPolicyNoFsWriteTools: Object.freeze([...granted]) };
+      })(),
     }));
   const privateDesktopActive = configs.some(config =>
     config.name === "agenc-desktop-control" && config.origin?.scope === "session" &&
@@ -1194,6 +1203,7 @@ export function createSessionMcpService(
       ),
       {
         pluginStorageRoot: options.pluginStorageRoot,
+        ...(options.noFsWriteToolsFor !== undefined ? { noFsWriteToolsFor: options.noFsWriteToolsFor } : {}),
         ...(signal !== undefined ? { signal } : {}),
       },
     );
@@ -1590,7 +1600,7 @@ export function createSessionMcpService(
         error: `Invalid MCP server name: ${serverNameIssue}.`,
       };
     }
-    const { args: inputArgs, ...inputConfig } = config;
+    const { args: inputArgs, toolPolicyNoFsWriteTools: _runtimeOwned, ...inputConfig } = config as McpSessionServerConfig & { readonly toolPolicyNoFsWriteTools?: unknown };
     let desktopAuthorityGrant;
     try { desktopAuthorityGrant = await verifyDesktopAuthority(config, options.authority.homeContext.path); }
     catch (error) { return mcpMutationFailure(config.name, error); }

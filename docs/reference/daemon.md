@@ -485,6 +485,14 @@ task that may only call a few tools from one MCP server, sends:
   `deferMcpTools: false` to advertise the allowlisted MCP tools directly with no
   search step, which also suits small models and Light mode. A policy that names
   no MCP tool and leaves `deferMcpTools` omitted needs no search tool.
+- `noFsWriteTools` is optional: MCP tools from `enabledTools`, written
+  `mcp.<server>.<tool>`, that the client vouches write nothing through Core.
+  The sandbox then does not try to infer their filesystem targets, which it
+  otherwise must for an MCP tool before it runs. It applies only to servers
+  attached to this session with `session.mcp.addServer`, never to configured,
+  project or plugin servers, and a server's own config cannot claim it. A name
+  that is not an enabled `mcp.` tool is a `-32602` error. The list is part of
+  the persisted policy, so a restored session keeps exactly the same grant.
 - Bundled skills are skills that ship inside the daemon, such as
   `browser-automation`. A session with a `toolPolicy` is offered none of them
   unless `enabledTools` lists the `Skill` tool and names each skill as

@@ -24,6 +24,7 @@ import {
   sessionToolPolicyAllowsTool,
   sessionToolPolicyFromMetadata,
   sessionToolPolicyIssue,
+  sessionToolPolicyNoFsWriteTools,
 } from "../../src/permissions/session-tool-policy.js";
 import {
   createEmptyToolPermissionContext,
@@ -131,6 +132,33 @@ describe("sessionToolPolicyIssue", () => {
     const tooMany = Array.from({ length: MAX_SESSION_TOOL_POLICY_TOOLS + 1 }, (_, i) => `tool${i}`);
     expect(sessionToolPolicyIssue({ enabledTools: tooMany })).toContain("at most");
     expect(sessionToolPolicyIssue({ enabledTools: tooMany.slice(0, -1) })).toBeUndefined();
+  });
+});
+
+describe("noFsWriteTools", () => {
+  const enabledTools = ["system.searchTools", "mcp.task.view_task", "mcp.task.run_tests", "FileRead"];
+
+  it("accepts MCP tools that are also enabled, and hands each server only its own", () => {
+    const policy = normalizeSessionToolPolicy({ enabledTools, noFsWriteTools: ["mcp.task.view_task", "mcp.task.run_tests"] });
+    expect(Object.isFrozen(policy.noFsWriteTools)).toBe(true);
+    expect(sessionToolPolicyNoFsWriteTools(policy, "task")).toEqual(["view_task", "run_tests"]);
+    expect(sessionToolPolicyNoFsWriteTools(policy, "other")).toBeUndefined();
+    expect(sessionToolPolicyNoFsWriteTools(normalizeSessionToolPolicy({ enabledTools }), "task")).toBeUndefined();
+  });
+
+  it("refuses names that are not enabled MCP tools, and duplicates", () => {
+    expect(sessionToolPolicyIssue({ enabledTools, noFsWriteTools: ["mcp.task.claim_task"] })).toMatch(/not in enabledTools/);
+    expect(sessionToolPolicyIssue({ enabledTools, noFsWriteTools: ["FileRead"] })).toMatch(/not an MCP tool name/);
+    expect(sessionToolPolicyIssue({ enabledTools, noFsWriteTools: ["mcp.task"] })).toMatch(/not an MCP tool name/);
+    expect(sessionToolPolicyIssue({ enabledTools, noFsWriteTools: ["mcp.task.view_task", "mcp.task.view_task"] })).toMatch(/more than once/);
+    expect(sessionToolPolicyIssue({ enabledTools, noFsWriteTools: "mcp.task.view_task" })).toMatch(/array of strings/);
+  });
+
+  it("counts toward whether a restored session keeps the same policy", () => {
+    const granted = normalizeSessionToolPolicy({ enabledTools, noFsWriteTools: ["mcp.task.view_task"] });
+    const plain = normalizeSessionToolPolicy({ enabledTools });
+    expect(sameSessionToolPolicy(granted, plain)).toBe(false);
+    expect(sameSessionToolPolicy(granted, normalizeSessionToolPolicy({ enabledTools: [...enabledTools].reverse(), noFsWriteTools: ["mcp.task.view_task"] }))).toBe(true);
   });
 });
 

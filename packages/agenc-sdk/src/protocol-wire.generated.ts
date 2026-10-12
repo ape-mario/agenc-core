@@ -672,6 +672,14 @@ export interface AgentToolPolicy extends JsonObject {
      * `system.searchTools` discovery. Omitted keeps the daemon default (deferred).
      */
     readonly deferMcpTools?: boolean;
+    /**
+     * MCP tools (`mcp.<server>.<tool>`, each also in `enabledTools`) that the
+     * client vouches write nothing through Core, so the sandbox does not try to
+     * infer their filesystem targets. It applies only to servers attached to
+     * this session (`session.mcp.addServer`), never to configured or plugin
+     * servers.
+     */
+    readonly noFsWriteTools?: readonly string[];
 }
 
 export interface AgentRuntimeOptionsParams extends JsonObject {
