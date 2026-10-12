@@ -153,6 +153,43 @@ describe("tool.approve and elicitation.respond are bound to an attached connecti
     expect(respondToElicitation).toHaveBeenCalledTimes(1);
   });
 
+  it("lets only the attached connection add, replace or toggle a session MCP server", async () => {
+    const addMcpServerToSession = vi.fn(async () => ({ success: true, sessionId: "session_1", serverName: "task", toolCount: 1 }));
+    const reconnectMcpServerOnSession = vi.fn(async () => ({ success: true }));
+    const enableMcpServerOnSession = vi.fn(async () => ({ success: true }));
+    const disableMcpServerOnSession = vi.fn(async () => ({ success: true }));
+    const sessions = new AgenCDaemonSessionManager();
+    await sessions.restoreSession({ sessionId: "session_1", agentId: "agent_1", cwd: process.cwd() });
+    const dispatcher = new AgenCDaemonJsonRpcDispatcher({
+      sessionManager: sessions,
+      clientMultiplexer: new AgenCDaemonClientMultiplexer({ sessionManager: sessions }),
+      agentManager: {
+        addMcpServerToSession, reconnectMcpServerOnSession, enableMcpServerOnSession, disableMcpServerOnSession,
+        getSessionToolPolicy: (id: string) => (id === "session_1" ? POLICY : undefined),
+        peekRoutineSessionId: (id: string) => id,
+      } as never,
+    });
+    const owner = dispatcher.createConnection({ sendNotification: () => {} });
+    await initialize(owner);
+    await call(owner, "session.attach", { sessionId: "session_1", clientId: "owner-client" }, "attach");
+    const stranger = dispatcher.createConnection({ sendNotification: () => {} });
+    await initialize(stranger);
+    const add = { sessionId: "session_1", config: { name: "task", transport: "http", endpoint: "http://127.0.0.1:43120/mcp" }, replace: true };
+    const byName = { sessionId: "session_1", serverName: "task" };
+    for (const [method, params] of [
+      ["session.mcp.addServer", add],
+      ["session.mcp.reconnectServer", byName],
+      ["session.mcp.enableServer", byName],
+      ["session.mcp.disableServer", byName],
+    ] as const) {
+      expect(await call(stranger, method, params), method).toMatchObject({ error: { code: -32000, data: { code: "SESSION_NOT_ATTACHED" } } });
+    }
+    expect(addMcpServerToSession).not.toHaveBeenCalled();
+    expect(disableMcpServerOnSession).not.toHaveBeenCalled();
+    expect(await call(owner, "session.mcp.addServer", add)).toMatchObject({ result: { success: true } });
+    expect(addMcpServerToSession).toHaveBeenCalledTimes(1);
+  });
+
   it("names the session in the error and does not echo the request", async () => {
     const { stranger } = await fixture(POLICY);
     const response = (await call(stranger, "tool.approve", approve)) as { error: { message: string } };

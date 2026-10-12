@@ -1633,13 +1633,13 @@ export class AgenCDaemonJsonRpcDispatcher {
             validateSessionMcpStatusParams(params),
           ),
         );
-      case "session.mcp.addServer":
-        return successResponse(
-          id,
-          await this.#agentManager.addMcpServerToSession(
-            validateSessionMcpAddServerParams(params),
-          ),
-        );
+      case "session.mcp.addServer": {
+        const validated = validateSessionMcpAddServerParams(params);
+        // A toolPolicy session's servers (and their noFsWriteTools grant) change only from its own client.
+        const unbound = await this.#approverBindingError(id, connection, method, validated.sessionId);
+        if (unbound !== undefined) return unbound;
+        return successResponse(id, await this.#agentManager.addMcpServerToSession(validated));
+      }
       case "plugin.settings.get":
       case "plugin.settings.set":
       case "plugin.settings.reset": {
@@ -1655,36 +1655,24 @@ export class AgenCDaemonJsonRpcDispatcher {
         if (validated.values === undefined || typeof validated.values !== "object" || Array.isArray(validated.values)) throw invalidParams("plugin.settings.set values must be an object");
         return successResponse(id, await this.#pluginSettings.set({ pluginId: validated.pluginId as string, values: validated.values as Record<string, string | number | boolean | string[]> }) as unknown as PluginSettingsResult);
       }
-      case "session.mcp.reconnectServer":
-        return successResponse(
-          id,
-          await this.#agentManager.reconnectMcpServerOnSession(
-            validateSessionMcpServerByNameParams(
-              params,
-              "session.mcp.reconnectServer",
-            ),
-          ),
-        );
-      case "session.mcp.enableServer":
-        return successResponse(
-          id,
-          await this.#agentManager.enableMcpServerOnSession(
-            validateSessionMcpServerByNameParams(
-              params,
-              "session.mcp.enableServer",
-            ),
-          ),
-        );
-      case "session.mcp.disableServer":
-        return successResponse(
-          id,
-          await this.#agentManager.disableMcpServerOnSession(
-            validateSessionMcpServerByNameParams(
-              params,
-              "session.mcp.disableServer",
-            ),
-          ),
-        );
+      case "session.mcp.reconnectServer": {
+        const validated = validateSessionMcpServerByNameParams(params, "session.mcp.reconnectServer");
+        const unbound = await this.#approverBindingError(id, connection, method, validated.sessionId);
+        if (unbound !== undefined) return unbound;
+        return successResponse(id, await this.#agentManager.reconnectMcpServerOnSession(validated));
+      }
+      case "session.mcp.enableServer": {
+        const validated = validateSessionMcpServerByNameParams(params, "session.mcp.enableServer");
+        const unbound = await this.#approverBindingError(id, connection, method, validated.sessionId);
+        if (unbound !== undefined) return unbound;
+        return successResponse(id, await this.#agentManager.enableMcpServerOnSession(validated));
+      }
+      case "session.mcp.disableServer": {
+        const validated = validateSessionMcpServerByNameParams(params, "session.mcp.disableServer");
+        const unbound = await this.#approverBindingError(id, connection, method, validated.sessionId);
+        if (unbound !== undefined) return unbound;
+        return successResponse(id, await this.#agentManager.disableMcpServerOnSession(validated));
+      }
       case "session.partialCompactFromMessage":
         return successResponse(
           id,
@@ -2136,9 +2124,11 @@ export class AgenCDaemonJsonRpcDispatcher {
   /**
    * A session created with a `toolPolicy` belongs to the client that attached
    * to it: a tool approval or an elicitation answer can unlock what the model
-   * does next, so it must come from a connection holding an attached client of
-   * that very session, as `session.resolveToolCall` already requires. Another
-   * local client that only knows the ids is refused.
+   * does next, and adding, replacing or toggling a session MCP server changes
+   * which code answers an allowlisted tool name (and who holds the policy's
+   * `noFsWriteTools` grant). So each must come from a connection holding an
+   * attached client of that very session, as `session.resolveToolCall` already
+   * requires. Another local client that only knows the ids is refused.
    *
    * Sessions without a policy keep their historic behaviour, because
    * `agenc permissions approve` answers a pending request from a connection
@@ -2148,7 +2138,13 @@ export class AgenCDaemonJsonRpcDispatcher {
   async #approverBindingError(
     id: RequestId,
     connection: AgenCDaemonJsonRpcConnection,
-    method: "tool.approve" | "elicitation.respond",
+    method:
+      | "tool.approve"
+      | "elicitation.respond"
+      | "session.mcp.addServer"
+      | "session.mcp.reconnectServer"
+      | "session.mcp.enableServer"
+      | "session.mcp.disableServer",
     sessionId: string,
   ): Promise<AgenCDaemonResponse | undefined> {
     if (connection.remoteAccess !== undefined) return undefined;
