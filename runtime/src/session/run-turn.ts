@@ -962,6 +962,9 @@ async function prepareSamplingRequestBoundary(
       ? { fileMentionAllowedRoots }
       : {}),
     skillsManager: session.services.skillsManager,
+    ...(session.services.registry.toolPolicy !== undefined
+      ? { toolPolicy: session.services.registry.toolPolicy }
+      : {}),
     config: currentConfig,
     contextWindowTokens: ctx.modelInfo.contextWindow,
   });

@@ -74,10 +74,14 @@ export function toToolCatalogPolicyConfig(
     : undefined;
   // This flag bypasses filesystem target inference, so only authorities that
   // cannot be supplied by a checked-out project, a plugin, or a session may
-  // grant it. Desktop persists its audited loopback bridge at user scope.
+  // grant it. Desktop persists its audited loopback bridge at user scope. A
+  // session-attached server gets it only from the session's frozen toolPolicy,
+  // which the runtime copies in; the server's own config cannot carry it.
   const virtualNoFsWriteTools = mayGrantVirtualNoFsWrite(config)
     ? config.virtual_no_fs_write_tools
-    : undefined;
+    : config.origin?.scope === "session"
+      ? config.toolPolicyNoFsWriteTools
+      : undefined;
   const sensitiveHeaders = catalogSensitiveHeaders(config);
   if (
     !displayDataRoot &&

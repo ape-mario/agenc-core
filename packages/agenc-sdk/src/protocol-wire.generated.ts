@@ -52,10 +52,12 @@ export const JSON_RPC_VERSION = "2.0" as const;
  * 1.29 adds the model_loop child terminal reason.
  * 1.30 adds authenticated local resident print invocations.
  * 1.31 adds optional child routing explanations.
+ * 1.32 adds the optional `toolPolicy` on `agent.create`: a fixed tool
+ * allowlist for the session, with an optional frozen permission mode.
  * Clients that need any of the additive surfaces above must not negotiate an
  * older daemon.
  */
-export const AGENC_DAEMON_PROTOCOL_VERSION = "1.31.0" as const;
+export const AGENC_DAEMON_PROTOCOL_VERSION = "1.32.0" as const;
 
 export const AGENC_DAEMON_METHODS = [
     "remote.capabilities",
@@ -635,6 +637,51 @@ export type MessageContentBlock = (JsonObject & {
 
 export type MessageContent = string | readonly MessageContentBlock[];
 
+/**
+ * A session's fixed tool allowlist (`agent.create` `toolPolicy`).
+ *
+ * Tools outside `enabledTools` are removed from the model-visible catalog AND
+ * from dispatch by name (a call to one is refused, never run), and are denied
+ * by the bypass-immune permission floor as well. Names are exact dispatch
+ * names: built-ins such as `FileRead`, MCP tools as `mcp.<server>.<tool>`. The
+ * policy is persisted with the agent, so a restored session keeps it, and it
+ * cannot be changed after creation.
+ */
+export interface AgentToolPolicy extends JsonObject {
+    /**
+     * Non-empty, well-formed, without duplicates. Two rules apply:
+     * - Bundled skills (the ones that ship inside the daemon) are offered only
+     *   when named `Skill:<name>` beside `Skill`. `Skill:` entries without
+     *   `Skill` are refused, and `Skill:agenc-marketplace-kit-installer` is
+     *   always refused. The slash commands `/claim`, `/delegate`, `/proof`,
+     *   `/settle` and `/stake` are never available in such a session.
+     * - MCP tools behind deferral are reached only through
+     *   `system.searchTools`, so a policy that defers them (`deferMcpTools: true`,
+     *   or omitted while an `mcp.` tool is listed) must list it too.
+     */
+    readonly enabledTools: readonly string[];
+    /**
+     * The session's permission mode may not become wider than it is at
+     * creation: `allowAllToolsForSession`, a wider `session.setPermissionMode`
+     * and widening `session.permissions.mutateRule` calls are refused.
+     * Narrowing (for example to `plan`) stays allowed.
+     */
+    readonly frozenPermissionMode?: boolean;
+    /**
+     * `false` advertises the allowlisted MCP tools directly instead of behind
+     * `system.searchTools` discovery. Omitted keeps the daemon default (deferred).
+     */
+    readonly deferMcpTools?: boolean;
+    /**
+     * MCP tools (`mcp.<server>.<tool>`, each also in `enabledTools`) that the
+     * client vouches write nothing through Core, so the sandbox does not try to
+     * infer their filesystem targets. It applies only to servers attached to
+     * this session (`session.mcp.addServer`), never to configured or plugin
+     * servers.
+     */
+    readonly noFsWriteTools?: readonly string[];
+}
+
 export interface AgentRuntimeOptionsParams extends JsonObject {
     readonly simpleMode: boolean;
     /** Deferred tool exposure; omitted means false. Instructions, schemas and execution policy are unchanged. */
@@ -719,6 +766,11 @@ export interface AgentCreateParams extends JsonObject {
     readonly initialDisplayUserMessage?: string | null;
     readonly unattendedAllow?: readonly string[];
     readonly unattendedDeny?: readonly string[];
+    /**
+     * Fixed tool allowlist for this session. An older daemon rejects the unknown
+     * param, so a client that needs the restriction fails closed.
+     */
+    readonly toolPolicy?: AgentToolPolicy;
     readonly metadata?: JsonObject;
     /**
      * Session-wide permission mode override for the spawned agent. When

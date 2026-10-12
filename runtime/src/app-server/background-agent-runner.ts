@@ -75,6 +75,10 @@ import {
 } from "../permissions/settings.js";
 import { parseRuleString, serializeRuleValue } from "../permissions/rules.js";
 import {
+  retainedToolPolicyModeCeiling,
+  sessionToolPolicyFromMetadata,
+} from "../permissions/session-tool-policy.js";
+import {
   authorizeBypassPermissionsConsent,
   canonicalizeBypassPermissionsCwd,
   loadBypassPermissionsConsent,
@@ -334,6 +338,7 @@ import {
   runtimeSettingsWithRestoreOverrides,
   buildBootstrapArgv,
   installUnattendedPermissionPolicy,
+  freezeSessionPermissionMode,
   assertRoutineRunAuthority,
 } from "./background-agent-runner/runtime-settings.js";
 import type {
@@ -558,6 +563,9 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         : {}),
       argv: buildBootstrapArgv(params, this.#argv),
       runtimeOptions,
+      ...(params.toolPolicy !== undefined
+        ? { toolRegistryOptions: { toolPolicy: params.toolPolicy } }
+        : {}),
       // Daemon agents are unattended execution for budget policy, but this
       // hint deliberately does not enable autonomous keepalive ticks.
       executionAdmissionAutonomous: true,
@@ -653,6 +661,12 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         params.unattendedAllow,
         params.unattendedDeny,
         routineRun ? { workspaceRoot: runtimeWorkspaceRoot(bootstrap) } : undefined,
+        params.toolPolicy,
+      );
+      const toolPolicyModeCeiling = freezeSessionPermissionMode(
+        bootstrap.session.permissionModeRegistry,
+        params.toolPolicy,
+        undefined,
       );
 
       // Upstream-parity top-level executor: bootstrap already registered
@@ -873,6 +887,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         runtimeGenerationId: active.runtimeGenerationId,
         startedAt,
         status: "running",
+        ...(toolPolicyModeCeiling !== undefined ? { toolPolicyModeCeiling } : {}),
         ...(rolloutIdentity !== undefined
           ? {
               rolloutPath: rolloutIdentity.rolloutPath,
@@ -1067,6 +1082,10 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           this.#env,
           params.envOverrides,
         );
+        // The policy a session was created with is part of its durable
+        // identity. Malformed stored policy throws here, so the restore fails
+        // closed instead of bringing the session back unrestricted.
+        const toolPolicy = sessionToolPolicyFromMetadata(params.metadata);
         // A restored routine run stays marked as one (see startAgent).
         const restoreRuntimeOptions = isRoutineRun(params.metadata) || params.runtimeOptions?.relaxedOneShot !== undefined
           ? Object.freeze({
@@ -1089,6 +1108,9 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
             : {}),
           conversationId: params.agentId,
           runtimeOptions: restoreRuntimeOptions,
+          ...(toolPolicy !== undefined
+            ? { toolRegistryOptions: { toolPolicy } }
+            : {}),
           resumeConversation: true,
           ...(params.resumeRolloutPath !== undefined
             ? { resumeRolloutPath: params.resumeRolloutPath }
@@ -1161,6 +1183,14 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           isRoutineRun(params.metadata)
             ? { workspaceRoot: runtimeWorkspaceRoot(bootstrap) }
             : undefined,
+          toolPolicy,
+        );
+        // Before any restore-time override can touch the mode, so a resume
+        // asking for a wider one is refused rather than applied.
+        freezeSessionPermissionMode(
+          bootstrap.session.permissionModeRegistry,
+          toolPolicy,
+          retainedToolPolicyModeCeiling(params.metadata),
         );
         // `/goal` is session state journaled outside the conversation. A
         // reopened session gets its open goal back, paused: continuing is the

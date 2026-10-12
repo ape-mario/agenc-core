@@ -131,6 +131,11 @@ import {
 } from "../elicitation/request-ledger-transfer.js";
 import { runAdmittedToolCall } from "../budget/admitted-tool-call.js";
 import {
+  sessionToolPolicyAllowsTool,
+  toolPolicyRefusalMessage,
+  type SessionToolPolicy,
+} from "../permissions/session-tool-policy.js";
+import {
   createWorkspaceOperationLifetime,
   runWithWorkspaceOperationLifetime,
 } from "../workspace/tool-operation-lifetime.js";
@@ -289,6 +294,12 @@ export interface ToolRouterOpts {
    * T9 wires from config.
    */
   readonly parallelMcpServerNames?: ReadonlySet<string>;
+  /**
+   * The session's tool allowlist. The specs it was applied to are already
+   * filtered; the router keeps it only to refuse a call to a tool outside it
+   * with an explicit message instead of "unknown tool".
+   */
+  readonly toolPolicy?: SessionToolPolicy;
 }
 
 /**
@@ -305,12 +316,14 @@ export interface ToolRouterFromConfigOpts {
   readonly discoverableTools?: ReadonlyArray<Tool>;
   readonly dynamicTools?: ReadonlyArray<Tool>;
   readonly parallelMcpServerNames?: ReadonlySet<string>;
+  readonly toolPolicy?: SessionToolPolicy;
 }
 
 export class ToolRouter {
   private readonly specs: ConfiguredToolSpec[];
   private readonly byName = new Map<string, ConfiguredToolSpec>();
   private readonly parallelMcpServerNames: ReadonlySet<string>;
+  private readonly toolPolicy: SessionToolPolicy | undefined;
 
   constructor(
     specs: ReadonlyArray<ConfiguredToolSpec>,
@@ -319,6 +332,14 @@ export class ToolRouter {
     this.specs = [...specs];
     for (const spec of this.specs) this.byName.set(spec.tool.name, spec);
     this.parallelMcpServerNames = opts.parallelMcpServerNames ?? new Set();
+    this.toolPolicy = opts.toolPolicy;
+  }
+
+  /** The error for a name no spec answers to: a policy refusal or unknown. */
+  private unknownToolError(name: string): string {
+    return sessionToolPolicyAllowsTool(this.toolPolicy, name)
+      ? `unknown tool: ${name}`
+      : toolPolicyRefusalMessage(name);
   }
 
   /**
@@ -380,9 +401,12 @@ export class ToolRouter {
       addTool(tool, { dynamic: true });
     }
 
-    const parallelOpts: ToolRouterOpts = opts.parallelMcpServerNames
-      ? { parallelMcpServerNames: opts.parallelMcpServerNames }
-      : {};
+    const parallelOpts: ToolRouterOpts = {
+      ...(opts.parallelMcpServerNames
+        ? { parallelMcpServerNames: opts.parallelMcpServerNames }
+        : {}),
+      ...(opts.toolPolicy !== undefined ? { toolPolicy: opts.toolPolicy } : {}),
+    };
     return new ToolRouter(Array.from(merged.values()), parallelOpts);
   }
 
@@ -531,11 +555,11 @@ export class ToolRouter {
     if (!spec) {
       return {
         content: JSON.stringify({
-          error: `unknown tool: ${
+          error: this.unknownToolError(
             invocation.toolName.namespace
               ? `${invocation.toolName.namespace}.${invocation.toolName.name}`
-              : invocation.toolName.name
-          }`,
+              : invocation.toolName.name,
+          ),
         }),
         isError: true,
       };
@@ -837,7 +861,7 @@ export class ToolRouter {
     const spec = this.findSpec(toolCall.name);
     if (!spec) {
       return {
-        content: JSON.stringify({ error: `unknown tool: ${toolCall.name}` }),
+        content: JSON.stringify({ error: this.unknownToolError(toolCall.name) }),
         isError: true,
       };
     }
@@ -1885,7 +1909,10 @@ export function routerFromRegistry(
       : {}),
     ...(unavailable?.has(tool.name) === true ? { unavailable: true } : {}),
   }));
-  return new ToolRouter(specs, opts);
+  return new ToolRouter(specs, {
+    ...(registry.toolPolicy !== undefined ? { toolPolicy: registry.toolPolicy } : {}),
+    ...opts,
+  });
 }
 
 /**

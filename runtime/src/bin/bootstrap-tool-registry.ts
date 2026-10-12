@@ -65,6 +65,9 @@ export function buildBootstrapToolRegistry(
     ...(options.toolRegistryOptions?.outputSchema !== undefined
       ? { outputSchema: options.toolRegistryOptions.outputSchema }
       : {}),
+    ...(options.toolRegistryOptions?.toolPolicy !== undefined
+      ? { toolPolicy: options.toolRegistryOptions.toolPolicy }
+      : {}),
   });
   return buildToolRegistry({
     workspaceRoot: options.workspaceRoot,
