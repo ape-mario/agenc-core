@@ -355,7 +355,7 @@ describe("Muse Wonder reasoning and tool calls", () => {
     expect(second.content).toBe("It says hello.");
     expect(body(fetchImpl, 1).input).toEqual([
       { type: "message", role: "user", content: [{ type: "input_text", text: "read a.txt" }] },
-      // Intermediate text before a call must be commentary, or Meta answers 400.
+      // Meta's Responses guide requires commentary on text before a call.
       {
         type: "message",
         role: "assistant",

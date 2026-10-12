@@ -314,9 +314,9 @@ later requests to the same provider and model, in the same position as OpenAI
 replay. A model or provider switch drops it. Meta replay is always on for Muse
 Wonder, because the model cannot run without reasoning;
 `AGENC_OPENAI_REASONING_REPLAY` does not apply to it. Assistant text from a turn
-that also called tools goes back with `phase: "commentary"`, because Meta
-rejects intermediate text replayed as a final answer before a function call
-([Responses guide](https://dev.meta.ai/docs/protocols/responses)).
+that also called tools goes back with `phase: "commentary"`, as Meta's
+[Responses guide](https://dev.meta.ai/docs/protocols/responses) requires for
+intermediate text before a function call.
 
 Muse Wonder takes `reasoning.effort` values `minimal`, `low`, `medium`, `high`,
 `xhigh`, and `max` (default `high`). Meta rejects `none`, so AgenC omits it and

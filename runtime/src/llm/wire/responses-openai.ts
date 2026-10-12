@@ -82,8 +82,9 @@ export interface OpenAIResponsesRequestOptions {
   readonly toolChoicePolicy?: "auto_only";
   /**
    * Tag the text of an assistant turn that also called tools with
-   * `phase: "commentary"`. Meta rejects intermediate text replayed as a
-   * final answer before a function call.
+   * `phase: "commentary"`. Meta's Responses guide requires the tag on
+   * intermediate text replayed before a function call and says a dropped
+   * phase can degrade quality.
    */
   readonly assistantCommentaryPhase?: boolean;
   /** Reasoning effort values the destination accepts; others are omitted. */

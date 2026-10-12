@@ -1600,9 +1600,9 @@ export class OpenAIProvider implements LLMProvider {
 
   /**
    * Request rules a Responses destination other than OpenAI documents. Meta
-   * accepts only `tool_choice: "auto"`, rejects intermediate assistant text
-   * replayed before a function call unless it is tagged as commentary, and
-   * takes only its documented effort values.
+   * accepts only `tool_choice: "auto"`, requires intermediate assistant text
+   * replayed before a function call to be tagged as commentary, and takes
+   * only its documented effort values.
    * https://dev.meta.ai/docs/tool-calling
    * https://dev.meta.ai/docs/protocols/responses
    */
