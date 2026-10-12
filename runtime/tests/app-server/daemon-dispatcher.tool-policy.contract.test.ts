@@ -197,6 +197,33 @@ describe("tool.approve and elicitation.respond are bound to an attached connecti
     expect(addMcpServerToSession).toHaveBeenCalledTimes(2);
   });
 
+  it("lets the connection that created the policy session set up its servers before any client attaches", async () => {
+    const addMcpServerToSession = vi.fn(async () => ({ success: true, sessionId: "session_live", serverName: "task", toolCount: 1 }));
+    const createAgent = vi.fn(async () => ({ agentId: "agent_9" }));
+    const sessions = new AgenCDaemonSessionManager();
+    const dispatcher = new AgenCDaemonJsonRpcDispatcher({
+      sessionManager: sessions,
+      clientMultiplexer: new AgenCDaemonClientMultiplexer({ sessionManager: sessions }),
+      agentManager: {
+        createAgent, addMcpServerToSession,
+        getSessionToolPolicy: (id: string) => (id === "session_live" || id === "agent_9" ? POLICY : undefined),
+        peekRoutineSessionId: (id: string) => id,
+        peekOwnerSessionIds: () => [],
+        peekOwnerAgentId: (id: string) => (id === "session_live" || id === "agent_9" ? "agent_9" : undefined),
+      } as never,
+    });
+    const creator = dispatcher.createConnection({ sendNotification: () => {} });
+    await initialize(creator);
+    const other = dispatcher.createConnection({ sendNotification: () => {} });
+    await initialize(other);
+    const create = { cwd: process.cwd(), objective: "marketplace task", runtimeOptions: resolveAgentRuntimeOptions({}), toolPolicy: { enabledTools: ["FileRead"] } };
+    expect(await call(creator, "agent.create", create)).toMatchObject({ result: { agentId: "agent_9" } });
+    const add = { sessionId: "session_live", config: { name: "task", transport: "http", endpoint: "http://127.0.0.1:43120/mcp" }, replace: true };
+    expect(await call(other, "session.mcp.addServer", add)).toMatchObject({ error: { data: { code: "SESSION_NOT_ATTACHED" } } });
+    expect(await call(creator, "session.mcp.addServer", add)).toMatchObject({ result: { success: true } });
+    expect(addMcpServerToSession).toHaveBeenCalledTimes(1);
+  });
+
   it("names the session in the error and does not echo the request", async () => {
     const { stranger } = await fixture(POLICY);
     const response = (await call(stranger, "tool.approve", approve)) as { error: { message: string } };

@@ -4745,6 +4745,15 @@ export class AgenCDaemonAgentManager {
     });
   }
 
+  /** The id of the agent that owns `ownerId` (an agent id or one of its session ids). */
+  peekOwnerAgentId(ownerId: string): string | undefined {
+    return this.#state.peek((state) => {
+      if (state.agents.has(ownerId)) return ownerId;
+      for (const [agentId, candidate] of state.agents) if (candidate.sessionIds.includes(ownerId)) return agentId;
+      return undefined;
+    });
+  }
+
   getSessionToolPolicy(ownerId: string): SessionToolPolicy | undefined {
     return this.#state.peek((state) => {
       const agent =

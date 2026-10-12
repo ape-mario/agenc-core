@@ -593,6 +593,7 @@ export interface AgenCDaemonDispatcherOptions {
     readonly getSessionToolPolicy?: AgenCDaemonAgentManager["getSessionToolPolicy"];
     readonly peekRoutineSessionId?: AgenCDaemonAgentManager["peekRoutineSessionId"];
     readonly peekOwnerSessionIds?: AgenCDaemonAgentManager["peekOwnerSessionIds"];
+    readonly peekOwnerAgentId?: AgenCDaemonAgentManager["peekOwnerAgentId"];
     readonly isLiveSessionToolCallExecuting?: AgenCDaemonAgentManager["isLiveSessionToolCallExecuting"];
   };
   readonly initializeAuthenticator?: (
@@ -728,6 +729,7 @@ export class AgenCDaemonJsonRpcDispatcher {
     readonly getSessionToolPolicy?: AgenCDaemonAgentManager["getSessionToolPolicy"];
     readonly peekRoutineSessionId?: AgenCDaemonAgentManager["peekRoutineSessionId"];
     readonly peekOwnerSessionIds?: AgenCDaemonAgentManager["peekOwnerSessionIds"];
+    readonly peekOwnerAgentId?: AgenCDaemonAgentManager["peekOwnerAgentId"];
     readonly isLiveSessionToolCallExecuting?: AgenCDaemonAgentManager["isLiveSessionToolCallExecuting"];
   };
   readonly #initializeAuthenticator:
@@ -806,6 +808,8 @@ export class AgenCDaemonJsonRpcDispatcher {
     agentId?: string;
     stop(): Promise<void>;
   }>>();
+  /** Agents each connection created with a toolPolicy: that connection may change their MCP servers. */
+  readonly #policyAgentsByConnection = new WeakMap<AgenCDaemonJsonRpcConnection, Set<string>>();
   readonly #now: () => string;
 
   constructor(options: AgenCDaemonDispatcherOptions) {
@@ -1379,11 +1383,16 @@ export class AgenCDaemonJsonRpcDispatcher {
         if (this.#routines === undefined) return methodNotImplementedResponse(id, method);
         this.#assertRoutineVisible(connection, params);
         return successResponse(id, await this.#routines.cancel(params));
-      case "agent.create":
-        return successResponse(
-          id,
-          await this.#createConnectionAgent(connection, validateAgentCreateParams(params), signal),
-        );
+      case "agent.create": {
+        const validated = validateAgentCreateParams(params);
+        const created = await this.#createConnectionAgent(connection, validated, signal);
+        if (validated.toolPolicy !== undefined) {
+          const agents = this.#policyAgentsByConnection.get(connection) ?? new Set<string>();
+          agents.add(created.agentId);
+          this.#policyAgentsByConnection.set(connection, agents);
+        }
+        return successResponse(id, created);
+      }
       case "agent.list":
         return successResponse(
           id,
@@ -2151,6 +2160,12 @@ export class AgenCDaemonJsonRpcDispatcher {
   ): Promise<AgenCDaemonResponse | undefined> {
     if (connection.remoteAccess !== undefined) return undefined;
     if (this.#agentManager.getSessionToolPolicy?.(sessionId) === undefined) return undefined;
+    // The connection that created the session with its toolPolicy may set up its MCP servers
+    // before any client attaches (a client may attach only on its first turn).
+    if (method.startsWith("session.mcp.")) {
+      const owner = this.#agentManager.peekOwnerAgentId?.(sessionId);
+      if (owner !== undefined && this.#policyAgentsByConnection.get(connection)?.has(owner) === true) return undefined;
+    }
     // The caller may name the session, its agent, or another session of that agent (a live
     // session id next to the one the client attached under); attachments are per session.
     const candidates = new Set([
