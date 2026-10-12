@@ -19,11 +19,12 @@ describe("ResponsesFunctionCallItemIds", () => {
     expect(ids.lookupFor("openai")("call_a")).toBe("fc_issued_a");
   });
 
-  test("keeps providers apart and matches provider names case-insensitively", () => {
+  test("keeps providers apart and matches provider names case-insensitively after trim", () => {
     const ids = new ResponsesFunctionCallItemIds();
-    ids.remember("openai", call("call_a", "fc_issued_a"));
+    ids.remember(" OpenAI ", call("call_a", "fc_issued_a"));
 
-    expect(ids.get("OpenAI", "call_a")).toBe("fc_issued_a");
+    expect(ids.get("openai", "call_a")).toBe("fc_issued_a");
+    expect(ids.get(" openai", "call_a")).toBe("fc_issued_a");
     expect(ids.get("openai-compatible", "call_a")).toBeUndefined();
   });
 
@@ -36,11 +37,19 @@ describe("ResponsesFunctionCallItemIds", () => {
     ["an overlong item id", call("call_a", `fc_${"x".repeat(600)}`)],
     ["a non-object", "fc_1"],
     ["null", null],
+    ["an array", [call("call_a", "fc_a")]],
+    ["an empty call id", { type: "function_call", id: "fc_observed", call_id: "" }],
+    ["a whitespace call id", { type: "function_call", id: "fc_observed", call_id: "  " }],
+    ["a control-character call id", { type: "function_call", id: "fc_observed", call_id: "call_\u00071" }],
+    ["an overlong call id", { type: "function_call", id: "fc_observed", call_id: `call_${"x".repeat(600)}` }],
+    ["a non-string call id", { type: "function_call", id: "fc_observed", call_id: 12 }],
   ])("ignores %s", (_label, item) => {
     const ids = new ResponsesFunctionCallItemIds();
     ids.remember("openai", item);
 
     expect(ids.size).toBe(0);
+    expect(ids.get("openai", "fc_observed")).toBeUndefined();
+    expect(ids.get("openai", "call_a")).toBeUndefined();
   });
 
   test("uses an observed item id as the call token when call_id was omitted", () => {
@@ -74,6 +83,16 @@ describe("ResponsesFunctionCallItemIds", () => {
     expect(ids.get("openai", "call_b")).toBeUndefined();
     expect(ids.get("openai", "call_a")).toBe("fc_a2");
     expect(ids.get("openai", "call_c")).toBe("fc_c");
+  });
+
+  test.each([0, -3])("keeps one newest call when capacity is %s", (capacity) => {
+    const ids = new ResponsesFunctionCallItemIds(capacity);
+    ids.remember("openai", call("call_a", "fc_a"));
+    ids.remember("openai", call("call_b", "fc_b"));
+
+    expect(ids.size).toBe(1);
+    expect(ids.get("openai", "call_a")).toBeUndefined();
+    expect(ids.get("openai", "call_b")).toBe("fc_b");
   });
 
   test("clears every remembered call", () => {

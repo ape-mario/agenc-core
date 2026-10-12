@@ -332,6 +332,46 @@ describe("buildOpenAIResponsesRequest", () => {
     expect(wire).not.toContain("\"fc_unseen\"");
   });
 
+  test.each(["", 1, null] as const)("omits an item id when the lookup returns %j", (issued) => {
+    const request = buildOpenAIResponsesRequest({
+      model: "gpt-5",
+      messages: [
+        { role: "user", content: "run" },
+        { role: "assistant", content: "", toolCalls: [{ id: "call_seen", name: "shell", arguments: "{}" }] },
+        { role: "tool", toolCallId: "call_seen", toolName: "shell", content: "ok" },
+      ],
+      tools: TEST_TOOLS,
+      functionCallItemId: () => issued as never,
+    });
+
+    expect(request.input).toEqual([
+      { type: "message", role: "user", content: [{ type: "input_text", text: "run" }] },
+      { type: "function_call", call_id: "call_seen", name: "shell", arguments: "{}" },
+      { type: "function_call_output", call_id: "call_seen", output: "ok" },
+    ]);
+    expect(JSON.stringify(request)).not.toContain("\"fc_");
+  });
+
+  test("trims a history call token before looking up the issued item id", () => {
+    const issuedId = "fc_0a1b2c3d4e5f6071016acbcc22e5e8819192aa7ff9b45985e6";
+    const request = buildOpenAIResponsesRequest({
+      model: "gpt-5",
+      messages: [
+        { role: "user", content: "run" },
+        { role: "assistant", content: "", toolCalls: [{ id: "  call_seen  ", name: "shell", arguments: "{}" }] },
+        { role: "tool", toolCallId: "  call_seen  ", toolName: "shell", content: "ok" },
+      ],
+      tools: TEST_TOOLS,
+      functionCallItemId: (callId) => callId === "call_seen" ? issuedId : undefined,
+    });
+
+    expect(request.input).toEqual([
+      { type: "message", role: "user", content: [{ type: "input_text", text: "run" }] },
+      { type: "function_call", id: issuedId, call_id: "call_seen", name: "shell", arguments: "{}" },
+      { type: "function_call_output", call_id: "call_seen", output: "ok" },
+    ]);
+  });
+
   test.each([false, true])("requires observed provenance for an item-id-shaped call token, observed=%s", (observed) => {
     const request = buildOpenAIResponsesRequest({
       model: "gpt-5",
