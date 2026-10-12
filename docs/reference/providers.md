@@ -663,11 +663,21 @@ much slower decode path. Issued ids are kept in a bounded in-memory map
 owned by each adapter and keyed by provider and call id
 (`runtime/src/llm/wire/responses-function-call-ids.ts`).
 
-OpenAI requests carry no reasoning items unless
-`AGENC_OPENAI_REASONING_REPLAY` is on (off by default; see
-[env.md](env.md)). With it on, the `openai` provider keeps each encrypted
-reasoning item of a Responses call and replays it on later stateless requests
-to the same provider and model, right before the function calls it led to.
+The `openai` provider enables encrypted reasoning replay by default for
+Responses reasoning calls, on both the platform API and ChatGPT sign-in.
+It keeps each encrypted reasoning item with its assistant message and sends it
+on later stateless requests to the same provider and model, right before the
+function calls it led to, or before its text on a turn without tools. Stored
+requests, non-reasoning models, reasoning effort `none`, and other providers
+using this adapter keep their existing behavior. Switching provider or model
+does not replay mismatched reasoning state.
+
+An unset `reasoning_summary` requests `auto` while replay is enabled. Explicit
+summary choices are preserved: `none` disables summaries while encrypted
+reasoning still replays. Set `AGENC_OPENAI_REASONING_REPLAY=0` to disable
+retention and replay, or use `false`, `no` or `off`; see [env.md](env.md).
+The switch is captured with each session, including ChatGPT sign-in sessions.
+Replayed input counts against the task token budget and can increase usage.
 
 `previous_response_id` can only reference a **stored** response. When
 the request snapshot has `store: false` (ChatGPT subscription is always

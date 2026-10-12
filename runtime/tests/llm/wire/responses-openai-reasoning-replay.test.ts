@@ -225,7 +225,7 @@ describe("OpenAI Responses encrypted reasoning replay", () => {
     ]);
   });
 
-  test("defaults the opt-in Luna max replay experiment to automatic summaries", () => {
+  test("defaults Luna max replay to automatic summaries", () => {
     const request = build([{ role: "user", content: "hi" }], {
       model: "gpt-6-luna",
       maxOutputTokens: 8192,
@@ -269,12 +269,16 @@ describe("OpenAI Responses encrypted reasoning replay", () => {
       { reasoningReplayProvider: undefined, options: { reasoningEffort: "max" as const } },
       { store: true, options: { reasoningEffort: "max" as const } },
       { options: { reasoningEffort: "none" as const } },
-      {},
+      { model: "gpt-5.4" },
     ]) {
       expect(build(messages, overrides).reasoning).toEqual(
         overrides.options ? { effort: overrides.options.reasoningEffort } : undefined,
       );
     }
+  });
+
+  test("requests automatic summaries when the model default already enables reasoning", () => {
+    expect(build([{ role: "user", content: "hi" }]).reasoning).toEqual({ summary: "auto" });
   });
 
   test("leaves the wire unchanged when replay is off or the request is stored", () => {

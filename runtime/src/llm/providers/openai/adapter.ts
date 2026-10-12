@@ -92,13 +92,17 @@ import {
   type ProviderFallbackDecision,
 } from "../../api/fallback-ladder.js";
 import { getRetryDelay, sleepMs } from "../../api/retry.js";
-import { openAiChatCompletionsRejectsFunctionTools } from "../../registry/openai-reasoning-models.js";
+import {
+  isOpenAiReasoningFamilyModel,
+  openAiChatCompletionsRejectsFunctionTools,
+  openAiModelDefaultsToNoReasoning,
+} from "../../registry/openai-reasoning-models.js";
 import {
   providerApiKeyEnvironmentLabel,
   resolveBuiltInProviderInfo,
 } from "../../registry/provider-info.js";
 import { getSelectedProviderEnvironment } from "../../../utils/model/providers.js";
-import { isEnvTruthy } from "../../../utils/envBoolean.js";
+import { isEnvDefinedFalsy } from "../../../utils/envBoolean.js";
 const OPENAI_RESPONSES_INVALID_FUNCTION_CALL_MESSAGE =
   "OpenAI Responses stream emitted invalid function_call";
 const OPENAI_STREAM_FAILED_MESSAGE = "OpenAI stream failed";
@@ -537,14 +541,14 @@ function isTransportFailure(error: unknown): boolean {
 }
 
 /**
- * Encrypted reasoning replay on the Responses API is opt-in
- * (`AGENC_OPENAI_REASONING_REPLAY=1`), read from the environment the session
- * captured at ingress. Without a session or startup scope there is no such
- * environment, and replay stays off.
+ * Encrypted reasoning replay defaults on for OpenAI reasoning calls.
+ * The explicit opt-out is read from the environment captured at ingress,
+ * never from mutable process-global state. Without a bound provider scope
+ * no environment is available, so replay stays off.
  */
 function openAiReasoningReplayEnabled(): boolean {
   try {
-    return isEnvTruthy(
+    return !isEnvDefinedFalsy(
       getSelectedProviderEnvironment().AGENC_OPENAI_REASONING_REPLAY,
     );
   } catch {
@@ -987,7 +991,7 @@ export class OpenAIProvider implements LLMProvider {
           const session = this.client.createTurnSession({
             wireApi: "responses",
           });
-          const reasoningReplay = this.reasoningReplayOptions();
+          const reasoningReplay = this.reasoningReplayOptions(model, options);
           const functionCallItemId = this.functionCallItemIdOptions();
           const request = buildOpenAIResponsesRequest({
             model,
@@ -1539,8 +1543,15 @@ export class OpenAIProvider implements LLMProvider {
    * subscription alike. Other providers served by this adapter keep their
    * current Responses wire.
    */
-  private reasoningReplayOptions(): { readonly reasoningReplayProvider?: string } {
-    return this.name === "openai" && openAiReasoningReplayEnabled()
+  private reasoningReplayOptions(
+    model: string,
+    options: LLMChatOptions | undefined,
+  ): { readonly reasoningReplayProvider?: string } {
+    const reasoningEnabled = options?.reasoningEffort === undefined
+      ? !openAiModelDefaultsToNoReasoning(model)
+      : options.reasoningEffort !== "none";
+    return this.name === "openai" && isOpenAiReasoningFamilyModel(model) &&
+      reasoningEnabled && openAiReasoningReplayEnabled()
       ? { reasoningReplayProvider: this.name }
       : {};
   }
@@ -1604,7 +1615,7 @@ export class OpenAIProvider implements LLMProvider {
       store: this.config.store,
       maxOutputTokens: this.resolveRequestMaxTokens(options),
       ...(this.isChatGptBackend() ? { chatgptBackend: true as const } : {}),
-      ...this.reasoningReplayOptions(),
+      ...this.reasoningReplayOptions(model, options),
       ...this.functionCallItemIdOptions(),
     };
     assertProviderStructuredOutputCompatibility({

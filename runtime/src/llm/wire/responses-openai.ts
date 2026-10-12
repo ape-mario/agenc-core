@@ -39,7 +39,10 @@ import {
   decodeMcpToolNameFromWire,
   encodeMcpToolNameForWire,
 } from "./mcp-tool-naming.js";
-import { openAiAcceptsSamplingTemperature } from "../registry/openai-reasoning-models.js";
+import {
+  openAiAcceptsSamplingTemperature,
+  openAiModelDefaultsToNoReasoning,
+} from "../registry/openai-reasoning-models.js";
 import { resolveRegisteredModelCatalogEntry } from "../registry/model-catalog.js";
 
 export interface OpenAIResponsesRequestOptions {
@@ -56,8 +59,9 @@ export interface OpenAIResponsesRequestOptions {
    */
   readonly chatgptBackend?: boolean;
   /**
-   * Provider that encrypted reasoning is kept for and replayed to (opt-in,
-   * `AGENC_OPENAI_REASONING_REPLAY`). Each reasoning output item of a
+   * Provider that encrypted reasoning is kept for and replayed to (default
+   * on for OpenAI reasoning calls; `AGENC_OPENAI_REASONING_REPLAY=0` opts out).
+   * Each reasoning output item of a
    * response is kept with the assistant message it preceded, and a later
    * request to the same provider and `model` sends it back. Stateless
    * requests only: a stored response keeps its reasoning server side.
@@ -539,14 +543,16 @@ export function buildOpenAIResponsesRequest(
       effort: input.options.reasoningEffort,
     };
   }
-  // The replay experiment should retain the provider's summary as well as
+  // Reasoning replay should retain the provider's summary as well as
   // its encrypted reasoning. Match stateless reasoning clients that ask for
   // `auto`, but keep an explicit summary choice (including `none`) authoritative.
-  // Replay is opt-in; the default wire and non-reasoning requests stay unchanged.
+  // An omitted effort can still run reasoning at the model's default tier.
+  // Explicit summary choices and non-reasoning requests stay authoritative.
   const useReplaySummaryDefault = replayProvider !== undefined &&
-    input.options?.reasoningEffort !== undefined &&
-    input.options.reasoningEffort !== "none" &&
-    (input.options.reasoningSummary === undefined ||
+    input.options?.reasoningEffort !== "none" &&
+    (input.options?.reasoningEffort !== undefined ||
+      !openAiModelDefaultsToNoReasoning(input.model)) &&
+    (input.options?.reasoningSummary === undefined ||
       input.options.reasoningSummaryIsDefault === true);
   const reasoningSummary = useReplaySummaryDefault ? "auto" : input.options?.reasoningSummary;
   if (reasoningSummary !== undefined && reasoningSummary !== "none") {
