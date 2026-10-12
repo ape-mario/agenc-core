@@ -115,7 +115,8 @@ describe("OpenAIProvider encrypted reasoning replay (AGENC_OPENAI_REASONING_REPL
     expect(requestBody(fetchImpl, 1).input).toEqual([
       { type: "message", role: "user", content: [{ type: "input_text", text: "read a" }] },
       REASONING,
-      { type: "function_call", id: "fc_1", call_id: "call_1", name: "read", arguments: '{"path":"a"}' },
+      // The call goes back with the item id the server issued for it.
+      { type: "function_call", id: "fc_server_side_id", call_id: "call_1", name: "read", arguments: '{"path":"a"}' },
       { type: "function_call_output", call_id: "call_1", output: "A" },
     ]);
   });

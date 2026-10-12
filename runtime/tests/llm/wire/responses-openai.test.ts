@@ -281,7 +281,6 @@ describe("buildOpenAIResponsesRequest", () => {
       },
       {
         type: "function_call",
-        id: "fc_tool-1",
         call_id: "tool-1",
         name: "shell",
         arguments: "{\"cmd\":\"pwd\"}",
@@ -291,6 +290,64 @@ describe("buildOpenAIResponsesRequest", () => {
         call_id: "tool-1",
         output: "ok",
       },
+    ]);
+  });
+
+  test.each([
+    ["platform API", false],
+    ["ChatGPT backend", true],
+  ])("sends history function calls with the item id the provider issued or none on the %s", (_label, chatgptBackend) => {
+    const issuedId = "fc_0a1b2c3d4e5f6071016acbcc22e5e8819192aa7ff9b45985e6";
+    const issued = new Map([["call_seen", issuedId]]);
+    const request = buildOpenAIResponsesRequest({
+      model: "gpt-6-luna",
+      messages: [
+        { role: "user", content: "inspect" },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            { id: "call_seen", name: "shell", arguments: "{\"cmd\":\"ls\"}" },
+            { id: "call_unseen", name: "shell", arguments: "{\"cmd\":\"pwd\"}" },
+          ],
+        },
+        { role: "tool", toolCallId: "call_seen", toolName: "shell", content: "a" },
+        { role: "tool", toolCallId: "call_unseen", toolName: "shell", content: "b" },
+      ],
+      tools: TEST_TOOLS,
+      chatgptBackend,
+      functionCallItemId: (callId) => issued.get(callId),
+    });
+
+    expect(request.input).toEqual([
+      { type: "message", role: "user", content: [{ type: "input_text", text: "inspect" }] },
+      { type: "function_call", id: issuedId, call_id: "call_seen", name: "shell", arguments: "{\"cmd\":\"ls\"}" },
+      { type: "function_call", call_id: "call_unseen", name: "shell", arguments: "{\"cmd\":\"pwd\"}" },
+      { type: "function_call_output", call_id: "call_seen", output: "a" },
+      { type: "function_call_output", call_id: "call_unseen", output: "b" },
+    ]);
+    // The serialized wire names no item derived from a call id.
+    const wire = JSON.stringify(request);
+    expect(wire).not.toContain("\"fc_seen\"");
+    expect(wire).not.toContain("\"fc_unseen\"");
+  });
+
+  test.each([false, true])("requires observed provenance for an item-id-shaped call token, observed=%s", (observed) => {
+    const request = buildOpenAIResponsesRequest({
+      model: "gpt-5",
+      messages: [
+        { role: "user", content: "run" },
+        { role: "assistant", content: "", toolCalls: [{ id: "fc_only", name: "shell", arguments: "{}" }] },
+        { role: "tool", toolCallId: "fc_only", toolName: "shell", content: "ok" },
+      ],
+      tools: TEST_TOOLS,
+      functionCallItemId: (id) => observed && id === "fc_only" ? "fc_only" : undefined,
+    });
+
+    expect(request.input).toEqual([
+      { type: "message", role: "user", content: [{ type: "input_text", text: "run" }] },
+      { type: "function_call", ...(observed ? { id: "fc_only" } : {}), call_id: "call_only", name: "shell", arguments: "{}" },
+      { type: "function_call_output", call_id: "call_only", output: "ok" },
     ]);
   });
 
@@ -628,7 +685,6 @@ describe("buildOpenAIResponsesRequest", () => {
       },
       {
         type: "function_call",
-        id: "fc_image",
         call_id: "call_image",
         name: "view_image",
         arguments: "{\"path\":\"/tmp/cat.png\"}",
