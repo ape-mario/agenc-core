@@ -160,7 +160,7 @@ they run only through the Grok Build CLI ACP path. See
 | `openrouter` | OpenRouter | `x-ai/grok-4.5` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `OPENROUTER_BASE_URL` | `api-key` |
 | `groq` | Groq | `openai/gpt-oss-120b` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` | `GROQ_BASE_URL` | `api-key` |
 | `deepseek` | DeepSeek | `deepseek-v4-flash` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` | `DEEPSEEK_BASE_URL` | `api-key` |
-| `meta` | Meta | `muse-spark-1.3` | `https://api.meta.ai/v1` | `MODEL_API_KEY` | `META_BASE_URL` | `api-key` |
+| `meta` | Meta | `muse-wonder-1.0` | `https://api.meta.ai/v1` | `MODEL_API_KEY` | `META_BASE_URL` | `api-key` |
 | `qwen` | QwenCloud Pay-As-You-Go | `qwen3.8-max` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | `DASHSCOPE_API_KEY`, `QWEN_API_KEY` | `DASHSCOPE_BASE_URL`, `QWEN_BASE_URL` | `api-key` |
 | `qwen-token-plan` | QwenCloud Token Plan | `qwen3.8-max` | `https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1` | `QWEN_TOKEN_PLAN_API_KEY`, `DASHSCOPE_TOKEN_PLAN_API_KEY` | `QWEN_TOKEN_PLAN_BASE_URL`, `DASHSCOPE_TOKEN_PLAN_BASE_URL` | `api-key` |
 | `ollama-cloud` | Ollama Cloud | `deepseek-v4.1-flash` | `https://ollama.com/v1` | `OLLAMA_API_KEY` | None (fixed Cloud endpoint) | `api-key` |
@@ -278,8 +278,9 @@ Meta Model API uses `MODEL_API_KEY`, the key variable Meta documents for the
 Model API, sent as a bearer token. Meta's own Muse Code CLI reads
 `META_API_KEY` instead; AgenC does not read that variable. Muse Spark models use
 the OpenAI-compatible `/chat/completions` transport and Muse Wonder uses
-`/responses` (below). The LLM catalog includes `muse-spark-1.3`,
-`muse-wonder-1.0`, `muse-spark-1.3-contributor`, `muse-spark-1.2`,
+`/responses` (below). The default model is `muse-wonder-1.0`. The LLM
+catalog includes `muse-wonder-1.0`, `muse-spark-1.3`,
+`muse-spark-1.3-contributor`, `muse-spark-1.2`,
 `muse-spark-1.2-contributor`, and `muse-spark-1.1`. The `/models` entries
 `muse-image-1.0` and `muse-voice-transcribe-1.0` are media APIs, so they remain
 excluded from the chat/session model picker. `muse-image-1.0` is instead the

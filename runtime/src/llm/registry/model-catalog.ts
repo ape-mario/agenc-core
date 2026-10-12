@@ -1221,11 +1221,13 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_SPARK_13_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 0,
+      priority: 1,
       visibility: "list",
     },
     {
-      // Model API pay-as-you-go id; Muse Wonder Full is Muse Code only.
+      // Meta provider default (BUILT_IN_PROVIDER_DEFAULT_MODELS.meta), so it
+      // leads the Meta list. Model API pay-as-you-go id; Muse Wonder Full is
+      // Muse Code only.
       // https://dev.meta.ai/docs/models (1,048,576-token context window).
       // Meta publishes no output cap for Wonder; this keeps the 131,072
       // output limit Meta documents for Muse Spark on the same endpoints
@@ -1250,7 +1252,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       // Meta's coding-agent guide calls high "a strong default".
       defaultReasoningLevel: "high",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 1,
+      priority: 0,
       visibility: "list",
     },
     {

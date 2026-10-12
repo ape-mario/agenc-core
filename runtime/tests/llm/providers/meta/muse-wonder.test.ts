@@ -19,6 +19,7 @@ import {
 } from "../../../../src/llm/registry/model-catalog.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
+  BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
 } from "../../../../src/llm/registry/provider-info.js";
 import { resolveProviderStructuredOutputMode } from "../../../../src/llm/structured-output.js";
@@ -192,6 +193,17 @@ describe("Muse Wonder registration", () => {
 });
 
 describe("Muse Wonder request shape", () => {
+  test("is the Meta default: a provider built without a model sends Wonder to Responses", async () => {
+    expect(BUILT_IN_PROVIDER_DEFAULT_MODELS.meta).toBe(MODEL);
+    expect(BUILT_IN_PROVIDER_MODEL_CATALOG.meta[0]).toBe(MODEL);
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(json(completed([])));
+    await createProvider("meta", { apiKey: "meta-test", extra: { fetchImpl } })
+      .chat([{ role: "user", content: "hello" }]);
+
+    expect(url(fetchImpl)).toBe(`${BUILT_IN_PROVIDER_BASE_URLS.meta}/responses`);
+    expect(body(fetchImpl).model).toBe(MODEL);
+  });
+
   test("factory sends Wonder to Meta's stateless Responses API with bearer auth", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(json(completed([
       { type: "message", role: "assistant", content: [{ type: "output_text", text: "ok" }] },
