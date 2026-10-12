@@ -73,11 +73,15 @@ import {
 } from "../../wire/shared.js";
 import { ThinkTagStreamFilter } from "../../wire/think-tags.js";
 import {
+  advertisedResponsesToolNames,
   buildOpenAIResponsesRequest,
   extractOpenAIReasoningReplay,
   parseOpenAIResponsesResponse,
   parseOpenAIResponsesUsage,
+  type OpenAIResponsesRequestOptions,
 } from "../../wire/responses-openai.js";
+import { metaModelUsesResponsesApi } from "../../registry/meta-models.js";
+import { resolveReasoningEffort } from "../../reasoning-effort.js";
 import { ResponsesFunctionCallItemIds } from "../../wire/responses-function-call-ids.js";
 import { assertKimiRequestPayloadSize } from "../../wire/kimi-contract.js";
 import {
@@ -806,6 +810,32 @@ function mapOpenAIStreamError(args: {
   return new LLMProviderError(args.providerName, message);
 }
 
+// Meta's transient stream failures: a draining instance during a deploy, an
+// overloaded backend, an unreachable backend dependency, or a server error.
+// https://dev.meta.ai/docs/error-handling (503, 500, Streaming errors)
+const META_TRANSIENT_STREAM_CODES: ReadonlySet<string> = new Set([
+  "server_shutting_down",
+  "service_overloaded",
+  "backend_unavailable",
+  "server_error",
+]);
+
+/**
+ * A Meta stream fails with a terminal `response.failed` (error inside the
+ * response) or a top-level `error` event (code and message at the top level).
+ * Meta asks for the full request to be sent again after a transient code:
+ * before any output that is a server error, after output a truncated stream.
+ */
+function mapMetaStreamFailure(errorBody: unknown, hasOutput: boolean, fallbackMessage: string): Error {
+  const message = readNestedProviderMessage(errorBody) ?? fallbackMessage;
+  if (META_TRANSIENT_STREAM_CODES.has(readNestedProviderCode(errorBody) ?? "")) {
+    return hasOutput
+      ? new LLMStreamTruncatedError("meta", message)
+      : new LLMServerError("meta", 503, message);
+  }
+  return mapOpenAIStreamError({ providerName: "meta", errorBody, fallbackMessage: message });
+}
+
 function openAIStreamFallbackCandidate(
   errorBody: unknown,
   fallbackMessage: string,
@@ -993,6 +1023,7 @@ export class OpenAIProvider implements LLMProvider {
           });
           const reasoningReplay = this.reasoningReplayOptions(model, options);
           const functionCallItemId = this.functionCallItemIdOptions();
+          const responsesContract = this.responsesContractOptions(model);
           const request = buildOpenAIResponsesRequest({
             model,
             messages,
@@ -1003,6 +1034,7 @@ export class OpenAIProvider implements LLMProvider {
             ...(this.isChatGptBackend() ? { chatgptBackend: true as const } : {}),
             ...reasoningReplay,
             ...functionCallItemId,
+            ...responsesContract,
           });
           const response = await session.requestJson<Record<string, unknown>>({
             api: "responses",
@@ -1036,6 +1068,7 @@ export class OpenAIProvider implements LLMProvider {
               maxOutputTokens: this.resolveRequestMaxTokens(options),
               ...reasoningReplay,
               ...functionCallItemId,
+              ...responsesContract,
             },
           );
         }
@@ -1201,6 +1234,7 @@ export class OpenAIProvider implements LLMProvider {
   ): boolean {
     if (this.config.useResponsesApi !== false) return true;
     if (this.name === "openai" && openAiModelRequiresResponses(model)) return true;
+    if (this.name === "meta" && metaModelUsesResponsesApi(model)) return true;
     return (
       this.name === "openai" &&
       tools.length > 0 &&
@@ -1239,7 +1273,8 @@ export class OpenAIProvider implements LLMProvider {
       // Only the chat-completions path applies this buffer
       // (`fitRequestWithinContextWindow`). The Responses path does not, so it
       // must not inherit it.
-      ...(this.config.useResponsesApi === false
+      ...(this.config.useResponsesApi === false &&
+        !(this.name === "meta" && metaModelUsesResponsesApi(model))
         ? {
             contextSafetyBufferTokens:
               CHAT_COMPLETIONS_CONTEXT_SAFETY_BUFFER_TOKENS,
@@ -1540,13 +1575,20 @@ export class OpenAIProvider implements LLMProvider {
 
   /**
    * Encrypted reasoning replay for OpenAI itself, platform API and ChatGPT
-   * subscription alike. Other providers served by this adapter keep their
-   * current Responses wire.
+   * subscription alike, and for Meta's Responses models, which always
+   * reason (Meta rejects effort `none`) and keep no reasoning between turns
+   * without it. Other providers served by this adapter keep their current
+   * Responses wire.
    */
   private reasoningReplayOptions(
     model: string,
     options: LLMChatOptions | undefined,
   ): { readonly reasoningReplayProvider?: string } {
+    if (this.name === "meta") {
+      return metaModelUsesResponsesApi(model)
+        ? { reasoningReplayProvider: this.name }
+        : {};
+    }
     const reasoningEnabled = options?.reasoningEffort === undefined
       ? !openAiModelDefaultsToNoReasoning(model)
       : options.reasoningEffort !== "none";
@@ -1554,6 +1596,29 @@ export class OpenAIProvider implements LLMProvider {
       reasoningEnabled && openAiReasoningReplayEnabled()
       ? { reasoningReplayProvider: this.name }
       : {};
+  }
+
+  /**
+   * Request rules a Responses destination other than OpenAI documents. Meta
+   * accepts only `tool_choice: "auto"`, rejects intermediate assistant text
+   * replayed before a function call unless it is tagged as commentary, and
+   * takes only its documented effort values.
+   * https://dev.meta.ai/docs/tool-calling
+   * https://dev.meta.ai/docs/protocols/responses
+   */
+  private responsesContractOptions(
+    model: string,
+  ): Pick<
+    OpenAIResponsesRequestOptions,
+    "toolChoicePolicy" | "assistantCommentaryPhase" | "reasoningEffortAllowedValues"
+  > {
+    if (this.name !== "meta") return {};
+    const effort = resolveReasoningEffort({ provider: this.name, model });
+    return {
+      toolChoicePolicy: "auto_only",
+      assistantCommentaryPhase: true,
+      reasoningEffortAllowedValues: effort.chatLevels ?? new Set<string>(),
+    };
   }
 
   /**
@@ -1617,6 +1682,7 @@ export class OpenAIProvider implements LLMProvider {
       ...(this.isChatGptBackend() ? { chatgptBackend: true as const } : {}),
       ...this.reasoningReplayOptions(model, options),
       ...this.functionCallItemIdOptions(),
+      ...this.responsesContractOptions(model),
     };
     assertProviderStructuredOutputCompatibility({
       providerName: this.name,
@@ -1722,6 +1788,10 @@ export class OpenAIProvider implements LLMProvider {
             }
           }
 
+          if (eventType === "error" && this.name === "meta") {
+            throw mapMetaStreamFailure(event.data, hasResponseOutput, OPENAI_STREAM_FAILED_MESSAGE);
+          }
+
           if (eventType === "response.output_text.delta") {
             const delta =
               typeof event.data.delta === "string" ? event.data.delta : "";
@@ -1794,15 +1864,17 @@ export class OpenAIProvider implements LLMProvider {
                   ? String(eventError.message)
                   : OPENAI_STREAM_FAILED_MESSAGE;
             const errorBody = failedError ?? eventError ?? failedResponse;
-            const streamError = mapOpenAIStreamError({
-              providerName: this.name,
-              errorBody,
-              fallbackMessage: message,
-              responsesAttempt: {
-                hasOutput: hasResponseOutput, retryDenied,
-                status: inferErrorStatus(overloadEvent),
-              },
-            });
+            const streamError = this.name === "meta"
+              ? mapMetaStreamFailure(errorBody, hasResponseOutput, message)
+              : mapOpenAIStreamError({
+                providerName: this.name,
+                errorBody,
+                fallbackMessage: message,
+                responsesAttempt: {
+                  hasOutput: hasResponseOutput, retryDenied,
+                  status: inferErrorStatus(overloadEvent),
+                },
+              });
             if (!(streamError instanceof LLMStreamRetryDeniedError) &&
               !isProviderFundsFailure(this.name, streamError) &&
               streamedContent.length === 0 && streamedToolCalls.size === 0) {
@@ -1873,7 +1945,7 @@ export class OpenAIProvider implements LLMProvider {
                 // and reports a silent dispatch miss.
                 name: decodeMcpToolNameFromWire(
                   String(item.name ?? "").trim(),
-                  requestOptions.tools.map((tool) => tool.function.name),
+                  advertisedResponsesToolNames(requestOptions),
                 ),
                 arguments: String(item.arguments ?? "{}"),
               },

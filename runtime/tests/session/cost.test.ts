@@ -362,11 +362,15 @@ describe("cost helpers", () => {
         turns: 1,
       };
 
-      expect(resolveModelCostEntry(usage, DEFAULT_MODEL_COSTS)?.entry).toMatchObject({
-        inputUsdPer1K: model.endsWith("-contributor") ? 0.0001 : 0.00125,
-        outputUsdPer1K: model.endsWith("-contributor") ? 0.0002 : 0.00425,
-        cachedInputUsdPer1K: model.endsWith("-contributor") ? 0.000002 : 0.00015,
-      });
+      expect(resolveModelCostEntry(usage, DEFAULT_MODEL_COSTS)?.entry).toMatchObject(
+        model === "muse-wonder-1.0"
+          ? { inputUsdPer1K: 0.004, outputUsdPer1K: 0.02, cachedInputUsdPer1K: 0.0002 }
+          : {
+            inputUsdPer1K: model.endsWith("-contributor") ? 0.0001 : 0.00125,
+            outputUsdPer1K: model.endsWith("-contributor") ? 0.0002 : 0.00425,
+            cachedInputUsdPer1K: model.endsWith("-contributor") ? 0.000002 : 0.00015,
+          },
+      );
       expect(computeUsdCostWithResolution(usage, DEFAULT_MODEL_COSTS))
         .toMatchObject({ known: true });
     },

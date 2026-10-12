@@ -66,8 +66,8 @@ function nimReasoningEffortValues(
   )?.values;
 }
 
-// Conservative Muse Spark fallback. Exact registered models use their catalog
-// enum below; newly documented tiers must not leak into unknown model variants.
+// Conservative Muse fallback. Exact registered models use their catalog enum
+// below; newly documented tiers must not leak into unknown model variants.
 const META_REASONING_EFFORT_VALUES = new Set([
   "minimal",
   "low",
@@ -149,7 +149,7 @@ export function resolveReasoningEffort(input: {
     acceptsReasoningEffort = isUpstreamReasoningModel(model);
   } else if (slug === "grok") {
     acceptsReasoningEffort = supportsXaiReasoningEffortParam(model);
-  } else if (slug === "meta" && /(?:^|[/:])muse-spark-/i.test(model ?? "")) {
+  } else if (slug === "meta" && /(?:^|[/:])muse-(?:spark|wonder)-/i.test(model ?? "")) {
     const entry = resolveRegisteredModelCatalogEntry({ provider: slug, model });
     reasoningEffortAllowedValues = entry !== undefined
       ? new Set(entry.supportedReasoningLevels)

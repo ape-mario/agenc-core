@@ -125,6 +125,9 @@ const META_SPARK_13_REASONING_LEVELS = Object.freeze([
   ...META_REASONING_LEVELS,
   "max",
 ] as const satisfies readonly ReasoningEffort[]);
+// Muse Wonder takes every level from minimal to max and rejects none.
+// https://dev.meta.ai/docs/reasoning
+const META_WONDER_REASONING_LEVELS = META_SPARK_13_REASONING_LEVELS;
 const QWEN_38_REASONING_LEVELS = Object.freeze([
   "low",
   "medium",
@@ -1222,6 +1225,35 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       visibility: "list",
     },
     {
+      // Model API pay-as-you-go id; Muse Wonder Full is Muse Code only.
+      // https://dev.meta.ai/docs/models (1,048,576-token context window).
+      // Meta publishes no output cap for Wonder; this keeps the 131,072
+      // output limit Meta documents for Muse Spark on the same endpoints
+      // (https://dev.meta.ai/docs/coding-agents).
+      provider: "meta",
+      model: "muse-wonder-1.0",
+      displayName: "Muse Wonder",
+      contextWindow: 1_048_576,
+      maxContextWindow: 1_048_576,
+      maxOutputTokens: 131_072,
+      inputModalities: TEXT_IMAGE_MODALITIES,
+      supportsToolUse: true,
+      supportsParallelToolCalls: true,
+      supportsStructuredOutput: true,
+      supportsSearchTool: false,
+      supportsVerbosity: false,
+      webSearchToolType: "none",
+      // Responses API reasoning summaries ("auto" is Meta's compact default).
+      supportsReasoningSummaries: true,
+      defaultReasoningSummary: "auto",
+      supportedReasoningLevels: META_WONDER_REASONING_LEVELS,
+      // Meta's coding-agent guide calls high "a strong default".
+      defaultReasoningLevel: "high",
+      additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
+      priority: 1,
+      visibility: "list",
+    },
+    {
       provider: "meta",
       model: "muse-spark-1.3-contributor",
       displayName: "Muse Spark 1.3 Contributor",
@@ -1240,7 +1272,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 1,
+      priority: 2,
       visibility: "list",
     },
     {
@@ -1262,7 +1294,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 2,
+      priority: 3,
       visibility: "list",
     },
     {
@@ -1284,7 +1316,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 3,
+      priority: 4,
       visibility: "list",
     },
     {
@@ -1306,7 +1338,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 4,
+      priority: 5,
       visibility: "list",
     },
     {

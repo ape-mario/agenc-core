@@ -225,7 +225,8 @@ describe("MetaProvider", () => {
       ]);
   });
 
-  test.each(BUILT_IN_PROVIDER_MODEL_CATALOG.meta)(
+  // Muse Wonder routes to the Responses API (muse-wonder.test.ts).
+  test.each(BUILT_IN_PROVIDER_MODEL_CATALOG.meta.filter((model) => model.startsWith("muse-spark-")))(
     "registers and routes chat model %s",
     async (model) => {
       const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(

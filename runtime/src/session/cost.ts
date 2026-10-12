@@ -818,6 +818,16 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
         },
       ]),
     )),
+    // Muse Wonder USD/1M: 4.00 input, 0.20 cached input, 20.00 output; no
+    // Contributor mode on the Model API. Verified 2026-10-12:
+    // https://dev.meta.ai/docs/pricing-rate-limits
+    "meta:muse-wonder-1.0": {
+      inputUsdPer1K: 0.004,
+      outputUsdPer1K: 0.02,
+      cachedInputUsdPer1K: 0.0002,
+      cachedInputIncludedInInputTokens: true,
+      webSearchUsdPerRequest: 0.0025,
+    },
     // Ollama peak rate (off-peak is cheaper), verified 2026-09-27:
     // https://www.ollama.com/pricing
     "ollama-cloud:deepseek-v4.1-flash": {
