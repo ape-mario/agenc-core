@@ -11,8 +11,10 @@ import {
   deferredShellWorkspaceMutationPermission,
   shellAdditionalWriteRoots,
   shellBypassesApprovalsAndSandbox,
+  shellFileWriteTools,
   shellWorkspaceMutationPermission,
 } from "./shell-mutation-permission.js";
+import { execInlineProgramNote } from "./inline-program-hint.js";
 import { preflightShellWorkspaceWritePolicy } from "./shell-preflight.js";
 import { recordSessionRead, resolveSessionId } from "./filesystem.js";
 import { isCompletePrintedOutput, rememberPrintedOutput, stableWorkspaceText } from "./printed-read-proof.js";
@@ -80,6 +82,12 @@ import {
 
 export interface ExecCommandToolConfig extends BashToolConfig {
   readonly lightMode?: boolean;
+  /**
+   * Light only: a failed command that carried a long inline program gets a
+   * note pointing at the file tools (the session's
+   * `AGENC_HL_INLINE_PROGRAM_HINT`, inline-program-hint.ts). Default: off.
+   */
+  readonly inlineProgramHint?: boolean;
   readonly allowedPaths?: readonly string[];
   readonly unifiedExecManager?: UnifiedExecProcessManagerLike;
   /** Advertise the continuation tool before a yielded handle reaches the model. */
@@ -1318,9 +1326,20 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
           : ordinaryNotice();
         const namespaceNotice = execProcessNamespaceNotice({ command: cmd, runtimeSandbox });
         const notice = [primaryNotice, namespaceNotice].filter(Boolean).join("\n\n") || null;
+        // Light harness-learning candidate: a failed long inline program is
+        // pointed at the file tools so the fix is an edit, not a resend.
+        const inlineProgramNote = execInlineProgramNote({
+          enabled: config?.lightMode === true && config.inlineProgramHint === true,
+          cmd,
+          output,
+          fileWriteTools: () => shellFileWriteTools(readToolRuntimeContext(args)),
+        });
+        const notes = [notice, inlineProgramNote].filter(
+          (note): note is string => note !== null,
+        );
         return {
           content:
-            notice === null ? execContent : `${execContent}\n\n${notice}`,
+            notes.length === 0 ? execContent : `${execContent}\n\n${notes.join("\n\n")}`,
           isError: isError || undefined,
           codeModeResult: unifiedExecCodeModeResult(output, notice),
           effectDisposition: processObservationDisposition(

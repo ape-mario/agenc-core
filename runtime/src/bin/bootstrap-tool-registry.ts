@@ -12,6 +12,7 @@ import { sparseLineNumbersEnabled } from "../tools/system/_deps/line-numbers.js"
 import type { CsvAgentJobsRepositoryProvider } from "../app-server/csv-agent-jobs-authority.js";
 import type { ProviderEnvironment } from "../llm/provider-options.js";
 import { rareToolDeferralEnabled } from "../tools/rare-tool-deferral.js";
+import { inlineProgramHintEnabled } from "../tools/system/inline-program-hint.js";
 
 export interface BootstrapToolRegistryOptions {
   readonly workspaceRoot: string;
@@ -97,6 +98,9 @@ export function buildBootstrapToolRegistry(
         ? { configured: options.configuredDeferRareTools }
         : {}),
     }),
+    // Same source as the two switches above; the exec tool applies it only in
+    // a Light session.
+    inlineProgramHint: inlineProgramHintEnabled(options.environment ?? {}),
     mcpToolsProvider: options.mcpManager,
     workflowController: buildWorkflowToolController({
       getSession: options.getSession,
