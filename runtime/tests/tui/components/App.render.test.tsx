@@ -3416,6 +3416,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
           }),
         );
 
+        const selectorModal = providerProbe.fullscreenLayoutProps.at(-1)?.modal;
+        expect(selectorModal).toBeDefined();
         const selectorProps = providerProbe.messageSelectorProps.at(-1)!;
         await (
           selectorProps.onRestoreMessage as (message: unknown) => Promise<void>

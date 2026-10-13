@@ -4920,6 +4920,17 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   // breaks the flex chain — the inner Box collapses to its intrinsic content
   // size and the bottom slot has 0 height. KeybindingSetup must remain a
   // context provider, not a Box.
+  const messageSelectorElement = isMessageSelectorVisible ? (
+        <MessageSelector
+          messages={transcript.messages as any[]}
+          onPreRestore={() => {}}
+          onRestoreMessage={handleRestoreMessage}
+          onRestoreCode={handleRestoreCode}
+          onPreviewRewind={handlePreviewRewind}
+          onSummarize={handleSummarize}
+          onClose={handleCloseMessageSelector}
+        />
+      ) : null;
   const body = (
     <StatusLineExecutionContext value={props.session.executeDaemonStatusLine}>
     <SessionUsageContext value={transcript.sessionUsage ?? null}>
@@ -4934,7 +4945,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       />
       <ScrollKeybindingHandler
         scrollRef={modalToolJSX !== null ? modalScrollRef : scrollRef}
-        isActive={fullscreen && permissionRequests.length === 0}
+        isActive={fullscreen && permissionRequests.length === 0 && !isMessageSelectorVisible}
         isModal={modalToolJSX !== null}
       />
       <CancelRequestHandler
@@ -4968,11 +4979,11 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         bottom={bottomContent}
         overlay={overlayContent ?? undefined}
         modal={
-          modalToolJSX !== null ? (
+          messageSelectorElement ?? (modalToolJSX !== null ? (
             <Box flexDirection="column" width="100%">
               {modalToolJSX}
             </Box>
-          ) : undefined
+          ) : undefined)
         }
         modalScrollRef={modalScrollRef}
       />
@@ -4981,17 +4992,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       ) : null}
       <LedgerVerificationOverlay />
       {exitFlow}
-      {isMessageSelectorVisible ? (
-        <MessageSelector
-          messages={transcript.messages as any[]}
-          onPreRestore={() => {}}
-          onRestoreMessage={handleRestoreMessage}
-          onRestoreCode={handleRestoreCode}
-          onPreviewRewind={handlePreviewRewind}
-          onSummarize={handleSummarize}
-          onClose={handleCloseMessageSelector}
-        />
-      ) : null}
+
     </StatusEffortContext>
     </SessionUsageContext>
     </StatusLineExecutionContext>
