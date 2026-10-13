@@ -70,6 +70,7 @@ async function executeOpenAiLogin(
   ctx: SlashCommandContext,
 ): Promise<SlashCommandResult> {
   return safeExecute(async () => {
+    if (ctx.argsRaw.trim() !== "") return { kind: "error", message: "Usage: /openai-login" };
     const home = requireCommandConfigStore(ctx).homeContext;
     const environment = providerEnvironmentFromCommandContext(ctx);
     // Load once before registering synchronous stage callbacks.

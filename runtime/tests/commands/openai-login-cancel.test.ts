@@ -10,6 +10,13 @@ vi.mock("src/commands/provider-sign-in.js", () => ({ signInToProvider: mocks.sig
 import { openaiLoginCommand } from "src/commands/openai-auth.js";
 
 describe("OpenAI login cancellation", () => {
+  it("rejects arguments before starting OAuth", async () => {
+    mocks.signIn.mockClear();
+    const result = await openaiLoginCommand.execute({ argsRaw: "badargument" } as SlashCommandContext);
+    expect(result).toEqual({ kind: "error", message: "Usage: /openai-login" });
+    expect(mocks.signIn).not.toHaveBeenCalled();
+  });
+
   it.each(["\x1b", "\x03"])("cancels with %j and restores the composer", async key => {
     const stdin = Object.assign(new PassThrough(), { isTTY: true, ref() {}, unref() {}, setRawMode() {} });
     const stdout = Object.assign(new PassThrough(), { isTTY: true, columns: 120, rows: 30 });
