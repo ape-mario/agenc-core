@@ -34,6 +34,9 @@ import { silentLogger } from "../../utils/logger.js";
 import type { Logger } from "../../utils/logger.js";
 import { classifyShellWorkspaceWritePolicy } from "../../llm/shell-write-policy.js";
 import { shellWorkspaceMutationPermission } from "./shell-mutation-permission.js";
+import { shellGitMutationPermission } from "./shell-git-permission.js";
+import { literalGitCommands } from "../../utils/shell/git-commands.js";
+import { shlexJoin } from "../../shell-command/parser.js";
 import { preflightShellWorkspaceWritePolicy } from "./shell-preflight.js";
 import { bashToolHasPermission } from "../../permissions/bash.js";
 import type { PermissionResult } from "../../permissions/types.js";
@@ -847,6 +850,11 @@ async function bashContentRulePermission(
   if (candidate === undefined) {
     return { behavior: "passthrough", message: "Run shell command" };
   }
+  const state = context.getAppState();
+  const permissions = context.toolPermissionContext?.(state) ?? state.toolPermissionContext;
+  if (permissions.mode === "default" && literalGitCommands(candidate.command)?.mutates === true) {
+    return { behavior: "ask", message: "Allow this Git command to change the workspace repository?" };
+  }
   // Rules and the safety checks see `command` joined with `args`, but that
   // remapped object is not the call: the router executes an allow's
   // `updatedInput`, so hand back what the model sent (`cwd`, `args`,
@@ -1088,9 +1096,17 @@ export function createBashTool(config?: BashToolConfig): Tool {
         logger.warn(`Bash tool denied: ${prepared.message}`);
         return errorResult(prepared.message);
       }
-      const { command, shellCommand } = prepared;
+      let { command, shellCommand } = prepared;
       const cwd = inspection?.cwd ?? prepared.cwd;
       const useShellMode = inspection === undefined && prepared.useShellMode;
+      const gitMutation = inspection === undefined ? shellGitMutationPermission(
+        useShellMode ? shellCommand : shlexJoin([command, ...prepared.directArgs]),
+        cwd, defaultCwd, shellWorkspaceMutationPermission(rawArgs).allowWorkspaceWrites,
+      ) : undefined;
+      if (gitMutation !== undefined) {
+        if (useShellMode) shellCommand = gitMutation.command;
+        else command = "/usr/bin/git";
+      }
       const execCommand = inspection?.program ?? (useShellMode ? shellPath : command);
       const execArgs = inspection !== undefined ? [...inspection.args] : useShellMode
         ? ["-c", wrapCommandForShell(shellPath, commandWrapperArgv, shellCommand)]
@@ -1187,6 +1203,7 @@ export function createBashTool(config?: BashToolConfig): Tool {
             args,
             cwd,
             env: { ...env },
+            ...(gitMutation !== undefined ? { additionalPermissions: gitMutation.permissions } : {}),
           });
           return {
             ok: true,

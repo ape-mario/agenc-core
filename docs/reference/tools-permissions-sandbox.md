@@ -570,6 +570,15 @@ an approval card for a shell edit rather than rejecting an edit the user can
 approve. Literal shell mutation targets are tracked for file-history restore,
 including newly created files; dynamic targets may not be fully tracked.
 Read operands, globs, pipes and redirects to `/dev/null` do not count as writes.
+Literal Git mutations (`git mv`, `git add`, `git commit`, `git checkout -b`)
+use the same edit consent. Default mode asks; acceptEdits and bypass run them
+directly. Only a command containing Git invocations receives temporary write
+access to its workspace repository metadata; `.git/config`, hooks and info
+stay read-only. The runtime pins the system Git binary. Mixed shell programs,
+substitutions, expansion and metadata outside the workspace receive no such
+grant. Linked-worktree operations keep their existing metadata authority.
+Raw writes such as `echo ... > .git/hooks/...` remain blocked in every mode.
+Code rewind tracks literal Git moves; it does not rewind commits or the index.
 Read-only substitutions such as `$(pwd)` run without a write approval. Embedded
 literal writes are classified, including protected targets. Opaque substitutions
 retain their unknown-write classification and require edit permission or an

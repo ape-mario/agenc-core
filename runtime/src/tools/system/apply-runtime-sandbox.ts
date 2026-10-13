@@ -13,6 +13,7 @@ import {
   type FileSystemSandboxPolicy,
   type PermissionProfile,
   type SandboxManager,
+  type AdditionalPermissionProfile,
 } from "../../sandbox/engine/index.js";
 import { effectivePermissionProfile } from "../../sandbox/engine/policy-transforms.js";
 import {
@@ -31,6 +32,7 @@ export interface SandboxSpawnCommand {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly env: Record<string, string>;
+  readonly additionalPermissions?: AdditionalPermissionProfile;
   readonly cwdBinding?: "inherited_readonly";
   readonly cwdCapability?: BoundReadOnlyCwdCapability;
   readonly argv0?: string;
@@ -43,6 +45,7 @@ interface ApplyRuntimeSandboxToSpawnParams {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly env: Record<string, string>;
+  readonly additionalPermissions?: AdditionalPermissionProfile;
   readonly cwdBinding?: "inherited_readonly";
   readonly cwdCapability?: BoundReadOnlyCwdCapability;
   readonly sandboxManager?: SandboxManager;
@@ -80,7 +83,7 @@ function applyRuntimeSandboxToSpawnWithCapabilities(
   const surface = params.surface ??
     readSandboxExecutionSurface(params.toolArgs) ??
     "tool";
-  const runtimeSandbox = runtimeSandboxForExec(
+  let runtimeSandbox = runtimeSandboxForExec(
     params.toolArgs,
     params.fallbackCwd,
     surface,
@@ -93,6 +96,8 @@ function applyRuntimeSandboxToSpawnWithCapabilities(
       cwd: params.cwd,
       env: params.env,
       argv0: basename(params.program),
+      ...(capabilities === "inherit" && params.additionalPermissions !== undefined
+        ? { additionalPermissions: params.additionalPermissions } : {}),
       ...(params.cwdCapability !== undefined ? { cwdCapability: params.cwdCapability } : {}),
       ...(params.cwdBinding !== undefined
         ? { cwdBinding: params.cwdBinding }
@@ -127,6 +132,15 @@ function applyRuntimeSandboxToSpawnWithCapabilities(
         ? { cwdBinding: params.cwdBinding }
         : {}),
     };
+  }
+  if (capabilities === "inherit" && params.additionalPermissions !== undefined) {
+    const previous = runtimeSandbox.additionalPermissions;
+    runtimeSandbox = { ...runtimeSandbox, additionalPermissions: { ...previous,
+      fileSystem: { entries: [
+        ...(previous?.fileSystem?.entries ?? []),
+        ...(params.additionalPermissions.fileSystem?.entries ?? []),
+      ] },
+    } };
   }
   return transformWithRuntimeSandbox({
     program: params.program,
