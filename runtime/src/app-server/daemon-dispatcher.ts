@@ -12,6 +12,7 @@ import { ROUTINE_SESSION_PREPARE_CAPABILITY, type RoutineSessionPreparation } fr
  */
 
 import { createHash, randomUUID } from "node:crypto";
+import { redactSecrets } from "../secrets/sanitizer.js";
 import type { PluginSettingsService } from "../plugins/settings-service.js";
 import type { PluginSettingsResult } from "./protocol/index.js";
 import { sessionMcpAttachmentIssue } from "../mcp-client/local-control.js";
@@ -5424,6 +5425,12 @@ function mapDispatchError(
   if (error instanceof AgenCSessionLifecycleError) {
     return errorResponse(id, -32602, error.message, { code: error.code });
   }
+  // The daemon owns a bounded console sink. Keep internal handler failures
+  // diagnosable there, including their stack, without logging request params.
+  console.error(
+    "agenc: unexpected RPC handler exception:",
+    redactSecrets(error instanceof Error ? error.stack || error.message : String(error)),
+  );
   return errorResponse(
     id,
     -32603,
