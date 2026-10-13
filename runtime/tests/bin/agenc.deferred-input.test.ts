@@ -5,6 +5,8 @@ import {
   __wrapDaemonTuiSessionWithPromptPreparationForTest,
   sessionConfigurationFromAgenCConfig,
 } from "./agenc-main.js";
+import { configCommand } from "../../src/commands/config.js";
+import type { Session } from "../../src/session/session.js";
 import { ConfigStore } from "../config/store.js";
 import { PermissionModeRegistry } from "../permissions/permission-mode.js";
 import { createEmptyToolPermissionContext } from "../permissions/types.js";
@@ -336,6 +338,16 @@ function daemonHarness(
 }
 
 describe("deferred daemon input ownership", () => {
+  it("reloads cold config without requiring session MCP authority", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps });
+    const result = await configCommand.execute({ session: session as unknown as Session, cwd: process.cwd(), home: process.cwd(), argsRaw: "reload" });
+    expect(result).toMatchObject({ kind: "text", text: expect.stringContaining("MCP refresh staged") });
+    expect(harness.requests).toContainEqual({ method: "daemon.reload", params: {} });
+    expect(harness.startPromptAgent).not.toHaveBeenCalled();
+    expect(harness.requests.some(entry => entry.method.startsWith("session.mcp"))).toBe(false);
+  });
+
   it("forwards compaction rollback once without replaying a failed mutation", async () => {
     const harness = daemonHarness();
     const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });

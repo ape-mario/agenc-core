@@ -57,6 +57,7 @@ export { getConfigFilePath } from "./config-context.js";
  * client-side ConfigStore.
  */
 interface DaemonApplyConfigResult {
+  readonly sessionId?: string;
   readonly applied: boolean;
   readonly summary: string;
 }
@@ -337,10 +338,12 @@ export function createConfigCommand(deps: ConfigCommandDeps = {}): SlashCommand 
             // client-side reload above only updates `/config show` chrome).
             const applyDaemonConfig = daemonApplyConfigFn(ctx);
             let daemonSuffix = "";
+            let mcpRefreshDeferred = false;
             if (applyDaemonConfig !== null) {
               try {
                 const result = await applyDaemonConfig({ reload: true });
                 daemonSuffix = `\nDaemon: ${result.summary}`;
+                mcpRefreshDeferred = result.sessionId === "pending";
               } catch (error) {
                 return {
                   kind: "error",
@@ -349,7 +352,9 @@ export function createConfigCommand(deps: ConfigCommandDeps = {}): SlashCommand 
               }
             }
             try {
-              const mcpSuffix = await refreshMcpAfterConfigReload(ctx.session);
+              const mcpSuffix = mcpRefreshDeferred
+                ? "; MCP refresh staged for the first conversation"
+                : await refreshMcpAfterConfigReload(ctx.session);
               const warningSuffix = formatConfigReloadWarnings(configStore);
               return {
                 kind: "text",
