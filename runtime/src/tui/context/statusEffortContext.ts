@@ -10,3 +10,9 @@ export const StatusEffortContext = createContext<string | null>(null);
 export function useStatusEffort(): string | null {
   return useContext(StatusEffortContext);
 }
+
+/** Resident usage shared by /context and the footer; null until known. */
+export const StatusContextUsageContext = createContext<number | null>(null);
+export function useStatusContextUsage(): number | null {
+  return useContext(StatusContextUsageContext);
+}

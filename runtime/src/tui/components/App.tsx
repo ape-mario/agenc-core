@@ -86,7 +86,7 @@ import {
 } from "../state/AppState.js";
 import { useSettings } from "../hooks/useSettings.js";
 import { useMainLoopModel } from "../hooks/useMainLoopModel.js";
-import { StatusEffortContext } from "../context/statusEffortContext.js";
+import { StatusEffortContext, StatusContextUsageContext } from "../context/statusEffortContext.js";
 import { readSessionSelection } from "../../session/provider-model-selection.js";
 import {
   getSessionEffortLabelForContext,
@@ -2685,7 +2685,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       context,
     );
   }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel]);
-  const contextPctLabel = useMemo(() => {
+  const contextUsagePercent = useMemo(() => {
     if (props.session.getDaemonSessionSnapshot !== undefined) {
       if (residentContext?.session !== props.session ||
           residentContext.conversationId !== props.session.conversationId ||
@@ -2695,13 +2695,13 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         model: resolvedMainLoopModel,
         contextWindowTokens: configuredContextWindow(config),
       });
-      return `ctx ${usage.usedPercentage}%`;
+      return usage.usedPercentage;
     }
     const usage = transcript.latestUsage ?? getCurrentUsage(transcriptMessagesRef.current as any[]);
     if (!usage) return null;
     const windowSize = getContextWindowForModelForContext(resolvedMainLoopModel, remoteAuthSessionContext);
     const { used } = calculateContextPercentages(usage, windowSize);
-    return used === null ? null : `ctx ${used}%`;
+    return used;
   }, [props.session, props.session.conversationId, residentContext, config, lastAssistantMessageId, transcript.latestUsage,
     resolvedMainLoopModel, remoteAuthSessionContext]);
   const realtimeState = useRealtimeState(props.session.realtime);
@@ -4955,6 +4955,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     <StatusLineExecutionContext value={props.session.executeDaemonStatusLine}>
     <SessionUsageContext value={transcript.sessionUsage ?? null}>
     <StatusEffortContext value={statusEffortLabel}>
+    <StatusContextUsageContext value={contextUsagePercent}>
       <AnimatedTerminalTitle isAnimating={titleIsAnimating} title={title} />
       <GlobalKeybindingHandlers
         screen={screen as any}
@@ -5014,6 +5015,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       <LedgerVerificationOverlay />
       {exitFlow}
 
+    </StatusContextUsageContext>
     </StatusEffortContext>
     </SessionUsageContext>
     </StatusLineExecutionContext>

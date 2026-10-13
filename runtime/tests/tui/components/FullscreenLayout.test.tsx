@@ -112,10 +112,10 @@ describe("FullscreenLayout modal viewport", () => {
     },
   );
 
-  test("marks Light next to the mode without changing other status facts", () => {
+  test("marks light next to the mode without changing other status facts", () => {
     const regular = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort");
     const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort", true);
-    expect(light).toEqual({ ...regular, mode: "default mode · Light" });
+    expect(light).toEqual({ ...regular, light: "light" });
   });
 
   test("shows each status fact once with plain mode labels", () => {
@@ -126,6 +126,7 @@ describe("FullscreenLayout modal viewport", () => {
       model: "grok-4-fast",
       effort: null,
       mode: "bypass mode",
+      light: null,
       branch: "main",
       spend: "$0.04",
     });
@@ -160,6 +161,7 @@ describe("FullscreenLayout modal viewport", () => {
       model: "grok-4-fast",
       effort: null,
       mode: "default mode",
+      light: null,
       branch: null,
       spend: null,
     });

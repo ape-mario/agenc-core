@@ -25,7 +25,7 @@ describe("SwarmStatusIndicator", () => {
       40,
     );
 
-    expect(output).toBe(" · ◇ swarm");
+    expect(output).toBe(" · swarm");
     expect(output).not.toContain("SWARM");
   });
 
@@ -35,6 +35,6 @@ describe("SwarmStatusIndicator", () => {
       40,
     );
 
-    expect(output).toBe(" · ◆ 3 agents");
+    expect(output).toBe(" · 3 agents");
   });
 });
