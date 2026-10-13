@@ -150,6 +150,11 @@ export function setSessionTaskTokenBudget(session: Session, tokens: number, chec
   const effective = admission?.setTaskTokenBudget?.(tokens) ?? tokens;
   replaceSessionTaskTokenBudgetSnapshot(session, effective);
   budgets.get(session)?.setTokenLimit(effective, checkpoint);
+  session.emit?.({ id: session.nextInternalSubId(), msg: { type: "warning", payload: {
+    cause: "task_budget_changed",
+    message: "Task token allowance updated.",
+    details: { taskTokenBudget: effective },
+  } } }, { durable: true });
   return effective;
 }
 
