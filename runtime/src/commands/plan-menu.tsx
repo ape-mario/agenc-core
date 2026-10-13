@@ -109,6 +109,7 @@ function PlanDashboardView({
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
   const [notice, setNotice] = React.useState<string | undefined>();
 
   const persistItems = React.useCallback((nextItems: PlanDashboardSnapshot["items"]) => {
@@ -122,11 +123,17 @@ function PlanDashboardView({
     if (text.length === 0) return;
     persistItems(items.map((item, index) => index === activeIndex ? { ...item, text } : item));
     setEditing(false);
+    setAdding(false);
   }, [activeIndex, draft, items, persistItems]);
 
   useInput((input, key) => {
     if (editing) {
       if (key.escape) {
+        if (adding) {
+          setItems(current => current.filter((_item, index) => index !== activeIndex));
+          setActiveIndex(index => Math.max(0, index - 1));
+          setAdding(false);
+        }
         setEditing(false);
         return;
       }
@@ -173,7 +180,8 @@ function PlanDashboardView({
         { state: "pending" as const, text: "new plan step" },
         ...items.slice(activeIndex + 1),
       ];
-      persistItems(nextItems);
+      setItems(nextItems);
+      setAdding(true);
       setActiveIndex(activeIndex + 1);
       setDraft("new plan step");
       setEditing(true);

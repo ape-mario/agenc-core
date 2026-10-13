@@ -440,3 +440,25 @@ describe("plan dashboard snapshot", () => {
     expect(snapshot.message).toContain("Plan mode is active");
   });
 });
+
+it("keeps an added plan step private until Enter and drops it on Esc", async () => {
+  const setToolJSX = vi.fn();
+  const h = mkHarness({ initialMode: "plan", appState: { setToolJSX } });
+  await writePlan(planCtx(h), "- [ ] original step\n");
+  await planCommand.execute(h.ctx);
+  const stdin = Object.assign(new PassThrough(), { isTTY: true, ref() {}, unref() {}, setRawMode() {} });
+  const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false });
+  stdout.resume();
+  const root = await createRoot({ stdin: stdin as unknown as NodeJS.ReadStream, stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false });
+  try {
+    root.render(React.createElement(AppStateProvider, { initialState: getDefaultAppState(), children: setToolJSX.mock.calls[0][0].jsx }));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    stdin.write("a"); await new Promise(resolve => setTimeout(resolve, 50));
+    expect(getPlan(planCtx(h))).toBe("- [ ] original step\n");
+    stdin.write("\x1b"); await new Promise(resolve => setTimeout(resolve, 60));
+    expect(getPlan(planCtx(h))).toBe("- [ ] original step\n");
+    stdin.write("a"); await new Promise(resolve => setTimeout(resolve, 50));
+    stdin.write("\r"); await new Promise(resolve => setTimeout(resolve, 50));
+    expect(getPlan(planCtx(h))).toBe("- [ ] original step\n- [ ] new plan step\n");
+  } finally { root.unmount(); stdin.end(); stdout.end(); }
+});
