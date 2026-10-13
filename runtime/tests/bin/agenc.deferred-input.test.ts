@@ -210,6 +210,7 @@ function daemonHarness(
     readonly method: string;
     readonly params: Record<string, unknown> | undefined;
   }> = [];
+  const sessionRules: Record<string, string[]> = { allow: [], deny: [], ask: [] };
   const client = {
     request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
       requests.push({ method, params });
@@ -236,6 +237,22 @@ function daemonHarness(
           );
         }
         return {};
+      }
+      if (method === "session.permissions.mutateRule") {
+        const behavior = String(params?.behavior);
+        const rule = String(params?.rule);
+        const bucket = sessionRules[behavior]!;
+        const index = bucket.indexOf(rule);
+        const applied = params?.operation === "add" ? index < 0 : index >= 0;
+        if (applied) {
+          if (params?.operation === "add") bucket.push(rule);
+          else bucket.splice(index, 1);
+        }
+        return {
+          ...params,
+          applied,
+          sessionRules: { allow: [...sessionRules.allow!], deny: [...sessionRules.deny!], ask: [...sessionRules.ask!] },
+        };
       }
       if (method === "session.shell.execute") {
         if (options.rejectShellExecute === true) {
@@ -338,6 +355,31 @@ function daemonHarness(
 }
 
 describe("deferred daemon input ownership", () => {
+  it("commits cold and live rule edits through daemon authority before submitting", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({
+      baseSession: harness.baseSession, deps: harness.deps,
+      preparePrompt: async ({ message }) => message,
+    });
+    const controls = session as typeof session & Pick<
+      import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession,
+      "mutateDaemonPermissionRule"
+    >;
+    await controls.mutateDaemonPermissionRule!({ operation: "add", behavior: "deny", rule: "exec_command" });
+    expect(harness.startPromptAgent).toHaveBeenCalledWith(expect.objectContaining({ deferInitialTurn: true }));
+    expect(harness.requests.some(({ method }) => method === "message.stream")).toBe(false);
+    expect(harness.requests.at(-1)).toEqual({
+      method: "session.permissions.mutateRule",
+      params: { sessionId: "session-1", operation: "add", behavior: "deny", rule: "exec_command" },
+    });
+    await session.submit("try the denied tool");
+    await controls.mutateDaemonPermissionRule!({ operation: "add", behavior: "deny", rule: "Bash" });
+    await controls.mutateDaemonPermissionRule!({ operation: "remove", behavior: "deny", rule: "exec_command" });
+    expect(harness.startPromptAgent).toHaveBeenCalledTimes(1);
+    const registry = (session.services as unknown as { permissionModeRegistry: PermissionModeRegistry }).permissionModeRegistry;
+    expect(registry.current().alwaysDenyRules.session).toEqual(["Bash"]);
+  });
+
   it("forwards rewind preview and both restore actions to canonical daemon history", async () => {
     const harness = daemonHarness();
     const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });

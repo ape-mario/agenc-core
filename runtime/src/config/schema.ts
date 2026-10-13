@@ -42,7 +42,7 @@ import {
 import {
   parseRuleString,
 } from "../permissions/rules.js";
-import { isRemovedLiveToolName } from "../permissions/tool-names.js";
+import { isRemovedLiveToolName, permissionRuleToolName } from "../permissions/tool-names.js";
 import {
   bindingCommandError,
   isKeybindingContextName,
@@ -4099,7 +4099,7 @@ function validatePermissionRuleArray(
   if (rules === undefined) return undefined;
   for (const rule of rules) {
     const toolName = parseRuleString(rule)?.toolName ?? rule;
-    if (isRemovedLiveToolName(toolName)) {
+    if (isRemovedLiveToolName(permissionRuleToolName(toolName, field))) {
       throw new InvalidPermissionsConfigError(
         field,
         `removed tool name '${toolName}'; run agenc config migrate`,

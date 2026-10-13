@@ -24,7 +24,7 @@ import {
   type ToolPermissionRulesBySource,
   immutableToolPermissionContext,
 } from "./types.js";
-import { isRemovedLiveToolName } from "./tool-names.js";
+import { isRemovedLiveToolName, permissionRuleToolName } from "./tool-names.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Escape helpers (parens + backslash)
@@ -231,7 +231,9 @@ export function matchRule(
       : `mcp__${tool.mcpInfo.serverName}`
     : tool.name;
 
-  if (toolNamesInPermissionRiskFamily(toolNameForMatch).includes(rule.ruleValue.toolName)) {
+  if (toolNamesInPermissionRiskFamily(toolNameForMatch).includes(
+    permissionRuleToolName(rule.ruleValue.toolName, rule.ruleBehavior),
+  )) {
     return true;
   }
 
@@ -339,7 +341,9 @@ export function getRuleByContentsForTool(
   }
   for (const rule of rules) {
     if (
-      toolNamesInPermissionRiskFamily(toolName).includes(rule.ruleValue.toolName) &&
+      toolNamesInPermissionRiskFamily(toolName).includes(
+        permissionRuleToolName(rule.ruleValue.toolName, rule.ruleBehavior),
+      ) &&
       rule.ruleValue.ruleContent !== undefined &&
       rule.ruleBehavior === behavior
     ) {

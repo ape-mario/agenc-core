@@ -507,6 +507,15 @@ Source of truth: `runtime/src/permissions/types.ts` (and
 | `dontAsk` | Deny rather than prompt when an ask would be required |
 | `auto` | Classifier-assisted auto decisions |
 
+`/permissions add` and `/permissions remove` update the daemon's live rule set
+before reporting success. An edit before the first message creates a session
+without starting a model turn. Use `--persist user` to retain a rule in
+`config.toml` for new sessions; `/permissions export` displays the current
+rules. A matching deny wins over allow rules in every mode, including bypass.
+Legacy `Bash` deny and ask rules restrict the canonical shell tool family
+(`exec_command`, `system.bash`, and process continuation tools). Legacy `Bash`
+allow rules remain invalid; use canonical tool names for grants.
+
 `bypassPermissions` is restricted. It skips approval prompts down to the deny
 floor, but it does not disable the OS sandbox and it does not skip tools
 that set `requiresUserInteraction()` — see

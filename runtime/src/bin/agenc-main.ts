@@ -1067,6 +1067,7 @@ type TuiSessionShape = Pick<
     readonly model: string;
   }) => Promise<ProviderModelSelectionOutcome>;
   setDaemonPermissionMode?: (mode: string) => Promise<unknown>;
+  mutateDaemonPermissionRule?: AgenCTuiBridgeSession["mutateDaemonPermissionRule"];
   getDaemonHooksStatus?: () => Promise<unknown>;
   setDaemonHooksDisabled?: (disabled: boolean) => Promise<unknown>;
   applyDaemonConfig?: (params: {
@@ -2330,6 +2331,16 @@ async function createDeferredDaemonPromptTuiSession(params: {
         );
       }
       return live.setDaemonPermissionMode(mode);
+    },
+    // Rule edits must reach the daemon even through this outer lazy wrapper.
+    // Create a turn-free session for a cold edit, so no first model turn can
+    // start before the daemon has acknowledged its permission rules.
+    mutateDaemonPermissionRule: async (ruleParams) => {
+      const live = liveSession ?? (await ensureLiveSession("", undefined, true));
+      if (typeof live?.mutateDaemonPermissionRule !== "function") {
+        throw new Error("Permission-rule editing is not supported by this daemon session.");
+      }
+      return live.mutateDaemonPermissionRule(ruleParams);
     },
     // `/hooks` reads the daemon session's REAL configured-hooks runtime
     // through liveSession.getDaemonHooksStatus. Hooks live on the daemon
