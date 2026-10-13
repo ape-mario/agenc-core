@@ -1,3 +1,4 @@
+import { createMemoizedSecretRedactor } from "../../src/secrets/sanitizer.js";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -30,6 +31,30 @@ afterEach(() => {
 });
 
 describe("secrets sanitizer", () => {
+  it.each([redactSecretsInValue, createMemoizedSecretRedactor()])(
+    "preserves protocol flags and containers while redacting credential values",
+    (redact) => {
+      const shared = { value: "opaque-credential", isSecret: false };
+      const input = {
+        questions: [{ isSecret: false }, { isSecret: true }],
+        plain: shared,
+        secret: shared,
+        secretKey: [1, 2, 3],
+        password: "opaque-password",
+        authorization: { enabled: false, credentials: ["opaque-token"] },
+      };
+      expect(redact(input)).toEqual({
+        questions: [{ isSecret: false }, { isSecret: true }],
+        plain: shared,
+        secret: { value: REDACTED_SECRET, isSecret: false },
+        secretKey: REDACTED_SECRET,
+        password: REDACTED_SECRET,
+        authorization: { enabled: false, credentials: [REDACTED_SECRET] },
+      });
+      expect(input.secret.value).toBe("opaque-credential");
+    },
+  );
+
   it.each(canonicalRedactionFixtures)(
     "redacts canonical outbound text: $name",
     ({ input, expected, secretFragments, preservedFragments }) => {
