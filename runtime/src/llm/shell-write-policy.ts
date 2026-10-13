@@ -17,6 +17,11 @@ import {
   type ShellToken,
 } from "../utils/shell/command-line.js";
 import { analyzeSedWrites } from "../utils/shell/sed-writes.js";
+import {
+  parseWriteCommandOperands,
+  type WriteCommand,
+  type WriteCommandOperands,
+} from "../utils/shell/write-command-options.js";
 
 const SHELL_WORKSPACE_WRITE_TOOL_NAMES = new Set([
   "exec_command",
@@ -336,12 +341,6 @@ function collectOperandTargets(
   return collection;
 }
 
-function collectDeletionTargets(
-  args: readonly string[],
-  cwd: string,
-): ShellWriteTargetCollection {
-  return asDeletions(collectOperandTargets(args, cwd));
-}
 
 function isWorkspaceGeneratedOutputPath(
   workspaceRoot: string,
@@ -555,69 +554,28 @@ function collectEvalWriteTargets(params: {
   return collection;
 }
 
-function collectTeeTargets(
-  args: readonly string[],
-  cwd: string,
-): ShellWriteTargetCollection {
-  return collectOperandTargets(args, cwd);
+/** Options do not reveal which implementation is installed on a BSD host. */
+function readWriteOperands(command: WriteCommand, args: readonly string[], bsd: boolean): WriteCommandOperands {
+  return parseWriteCommandOperands(command, args,
+    bsd ? ["gnu", "gnu-posix", "uutils", "bsd"] : ["gnu", "gnu-posix", "uutils"]);
 }
 
-function collectTouchTargets(
-  args: readonly string[],
-  cwd: string,
-): ShellWriteTargetCollection {
-  return collectOperandTargets(args, cwd);
-}
-
-interface DestinationOperands {
-  readonly operands: readonly string[];
-  readonly targetDirectory?: string;
-  /** `-T`: the destination is the file written, even when it is a directory. */
-  readonly noTargetDirectory: boolean;
-  /** install's `-d`: every operand is a directory it creates. */
-  readonly createsDirectories: boolean;
-}
-
-function parseDestinationOperands(args: readonly string[]): DestinationOperands {
-  const operands: string[] = [];
-  let targetDirectory: string | undefined;
-  let noTargetDirectory = false;
-  let createsDirectories = false;
-  let treatRemainingAsOperands = false;
-  for (let i = 0; i < args.length; i += 1) {
-    const token = args[i];
-    if (!token) continue;
-    if (!treatRemainingAsOperands && token === "--") {
-      treatRemainingAsOperands = true;
-      continue;
-    }
-    if (!treatRemainingAsOperands) {
-      if (token === "-t" || token === "--target-directory") {
-        const value = args[i + 1];
-        if (typeof value === "string") {
-          targetDirectory = value;
-          i += 1;
-        }
-        continue;
-      }
-      if (token.startsWith("--target-directory=")) {
-        targetDirectory = token.slice("--target-directory=".length);
-        continue;
-      }
-      if (token.startsWith("-")) {
-        noTargetDirectory ||= token === "--no-target-directory" || /^-[^-]*T/u.test(token);
-        createsDirectories ||= token === "--directory" || /^-[^-]*d/u.test(token);
-        continue;
-      }
-    }
-    operands.push(token);
+/** Keep every possible path even when option parsing stopped before it. */
+function collectUnclassifiedWriteTargets(parsed: WriteCommandOperands, cwd: string): ShellWriteTargetCollection {
+  const collection = indeterminateTargetCollection();
+  for (const word of parsed.fallbackTargets) {
+    mergeTargetCollections(collection, normalizeConcreteTargetPath(word, cwd));
   }
-  return {
-    operands,
-    ...(targetDirectory === undefined ? {} : { targetDirectory }),
-    noTargetDirectory,
-    createsDirectories,
-  };
+  return collection;
+}
+
+function collectParsedOperandTargets(parsed: WriteCommandOperands, cwd: string): ShellWriteTargetCollection {
+  if (parsed.indeterminate) return collectUnclassifiedWriteTargets(parsed, cwd);
+  const collection = emptyTargetCollection();
+  for (const word of [...parsed.operands, ...parsed.extraTargets]) {
+    mergeTargetCollections(collection, normalizeConcreteTargetPath(word, cwd));
+  }
+  return collection;
 }
 
 /**
@@ -625,10 +583,11 @@ function parseDestinationOperands(args: readonly string[]): DestinationOperands 
  * the sources go into: one written with a trailing `/`, `.` or `..`, or one
  * that exists as a directory, through a symlink as cp and mv follow it.
  */
-function isDirectoryDestination(raw: string, cwd: string): boolean {
+function isDirectoryDestination(raw: string, cwd: string, noDereference = false): boolean {
   if (raw.endsWith("/") || /(?:^|\/)\.{1,2}$/u.test(raw)) return true;
   try {
-    return statSync(kernelPath(cwd, expandLeadingHome(raw))).isDirectory();
+    const path = kernelPath(cwd, expandLeadingHome(raw));
+    return (noDereference ? lstatSync(path) : statSync(path)).isDirectory();
   } catch {
     return false;
   }
@@ -668,11 +627,14 @@ function collectDestinationDirectoryTarget(
  * single operand links it into the working directory.
  */
 function collectDestinationTarget(
-  command: string,
+  command: "cp" | "install" | "ln",
   args: readonly string[],
   cwd: string,
+  bsd: boolean,
 ): ShellWriteTargetCollection {
-  const parsed = parseDestinationOperands(args);
+  const parsed = readWriteOperands(command, args, bsd);
+  if (parsed.indeterminate) return collectUnclassifiedWriteTargets(parsed, cwd);
+  if (parsed.createsDirectories) return collectParsedOperandTargets(parsed, cwd);
   const { operands, targetDirectory } = parsed;
   let sources: readonly string[] = operands.slice(0, -1);
   let destinationRaw = operands[operands.length - 1];
@@ -686,20 +648,18 @@ function collectDestinationTarget(
     destinationRaw = ".";
     intoDirectory = true;
   } else if (command === "install" && operands.length <= 1) {
-    return emptyTargetCollection();
-  } else if (command === "install" && parsed.createsDirectories) {
-    // install -d creates its operands; the last one is judged, as it always was.
-    return normalizeConcreteTargetPath(destinationRaw!, cwd);
+    return collectParsedOperandTargets({ ...parsed, operands: [] }, cwd);
   } else if (destinationRaw !== undefined && sources.length > 0) {
     intoDirectory =
       !parsed.noTargetDirectory &&
-      (sources.length > 1 || isDirectoryDestination(destinationRaw, cwd));
+      (sources.length > 1 || isDirectoryDestination(destinationRaw, cwd, parsed.noDereferenceDestination));
   }
   if (destinationRaw === undefined) return emptyTargetCollection();
   const destination = normalizeConcreteTargetPath(destinationRaw, cwd);
   const directory = destination.targets[0];
+  for (const target of parsed.extraTargets) mergeTargetCollections(destination, normalizeConcreteTargetPath(target, cwd));
   if (!intoDirectory || directory === undefined) return destination;
-  const collection = emptyTargetCollection();
+  const collection = collectParsedOperandTargets({ ...parsed, operands: [] }, cwd);
   for (const source of sources) collectDestinationDirectoryTarget(collection, directory, source);
   if (sources.length === 0) pushUnique(collection.targets, directory);
   return collection;
@@ -716,8 +676,15 @@ function collectDestinationTarget(
 function collectMoveTargets(
   args: readonly string[],
   cwd: string,
+  bsd: boolean,
 ): ShellWriteTargetCollection {
-  const parsed = parseDestinationOperands(args);
+  const parsed = readWriteOperands("mv", args, bsd);
+  if (parsed.indeterminate) {
+    const collection = collectUnclassifiedWriteTargets(parsed, cwd);
+    // An unreadable move may also remove any of these paths.
+    mergeTargetCollections(collection, asDeletions({ ...collection, deletions: [] }));
+    return collection;
+  }
   const { operands, targetDirectory } = parsed;
   const collection = emptyTargetCollection();
   let destinationRaw: string | undefined;
@@ -732,7 +699,7 @@ function collectMoveTargets(
     sourceRaws = operands.slice(0, -1);
     intoDirectory =
       !parsed.noTargetDirectory &&
-      (sourceRaws.length > 1 || isDirectoryDestination(destinationRaw!, cwd));
+      (sourceRaws.length > 1 || isDirectoryDestination(destinationRaw!, cwd, parsed.noDereferenceDestination));
   } else {
     destinationRaw = operands[0];
     sourceRaws = [];
@@ -1712,26 +1679,25 @@ function collectDirectCommandWriteTargets(
   if (command === "eval") {
     return collectEvalWriteTargets(params);
   }
-  if (command === "tee") {
-    return collectTeeTargets(params.args, params.cwd);
-  }
-  if (command === "touch") {
-    return collectTouchTargets(params.args, params.cwd);
+  if (command === "tee" || command === "touch" || command === "truncate") {
+    return collectParsedOperandTargets(readWriteOperands(command, params.args, params.environment.bsdSed), params.cwd);
   }
   if (command === "mv") {
-    return collectMoveTargets(params.args, params.cwd);
+    return collectMoveTargets(params.args, params.cwd, params.environment.bsdSed);
   }
   if (command === "cp" || command === "install" || command === "ln") {
-    return collectDestinationTarget(command, params.args, params.cwd);
+    return collectDestinationTarget(command, params.args, params.cwd, params.environment.bsdSed);
   }
   if (command === "mkdir") {
-    return emptyTargetCollection();
+    const parsed = readWriteOperands(command, params.args, params.environment.bsdSed);
+    return parsed.indeterminate ? collectUnclassifiedWriteTargets(parsed, params.cwd) : emptyTargetCollection();
   }
   if (DELETE_COMMANDS.has(command)) {
-    return collectDeletionTargets(params.args, params.cwd);
-  }
-  if (command === "truncate") {
-    return collectOperandTargets(params.args, params.cwd);
+    const parsed = readWriteOperands(command as "rm" | "rmdir" | "unlink", params.args, params.environment.bsdSed);
+    const collection = collectParsedOperandTargets(parsed, params.cwd);
+    const deletions = asDeletions(collection);
+    if (parsed.indeterminate) mergeTargetCollections(deletions, collection);
+    return deletions;
   }
   if (command === "dd") {
     const collection = emptyTargetCollection();
