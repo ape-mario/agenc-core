@@ -63,6 +63,18 @@ describe("configuredContextWindow", () => {
 });
 
 describe("projectResidentContextUsage", () => {
+  it("uses the prepared input/window/threshold and keeps output reservation separate", () => {
+    const resident = {
+      ...breakdown({ messageTokens: 2_000_000, effectiveWindowTokens: 83_000 }),
+      compactionInputTokens: 75_000,
+      compactionWindowTokens: 100_000,
+      compactionThresholdTokens: 75_000,
+      compactionReservedOutputTokens: 64_000,
+    };
+    const projected = projectResidentContextUsage(resident, { providerEnvironment: {} });
+    expect(projected).toMatchObject({ totalUsed: 75_000, hardLimit: 100_000, compactionThreshold: 75_000, usedPercentage: 75, freeUntilCompact: 0 });
+  });
+
   it("does not re-apply the client compact window when the daemon already published capacity", () => {
     const resident = breakdown({
       windowTokens: 200_000,

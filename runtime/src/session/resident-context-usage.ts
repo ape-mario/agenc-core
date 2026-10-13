@@ -29,7 +29,15 @@ export function projectResidentContextUsage(
     readonly contextWindowTokens?: number;
   },
 ) {
-  const authoritativeWindow = resident.effectiveWindowTokens;
+  // New daemons publish the exact pre-request compaction pressure. Older
+  // daemons retain their explicitly estimated resident-history projection.
+  const pressure = resident as ResidentContextBreakdown & {
+    readonly compactionInputTokens?: number;
+    readonly compactionWindowTokens?: number;
+    readonly compactionThresholdTokens?: number;
+    readonly compactionReservedOutputTokens?: number;
+  };
+  const authoritativeWindow = pressure.compactionWindowTokens ?? resident.effectiveWindowTokens;
   const hasAuthoritativeWindow = typeof authoritativeWindow === "number" && Number.isFinite(authoritativeWindow) && authoritativeWindow > 0;
   // The daemon already applied its effective model percentage and environment.
   // A client's local override must not apply that capacity policy a second time.
@@ -42,10 +50,17 @@ export function projectResidentContextUsage(
   const lookup = { options: { mainLoopModel: model, contextWindowTokens: window } };
   const hardLimit = getEffectiveContextWindowSizeForEnvironment(lookup, environment);
   const autoCompactEnabled = isAutoCompactEnabledForEnvironment(environment);
+  const authoritativeThreshold = pressure.compactionThresholdTokens;
   const compactionThreshold = autoCompactEnabled
-    ? getAutoCompactThresholdForEnvironment(lookup, environment) : hardLimit;
+    ? typeof authoritativeThreshold === "number" && Number.isFinite(authoritativeThreshold) && authoritativeThreshold > 0
+      ? authoritativeThreshold : getAutoCompactThresholdForEnvironment(lookup, environment)
+    : hardLimit;
   const toolsTokens = resident.systemToolTokens + resident.mcpToolTokens;
-  const totalUsed = resident.messageTokens + resident.systemPromptTokens + toolsTokens + resident.memoryFileTokens;
+  const requestInput = pressure.compactionInputTokens;
+  // Reserved output is separate; subtracting it from the window would make
+  // ctx% disagree with the threshold that decides whether to compact.
+  const totalUsed = typeof requestInput === "number" && Number.isFinite(requestInput) && requestInput >= 0
+    ? requestInput : resident.messageTokens + resident.systemPromptTokens + toolsTokens + resident.memoryFileTokens;
   return {
     hardLimit, autoCompactEnabled, compactionThreshold,
     messagesTokens: resident.messageTokens, toolsTokens,

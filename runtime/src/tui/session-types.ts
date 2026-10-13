@@ -120,6 +120,7 @@ export interface AgenCBridgeSession extends AgenCCompactProgressControls {
   readonly initialTranscriptEvents?: readonly unknown[];
   getInitialTranscriptEvents?(): readonly unknown[];
   subscribeToEvents?(cb: (event: unknown) => void): () => void;
+  subscribeToCompactProgress?(cb: (event: unknown) => void): () => void;
   emitPhaseEvent?(event: PhaseEvent): void;
   clearDaemonSession?(): Promise<void>;
   resolveDaemonToolCall?(
