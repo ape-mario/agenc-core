@@ -23,6 +23,11 @@ import {
 } from "./background-agent-runner/completed-event-cache.js";
 import { roughTokenCountEstimation } from "../llm/token-estimation.js";
 import { modelContextWindow } from "../session/turn-context.js";
+import { readPreparedContextPressure, clearPreparedContextPressure } from "../session/prepared-context-pressure.js";
+import { readCompactionProgress, subscribeToCompactionProgress } from "../services/compact/progress.js";
+import { estimateMessagesTokens } from "../services/compact/_deps/runtime.js";
+import { toAgenCRuntimeMessages } from "../session/runtime-message-conversion.js";
+import { getAutoCompactThresholdForEnvironment } from "../services/compact/thresholds.js";
 import { getEffectiveContextWindowSizeForEnvironment } from "../services/compact/thresholds.js";
 import {
   bootstrapLocalRuntimeSession,
@@ -2910,6 +2915,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       );
     }
     await clearSession(active.bootstrap.session);
+    clearPreparedContextPressure(active.bootstrap.session);
     await active.control.clearConversationHistory(agentId);
     // A new conversation does not inherit the old one's goal.
     const clearedGoal = getSessionGoal(active.bootstrap.session);
@@ -3276,12 +3282,34 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           contextWindowTokens: effectiveModelWindow,
         } }, bootstrap.session.services.providerEnvironment ?? {})
         : undefined;
+      const preparedPressure = readPreparedContextPressure(bootstrap.session);
+      const pressure = preparedPressure !== undefined && preparedPressure.model === model && preparedPressure.provider === provider && preparedPressure.effectiveWindowTokens === effectiveWindowTokens
+        ? preparedPressure : undefined;
+      // Before the first prepared request (or after history replacement), use
+      // token-aware input accounting, never base64/metadata JSON byte counts.
+      const compactionWindow = pressure?.effectiveWindowTokens ?? effectiveWindowTokens;
+      const fallbackInput = pressure !== undefined || compactionWindow === undefined ? undefined : estimateMessagesTokens(
+        toAgenCRuntimeMessages(history as import("../llm/types.js").LLMMessage[]),
+        { provider: bootstrap.session.services.provider, options: {
+          mainLoopModel: model, contextWindowTokens: compactionWindow,
+          systemPrompt: instructions, tools: llmTools,
+        } }, { inputOnly: true },
+      );
       return {
         ...(provider !== undefined ? { provider } : {}),
         ...(model !== undefined ? { model } : {}),
         estimated: true,
         windowTokens: rawWindow,
         ...(effectiveWindowTokens !== undefined ? { effectiveWindowTokens } : {}),
+        ...(compactionWindow !== undefined ? {
+          compactionInputTokens: pressure?.inputTokens ?? fallbackInput,
+          compactionWindowTokens: compactionWindow,
+          compactionThresholdTokens: pressure?.autoCompactThresholdTokens ?? getAutoCompactThresholdForEnvironment(
+            { options: { mainLoopModel: model, contextWindowTokens: compactionWindow } },
+            bootstrap.session.services.providerEnvironment ?? {},
+          ),
+          compactionReservedOutputTokens: pressure?.reservedOutputTokens ?? 0,
+        } : {}),
         messageTokens: finiteNumber(messageTokens),
         systemPromptTokens: finiteNumber(estimate(instructions)),
         systemToolTokens: finiteNumber(systemToolTokens),
@@ -3681,6 +3709,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     active: ActiveBackgroundAgent,
     replacementEvent: JsonObject,
   ): Promise<void> {
+    clearPreparedContextPressure(active.bootstrap.session);
     const id =
       typeof replacementEvent.id === "string"
         ? replacementEvent.id
@@ -5246,6 +5275,15 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
   }
 
   #installSessionEventLogBridge(active: ActiveBackgroundAgent): () => void {
+    const unsubscribeCompact = subscribeToCompactionProgress(active.bootstrap.session, (progress) => {
+      // Live telemetry travels over the existing opaque notification surface.
+      // It is never appended to the canonical run journal or used as authority.
+      void this.#emitOrBufferEvent(active, {
+        id: active.bootstrap.session.nextInternalSubId(),
+        type: "compact_progress", payload: { ...progress },
+        statusProjection: "session_only",
+      });
+    });
     const eventLog = (
       active.bootstrap.session as {
         eventLog?: {
@@ -5263,11 +5301,23 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         };
       }
     ).eventLog;
-    if (typeof eventLog?.subscribe !== "function") return () => {};
+    if (typeof eventLog?.subscribe !== "function") return unsubscribeCompact;
     active.canonicalEventBridgeInstalled = true;
-    return eventLog.subscribe((event) => {
-      const uncorrelated = daemonEventFromUnboundSessionEvent(event);
-      if (uncorrelated === null) return;
+    const unsubscribeLog = eventLog.subscribe((event) => {
+      if (event.msg?.type === "context_compacted" || event.msg?.type === "history_cleared" || event.msg?.type === "history_replaced") {
+        clearPreparedContextPressure(active.bootstrap.session);
+      }
+      const canonicalEvent = daemonEventFromUnboundSessionEvent(event);
+      if (canonicalEvent === null) return;
+      const completed = event.msg?.type === "context_compacted"
+        ? readCompactionProgress(active.bootstrap.session) : undefined;
+      // Enrich only the daemon display projection. The canonical boundary and
+      // its strict recovery schema remain byte-for-byte unchanged.
+      const uncorrelated = completed?.phase === "complete" && completed.afterTokens !== undefined
+        ? { ...canonicalEvent, payload: { ...canonicalEvent.payload,
+            displayText: `Compacted ${completed.beforeTokens.toLocaleString("en-US")} to ${completed.afterTokens.toLocaleString("en-US")} tokens in ${Math.round((Date.now() - completed.startedAtMs) / 1000)}s`,
+          } }
+        : canonicalEvent;
       const daemonEvent = projectTelemetryErrorAsSessionOnly(
         scopeDirectShellDaemonEvent(
           active,
@@ -5278,6 +5328,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       this.#applyCanonicalEventBookkeeping(active, daemonEvent);
       void this.#emitOrBufferEvent(active, daemonEvent);
     });
+    return () => { unsubscribeLog(); unsubscribeCompact(); };
   }
 
   #applyCanonicalEventBookkeeping(

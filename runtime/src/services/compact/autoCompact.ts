@@ -29,7 +29,6 @@ import {
   EMERGENCY_COMPACTION_FOCUS,
   type CompactionLadderTier,
 } from "./ladder.js";
-import { usesLocalToolProfile } from "../../llm/wire/capability-gating.js";
 
 export type AutoCompactTrackingState = {
   readonly compacted?: boolean;
@@ -122,12 +121,10 @@ export async function autoCompactIfNeeded(
   const tokenCount = Math.max(
     0,
     estimateMessagesTokens(messages, context, {
-      // Local admission already fits the output reservation to remaining room.
-      // The proactive threshold separately reserves context headroom; charging
-      // the nominal output again can compact a single short first message.
+      // The proactive threshold already reserves context headroom; charging
+      // the nominal output again can compact a single short tool exchange.
       // Forced/reactive and model-downshift paths retain their full accounting.
-      inputOnly: options.force !== true && querySource !== "model_downshift" &&
-        usesLocalToolProfile(context.provider?.name),
+      inputOnly: options.force !== true && querySource !== "model_downshift",
     }) - snipTokensFreed,
   );
   if (options.force !== true && tokenCount < autoCompactThreshold(context)) {

@@ -1,4 +1,6 @@
 import "../bootstrap/node-env.js";
+import { readCompactionProgressEvent } from "../services/compact/progress.js";
+import type { CompactionProgressEvent } from "../services/compact/types.js";
 import type { OneShotContinueSession } from "./route.js";
 import { reproveResumeDescriptor, type ResumeCwdProof, openResumeCwdProof, assertResumeCwdProof, assertLiveAgentMatchesResumeDescriptor, isCanonicalSessionAlreadyActiveError } from "./daemon-one-shot-continue.js";
 import { runDefaultCliRoute } from "./default-cli-route.js";
@@ -1034,6 +1036,7 @@ type TuiSessionShape = Pick<
   rollbackIdleInputAdmission?: (token: string) => boolean;
   commitIdleInputAdmission?: (token: string) => boolean;
   subscribeToEvents?: (cb: (event: unknown) => void) => () => void;
+  subscribeToCompactProgress?: (cb: (event: CompactionProgressEvent) => void) => () => void;
   emit?: (event: unknown) => void;
   emitPhaseEvent?: (event: PhaseEvent) => void;
   cancelActiveTurn?: (reason?: string) => Promise<void>;
@@ -2748,6 +2751,11 @@ async function createDeferredDaemonPromptTuiSession(params: {
         liveUnsubscribers.delete(cb);
       };
     },
+    subscribeToCompactProgress: (cb: (event: CompactionProgressEvent) => void): (() => void) =>
+      session.subscribeToEvents!((event) => {
+        const progress = readCompactionProgressEvent(event);
+        if (progress !== undefined) cb(progress);
+      }),
     getInitialTranscriptEvents: () =>
       liveSession?.getInitialTranscriptEvents?.() ??
       (typeof base.getInitialTranscriptEvents === "function"

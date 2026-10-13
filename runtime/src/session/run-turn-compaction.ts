@@ -647,6 +647,9 @@ async function runAutoCompact(
           ? [...compacted, { ...unsentImageTurn }]
           : compacted;
         state.messagesForQuery = [...compacted];
+        // The last sample measured the replaced history. It must not trigger
+        // another compaction before the model consumes the retained results.
+        state.lastResponseUsage = undefined;
         if (unsentImageTurn) {
           state.messagesForQuery.push({ ...unsentImageTurn });
         }
@@ -970,7 +973,7 @@ function effectivePreviousModelContextWindow(previousTurnSettings: {
 async function runPreSamplingCompact(
   session: Session,
   ctx: TurnContext,
-  querySource: string,
+  _querySource: string,
   state?: TurnState,
   options: Pick<RunAutoCompactOptions, "onAdvisoryRefusal" | "onDurableHistoryReplaced"> = {},
 ): Promise<boolean> {
@@ -979,7 +982,7 @@ async function runPreSamplingCompact(
     ctx,
     state,
   );
-  let preSamplingCompacted = await maybeRunPreviousModelInlineCompact(
+  const preSamplingCompacted = await maybeRunPreviousModelInlineCompact(
     session,
     ctx,
     // Model downshift is a separate safety path, not the local proactive gate.
@@ -989,22 +992,9 @@ async function runPreSamplingCompact(
     state,
     options,
   );
-  const autoCompactLimit = getPreSamplingAutoCompactTokenLimit(ctx);
-  if (
-    autoCompactLimit !== undefined &&
-    activeContextTokensBefore >= autoCompactLimit
-  ) {
-    const contextLimitCompacted = await runAutoCompact(
-      session,
-      ctx,
-      "do_not_inject",
-      "context_limit",
-      "pre_turn",
-      state,
-      { propagateErrors: true, querySource, ...options },
-    );
-    preSamplingCompacted = preSamplingCompacted || contextLimitCompacted;
-  }
+  // General context pressure is evaluated after query preparation, before
+  // every physical provider dispatch. Only a model downshift needs this
+  // separate earlier path to summarize with the previous larger model.
   return preSamplingCompacted;
 }
 
@@ -1053,7 +1043,7 @@ function getActiveContextTokenUsage(
     // Keep input (including its safety margin) on the same scale as the
     // headroom-reserving proactive threshold. Output remains fully accounted
     // by hard admission and can be clamped there; no request limit changes.
-    inputOnly: options.includeOutput !== true && usesLocalToolProfile(ctx.modelProviderId),
+    inputOnly: options.includeOutput !== true,
   });
 }
 

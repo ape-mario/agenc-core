@@ -7,6 +7,8 @@
 
 import { replaceSessionTaskTokenBudgetSnapshot } from "../session/task-budget.js";
 import { randomUUID } from "node:crypto";
+import { readCompactionProgressEvent } from "../services/compact/progress.js";
+import type { CompactionProgressEvent } from "../services/compact/types.js";
 import { isAbsolute } from "node:path";
 import { AgenCDaemonResponseError, MAX_BUFFERED_SESSION_EVENTS_PER_SESSION } from "../app-server/agent-cli.js";
 import { DaemonEventReplay } from "./daemon-event-replay.js";
@@ -264,6 +266,7 @@ export interface AgenCTuiBridgeSession extends AgenCCompactProgressControls {
   readonly initialTranscriptEvents?: readonly unknown[];
   getInitialTranscriptEvents?(): readonly unknown[];
   subscribeToEvents?(cb: (event: unknown) => void): () => void;
+  subscribeToCompactProgress?(cb: (event: CompactionProgressEvent) => void): () => void;
   emitPhaseEvent?(event: PhaseEvent): void;
   clearDaemonSession?(): Promise<void>;
   resolveDaemonToolCall?(params: {
@@ -1825,6 +1828,11 @@ export function createDaemonTuiSession<
         maybeStopDaemonEvents();
       };
     },
+    subscribeToCompactProgress: (cb: (event: CompactionProgressEvent) => void): (() => void) =>
+      daemonSession.subscribeToEvents((event) => {
+        const progress = readCompactionProgressEvent(event);
+        if (progress !== undefined) cb(progress);
+      }),
     getInitialTranscriptEvents: () => [
       ...(restoredTranscriptEvents ?? baseInitialTranscriptEvents(baseSession)),
       ...connectionNoticeEvents(client.getConnectionState?.() ?? null),

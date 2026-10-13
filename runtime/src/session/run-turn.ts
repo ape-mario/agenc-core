@@ -2,7 +2,8 @@ import { assistantMessageFromResponse, parseToolUseBlocks, admittedModelStepId }
 import { cumulativeUsage } from "./cumulative-usage.js";
 import { runMinimalTurn } from "./minimal-turn.js";
 import { oneShotFastModeActive, bypassFastModeEnabled, withOneShotFastMode } from "../one-shot-fast-mode.js";
-import { usesLocalToolProfile } from "../llm/wire/capability-gating.js";
+import { recordPreparedContextPressure } from "./prepared-context-pressure.js";
+import { getEffectiveContextWindowSize } from "../services/compact/thresholds.js";
 import { resolveMainLoopReasoningEffort } from "./session-reasoning-effort.js";
 import { admitReasoningCapSample, clearReasoningCapPolicyForTransition } from "./reasoning-cap-policy.js";
 /**
@@ -283,13 +284,11 @@ import {
   snapshotSamplingRequestContract,
 } from "./run-turn-sampling-request.js";
 import {
-  getActiveContextTokenUsage,
   getAutoCompactTokenLimit,
   getPreSamplingAutoCompactTokenLimit,
   runAutoCompact,
   runPreSamplingCompact,
 } from "./run-turn-compaction.js";
-import { compactionExhaustedReasonText } from "../services/compact/ladder.js";
 
 // Declarations that moved to the run-turn-* sibling modules. Re-exported so
 // every importer of run-turn.js keeps its surface.
@@ -1424,7 +1423,7 @@ class DeferredCompactionError extends Error {}
 
 interface PreparedRequestContextPressure {
   readonly fits: boolean;
-  readonly fallbackProactiveTokens?: number;
+  readonly inputTokens: number;
 }
 
 async function preparedRequestContextPressure(
@@ -1436,7 +1435,7 @@ async function preparedRequestContextPressure(
 ): Promise<PreparedRequestContextPressure> {
   const configuredWindow = request.contextWindowTokens;
   if (configuredWindow === undefined || !Number.isFinite(configuredWindow) || configuredWindow <= 0) {
-    return { fits: false };
+    return { fits: false, inputTokens: Number.POSITIVE_INFINITY };
   }
   const window = Math.floor(configuredWindow);
   const provider = session.services.provider;
@@ -1489,6 +1488,18 @@ async function preparedRequestContextPressure(
       : {}),
     signal,
   });
+  const compactionWindow = getEffectiveContextWindowSize({ options: {
+    mainLoopModel: ctx.modelInfo.slug, contextWindowTokens: window,
+  } });
+  recordPreparedContextPressure(session, {
+    provider: providerName, model,
+    inputTokens: accounting.inputTokens,
+    effectiveWindowTokens: compactionWindow,
+    autoCompactThresholdTokens: getPreSamplingAutoCompactTokenLimit(ctx) ?? compactionWindow,
+    reservedOutputTokens: accounting.reservedOutputTokens,
+    source: accounting.source,
+    measuredAtMs: Date.now(),
+  });
   // Admission may lower the output ceiling while retaining every input token.
   // Checking the nominal ceiling here would force compaction on requests the
   // actual provider boundary can safely admit, notably small Ollama windows.
@@ -1497,13 +1508,7 @@ async function preparedRequestContextPressure(
       accounting, window, maxOutputTokens,
       profile?.contextSafetyBufferTokens ?? 0,
     ) !== undefined,
-    ...(accounting.source === "conservative_fallback" && accounting.admissible
-      ? {
-          fallbackProactiveTokens: usesLocalToolProfile(ctx.modelProviderId)
-            ? accounting.inputTokens
-            : accounting.totalTokens,
-        }
-      : {}),
+    inputTokens: accounting.admissible ? accounting.inputTokens : Number.POSITIVE_INFINITY,
   };
 }
 
@@ -3213,7 +3218,6 @@ async function* runTurnKernelInner(
     // read the just-returned model_needs_follow_up signal from
     // `SamplingRequestResult` right before the
     // `token_limit_reached && needs_follow_up` check.
-    let modelNeedsFollowUp = false;
     try {
       const consumedCorrection = currentTextToolCallCorrectionPrompt(state);
       const consumeFastResponse = async (): Promise<SamplingRequestResult> => {
@@ -3250,6 +3254,9 @@ async function* runTurnKernelInner(
           const requestPressure = () => pressure ??= preparedRequestContextPressure(
             request, session, ctx, signal, requestedModel,
           );
+          // Every physical model dispatch measures the assembled request,
+          // including the first sample, native counts, images and fresh tools.
+          const measuredPressure = await requestPressure();
           const requestFits = async () => (await requestPressure()).fits;
           if (!deferredCompaction && proactiveDispatchCompactionAttempted) {
             // A successful shrink may fall below the proactive threshold
@@ -3266,18 +3273,16 @@ async function* runTurnKernelInner(
            * before that gate runs again. On a provider without a native
            * tokenizer the conservative-fallback estimate is already the
            * number admission will refuse on, so compact from it while the
-           * request is still unsent (#2520). Pre-turn compaction covers the
-           * first sample; this only guards later dispatches.
+           * request is still unsent (#2520). Check the first sample and every
+           * later physical dispatch, including provider-native token counts.
            */
           const preparedOverThreshold =
             !deferredCompaction &&
-            state.turnCount > 1 &&
             autoCompactLimit !== undefined &&
             // Admission learns conservative fallback calibration from prior
             // provider usage. Keep that scoped factor on the proactive path
             // too; the synchronous estimate omits it.
-            ((await requestPressure()).fallbackProactiveTokens ??
-              getActiveContextTokenUsage(session, ctx, state)) >= autoCompactLimit;
+            measuredPressure.inputTokens >= autoCompactLimit;
           if (!deferredCompaction && preparedOverThreshold) {
             proactiveDispatchCompactionAttempted = true;
             persistNewResponseItems();
@@ -3382,7 +3387,6 @@ async function* runTurnKernelInner(
       // anywhere; it was never brought back down, so five transient
       // reconnects spread over a long turn ended it as if it had looped.
       resetRecoveryReentriesAfterProgress(state);
-      modelNeedsFollowUp = result.needsFollowUp;
       if (result.terminal) {
         // The last admitted response may contain useful partial work even when
         // its output recovery cannot fit another call in the task allocation.
@@ -3505,192 +3509,9 @@ async function* runTurnKernelInner(
       continue;
     }
 
-    // Mid-turn compaction. When the
-    // just-finished sampling step pushed total token usage at or past
-    // the current model's auto-compact limit AND a follow-up is still
-    // required (tool calls pending or mailbox has queued user input),
-    // compact before the next sampling request instead of letting the
-    // next prepareContext stage blow through the window.
-    //
-    // Contract:
-    //   token_limit_reached = total_usage_tokens >= auto_compact_limit
-    //   needs_follow_up     = model_needs_follow_up || has_pending_input
-    //   if both: run_auto_compact(MidTurn) -> reset_websocket_session -> continue
-    //
-    // AgenC signal mapping:
-    //   model_needs_follow_up ← `result.needsFollowUp` (set by stream-model
-    //     when `toolUseBlocks.length > 0`; cleared by execute-tools after
-    //     dispatch, so we must evaluate BEFORE execute-tools runs below).
-    //   has_pending_input     ← `session.hasPendingInput()` (mailbox queue).
-    //   total_usage_tokens    ← `getTotalTokenUsage(session)` reads the
-    //     cross-turn cumulative `SessionState.totalTokenUsage` maintained
-    //     by the stream-model writer (phases/stream-model.ts) after every
-    //     provider response.
-    //   auto_compact_limit    ← `ctx.modelInfo.autoCompactTokenLimit`.
-    //
-    // Provider continuity reset:
-    //   `runAutoCompact` → `autoCompactIfNeeded` → `runPostCompactCleanup`
-    //   → `context.clearProviderResponseId()` wires through
-    //   `session.clearProviderResponseId()`, which is AgenC's equivalent.
-    //   That covers the reset when compaction actually runs; we add an
-    //   explicit `session.bindProviderConversation()` rebind after
-    //   compaction so the next sampling request looks like a fresh
-    //   conversation.
-    //
-    // AgenC behavior: mid-turn compaction must re-inject the current
-    // reference-context snapshot immediately before the last real user
-    // message in the compacted replacement history. That wiring is
-    // carried by `before_last_user_message` through runAutoCompact →
-    // autoCompactIfNeeded → compactConversation/session-memory compact.
-    const hasPendingInput = session.hasPendingInput(
-      pendingInputOwnershipForTurn(),
-    );
-    const pendingAssistantToolCalls =
-      state.assistantMessages.at(-1)?.toolCalls.length ?? 0;
-    const needsFollowUpForCompact =
-      modelNeedsFollowUp ||
-      state.toolUseBlocks.length > 0 ||
-      pendingAssistantToolCalls > 0 ||
-      hasPendingInput;
-    /*
-     * Tool calls the model just emitted are already running: the streaming
-     * tool executor starts them as their input completes. A compaction begun
-     * here raced them (observed live: the tool's admission and effect records
-     * landed in the rollout while the summary call was in flight, and the
-     * transaction refused to commit over a rollout that "advanced outside
-     * the compaction admission journal"). Tools do not consume model
-     * context; only the next sample does. So when tool work is pending the
-     * post-tool gate compacts instead, once the results are canonical.
-     */
-    const toolWorkPending =
-      state.toolUseBlocks.length > 0 || pendingAssistantToolCalls > 0;
-    const autoCompactLimit =
-      getPreSamplingAutoCompactTokenLimit(ctx) ?? Number.POSITIVE_INFINITY;
-    // Mirror the donor's `tokenCountWithEstimation` (utils/tokens.ts:418):
-    // anchor on the LAST provider-reported prompt size (single sample, not
-    // cumulative) and treat that as the projected cost of the NEXT API
-    // request. The previous logic took `Math.max(getTotalTokenUsage,
-    // usage.totalTokens, lastResponseUsage.totalTokens)` where the first
-    // two are CUMULATIVE counters that sum every sample's `totalTokens`
-    // additively across the turn (see stream-model.ts; these are
-    // cumulative cost-tracking surfaces, not context-window-pressure
-    // signals). After 19
-    // samples in a single turn each ~13k, the cumulative total reached
-    // 248k and falsely tripped the 236k threshold even though no single
-    // prompt was anywhere near it. Use the latest sample's
-    // `promptTokens` (input-side, what the model just received as
-    // context); on turn 0 with no prior response, fall back to 0 so the
-    // first sample is always allowed through.
-    /*
-     * Measure what admission measures. Admission compares the token
-     * ACCOUNTING estimate (bytes-derived for any provider without a native
-     * tokenizer, plus margin and reserved output) against the window, while
-     * this gate used the provider's reported prompt size. On grok-4.6 the
-     * estimate ran 2.12x the reported number, so admission's real ceiling
-     * was ~224k while this gate waited for 462k of provider tokens: an
-     * observed 306-iteration turn died on `context_window_exceeded` having
-     * never once called auto-compaction. Reading the same scale here makes
-     * the safety net reachable; it crossed the threshold 91 iterations
-     * before that run was killed.
-     */
-    const totalUsageTokens = Math.max(
-      state.lastResponseUsage?.promptTokens ?? 0,
-      getActiveContextTokenUsage(session, ctx, state),
-    );
-    const tokenLimitReached = totalUsageTokens >= autoCompactLimit;
-
-    if (
-      tokenLimitReached &&
-      !deferredCompaction &&
-      needsFollowUpForCompact &&
-      !toolWorkPending
-    ) {
-      let midTurnCompacted = false;
-      try {
-        midTurnCompacted = await runAutoCompact(
-          session,
-          ctx,
-          "before_last_user_message",
-          "context_limit",
-          "in_turn",
-          state,
-          {
-            querySource: turnQuerySource,
-            durableMessageCount: compactionDurableCount(),
-            onDurableHistoryReplaced: onCompactionReplacedHistory,
-            onAdvisoryRefusal: deferCompactionRefusal,
-          },
-        );
-      } catch (error) {
-        const cancelled = await finishCancelledIfAborted(
-          compactFailureError(error),
-        );
-        if (cancelled !== null) {
-          yield cancelled.event;
-          return cancelled.terminal;
-        }
-        // Mid-turn compact failure: end
-        // the turn with a warning plus compact_failed so rollout
-        // reducers see a closed boundary without killing the run.
-        await drainInFlight(state, ctx, session);
-        if (taskBudget?.reached && !await continueInteractiveTaskBudget(session, 0, signal)) {
-          yield await finishTaskBudget();
-          return { reason: "task_budget" };
-        }
-        const underlying = compactFailureError(error);
-        emitTurnWarning(
-          session,
-          MID_TURN_COMPACT_FAILED_CAUSE,
-          underlying.message,
-        );
-        await syncSessionState();
-        emitTurnComplete(lastContent, "compact_failed", underlying);
-        const terminal: Terminal = { reason: "completed", error: underlying };
-        yield compactFailedTurnComplete(lastContent, usage, underlying);
-        return terminal;
-      }
-
-      if (!midTurnCompacted && !deferredCompaction) {
-        // The catch arm above fires only on dispatcher failure. If
-        // the dispatcher ran but reported `wasCompacted=false` (circuit
-        // breaker tripped, feature disabled, or threshold logic inside
-        // the compact module disagreed with our outer check), we do NOT
-        // loop — that would spin forever with unchanged state. Surface
-        // the token-limit condition as a per-turn compact_failed.
-        await drainInFlight(state, ctx, session);
-        const reasonText = compactionExhaustedReasonText({
-          tiersAttempted: state.compactionLadder?.tiersAttempted ?? [],
-          lastSamplePromptTokens: totalUsageTokens,
-          limit: autoCompactLimit,
-          interactive: session.services?.runtimeOptions?.nonInteractive !== true,
-        });
-        emitTurnWarning(
-          session,
-          MID_TURN_COMPACT_FAILED_CAUSE,
-          reasonText,
-        );
-        await syncSessionState();
-        const underlying = new Error(reasonText);
-        emitTurnComplete(lastContent, "compact_failed", underlying);
-        const terminal: Terminal = { reason: "completed", error: underlying };
-        yield compactFailedTurnComplete(lastContent, usage, underlying);
-        return terminal;
-      }
-
-      // Provider continuity reset.
-      // `runAutoCompact` → `runPostCompactCleanup` already called
-      // `session.clearProviderResponseId()` via the compact context;
-      // rebind the provider HTTP client to the current conversation
-      // so the next request opens a fresh continuation under the same
-      // conversationId.
-      if (midTurnCompacted) session.bindProviderConversation();
-      // There is no separate "can drain pending input" gate on the outer
-      // loop's next iteration: the phase machine drains pending input
-      // whenever `prepareContext` decides, so there is nothing to set
-      // here; the session mailbox fires naturally on the
-      // next iteration.
-      if (midTurnCompacted) continue;
-    }
+    // Proactive compaction is owned by the next fully prepared request.
+    // History and the previous sample omit fresh tools and provider image/
+    // output projection, so they cannot supply the authoritative gate tuple.
 
     const lastAssistant = state.assistantMessages.at(-1);
     const assistantText = lastAssistant?.text ?? "";
@@ -3977,79 +3798,9 @@ async function* runTurnKernelInner(
       return { reason: "task_budget" };
     }
 
-    const postToolAutoCompactLimit =
-      getPreSamplingAutoCompactTokenLimit(ctx) ?? Number.POSITIVE_INFINITY;
-    // Same correctness fix as the mid-turn check above: anchor on the
-    // last sample's `promptTokens` (per-sample) rather than the cumulative
-    // session counter, so post-tool-loop compaction triggers on the
-    // projected next-sample prompt size, not on summed throughput — and on
-    // admission's own scale, so the net sits ahead of the trap.
-    const postToolTokenLimitReached =
-      Math.max(
-        state.lastResponseUsage?.promptTokens ?? 0,
-        getActiveContextTokenUsage(session, ctx, state),
-      ) >= postToolAutoCompactLimit;
-    if (
-      postToolTokenLimitReached &&
-      !deferredCompaction &&
-      (state.needsFollowUp || state.toolResults.length > 0)
-    ) {
-      // The results that just came back are the newest context and the
-      // reason the history is over the limit. Make them canonical first so
-      // the transaction can summarize them along with everything else,
-      // instead of finding them unmapped and refusing to compact.
-      persistNewResponseItems();
-      let midTurnCompacted: boolean;
-      try {
-        midTurnCompacted = await runAutoCompact(
-          session,
-          ctx,
-          "before_last_user_message",
-          "context_limit",
-          "in_turn",
-          state,
-          {
-            querySource: turnQuerySource,
-            durableMessageCount: compactionDurableCount(),
-            onDurableHistoryReplaced: onCompactionReplacedHistory,
-            onAdvisoryRefusal: deferCompactionRefusal,
-          },
-        );
-      } catch (error) {
-        const cancelled = await finishCancelledIfAborted(
-          compactFailureError(error),
-        );
-        if (cancelled !== null) {
-          yield cancelled.event;
-          return cancelled.terminal;
-        }
-        throw error;
-      }
-      if (midTurnCompacted) {
-        session.bindProviderConversation();
-        continue;
-      }
-      if (!deferredCompaction) {
-        await drainInFlight(state, ctx, session);
-        const postToolUsageTokens = Math.max(
-          state.lastResponseUsage?.promptTokens ?? 0,
-          getActiveContextTokenUsage(session, ctx, state),
-        );
-        const reasonText = compactionExhaustedReasonText({
-          tiersAttempted: state.compactionLadder?.tiersAttempted ?? [],
-          lastSamplePromptTokens: postToolUsageTokens,
-          limit: postToolAutoCompactLimit,
-          interactive: session.services?.runtimeOptions?.nonInteractive !== true,
-        });
-        emitTurnWarning(session, MID_TURN_COMPACT_FAILED_CAUSE, reasonText);
-        await syncSessionState();
-        const underlying = new Error(reasonText);
-        emitTurnComplete(lastContent, "compact_failed", underlying);
-        const terminal: Terminal = { reason: "completed", error: underlying };
-        yield compactFailedTurnComplete(lastContent, usage, underlying);
-        return terminal;
-      }
-    }
+    // Commit the newest tool exchange before the next prepared request's
+    // gate can start compaction. Never race streamed tool effects or count
+    // raw resident tool bodies instead of the provider request projection.
 
     // Phase 6 — commit iteration. Stop-hook may request re-entry.
     await commit(state, ctx, session, signal, { querySource: turnQuerySource });
