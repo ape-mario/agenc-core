@@ -852,8 +852,15 @@ async function bashContentRulePermission(
   }
   const state = context.getAppState();
   const permissions = context.toolPermissionContext?.(state) ?? state.toolPermissionContext;
-  if (permissions.mode === "default" && literalGitCommands(candidate.command)?.mutates === true) {
-    return { behavior: "ask", message: "Allow this Git command to change the workspace repository?" };
+  if (literalGitCommands(candidate.command)?.mutates === true) {
+    if (permissions.mode === "default") {
+      return { behavior: "ask", message: "Allow this Git command to change the workspace repository?" };
+    }
+    if (["acceptEdits", "bypassPermissions", "auto"].includes(permissions.mode)) {
+      return { behavior: "allow", updatedInput: { ...input }, decisionReason: {
+        type: "other", reason: "Git repository edit allowed by permission mode",
+      } };
+    }
   }
   // Rules and the safety checks see `command` joined with `args`, but that
   // remapped object is not the call: the router executes an allow's
