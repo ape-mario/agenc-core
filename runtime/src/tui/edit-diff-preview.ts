@@ -117,6 +117,7 @@ export function editPairsFromInput(
 export function buildEditDiffPreview(
   toolName: string,
   input: unknown,
+  maxLines = EDIT_PREVIEW_MAX_LINES,
 ): EditDiffPreview | null {
   const extracted = editPairsFromInput(toolName, input);
   if (extracted === null) return null;
@@ -169,14 +170,14 @@ export function buildEditDiffPreview(
   }
 
   const stats = `+${additions} -${removals}`;
-  if (lines.length <= EDIT_PREVIEW_MAX_LINES) {
+  if (lines.length <= maxLines) {
     return { file, stats, lines, remaining: 0, additions, removals };
   }
   return {
     file,
     stats,
-    lines: lines.slice(0, EDIT_PREVIEW_MAX_LINES),
-    remaining: lines.length - EDIT_PREVIEW_MAX_LINES,
+    lines: lines.slice(0, maxLines),
+    remaining: lines.length - maxLines,
     additions,
     removals,
   };

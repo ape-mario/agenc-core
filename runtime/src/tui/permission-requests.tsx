@@ -26,7 +26,9 @@ import type { InputEvent } from "./ink/events/input-event.js";
 import { useRegisterKeybindingContext } from "./keybindings/KeybindingContext.js";
 import { useInputCapture, useKeybindings } from "./keybindings/useKeybinding.js";
 import { useRegisterOverlay } from "./context/overlayContext.js";
-import { ApprovalCard, type ApprovalDiffPreview } from "./components/v2/primitives.js";
+import { ApprovalCard, DiffInline, Popup, type ApprovalDiffPreview } from "./components/v2/primitives.js";
+import { useTerminalSize } from "./hooks/useTerminalSize.js";
+import { useModalOrTerminalSize } from "./context/modalContext.js";
 import { buildEditDiffPreview } from "./edit-diff-preview.js";
 import { EXIT_PLAN_MODE_TOOL_NAME } from "../tools/ExitPlanModeTool/constants.js";
 import { PlanApprovalOverlay } from "./components/PlanApprovalOverlay.js";
@@ -553,6 +555,7 @@ function AgenCApprovalOverlay({
       const built = buildEditDiffPreview(
         writeInput === undefined ? toolUseConfirm.tool.name : "Edit",
         writeInput ?? toolUseConfirm.input,
+        Number.MAX_SAFE_INTEGER,
       );
       if (built === null) return undefined;
       const op = toolUseConfirm.tool.name === "Write" && fileWritePreview?.kind === "missing"
@@ -571,6 +574,43 @@ function AgenCApprovalOverlay({
       return undefined;
     }
   }, [toolUseConfirm.tool.name, toolUseConfirm.input, fileWritePreview, writePreviewUnavailable]);
+  const [fullDiffVisible, setFullDiffVisible] = useState(false);
+  const fullDiffVisibleRef = useRef(false);
+  const diffChordRef = useRef(false);
+  const [diffOffset, setDiffOffset] = useState(0);
+  const viewport = useModalOrTerminalSize(useTerminalSize());
+  const diffPageRows = Math.max(1, viewport.rows - 16);
+  const maxDiffOffset = Math.max(0, (diffPreview?.lines.length ?? 0) - diffPageRows);
+  const handleDiffInput = useCallback((input: string, key: Key, event: InputEvent): boolean => {
+    if (diffPreview === undefined) return false;
+    if (key.ctrl && input === "w") {
+      diffChordRef.current = true;
+      event.stopImmediatePropagation();
+      return true;
+    }
+    if (diffChordRef.current) {
+      diffChordRef.current = false;
+      if (input === "d" && !key.ctrl && !key.meta) {
+        fullDiffVisibleRef.current = true;
+        setFullDiffVisible(true);
+        setDiffOffset(0);
+        event.stopImmediatePropagation();
+        return true;
+      }
+    }
+    if (!fullDiffVisibleRef.current) return false;
+    event.stopImmediatePropagation();
+    if (key.escape || key.return || input === "q") {
+      fullDiffVisibleRef.current = false;
+      setFullDiffVisible(false);
+    } else if (input === "G" || key.end) setDiffOffset(maxDiffOffset);
+    else if (input === "g" || key.home) setDiffOffset(0);
+    else if (key.downArrow || input === "j") setDiffOffset(value => Math.min(maxDiffOffset, value + 1));
+    else if (key.upArrow || input === "k") setDiffOffset(value => Math.max(0, value - 1));
+    else if (key.pageDown || (key.ctrl && input === "d")) setDiffOffset(value => Math.min(maxDiffOffset, value + diffPageRows));
+    else if (key.pageUp || (key.ctrl && input === "u")) setDiffOffset(value => Math.max(0, value - diffPageRows));
+    return true;
+  }, [diffPreview, diffPageRows, maxDiffOffset]);
   const risk = classifyApprovalRisk({
     request,
     toolName: toolUseConfirm.tool.name,
@@ -631,6 +671,7 @@ function AgenCApprovalOverlay({
 
   const handleSelectionInput = useCallback(
     (input: string, key: Key, event: InputEvent): boolean => {
+      if (handleDiffInput(input, key, event)) return true;
       if (input === "1") {
         event.stopImmediatePropagation();
         selectedIndexRef.current = 0;
@@ -671,8 +712,9 @@ function AgenCApprovalOverlay({
       }
       return false;
     },
-    [approve, approveForSession, confirmSelection, reject],
+    [approve, approveForSession, confirmSelection, reject, handleDiffInput],
   );
+  useInputCapture(handleDiffInput, { context: "Modal", isActive: destructive });
   useInputCapture(handleSelectionInput, { context: "Modal", isActive: !destructive });
   useInput(handleSelectionInput, { isActive: !destructive });
 
@@ -696,6 +738,7 @@ function AgenCApprovalOverlay({
   useInput(
     (input, key, event) => {
       if (!destructive) return;
+      if (handleDiffInput(input, key, event)) return;
       event.stopImmediatePropagation();
       if (key.return) {
         if (typedRef.current === requiredWord) approve();
@@ -719,6 +762,11 @@ function AgenCApprovalOverlay({
     { isActive: destructive },
   );
 
+  if (fullDiffVisible && diffPreview !== undefined) {
+    return <Popup title="FULL APPROVAL DIFF" status={`${diffOffset + 1}-${Math.min(diffOffset + diffPageRows, diffPreview.lines.length)} of ${diffPreview.lines.length}`} footer={[{ keyName: "↑↓", label: "scroll" }, { keyName: "PgUp/PgDn", label: "page" }, { keyName: "esc / ↵", label: "back to approval" }]}>
+      <DiffInline file={diffPreview.file} stats={diffPreview.stats} op={diffPreview.op} lines={diffPreview.lines.slice(diffOffset, diffOffset + diffPageRows)} />
+    </Popup>;
+  }
   const name = toolLabel(toolUseConfirm);
   const title =
     risk === "destructive"
