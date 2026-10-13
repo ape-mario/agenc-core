@@ -95,7 +95,10 @@ import {
   type DurableCheckpointUpgradeFailure,
 } from "./durable-checkpoint-upgrade.js";
 import { StateToolPairProjection } from "../state/tool-pair-projection.js";
-import { DURABLE_ROLLOUT_SCHEMA_VERSION } from "./durable-checkpoint-reader.js";
+import {
+  DURABLE_ROLLOUT_SCHEMA_VERSION,
+  computeCheckpointPrefixHashV4,
+} from "./durable-checkpoint-reader.js";
 import {
   StreamingToolPairValidator,
   validateToolPairSequence,
@@ -1496,6 +1499,22 @@ export class RolloutStore {
       committed.replacement_history as readonly ToolPairMessage[],
       "transactional compaction commit",
     );
+    // Publishing an in-turn replacement immediately forces a checkpoint.
+    // Validate that exact consumer before the sole durable commit point;
+    // a producer/reader mismatch must not poison already-committed work.
+    // The strict reader retains and authenticates failed-tool metadata.
+    try {
+      computeCheckpointPrefixHashV4(
+        committed.replacement_history as readonly ResponseItem[],
+        committed.replacement_history.length,
+      );
+    } catch (error) {
+      throw new CompactionTransactionError(
+        "commit_failed",
+        "compaction replacement cannot be checkpointed; history was not changed",
+        { cause: error },
+      );
+    }
     try {
       this.appendCompactionPayloadBundles(
         [

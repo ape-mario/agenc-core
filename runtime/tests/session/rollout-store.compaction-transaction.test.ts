@@ -11,10 +11,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RolloutStore } from "../../src/session/rollout-store.js";
 import { computeCheckpointPrefixHashV3 } from "../../src/session/durable-checkpoint-reader.js";
+import * as checkpointReader from "../../src/session/durable-checkpoint-reader.js";
 import { currentBuildId } from "../../src/session/durable-turns.js";
 import {
   COMPACTION_EVENT_FORMAT_VERSION,
@@ -85,6 +86,24 @@ afterEach(() => {
 });
 
 describe("RolloutStore transactional compaction", () => {
+  it("refuses an uncheckpointable replacement before the durable commit point", () => {
+    const store = openStore("checkpoint-consumer-preflight");
+    const hash = vi.spyOn(checkpointReader, "computeCheckpointPrefixHashV4");
+    try {
+      expect(() => commitSmallCompaction(store, "checkpoint-consumer-attempt", () => {
+        hash.mockImplementationOnce(() => {
+          throw new Error("checkpoint consumer rejected replacement");
+        });
+      })).toThrow(/replacement cannot be checkpointed; history was not changed/);
+      expect(store.readAll().some((item) => item.type === "compaction_committed")).toBe(false);
+      expect(store.prepareSource("after-refusal", []).messages.map((item) => item.content))
+        .toEqual(["source one", "source two"]);
+    } finally {
+      hash.mockRestore();
+      store.close();
+    }
+  });
+
   it("fails fast on a concurrent compaction lease and releases idempotently", async () => {
     const store = openStore("compaction-lease");
     try {
