@@ -209,6 +209,7 @@ import {
   type SessionShellExecuteResult,
   type SessionStatusLineExecuteParams,
   type SessionStatusLineExecuteResult,
+  type SessionSetProviderKeyParams,
   type SessionSetModelParams,
   type SessionSetPermissionModeParams,
   type SessionPermissionRuleMutationParams,
@@ -484,6 +485,7 @@ function buildServerCapabilities(
       agentManager,
       "executeSessionStatusLine",
     ),
+    "session.setProviderKey": hasMethod(agentManager, "setSessionProviderKey"),
     "session.setModel": hasMethod(agentManager, "setSessionModel"),
     "session.setPermissionMode": hasMethod(
       agentManager,
@@ -578,6 +580,7 @@ export interface AgenCDaemonDispatcherOptions {
     | "previewFileRewind"
     | "rewindFilesToMessage"
     | "executeSessionShell"
+    | "setSessionProviderKey"
     | "setSessionModel"
     | "setSessionPermissionMode"
     | "mutateSessionPermissionRule"
@@ -715,6 +718,7 @@ export class AgenCDaemonJsonRpcDispatcher {
     | "previewFileRewind"
     | "rewindFilesToMessage"
     | "executeSessionShell"
+    | "setSessionProviderKey"
     | "setSessionModel"
     | "setSessionPermissionMode"
     | "mutateSessionPermissionRule"
@@ -1771,6 +1775,21 @@ export class AgenCDaemonJsonRpcDispatcher {
           id,
           validateSessionShellExecuteResult(result, validated.commandId),
         );
+      }
+      case "session.setProviderKey": {
+        const validated = validateObjectShape(params, {
+          methodName: "session.setProviderKey",
+          stringFields: ["sessionId", "provider", "apiKey"],
+        });
+        for (const field of ["sessionId", "provider", "apiKey"]) {
+          validateRequiredString(validated, "session.setProviderKey", field);
+        }
+        if ((validated.apiKey as string).length > 32_768 || /\s/u.test(validated.apiKey as string)) {
+          throw invalidParams("session.setProviderKey requires a single API key token");
+        }
+        return successResponse(id, await this.#agentManager.setSessionProviderKey(
+          validated as SessionSetProviderKeyParams,
+        ));
       }
       case "session.setModel":
         return successResponse(

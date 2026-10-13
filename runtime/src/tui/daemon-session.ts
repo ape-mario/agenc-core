@@ -5,6 +5,8 @@
  * input and streamed session events through the daemon protocol.
  */
 
+import { snapshotProviderEnvironment } from "../llm/provider-options.js";
+import { resolveBuiltInProviderInfo } from "../llm/registry/provider-info.js";
 import { replaceSessionTaskTokenBudgetSnapshot } from "../session/task-budget.js";
 import { randomUUID } from "node:crypto";
 import { readCompactionProgressEvent } from "../services/compact/progress.js";
@@ -309,6 +311,7 @@ export interface AgenCTuiBridgeSession extends AgenCCompactProgressControls {
   rewindFilesToMessage?(params: {
     readonly messageOrdinal: number;
   }): Promise<SessionRewindFilesToMessageResult>;
+  useSessionProviderKey?(provider: string, apiKey: string): Promise<void>;
   applyProviderModelSelection?(selection: {
     readonly provider: string;
     readonly model: string;
@@ -478,6 +481,11 @@ export interface AgenCDaemonTuiClient {
     params?: JsonObject,
     options?: { readonly signal?: AbortSignal },
   ): Promise<SessionRewindFilesToMessageResult>;
+  request(
+    method: "session.setProviderKey",
+    params?: JsonObject,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<{ readonly sessionId: string }>;
   request(
     method: "session.setModel",
     params?: JsonObject,
@@ -1610,6 +1618,17 @@ export function createDaemonTuiSession<
         sessionId,
         messageOrdinal: params.messageOrdinal,
       } satisfies SessionFileRewindParams),
+    useSessionProviderKey: async (provider, apiKey) => {
+      await client.request("session.setProviderKey", { sessionId, provider, apiKey });
+      const credentials = resolveBuiltInProviderInfo(provider)?.credentials;
+      if (credentials?.kind === "api-key") {
+        services.providerEnvironment = snapshotProviderEnvironment({
+          ...(baseSession.services.providerEnvironment as Record<string, string | undefined> | undefined),
+          ...(services.providerEnvironment as Record<string, string | undefined> | undefined),
+          [credentials.apiKey.envVars[0]!]: apiKey,
+        });
+      }
+    },
     applyProviderModelSelection: (selection) =>
       runRuntimeSettingsAuthorityMutation(async () => {
         await awaitRuntimeSettingsAuthority();

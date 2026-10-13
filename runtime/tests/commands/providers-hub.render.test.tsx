@@ -133,6 +133,31 @@ describe("providers screen", () => {
     }
   });
 
+  it("shows session-only storage guidance in the key dialog after verification", async () => {
+    const services = fakeServices();
+    services.connect.mockResolvedValue({ ok: true, sessionOnly: true,
+      message: "Key active for this session only; it was not saved. Linux Secret Service is unavailable. Set DEEPSEEK_API_KEY before launching AgenC." } as never);
+    const screen = await mount(<ProvidersHubView initial={snapshot} initialProvider="deepseek" services={services} onDone={() => {}} />);
+    try {
+      await screen.press("\x1b[B", "\x1b[B", "\r", "test-placeholder", "\r");
+      expect(screen.screen()).toContain("session only");
+      expect(screen.screen()).toContain("secret service is unavailable");
+      expect(screen.screen()).toContain("deepseek_api_key");
+      expect(screen.screen()).not.toContain("test-placeholder");
+    } finally { screen.unmount(); }
+  });
+
+  it("shows an unexpected action rejection instead of silently clearing checking", async () => {
+    const services = fakeServices();
+    services.connect.mockRejectedValue(new Error("test-placeholder"));
+    const screen = await mount(<ProvidersHubView initial={snapshot} initialProvider="deepseek" services={services} onDone={() => {}} />);
+    try {
+      await screen.press("\x1b[B", "\x1b[B", "\r", "test-placeholder", "\r");
+      expect(screen.screen()).toContain("could not complete this action");
+      expect(screen.screen()).not.toContain("test-placeholder");
+    } finally { screen.unmount(); }
+  });
+
   it("asks for a key on a provider that is not set, then shows its models", async () => {
     const services = fakeServices();
     const screen = await mount(
