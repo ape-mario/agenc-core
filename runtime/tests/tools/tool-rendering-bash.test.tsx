@@ -58,14 +58,14 @@ describe("createTuiTool('Bash').renderToolResultMessage — end-to-end dispatch"
     expect(props.content).toContain("[exit_code=0 duration_ms=42]");
   });
 
-  test("Bash dispatch is exact-case — the TUI tool name 'bash' (lowercase) does NOT route to BashOutputView", () => {
+  test("the exact lowercase bash compatibility alias routes to BashOutputView", () => {
     const tool = createTuiTool("bash");
     const node = tool.renderToolResultMessage(
       "<bash-stdout>x</bash-stdout>",
       [],
       { verbose: false },
     );
-    expect((node as { type: unknown }).type).not.toBe(BashOutputView);
+    expect((node as { type: unknown }).type).toBe(BashOutputView);
   });
 
   test("Non-Bash tool name with content that happens to contain <bash-stdout> does NOT route to BashOutputView", () => {

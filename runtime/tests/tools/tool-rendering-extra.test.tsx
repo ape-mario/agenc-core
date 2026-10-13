@@ -200,14 +200,14 @@ describe("createTuiTool('FileRead').renderToolResultMessage — end-to-end dispa
     expect((node as { type: unknown }).type).toBe(FileReadView);
   });
 
-  test("'Read' (the wrong pre-seeded name) is not registered in the TUI dispatch table — even with the right envelope it falls through to generic", () => {
+  test("the exact Read compatibility alias routes its envelope to FileReadView", () => {
     const tool = createTuiTool("Read");
     const node = tool.renderToolResultMessage(
       "<read-content>x</read-content>",
       [],
       { verbose: false },
     );
-    expect((node as { type: unknown }).type).not.toBe(FileReadView);
+    expect((node as { type: unknown }).type).toBe(FileReadView);
   });
 
   test("FileReadView renders an 'N lines' result line using the line range", () => {
