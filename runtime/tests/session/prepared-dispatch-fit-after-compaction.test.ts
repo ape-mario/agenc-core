@@ -16,14 +16,14 @@ afterEach(() => {
   tokenAccountingService.clear();
 });
 
-for (const accounting of ["native", "calibrated fallback"] as const) {
+for (const accounting of ["native", "calibrated fallback", "calibrated fallback below raw threshold"] as const) {
   for (const fits of [false, true]) {
     test(`${accounting}: a replacement below the proactive threshold ${fits ? "is sent when it fits" : "ends compact_failed when it cannot fit"}`, async () => {
       tokenAccountingService.clear();
       const provider = mkProvider();
       Object.assign(provider, { name: "zai-coding-plan" });
       const model = "glm-5.3";
-      const replacement = !fits && accounting === "calibrated fallback"
+      const replacement = !fits && accounting !== "native"
         ? "small-summary ".repeat(6_500)
         : "small-summary done";
       if (accounting === "native") {
@@ -57,7 +57,7 @@ for (const accounting of ["native", "calibrated fallback"] as const) {
         return {
           content: first ? "Read one result." : "done",
           toolCalls: first ? [{ id: "read-1", name: "read_probe", arguments: "{}" }] : [],
-          ...(first ? { providerReasoningContent: "r".repeat(400_000),
+          ...(first ? { providerReasoningContent: "r".repeat(accounting === "calibrated fallback below raw threshold" ? 120_000 : 400_000),
             providerReasoningProvenance: { provider: provider.name, model } } : {}),
           usage: { promptTokens: 1_000, completionTokens: 1, totalTokens: 1_001 },
           model, finishReason: first ? "tool_calls" : "stop",

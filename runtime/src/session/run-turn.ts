@@ -2,6 +2,7 @@ import { assistantMessageFromResponse, parseToolUseBlocks, admittedModelStepId }
 import { cumulativeUsage } from "./cumulative-usage.js";
 import { runMinimalTurn } from "./minimal-turn.js";
 import { oneShotFastModeActive, bypassFastModeEnabled, withOneShotFastMode } from "../one-shot-fast-mode.js";
+import { usesLocalToolProfile } from "../llm/wire/capability-gating.js";
 import { resolveMainLoopReasoningEffort } from "./session-reasoning-effort.js";
 import { admitReasoningCapSample, clearReasoningCapPolicyForTransition } from "./reasoning-cap-policy.js";
 /**
@@ -1421,16 +1422,21 @@ async function runSamplingRequest(
 
 class DeferredCompactionError extends Error {}
 
-async function preparedRequestFitsContext(
+interface PreparedRequestContextPressure {
+  readonly fits: boolean;
+  readonly fallbackProactiveTokens?: number;
+}
+
+async function preparedRequestContextPressure(
   request: StreamModelRequestContract,
   session: Session,
   ctx: TurnContext,
   signal: AbortSignal,
   requestedModel: string,
-): Promise<boolean> {
+): Promise<PreparedRequestContextPressure> {
   const configuredWindow = request.contextWindowTokens;
   if (configuredWindow === undefined || !Number.isFinite(configuredWindow) || configuredWindow <= 0) {
-    return false;
+    return { fits: false };
   }
   const window = Math.floor(configuredWindow);
   const provider = session.services.provider;
@@ -1486,10 +1492,19 @@ async function preparedRequestFitsContext(
   // Admission may lower the output ceiling while retaining every input token.
   // Checking the nominal ceiling here would force compaction on requests the
   // actual provider boundary can safely admit, notably small Ollama windows.
-  return fitOutputReservationToContext(
-    accounting, window, maxOutputTokens,
-    profile?.contextSafetyBufferTokens ?? 0,
-  ) !== undefined;
+  return {
+    fits: fitOutputReservationToContext(
+      accounting, window, maxOutputTokens,
+      profile?.contextSafetyBufferTokens ?? 0,
+    ) !== undefined,
+    ...(accounting.source === "conservative_fallback" && accounting.admissible
+      ? {
+          fallbackProactiveTokens: usesLocalToolProfile(ctx.modelProviderId)
+            ? accounting.inputTokens
+            : accounting.totalTokens,
+        }
+      : {}),
+  };
 }
 
 function isTransientSamplingError(err: unknown): boolean {
@@ -3227,9 +3242,11 @@ async function* runTurnKernelInner(
         async (request) => {
           const requestedModel = state.pendingAdmissionFallback?.toModel ??
             session.config?.model ?? ctx.config.model ?? ctx.modelInfo.slug;
-          const requestFits = () => preparedRequestFitsContext(
+          let pressure: Promise<PreparedRequestContextPressure> | undefined;
+          const requestPressure = () => pressure ??= preparedRequestContextPressure(
             request, session, ctx, signal, requestedModel,
           );
+          const requestFits = async () => (await requestPressure()).fits;
           if (!deferredCompaction && proactiveDispatchCompactionAttempted) {
             // A successful shrink may fall below the proactive threshold
             // while admission's calibrated or native count still cannot fit.
@@ -3249,9 +3266,14 @@ async function* runTurnKernelInner(
            * first sample; this only guards later dispatches.
            */
           const preparedOverThreshold =
+            !deferredCompaction &&
             state.turnCount > 1 &&
             autoCompactLimit !== undefined &&
-            getActiveContextTokenUsage(session, ctx, state) >= autoCompactLimit;
+            // Admission learns conservative fallback calibration from prior
+            // provider usage. Keep that scoped factor on the proactive path
+            // too; the synchronous estimate omits it.
+            ((await requestPressure()).fallbackProactiveTokens ??
+              getActiveContextTokenUsage(session, ctx, state)) >= autoCompactLimit;
           if (!deferredCompaction && preparedOverThreshold) {
             proactiveDispatchCompactionAttempted = true;
             persistNewResponseItems();
