@@ -35,6 +35,8 @@ import { SessionWriteBehindQueue, withSessionWriteBehind } from "./write-behind.
  */
 
 import { randomUUID } from "node:crypto";
+import { isHiddenGoalContinuation } from "./hidden-goal-history.js";
+import { MAX_RECOVERY_CANONICAL_LINE_BYTES } from "../state/recovery-contract.js";
 import { isKnownEmptyProviderReasoning } from "../llm/types.js";
 import { persistDisplayAttachments } from "./display-artifact-store.js";
 import { boundDisplayCompletionEvent } from "./display-completion.js";
@@ -85,6 +87,7 @@ import {
 import {
   extendCompactionRetentionForOperator,
   formatCompactionOperatorDisplay,
+  compactionCannotShrinkDisplay,
   rollbackCompactionForOperator,
 } from "../services/compact/operator.js";
 import { CompactionReconstructionRequiredError } from "../services/compact/transaction-types.js";
@@ -2124,6 +2127,7 @@ function lastTextBlock(content: LLMMessage["content"]): string {
 
 function isSelectableHistoryUserMessage(message: LLMMessage): boolean {
   if (message.role !== "user") return false;
+  if (isHiddenGoalContinuation(message)) return false;
   const invocationChannel = message.runtimeOnly?.agentInvocation;
   if (invocationChannel !== undefined) {
     // The three authenticated user-role records are one logical invocation,
@@ -4178,6 +4182,8 @@ export class Session {
           "Conversation summarization was cancelled.",
         );
       }
+      const message = compactionCannotShrinkDisplay(error);
+      if (message !== undefined) throw new Error(message, { cause: error });
       throw error;
     } finally {
       params.signal?.removeEventListener("abort", onCallerAbort);
@@ -4922,6 +4928,18 @@ export class Session {
       throw new Error(
         `cannot append ${event.msg.type}: canonical run journal is sealed`,
       );
+    }
+    if (event.msg.type === "session_configured" &&
+      Buffer.byteLength(JSON.stringify(event), "utf8") > MAX_RECOVERY_CANONICAL_LINE_BYTES - 4096) {
+      // Canonical transcript rows and getInitialTranscriptEvents own this
+      // display seed already. Bound the header before stamping so publication
+      // and persistence agree, and checkpoint prefix hashes cover those bytes.
+      event = { ...event, msg: { ...event.msg, payload: {
+        ...event.msg.payload, initialMessages: [],
+      } } };
+      if (Buffer.byteLength(JSON.stringify(event), "utf8") > MAX_RECOVERY_CANONICAL_LINE_BYTES - 4096) {
+        throw new Error("session configuration metadata exceeds its recovery byte limit");
+      }
     }
     if (event.msg.type === "tool_call_completed") {
       let completion = boundDisplayCompletionEvent(event as Parameters<typeof boundDisplayCompletionEvent>[0]);

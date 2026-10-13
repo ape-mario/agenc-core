@@ -1,4 +1,5 @@
 import { SessionWriteBehindQueue, registerSessionWriteBehind, drainRolloutWriteBehind } from "./write-behind.js";
+import { isLegacyConfiguredCacheWithinCeiling, recoveryPendingLineCeiling } from "../state/session-configured-cache.js";
 import { assertOneShotRecoverable, beginOneShotWriter, consumeOneShotSeal, supportsRelaxedOneShot, withOneShotWriteScope, type OneShotWriterAuthority } from "../durability/one-shot-durability.js";
 /**
  * Session on-disk store — owns the rollout JSONL file, its fsync
@@ -821,14 +822,21 @@ function maxEventSeqInRolloutFd(fd: number): EventSeq {
     if (bytesRead === 0) break;
     position += bytesRead;
     pending = Buffer.concat([pending, chunk.subarray(0, bytesRead)]);
-    if (pending.byteLength > MAX_RECOVERY_CANONICAL_LINE_BYTES) {
-      throw new Error("canonical rollout row exceeds its recovery byte limit");
-    }
     for (;;) {
       const newline = pending.indexOf(0x0a);
       if (newline < 0) break;
+      if (newline > MAX_RECOVERY_CANONICAL_LINE_BYTES &&
+        !isLegacyConfiguredCacheWithinCeiling(pending.subarray(0, newline), MAX_RECOVERY_CANONICAL_LINE_BYTES)) {
+        throw new Error("canonical rollout row exceeds its recovery byte limit");
+      }
       inspect(pending.subarray(0, newline));
       pending = pending.subarray(newline + 1);
+    }
+    // The read chunk can contain the end of a valid near-limit row and the
+    // beginning of its successor. Apply the cap to individual rows, not to
+    // their combined read buffer. Unfinished rows remain equally bounded.
+    if (pending.byteLength > recoveryPendingLineCeiling(pending, MAX_RECOVERY_CANONICAL_LINE_BYTES)) {
+      throw new Error("canonical rollout row exceeds its recovery byte limit");
     }
   }
   if (pending.byteLength > 0) inspect(pending);
@@ -3513,7 +3521,7 @@ export class SessionStore {
           start = newline + 1;
         }
         pending = Buffer.from(available.subarray(start));
-        if (pending.byteLength > MAX_RECOVERY_CANONICAL_LINE_BYTES) {
+        if (pending.byteLength > recoveryPendingLineCeiling(pending, MAX_RECOVERY_CANONICAL_LINE_BYTES)) {
           throw new Error(
             "canonical row exceeds the streaming rewrite line limit",
           );

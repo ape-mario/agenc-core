@@ -923,7 +923,9 @@ describe("transactional compaction production path", () => {
       const provider = compactionProvider();
       const failure = await runRealTransaction(store, source, provider).catch(error => error as Error);
       if (!(failure instanceof Error)) throw new Error("expected compaction rejection");
-      expect(failure.message).toMatch(/required 1024/i);
+      // Manual compaction scales its absolute floor for short histories;
+      // this admitted candidate still grows history and must fail exactly once.
+      expect(failure.message).toMatch(/saves -\d+ tokens.*required [1-9]\d* and 0\.2/i);
       const recorded = store.readAll().find(item => item.type === "compaction_failed");
       expect(recorded?.type).toBe("compaction_failed");
       if (recorded?.type !== "compaction_failed") throw new Error("missing failure record");

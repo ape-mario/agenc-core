@@ -6,6 +6,7 @@
 
 import type { LocalRuntimeBootstrap } from "../../bin/bootstrap.js";
 import type { Event } from "../../session/event-log.js";
+import { isHiddenGoalContinuation } from "../../session/hidden-goal-history.js";
 import { classifyTurnTerminal, type TurnTerminal } from "../../contracts/turn-terminal.js";
 import type { RolloutItem } from "../../session/rollout-item.js";
 import { persistDisplayArtifactBytes } from "../../session/display-artifact-store.js";
@@ -412,6 +413,7 @@ export function sessionTranscriptV2FromRollout(
       // Synthetic compaction rows are model context, not rewindable user
       // prompts. Keep snapshot ordinals aligned with the daemon history.
       if (item.compactionHistory !== undefined) continue;
+      if (isHiddenGoalContinuation(item)) continue;
       const text = responseItemDisplayText(item.content);
       if (text.length === 0) continue;
       const messageId = `replacement:${boundary.id}:${ordinal}`;
@@ -444,6 +446,7 @@ export function sessionTranscriptV2FromRollout(
     const item = items[index]!;
     if (item.type !== "response_item") continue;
     if (item.payload.compactionHistory !== undefined) continue;
+    if (isHiddenGoalContinuation(item.payload)) continue;
     if (item.payload.role !== "user" && item.payload.role !== "assistant") {
       continue;
     }
