@@ -706,6 +706,7 @@ const COLLAB_AGENT_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
  */
 const CANONICAL_CORE_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   "history_cleared",
+  "context_compacted",
   "transcript_epoch",
   "agent_message_delta",
   "tool_call_started",

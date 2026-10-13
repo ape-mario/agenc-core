@@ -594,7 +594,7 @@ function useSessionSpendLabel(): string {
   }, [hasUsageContext]);
   // No usage reported yet: show nothing rather than a placeholder.
   if (usage === null) return '';
-  if (usage !== undefined) return `${formatUsdCost(usage.costUsd)}${usage.costEstimated ? ' est.' : ''}${usage.hasUnknownCost ? ' +?' : ''}`;
+  if (usage !== undefined) return `${usage.hasUnknownCost ? '≥' : ''}${formatUsdCost(usage.costUsd)}${usage.costEstimated ? ' est.' : ''}`;
   return spend;
 }
 

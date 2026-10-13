@@ -46,6 +46,8 @@ import {
   isMouseTrackingEnabled,
 } from "../../utils/fullscreen.js";
 import { SpinnerWithVerb } from "./spinner/Spinner.js";
+import { CompactingStatus } from "./spinner/CompactingStatus.js";
+import { compactionIsActive, readCompactionProgress, type CompactionProgress } from "../compaction-progress.js";
 import { getActiveLocalAgentTasks } from "./spinner/agentActivity.js";
 import type { SpinnerMode } from "./spinner/types.js";
 import { PromptInputQueuedCommands } from "./PromptInput/PromptInputQueuedCommands.js";
@@ -2436,6 +2438,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     label: null as string | null,
     responseLength: 0,
   });
+  const [compactActivity, setCompactActivity] = useState<CompactionProgress | null>(null);
   const setAppState = useSetAppState();
   const appStateStore = useAppStateStore();
   const reportProcessRefreshError = useCallback((message: string) => {
@@ -4261,6 +4264,14 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     [],
   );
   const handleCompactProgress = useCallback((event: unknown) => {
+    const activity = readCompactionProgress(event);
+    if (activity !== null) {
+      setCompactActivity(previous => previous !== null && previous.startedAtMs > activity.startedAtMs ? previous : activity);
+      if (activity.phase === "prepare" || activity.phase === "complete") {
+        void props.session.getDaemonSessionSnapshot?.().then(observeDaemonSnapshot).catch(error => logError(error));
+      }
+      return;
+    }
     if (!isCompactProgressEvent(event)) return;
     if (event.type === "hooks_start") {
       setCompactProgress({
@@ -4283,7 +4294,14 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       label: null,
       responseLength: 0,
     });
-  }, []);
+  }, [props.session, observeDaemonSnapshot]);
+  useEffect(() => {
+    setCompactActivity(null);
+    const stopLog = props.session.eventLog?.subscribe(handleCompactProgress);
+    const stopEvents = props.session.subscribeToEvents?.(handleCompactProgress);
+    const stopCompact = props.session.subscribeToCompactProgress?.(handleCompactProgress);
+    return () => { stopLog?.(); stopEvents?.(); stopCompact?.(); };
+  }, [props.session, handleCompactProgress]);
   useEffect(
     () =>
       installCompactProgressControls(props.session, {
@@ -4607,7 +4625,8 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
             ? "thinking"
             : "requesting";
   const cancelStreamMode = visibleCancelStreamMode(showSpinner, streamMode);
-  const spinnerElement = showSpinner ? (
+  const isCompacting = compactActivity !== null && compactionIsActive(compactActivity);
+  const spinnerElement = isCompacting ? <CompactingStatus progress={compactActivity} /> : showSpinner ? (
     <SpinnerWithVerb
       mode={streamMode}
       loadingStartTimeRef={loadingStartTimeRef}
@@ -4778,7 +4797,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           {row}
         </Text>
       ))}
-      {compactProgress.status !== "idle" ? (
+      {compactProgress.status !== "idle" && compactActivity === null ? (
         <Box flexDirection="row" width="100%">
           <Text dimColor>
             {compactProgress.label ?? "Compacting conversation"}

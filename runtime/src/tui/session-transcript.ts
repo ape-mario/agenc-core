@@ -2716,7 +2716,7 @@ export function adaptTranscriptEvents(
         break;
       }
       case "context_compacted":
-        out.push(makeSystemMessage("Context compacted", "info", nextUuid()));
+        out.push(makeSystemMessage(typeof payload.displayText === "string" ? payload.displayText : "Context compacted", "info", nextUuid()));
         break;
       case "token_count":
         sessionCostUsd += computeUsdCostWithResolution(

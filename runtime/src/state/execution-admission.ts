@@ -34,7 +34,7 @@ import {
 } from "./run-cancellation.js";
 import { sqlPlaceholders } from "./sql.js";
 import type { StateSqliteDriver, SqliteStatement } from "./sqlite-driver.js";
-import { AdmissionUsageProjection, captureMaterializedUsage, type UsageReservation } from "./admission-usage-snapshot.js";
+import { AdmissionUsageProjection, captureMaterializedUsage, MAX_UNPRICED_USAGE_CALLS, unpricedUsageCall, type UsageReservation } from "./admission-usage-snapshot.js";
 
 export const NANO_USD_PER_USD = 1_000_000_000;
 const MAX_LIST_LIMIT = 1_000;
@@ -1849,10 +1849,23 @@ export class ExecutionAdmissionRepository {
           agentRows.set(row.run_id, group);
         }
       }
+      const unpricedCallCount = rows.reduce((sum, row) => sum + row.unknown_count, 0);
+      const unpricedCalls = unpricedCallCount === 0 ? [] : this.#driver
+        .prepareState<string[], UsageReservation>(
+          `SELECT reservation.* FROM execution_admission_reservations AS reservation
+           JOIN execution_admission_reservation_allocations AS allocation
+             ON allocation.reservation_id = reservation.reservation_id AND allocation.scope_key = ?
+           WHERE (reservation.status = 'held_unknown' OR
+             (reservation.status IN ('reconciled', 'provider_overrun') AND reservation.actual_cost_nanos IS NULL))
+             ${directOnly ? "AND reservation.run_id = ?" : ""}
+           ORDER BY reservation.reservation_id LIMIT ${MAX_UNPRICED_USAGE_CALLS}`,
+        ).all(...(directOnly ? [allocationKey, runId] : [allocationKey]))
+        .map(row => unpricedUsageCall(row)!);
       return {
         runId,
         sequence,
         ...sumUsageRows(rows),
+        ...(unpricedCallCount > 0 ? { unpricedCalls, unpricedCallCount } : {}),
         models: [...modelRows.values()].map((group) => ({
           model: group[0]!.model ?? "unknown",
           ...(group[0]!.provider !== null ? { provider: group[0]!.provider! } : {}),
