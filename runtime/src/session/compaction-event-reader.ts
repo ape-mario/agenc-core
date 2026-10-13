@@ -64,7 +64,7 @@ import { gte as semverGte } from "../utils/semver.js";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 /** Latest transactional compaction capability supported by this reader. */
-const COMPACTION_READER_RUNTIME_CAPABILITY = MANUAL_PROPORTIONAL_COMPACTION_READER_RUNTIME;
+export const COMPACTION_READER_RUNTIME_CAPABILITY = MANUAL_PROPORTIONAL_COMPACTION_READER_RUNTIME;
 const COMPACTION_EVENT_TYPES = Object.freeze([
   "compaction_intent",
   "compaction_payload_chunk",

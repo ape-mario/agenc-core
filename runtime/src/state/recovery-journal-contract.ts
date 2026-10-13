@@ -1,3 +1,5 @@
+import { gte as semverGte } from "../utils/semver.js";
+import { COMPACTION_READER_RUNTIME_CAPABILITY } from "../session/compaction-event-reader.js";
 import { runtimeSettingsEqual } from "./runtime-settings-snapshot.js";
 import { createHash, type Hash } from "node:crypto";
 import {
@@ -526,6 +528,18 @@ export class StrictCanonicalJournalValidator {
     }
     if (type === "event_msg") {
       this.#rejectUnsupportedEventType(value.payload, facts);
+    }
+    // Check a well-formed capability floor before the shape validator erases
+    // the compaction reader's reason into a generic corruption diagnostic.
+    const minimumReader = value.payload.minimum_reader_runtime;
+    if (type.startsWith("compaction_") && typeof minimumReader === "string" &&
+        /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u.test(minimumReader) &&
+        !semverGte(COMPACTION_READER_RUNTIME_CAPABILITY, minimumReader)) {
+      this.#fail(
+        "unsupported_format_version",
+        `canonical ${type} requires AgenC ${minimumReader} or later; this runtime supports compaction through ${COMPACTION_READER_RUNTIME_CAPABILITY}. Upgrade AgenC and restart its daemon before resuming this session`,
+        facts,
+      );
     }
     if (!isCanonicalRolloutPayload(type, value.payload)) {
       this.#fail(

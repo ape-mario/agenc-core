@@ -59,6 +59,7 @@ import {
   COMPACTION_CONTEXT_KIND_V2,
   COMPACTION_EVENT_FORMAT_VERSION,
   COMPACTION_MINIMUM_READER_RUNTIME,
+  MANUAL_PROPORTIONAL_COMPACTION_READER_RUNTIME,
   COMPACTION_POLICY_DIGEST_DOMAIN,
   COMPACTION_SUMMARY_DAG_DIGEST_DOMAIN,
   MAX_COMPACTION_FOCUS_UTF8_BYTES,
@@ -605,7 +606,12 @@ async function compactConversationTransactionBody(
       preCompactTokenCount: shrink.source.inputTokens,
       postCompactTokenCount: shrink.candidate.inputTokens,
       truePostCompactTokenCount: shrink.candidate.inputTokens,
-      userDisplayMessage: buildCompactionDisplayMessage(hookDiagnostics),
+      userDisplayMessage: buildCompactionDisplayMessage([
+        ...hookDiagnostics,
+        ...(shrink.observation.savings_policy === "manual_proportional" ? [
+          `Resume this session with AgenC ${MANUAL_PROPORTIONAL_COMPACTION_READER_RUNTIME} or later; older versions cannot read this short compaction. Upgrade AgenC, then run agenc daemon restart.`,
+        ] : []),
+      ]),
       transaction,
     };
   } catch (error) {
