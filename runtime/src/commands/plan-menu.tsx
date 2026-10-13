@@ -91,8 +91,8 @@ export function createPlanDashboardSnapshot(params: {
     ...params,
     items: planItemsFromText(params.planText),
     message: hasPlan
-      ? "Review the current plan before approving edits or shell actions."
-      : "Plan mode is active. Ask AgenC to draft a plan, then approve it before execution.",
+      ? "Review or edit the plan here. Ask AgenC to use ExitPlanMode to request execution approval."
+      : "Plan mode is active. Ask AgenC to draft a plan and use ExitPlanMode to request execution approval.",
   };
 }
 
@@ -185,14 +185,14 @@ function PlanDashboardView({
   return (
     <Popup
       title="plan mode · full plan"
-      status="e edit · d delete · a add · ↵ accept & run"
+      status="e edit · d delete · a add · ↵ close"
       accentColor="worker"
       bodyBackgroundColor="planModeWash"
       footer={[
         { keyName: "e", label: "edit step" },
         { keyName: "d", label: "delete" },
         { keyName: "a", label: "add" },
-        { keyName: "↵", label: "accept & run" },
+        { keyName: "↵", label: "close" },
         { keyName: "esc", label: "close" },
       ]}
     >
