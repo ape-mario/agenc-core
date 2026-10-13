@@ -2039,6 +2039,7 @@ async function bootstrapLocalRuntimeSessionScoped(
           cwd: workspaceRoot,
           originator: "agenc-cli",
           source: "interactive-root",
+          lightMode: runtimeOptions.lightMode === true,
           agencVersion: VERSION,
           model,
           modelProvider: resolvedProvider,

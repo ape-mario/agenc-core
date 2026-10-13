@@ -34,6 +34,7 @@ import {
   accountCompactionCall,
   buildCompactionMapReducePlan,
   canonicalCompactionSourceMessages,
+  compactionSourceRefAlias,
   structuredReductionMessages,
   type CompactionMapReducePlan,
 } from "./plan.js";
@@ -58,6 +59,7 @@ import {
   COMPACTION_CONTEXT_KIND_V2,
   COMPACTION_EVENT_FORMAT_VERSION,
   COMPACTION_MINIMUM_READER_RUNTIME,
+  MANUAL_PROPORTIONAL_COMPACTION_READER_RUNTIME,
   COMPACTION_POLICY_DIGEST_DOMAIN,
   COMPACTION_SUMMARY_DAG_DIGEST_DOMAIN,
   MAX_COMPACTION_FOCUS_UTF8_BYTES,
@@ -72,6 +74,7 @@ import {
   MAX_COMPACTION_WALL_MS,
   MIN_COMPACTION_ABSOLUTE_TOKEN_SAVINGS,
   MIN_COMPACTION_RELATIVE_TOKEN_SAVINGS,
+  minimumCompactionTokenSavings,
   type CompactionAccountingObservationV1,
   type CompactionFailureReason,
   type CompactionIntentV1,
@@ -519,6 +522,7 @@ async function compactConversationTransactionBody(
       providerName,
       model,
       accountingRef,
+      automatic: options.automatic,
       imageBudgetBytes: shrinkAccountingImageBudgetBytes(session),
     }));
     deadline.assertActive();
@@ -602,7 +606,12 @@ async function compactConversationTransactionBody(
       preCompactTokenCount: shrink.source.inputTokens,
       postCompactTokenCount: shrink.candidate.inputTokens,
       truePostCompactTokenCount: shrink.candidate.inputTokens,
-      userDisplayMessage: buildCompactionDisplayMessage(hookDiagnostics),
+      userDisplayMessage: buildCompactionDisplayMessage([
+        ...hookDiagnostics,
+        ...(shrink.observation.savings_policy === "manual_proportional" ? [
+          `Resume this session with AgenC ${MANUAL_PROPORTIONAL_COMPACTION_READER_RUNTIME} or later; older versions cannot read this short compaction. Upgrade AgenC, then run agenc daemon restart.`,
+        ] : []),
+      ]),
       transaction,
     };
   } catch (error) {
@@ -927,7 +936,7 @@ async function runSummaryTree(params: {
         content = params.summarizer({
           stage,
           messages,
-          allowedSourceRefIds: sourceRefs.map((ref) => ref.ref_id),
+          allowedSourceRefIds: sourceRefs.map((_, index) => compactionSourceRefAlias(index)),
           maxOutputTokens: params.plan.output_reserve_tokens,
         });
       } catch (error) {
@@ -999,7 +1008,20 @@ async function runSummaryTree(params: {
       );
     }
     const allowedIds = new Set(sourceRefs.map((ref) => ref.ref_id));
-    const validated = parseCompactionBodyV1(response.content, allowedIds);
+    const aliases = new Map(sourceRefs.map((ref, index) => [compactionSourceRefAlias(index), ref.ref_id]));
+    const wireBody = parseCompactionBodyV1(response.content, new Set(aliases.keys())).body;
+    const bindRecords = (records: typeof wireBody.facts) => records.map((record) => ({
+      ...record,
+      source_ref_ids: record.source_ref_ids.map((id) => aliases.get(id)!),
+    }));
+    // Validate model labels exactly, then restore the frozen canonical IDs.
+    // Re-validate the bound body so all durable size/provenance limits still
+    // cover the actual identifiers, not only their shorter wire aliases.
+    const validated = parseCompactionBodyV1(canonicalizeJson({
+      ...wireBody,
+      facts: bindRecords(wireBody.facts),
+      open_actions: bindRecords(wireBody.open_actions),
+    }), allowedIds);
     // The runtime knows every tool call/result pair of the span and pins
     // them into the summary itself. A model that echoes them anyway must
     // match exactly; one that leaves them out has done nothing wrong.
@@ -1477,6 +1499,7 @@ async function validateShrink(params: {
   readonly providerName: string;
   readonly model: string;
   readonly accountingRef: string;
+  readonly automatic: boolean;
   /** See {@link shrinkAccountingImageBudgetBytes}. */
   readonly imageBudgetBytes: number;
 }): Promise<{
@@ -1532,19 +1555,25 @@ async function validateShrink(params: {
   assertTokenAccountingWithinContext(candidate, contextWindow);
   const savings = source.inputTokens - candidate.inputTokens;
   const relativeSavings = source.inputTokens === 0 ? 0 : savings / source.inputTokens;
+  // An explicit manual request can use a substantial proportional saving
+  // even when its entire short history cannot spare 1,024 tokens. Automatic
+  // compaction keeps the original absolute floor to amortize its own cost.
+  const minimumAbsoluteSavings = minimumCompactionTokenSavings(source.inputTokens, params.automatic);
   if (
-    savings < MIN_COMPACTION_ABSOLUTE_TOKEN_SAVINGS ||
+    savings < minimumAbsoluteSavings ||
     relativeSavings < MIN_COMPACTION_RELATIVE_TOKEN_SAVINGS
   ) {
     throw new CompactionCannotReduceError(
       "no_shrink",
-      `compaction candidate saves ${savings} tokens (${relativeSavings.toFixed(3)}); required ${MIN_COMPACTION_ABSOLUTE_TOKEN_SAVINGS} and ${MIN_COMPACTION_RELATIVE_TOKEN_SAVINGS}`,
+      `compaction candidate saves ${savings} tokens (${relativeSavings.toFixed(3)}); required ${minimumAbsoluteSavings} and ${MIN_COMPACTION_RELATIVE_TOKEN_SAVINGS}`,
     );
   }
   return {
     source,
     candidate,
     observation: {
+      ...(!params.automatic && savings < MIN_COMPACTION_ABSOLUTE_TOKEN_SAVINGS
+        ? { savings_policy: "manual_proportional" as const } : {}),
       accounting_ref: params.accountingRef,
       source_tokens: source.inputTokens,
       candidate_tokens: candidate.inputTokens,

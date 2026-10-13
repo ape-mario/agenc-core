@@ -121,6 +121,8 @@ export interface SessionMetaLine {
   readonly modelProvider?: string;
   /** Upstream thread memory mode persisted by metadata-update rows. */
   readonly memoryMode?: string;
+  /** Presentation/tool-catalog profile, independent of permission authority. */
+  readonly lightMode?: boolean;
   readonly admissionOwner?: {
     readonly workspaceId: string;
     readonly runId: string;

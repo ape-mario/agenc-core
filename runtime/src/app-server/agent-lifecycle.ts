@@ -1056,13 +1056,16 @@ export class AgenCDaemonAgentManager {
       const retainedLightMode = resumeSessionId === undefined
         ? undefined
         : retainedRuntimeOptions?.lightMode ??
+          resumeProof?.lightMode ??
           this.#threadStore?.readThreadLightMode?.(
             resumeSessionId,
             // assertAuthoritativeResumeSource already bound this canonical
             // projects/<project>/sessions/<id>/rollout file to the caller.
             dirname(dirname(dirname(resumeRolloutPath!))),
           ) ??
-          (requestedRuntimeOptions.lightMode !== undefined ? false : undefined);
+          (resumeProof?.reviewedRollbackBranch
+            ? requestedRuntimeOptions.lightMode
+            : (requestedRuntimeOptions.lightMode !== undefined ? false : undefined));
       const runtimeOptions = Object.freeze({
         ...requestedRuntimeOptions,
         ...(requestedRuntimeOptions.relaxedOneShot !== undefined ? { relaxedOneShot: selectRelaxedOneShot({
@@ -5159,6 +5162,8 @@ interface ResumeSourceProof {
   readonly runtimeSettings?: RunRuntimeSettingsSnapshot;
   readonly runtimeSettingsEventId?: string;
   readonly legacyPermissionMode?: "plan";
+  readonly lightMode?: boolean;
+  readonly reviewedRollbackBranch?: boolean;
 }
 
 function interactivePermissionModeFromRuntimeSettings(
@@ -5618,6 +5623,8 @@ function assertAuthoritativeResumeSource(params: {
       ...(canonical.terminalStatus !== undefined
         ? { terminalStatus: canonical.terminalStatus }
         : {}),
+      ...(meta.lightMode !== undefined ? { lightMode: meta.lightMode } : {}),
+      ...(reviewedRollbackTopLevel ? { reviewedRollbackBranch: true } : {}),
       ...(meta.model !== undefined ? { model: meta.model } : {}),
       ...(meta.modelProvider !== undefined
         ? { provider: meta.modelProvider }

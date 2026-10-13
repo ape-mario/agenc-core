@@ -1729,6 +1729,7 @@ describe("runTurn — T6 gap #119 lifecycle emits", () => {
       .snapshotHistoryMessages()
       .find((message) => message.role === "user");
     expect(historyUser?.runtimeOnly?.userMessageId).toBe(userEvent?.id);
+    expect(historyUser?.runtimeOnly?.responseItemId).toBe(userEvent?.id);
   });
 
   test("can emit a raw display user_message while running expanded prompt content", async () => {
@@ -2924,6 +2925,7 @@ describe("runTurn — T6 gap #119 lifecycle emits", () => {
         // user_message event id).
         runtimeOnly: {
           userMessageId: expect.stringMatching(/^user-msg-/),
+          responseItemId: getState().history[0]?.runtimeOnly?.userMessageId,
         },
       },
       { role: "assistant", content: "first answer" },
@@ -2939,10 +2941,16 @@ describe("runTurn — T6 gap #119 lifecycle emits", () => {
     await drain(session.runTurn("second question", { ctx: mkCtx() }));
 
     expect(seenMessages).toHaveLength(2);
+    const firstUserId = getState().history[0]?.runtimeOnly?.userMessageId;
+    const secondUserId = getState().history[2]?.runtimeOnly?.userMessageId;
+    expect(secondUserId).toMatch(/^user-msg-/);
+    expect(secondUserId).not.toBe(firstUserId);
     expect(seenMessages[1]).toEqual([
-      { role: "user", content: "first question" },
+      { role: "user", content: "first question",
+        runtimeOnly: { userMessageId: firstUserId, responseItemId: firstUserId } },
       { role: "assistant", content: "first answer" },
-      { role: "user", content: "second question" },
+      { role: "user", content: "second question",
+        runtimeOnly: { userMessageId: secondUserId, responseItemId: secondUserId } },
     ]);
   });
 
@@ -3792,7 +3800,10 @@ describe("runTurn — live sampling request contract", () => {
 
     await drain(session.runTurn("hello", { ctx, skipCacheWrite: true }));
 
-    expect(seenMessages[0]).toEqual({ role: "user", content: "hello" });
+    const userMessageId = seenMessages[0]?.runtimeOnly?.userMessageId;
+    expect(userMessageId).toMatch(/^user-msg-/);
+    expect(seenMessages[0]).toEqual({ role: "user", content: "hello",
+      runtimeOnly: { userMessageId, responseItemId: userMessageId } });
     expect(seenMessages.some((message) => message.role === "system")).toBe(
       false,
     );
@@ -4561,7 +4572,10 @@ describe("runTurn — model request context ordering", () => {
     ).toHaveLength(0);
     expect(seenMessages[0]?.role).toBe("user");
     expect(String(seenMessages[0]?.content)).toContain("Plan mode is active");
-    expect(seenMessages.at(-1)).toEqual({ role: "user", content: "hello" });
+    const userMessageId = seenMessages.at(-1)?.runtimeOnly?.userMessageId;
+    expect(userMessageId).toMatch(/^user-msg-/);
+    expect(seenMessages.at(-1)).toEqual({ role: "user", content: "hello",
+      runtimeOnly: { userMessageId, responseItemId: userMessageId } });
   });
 
   test("binds swarm routing to the exact root-human turn", async () => {

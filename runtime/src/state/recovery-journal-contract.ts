@@ -1,3 +1,6 @@
+import { gte as semverGte } from "../utils/semver.js";
+import { COMPACTION_READER_RUNTIME_CAPABILITY } from "../session/compaction-event-reader.js";
+import { REDACTED_SECRET } from "../secrets/sanitizer.js";
 import { runtimeSettingsEqual } from "./runtime-settings-snapshot.js";
 import { createHash, type Hash } from "node:crypto";
 import {
@@ -526,6 +529,29 @@ export class StrictCanonicalJournalValidator {
     }
     if (type === "event_msg") {
       this.#rejectUnsupportedEventType(value.payload, facts);
+      const msg = value.payload.msg;
+      if (isPlainRecord(msg) && msg.type === "request_user_input" &&
+          isPlainRecord(msg.payload) && Array.isArray(msg.payload.questions) &&
+          msg.payload.questions.some(question => isPlainRecord(question) &&
+            question.isSecret === REDACTED_SECRET)) {
+        this.#fail(
+          "schema_invalid",
+          "legacy redaction damaged request_user_input.questions[].isSecret: the original boolean flag was lost. Recovery is refused; restore an intact session backup or start a new session",
+          facts,
+        );
+      }
+    }
+    // Check a well-formed capability floor before the shape validator erases
+    // the compaction reader's reason into a generic corruption diagnostic.
+    const minimumReader = value.payload.minimum_reader_runtime;
+    if (type.startsWith("compaction_") && typeof minimumReader === "string" &&
+        /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u.test(minimumReader) &&
+        !semverGte(COMPACTION_READER_RUNTIME_CAPABILITY, minimumReader)) {
+      this.#fail(
+        "unsupported_format_version",
+        `canonical ${type} requires AgenC ${minimumReader} or later; this runtime supports compaction through ${COMPACTION_READER_RUNTIME_CAPABILITY}. Upgrade AgenC and restart its daemon before resuming this session`,
+        facts,
+      );
     }
     if (!isCanonicalRolloutPayload(type, value.payload)) {
       this.#fail(
@@ -693,6 +719,10 @@ export class StrictCanonicalJournalValidator {
         );
       }
       if (item.type === "compaction_committed") {
+        const accounting = payload.accounting as Readonly<Record<string, unknown>>;
+        if (accounting.savings_policy === "manual_proportional" && current.intent.automatic !== false) {
+          this.#fail("identity_conflict", "manual proportional savings conflict with the compaction intent", facts);
+        }
         if (
           [...(current.payloadChunks?.values() ?? [])].some(
             (chunkState) => !chunkState.complete,

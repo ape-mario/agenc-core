@@ -1682,7 +1682,10 @@ describe("bootstrapLocalRuntimeSession", () => {
         {
           role: "user",
           content: "driver prompt",
-          runtimeOnly: { userMessageId: expect.stringMatching(/^user-msg-/) },
+          runtimeOnly: {
+            userMessageId: expect.stringMatching(/^user-msg-/),
+            responseItemId: state.history[0]?.runtimeOnly?.userMessageId,
+          },
         },
         { role: "assistant", content: "driver reply" },
       ]);

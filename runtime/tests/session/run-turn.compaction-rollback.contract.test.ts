@@ -107,12 +107,14 @@ describe("runTurn automatic compaction rollback wiring", () => {
         resume: true,
       });
       try {
-        expect(reconstructFromRollout(reviewed.readAll()).history).toEqual(
-          expectedSourceHistory([
-            ...source,
-            { role: "user", content: USER_MESSAGE },
-          ]),
-        );
+        const seedEvent = rows.find((item) => item.type === "event_msg" &&
+          item.payload.msg.type === "user_message");
+        const userMessageId = seedEvent?.type === "event_msg" ? seedEvent.payload.id : undefined;
+        expect(userMessageId).toMatch(/^user-msg-/);
+        expect(reconstructFromRollout(reviewed.readAll()).history).toEqual([
+          ...expectedSourceHistory(source),
+          { role: "user", content: USER_MESSAGE, id: userMessageId },
+        ]);
       } finally {
         reviewed.close();
       }

@@ -728,6 +728,7 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
       model: isString,
       modelProvider: isString,
       memoryMode: isString,
+      lightMode: isBoolean,
       admissionOwner: objectShape(
         { workspaceId: isNonEmptyString, runId: isNonEmptyString },
         { parentRunId: isNonEmptyString },
