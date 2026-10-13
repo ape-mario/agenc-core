@@ -320,6 +320,7 @@ These have their own pages. Short map:
 | `AGENC_SCROLL_SPEED` | Scroll multiplier |
 | `AGENC_REVIEWER_ID` | Reviewer identity for `agenc state resolve-tool-call` |
 | `COLORFGBG` | Seeds the `auto` theme from terminal foreground/background indexes before the OSC 11 background query can respond |
+| `NO_COLOR` | A nonempty value disables TUI colors and text styling, including terminal-specific color-depth overrides |
 
 
 ## Gateway and remote

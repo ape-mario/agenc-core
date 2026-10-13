@@ -1,6 +1,8 @@
 import { c as _c } from "react-compiler-runtime";
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { homedir } from 'node:os';
+import { resolve, sep } from 'node:path';
 import React, { createContext, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { fileURLToPath } from 'url';
 import { useFullscreenMode } from '../context/fullscreenModeContext.js';
@@ -28,7 +30,7 @@ import type { PermissionMode } from '../../permissions/types.js';
 import type { StickyPrompt } from './VirtualMessageList';
 import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
 import { PlanModeBanner } from './v2/primitives.js';
-import { useStatusEffort, useStatusContextUsage } from '../context/statusEffortContext.js';
+import { useStatusEffort, useStatusContextUsage, useStatusTurnBusy } from '../context/statusEffortContext.js';
 import ThemedText from './design-system/ThemedText.js';
 import { LedgerStatus } from './LedgerStatus.js';
 import { swarmStatusPresentation } from './SwarmStatusIndicator.js';
@@ -543,11 +545,12 @@ async function probeGitChromeLabel(): Promise<string | null> {
 
 /** Branch for the status line. The probe runs async (one short `git`
  *  subprocess) so it never blocks the first paint; it re-runs on terminal
- *  focus changes and on a slow interval so a mid-session branch switch
+ *  focus changes, at turn/shell boundaries, and on a slow interval so a branch switch
  *  surfaces. Until the first probe resolves, and outside a repository, the
  *  branch segment stays hidden. */
 function useGitChromeLabel(): string | null {
   const terminalFocused = useTerminalFocus();
+  const turnBusy = useStatusTurnBusy();
   const [label, setLabel] = useState<string | null>(() => cachedGitChromeLabel);
   useEffect(() => {
     let cancelled = false;
@@ -565,7 +568,7 @@ function useGitChromeLabel(): string | null {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [terminalFocused]);
+  }, [terminalFocused, turnBusy]);
   return label;
 }
 
@@ -657,9 +660,19 @@ export function statusLineSegments(
   };
 }
 
+/** Only the real home directory is represented by ~; preserve the remaining path. */
+export function workspacePathLabel(cwd: string, home: string = homedir()): string {
+  const directory = resolve(cwd);
+  const homeDirectory = resolve(home);
+  return directory === homeDirectory
+    ? '~'
+    : directory.startsWith(homeDirectory + sep)
+      ? '~' + directory.slice(homeDirectory.length)
+      : directory;
+}
+
 function workspaceFolderLabel(columns: number): string {
-  const name = process.cwd().split(/[\\/]/u).filter(Boolean).at(-1) ?? 'workspace';
-  return truncateMiddleToWidth(`~/${name}`, Math.max(12, Math.floor(columns * 0.24)));
+  return truncateMiddleToWidth(workspacePathLabel(process.cwd()), Math.max(12, Math.floor(columns * 0.24)));
 }
 
 /**

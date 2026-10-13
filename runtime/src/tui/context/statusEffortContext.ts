@@ -16,3 +16,9 @@ export const StatusContextUsageContext = createContext<number | null>(null);
 export function useStatusContextUsage(): number | null {
   return useContext(StatusContextUsageContext);
 }
+
+/** Changes only at turn/shell boundaries, so chrome can refresh filesystem facts. */
+export const StatusTurnBusyContext = createContext(false);
+export function useStatusTurnBusy(): boolean {
+  return useContext(StatusTurnBusyContext);
+}
