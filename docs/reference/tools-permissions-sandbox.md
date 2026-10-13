@@ -511,7 +511,9 @@ Source of truth: `runtime/src/permissions/types.ts` (and
 before reporting success. An edit before the first message creates a session
 without starting a model turn. Use `--persist user` to retain a rule in
 `config.toml` for new sessions; `/permissions export` displays the current
-rules. A matching deny wins over allow rules in every mode, including bypass.
+rules. Persisted add/remove operations also refresh the live rule sources before
+reporting success, without selecting a different model or effort. A matching
+deny wins over allow rules in every mode, including bypass.
 Shell deny and ask rules with command content are checked before any approval
 prompt, including exact commands, wildcard/prefix patterns, compound commands
 and recognized shell wrappers. An approval cannot override a matching deny.

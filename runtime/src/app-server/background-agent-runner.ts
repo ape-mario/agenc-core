@@ -4160,46 +4160,58 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     }
     const canonicalRule = serializeRuleValue(parsed);
     const registry = active.bootstrap.session.permissionModeRegistry;
-    return registry.transact(async (current) => {
-      try {
-        if (!isRunnableActiveAgent(active)) {
-          throw new Error(`AgenC daemon agent not running: ${agentId}`);
-        }
-        const policy = await loadPermissionRulesSnapshot({
-          configStore: active.bootstrap.configStore,
-          cwd: runtimeWorkspaceRoot(active.bootstrap),
-        });
-        if (policy.managedOnly) {
-          throw new Error(
-            "Session permission rules are disabled by managed-only policy",
+    // Read the same configured sources as startup, without applying a provider
+    // selection. The registry coordinator publishes the fresh store and rules
+    // together, so a persisted removal cannot leave an older live deny behind.
+    const preparedConfigReload = await active.bootstrap.configStore.prepareReload();
+    try {
+      return await registry.transact(async (current) => {
+        try {
+          if (!isRunnableActiveAgent(active)) {
+            throw new Error(`AgenC daemon agent not running: ${agentId}`);
+          }
+          const policy = await loadPermissionRulesSnapshot({
+            configStore: preparedConfigReload.authority,
+            cwd: runtimeWorkspaceRoot(active.bootstrap),
+          });
+          if (policy.managedOnly) {
+            throw new Error(
+              "Session permission rules are disabled by managed-only policy",
+            );
+          }
+
+          const mutation = mutatePermissionRuleSource(
+            applyPermissionRulesSnapshot(current, policy),
+            "session",
+            params.operation,
+            params.behavior,
+            parsed,
+          );
+          return {
+            next: mutation.next,
+            metadata: { preparedConfigReload },
+            result: () => ({
+              applied: mutation.applied,
+              operation: params.operation,
+              behavior: params.behavior,
+              rule: canonicalRule,
+              sessionRules: mutation.buckets,
+            }),
+          };
+        } catch (error) {
+          if (error instanceof PermissionRuleMutationPrecommitError) throw error;
+          throw new PermissionRuleMutationPrecommitError(
+            error instanceof Error ? error.message : String(error),
+            { cause: error },
           );
         }
-
-        const mutation = mutatePermissionRuleSource(
-          current,
-          "session",
-          params.operation,
-          params.behavior,
-          parsed,
-        );
-        return {
-          next: mutation.applied ? mutation.next : null,
-          result: () => ({
-            applied: mutation.applied,
-            operation: params.operation,
-            behavior: params.behavior,
-            rule: canonicalRule,
-            sessionRules: mutation.buckets,
-          }),
-        };
-      } catch (error) {
-        if (error instanceof PermissionRuleMutationPrecommitError) throw error;
-        throw new PermissionRuleMutationPrecommitError(
-          error instanceof Error ? error.message : String(error),
-          { cause: error },
-        );
-      }
-    });
+      });
+    } catch (error) {
+      preparedConfigReload.rollback();
+      throw error;
+    } finally {
+      preparedConfigReload.settle();
+    }
   }
 
   async getAgentHooksStatus(
