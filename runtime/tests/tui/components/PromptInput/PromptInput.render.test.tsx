@@ -2772,6 +2772,24 @@ describe("PromptInput render surface", () => {
     }
   });
 
+  test("keeps typing and first prompt submission active while the mode toast is shown", async () => {
+    harness.nextPermissionMode = "plan";
+    const onSubmit = vi.fn(async () => {});
+    const rendered = await renderPromptInput({ input: "first cold prompt", onSubmit });
+    try {
+      await waitForPromptInputProps();
+      harness.keybindings["chat:cycleMode"]?.();
+      await sleep(50);
+      expect(harness.baseProps?.focus).toBe(true);
+      const registration = harness.keybindingRegistrations.find(item => item.action === "chat:submit");
+      expect(registration).toBeDefined();
+      (registration!.handler as () => void)();
+      await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith("first cold prompt", expect.anything(), undefined, expect.objectContaining({ mode: "prompt" })));
+    } finally {
+      await rendered.dispose();
+    }
+  });
+
   test("keeps mode cycling active while its temporary overlays are shown", async () => {
     harness.features.TRANSCRIPT_CLASSIFIER = true;
     harness.hasAutoModeOptIn = false;
