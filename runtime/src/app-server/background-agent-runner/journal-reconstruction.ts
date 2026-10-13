@@ -409,6 +409,9 @@ export function sessionTranscriptV2FromRollout(
     let ordinal = 0;
     for (const item of replacement) {
       if (item.role !== "user" && item.role !== "assistant") continue;
+      // Synthetic compaction rows are model context, not rewindable user
+      // prompts. Keep snapshot ordinals aligned with the daemon history.
+      if (item.compactionHistory !== undefined) continue;
       const text = responseItemDisplayText(item.content);
       if (text.length === 0) continue;
       const messageId = `replacement:${boundary.id}:${ordinal}`;
@@ -440,6 +443,7 @@ export function sessionTranscriptV2FromRollout(
   for (let index = transcriptStartIndex; index < legacyEndIndex; index += 1) {
     const item = items[index]!;
     if (item.type !== "response_item") continue;
+    if (item.payload.compactionHistory !== undefined) continue;
     if (item.payload.role !== "user" && item.payload.role !== "assistant") {
       continue;
     }

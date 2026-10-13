@@ -4102,7 +4102,12 @@ export class Session {
       const selectedIndex = activeHistoryIndexForOrdinal(
         activeHistory,
         params.messageOrdinal,
-      );
+      ) ?? (params.messageOrdinal === 0 && params.direction === "from" &&
+        activeHistory.length > 0 && activeHistory.every((message) =>
+          !isSelectableHistoryUserMessage(message))
+        // Full manual compaction remains meaningful when the previous
+        // compaction left only a summary. There is no selectable prompt.
+        ? 0 : null);
       if (selectedIndex === null) {
         return this.partialCompactFailure(
           "MESSAGE_NOT_FOUND",
