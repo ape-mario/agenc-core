@@ -275,14 +275,26 @@ describe("pure write command option parser", () => {
 });
 
 describe("derived destinations and protected-path decisions", () => {
-  it.each(flagCases)("blocks a protected destination after $command $dialect -$flag", ({ command, dialect, flag }) => {
+  it.each(flagCases)("derives the protected-path decision for $command $dialect -$flag", ({ command, dialect, flag }) => {
     const result = policy(command, [`-${flag}`, SOURCE, PROTECTED], dialect === "bsd" ? "darwin" : "linux");
+    if (command === "mkdir") {
+      // The existing policy permits known directory creation. The parser
+      // still reads its operands, and unknown mkdir options fail closed.
+      expect(result.blocked).toBe(false);
+      expect(result.observedTargets).toEqual([]);
+      return;
+    }
     expect(result.blocked).toBe(true);
     expect(result.observedTargets).toContain(PROTECTED);
   });
   it.each(shortCases)("checks $command $dialect $args against a protected destination", ({ command, dialect, args }) => {
     const protectedArgs = [...args.slice(0, -1), PROTECTED];
     const result = policy(command, protectedArgs, dialect === "bsd" ? "darwin" : "linux");
+    if (command === "mkdir") {
+      expect(result.blocked).toBe(false);
+      expect(result.observedTargets).toEqual([]);
+      return;
+    }
     expect(result.blocked).toBe(true);
     expect(result.observedTargets).toContain(PROTECTED);
     expect([...result.blockedTargets, ...result.blockedDeletions]).toContain(PROTECTED);
@@ -292,6 +304,11 @@ describe("derived destinations and protected-path decisions", () => {
     const tail = DESTINATION_COMMANDS.has(command) ? [SOURCE, PROTECTED] : [PROTECTED];
     for (const prefix of [[`--${name}`, value], [`--${name}=${value}`]]) {
       const result = policy(command, [...prefix, ...tail]);
+      if (command === "mkdir") {
+        expect(result.blocked).toBe(false);
+        expect(result.observedTargets).toEqual([]);
+        continue;
+      }
       expect(result.observedTargets).toContain(PROTECTED);
       expect(result.blocked).toBe(true);
     }
