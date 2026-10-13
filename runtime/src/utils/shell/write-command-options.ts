@@ -91,6 +91,8 @@ export interface WriteCommandOperands {
   readonly operands: readonly string[];
   readonly targetDirectory?: string;
   readonly noTargetDirectory: boolean;
+  /** ln -n/-h and BSD mv -h treat a destination symlink as a file. */
+  readonly noDereferenceDestination: boolean;
   readonly createsDirectories: boolean;
   /** BSD install -M is another write, not a source operand. */
   readonly extraTargets: readonly string[];
@@ -149,7 +151,10 @@ function readOperands(command: WriteCommand, args: readonly string[], dialect: W
   const extraTargets: string[] = [];
   let targetDirectory: string | undefined;
   let noTargetDirectory = false;
+  let noDereferenceDestination = false;
   let createsDirectories = false;
+  let symbolic = false;
+  let replaceDirectory = false;
   let error: Reading["error"];
   let errorIndex: number | undefined;
   const optionIndexes: number[] = [];
@@ -161,6 +166,10 @@ function readOperands(command: WriteCommand, args: readonly string[], dialect: W
       targetDirectory = value;
     }
     if (name === "no-target-directory" || name === "T" && !(dialect === "bsd" && command === "install")) noTargetDirectory = true;
+    if (command === "ln" && (name === "n" || name === "no-dereference" || dialect === "bsd" && name === "h") ||
+      command === "mv" && dialect === "bsd" && name === "h") noDereferenceDestination = true;
+    if (command === "ln" && (name === "s" || name === "symbolic")) symbolic = true;
+    if (command === "ln" && dialect === "bsd" && name === "F") replaceDirectory = true;
     if (command === "install" && (name === "d" || name === "directory")) createsDirectories = true;
     if (command === "install" && dialect === "bsd" && name === "M" && value !== undefined) extraTargets.push(value);
     // --parents changes destination names. Do not guess at the path hierarchy.
@@ -212,9 +221,11 @@ function readOperands(command: WriteCommand, args: readonly string[], dialect: W
   }
   if (targetDirectory !== undefined && noTargetDirectory) error = "unsupported";
   if (createsDirectories && targetDirectory !== undefined) error = "unsupported";
+  // BSD ln -sF can remove a directory before creating the link at that name.
+  if (symbolic && replaceDirectory) error = "unsupported";
   return {
     operands, ...(targetDirectory === undefined ? {} : { targetDirectory }),
-    noTargetDirectory, createsDirectories, extraTargets,
+    noTargetDirectory, noDereferenceDestination, createsDirectories, extraTargets,
     indeterminate: error !== undefined, fallbackTargets: [], optionIndexes,
     ...(error ? { error } : {}), ...(errorIndex === undefined ? {} : { errorIndex }),
   };
@@ -235,8 +246,8 @@ export function parseWriteCommandOperands(
   const valid = readings.filter(reading => reading.error === undefined);
   const first = valid[0];
   const same = first !== undefined && valid.every(reading =>
-    JSON.stringify([reading.operands, reading.targetDirectory, reading.noTargetDirectory, reading.createsDirectories, reading.extraTargets]) ===
-    JSON.stringify([first.operands, first.targetDirectory, first.noTargetDirectory, first.createsDirectories, first.extraTargets]));
+    JSON.stringify([reading.operands, reading.targetDirectory, reading.noTargetDirectory, reading.noDereferenceDestination, reading.createsDirectories, reading.extraTargets]) ===
+    JSON.stringify([first.operands, first.targetDirectory, first.noTargetDirectory, first.noDereferenceDestination, first.createsDirectories, first.extraTargets]));
   const unreadOption = readings.some(reading => reading.error === "unknown" &&
     !valid.some(candidate => candidate.optionIndexes.includes(reading.errorIndex!)));
   if (same && !unreadOption && !readings.some(reading => reading.error === "ambiguous" || reading.error === "unsupported")) {
@@ -258,6 +269,6 @@ export function parseWriteCommandOperands(
       }
     }
   }
-  return { operands: [], noTargetDirectory: false, createsDirectories: false,
+  return { operands: [], noTargetDirectory: false, noDereferenceDestination: false, createsDirectories: false,
     extraTargets: [], indeterminate: true, fallbackTargets: [...fallbackTargets] };
 }

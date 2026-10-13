@@ -583,10 +583,11 @@ function collectParsedOperandTargets(parsed: WriteCommandOperands, cwd: string):
  * the sources go into: one written with a trailing `/`, `.` or `..`, or one
  * that exists as a directory, through a symlink as cp and mv follow it.
  */
-function isDirectoryDestination(raw: string, cwd: string): boolean {
+function isDirectoryDestination(raw: string, cwd: string, noDereference = false): boolean {
   if (raw.endsWith("/") || /(?:^|\/)\.{1,2}$/u.test(raw)) return true;
   try {
-    return statSync(kernelPath(cwd, expandLeadingHome(raw))).isDirectory();
+    const path = kernelPath(cwd, expandLeadingHome(raw));
+    return (noDereference ? lstatSync(path) : statSync(path)).isDirectory();
   } catch {
     return false;
   }
@@ -651,7 +652,7 @@ function collectDestinationTarget(
   } else if (destinationRaw !== undefined && sources.length > 0) {
     intoDirectory =
       !parsed.noTargetDirectory &&
-      (sources.length > 1 || isDirectoryDestination(destinationRaw, cwd));
+      (sources.length > 1 || isDirectoryDestination(destinationRaw, cwd, parsed.noDereferenceDestination));
   }
   if (destinationRaw === undefined) return emptyTargetCollection();
   const destination = normalizeConcreteTargetPath(destinationRaw, cwd);
@@ -698,7 +699,7 @@ function collectMoveTargets(
     sourceRaws = operands.slice(0, -1);
     intoDirectory =
       !parsed.noTargetDirectory &&
-      (sourceRaws.length > 1 || isDirectoryDestination(destinationRaw!, cwd));
+      (sourceRaws.length > 1 || isDirectoryDestination(destinationRaw!, cwd, parsed.noDereferenceDestination));
   } else {
     destinationRaw = operands[0];
     sourceRaws = [];
