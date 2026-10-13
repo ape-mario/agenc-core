@@ -559,6 +559,13 @@ export type AgenCDaemonOnlyTuiSession = Omit<AgenCBridgeSession, "services"> & {
   };
 };
 
+function daemonTuiRuleSnapshot(configStore: ConfigStore) {
+  const snapshot = readPermissionRulesSnapshot(configStore);
+  // The daemon snapshot owns mode capabilities. Hydrate rule sources without
+  // letting a client-side policy snapshot override those authoritative flags.
+  return { ...snapshot, bypassPermissionsModeDisabled: false, disableAutoMode: false };
+}
+
 /** Apply one canonical daemon settings successor to the client-side TUI shim. */
 export async function applyDaemonTuiRuntimeSettingsAuthority(
   session: AgenCDaemonOnlyTuiSession,
@@ -575,7 +582,7 @@ export async function applyDaemonTuiRuntimeSettingsAuthority(
     additionalWorkingDirectories: current.additionalWorkingDirectories,
     ...(current.strippedDangerousRules !== undefined
       ? { strippedDangerousRules: current.strippedDangerousRules } : {}),
-  }, readPermissionRulesSnapshot(session.services.configStore));
+  }, daemonTuiRuleSnapshot(session.services.configStore));
   if (typeof registry.update !== "function") {
     throw new Error("daemon TUI session cannot apply live permission settings");
   }
@@ -811,7 +818,8 @@ async function createBoundAgenCDaemonOnlyTuiContext(
     // Runtime settings carry modes and capabilities, not rule buckets. A
     // resumed/attached TUI must still project the saved canonical rules.
     permissionContext = applyPermissionRulesSnapshot(
-      permissionContext, readPermissionRulesSnapshot(configStore),
+      permissionContext, runtimeSettings === undefined
+        ? readPermissionRulesSnapshot(configStore) : daemonTuiRuleSnapshot(configStore),
     );
     if (runtimeSettings === undefined) {
       // A cold shim has no daemon snapshot yet. Restore only exact workspace
