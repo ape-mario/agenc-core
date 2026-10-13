@@ -5,6 +5,13 @@ export const TASK_BUDGET_LEVELS = Object.freeze({ eco: 1_000_000, balanced: 2_40
 export type TaskBudgetLevel = keyof typeof TASK_BUDGET_LEVELS;
 /** Default run allocation; explicit zero disables it in every runtime mode. */
 export const DEFAULT_TASK_TOKEN_BUDGET = TASK_BUDGET_LEVELS[DEFAULT_TASK_BUDGET_LEVEL];
+/** Cold TUI shims expose canonical settings; live sessions expose runtime config. */
+export function sessionTaskTokenBudget(config?: {
+  readonly taskTokenBudget?: number;
+  readonly task_token_budget?: number;
+}): number {
+  return config?.taskTokenBudget ?? config?.task_token_budget ?? DEFAULT_TASK_TOKEN_BUDGET;
+}
 export function isTaskBudgetLevel(value: unknown): value is TaskBudgetLevel {
   return typeof value === "string" && Object.hasOwn(TASK_BUDGET_LEVELS, value);
 }

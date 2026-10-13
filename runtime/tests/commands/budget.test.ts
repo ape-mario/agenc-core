@@ -10,6 +10,16 @@ it("shows the active level without a model call or settings mutation", async () 
   expect(await budgetCommand.execute(context(""))).toMatchObject({ kind: "text", text: expect.stringContaining("eco (1,000,000 tokens)") });
   expect(mocks.update).not.toHaveBeenCalled();
 });
+it("reads the saved cap from a cold canonical config before the runtime exists", async () => {
+  const ctx = context("");
+  Object.assign(ctx.session, { config: Object.freeze({ task_token_budget: 0, budget_level: "max" }) });
+  expect(await budgetCommand.execute(ctx)).toMatchObject({ kind: "text", text: expect.stringContaining("max (no token cap)") });
+  const setToolJSX = vi.fn();
+  Object.assign(ctx, { appState: { setToolJSX } });
+  expect(await budgetCommand.execute(ctx)).toEqual({ kind: "skip" });
+  expect(setToolJSX.mock.calls[0]![0].jsx.props.current).toBe(0);
+  expect(mocks.update).not.toHaveBeenCalled();
+});
 it("saves and applies a level to the current session", async () => {
   const ctx = context("max");
   expect(await budgetCommand.execute(ctx)).toMatchObject({ kind: "text", text: expect.stringContaining("Current session budget: max") });

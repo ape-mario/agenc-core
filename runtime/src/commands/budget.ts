@@ -1,4 +1,4 @@
-import { DEFAULT_TASK_TOKEN_BUDGET, isTaskBudgetLevel, parseTaskTokenBudget, taskBudgetLabel } from "../config/task-budget.js";
+import { sessionTaskTokenBudget, isTaskBudgetLevel, parseTaskTokenBudget, taskBudgetLabel } from "../config/task-budget.js";
 import { updateSettingsForSource } from "../utils/settings/settings.js";
 import { runWithCanonicalSettingsAuthority } from "../utils/settings/canonicalAuthority.js";
 import { openBudgetMenu } from "./budget-menu.js";
@@ -12,9 +12,9 @@ export const budgetCommand: SlashCommand = {
   immediate: true,
   supportsNonInteractive: true,
   execute: async (ctx) => safeExecute(async () => {
-    const active = ctx.session.config === undefined ? "unavailable" : taskBudgetLabel(ctx.session.config.taskTokenBudget ?? DEFAULT_TASK_TOKEN_BUDGET);
+    const active = ctx.session.config === undefined ? "unavailable" : taskBudgetLabel(sessionTaskTokenBudget(ctx.session.config));
     const choice = ctx.argsRaw.trim();
-    if (!choice && openBudgetMenu(ctx, ctx.session.config?.taskTokenBudget ?? DEFAULT_TASK_TOKEN_BUDGET,
+    if (!choice && openBudgetMenu(ctx, sessionTaskTokenBudget(ctx.session.config),
       level => budgetCommand.execute({ ...ctx, argsRaw: level }))) return { kind: "skip" };
     if (!choice) return { kind: "text", text: `Current session budget: ${active}.\nChoose /budget eco (1,000,000), balanced (2,400,000), max (no token cap), or a whole token number such as 3m or 500k. Choices apply to this session and new sessions; independent call and cost limits still apply.` };
     const requested = parseTaskTokenBudget(choice);
