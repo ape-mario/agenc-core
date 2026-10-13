@@ -647,6 +647,9 @@ async function runAutoCompact(
           ? [...compacted, { ...unsentImageTurn }]
           : compacted;
         state.messagesForQuery = [...compacted];
+        // The last sample measured the replaced history. It must not trigger
+        // another compaction before the model consumes the retained results.
+        state.lastResponseUsage = undefined;
         if (unsentImageTurn) {
           state.messagesForQuery.push({ ...unsentImageTurn });
         }
@@ -1053,7 +1056,7 @@ function getActiveContextTokenUsage(
     // Keep input (including its safety margin) on the same scale as the
     // headroom-reserving proactive threshold. Output remains fully accounted
     // by hard admission and can be clamped there; no request limit changes.
-    inputOnly: options.includeOutput !== true && usesLocalToolProfile(ctx.modelProviderId),
+    inputOnly: options.includeOutput !== true,
   });
 }
 
