@@ -336,6 +336,16 @@ function daemonHarness(
 }
 
 describe("deferred daemon input ownership", () => {
+  it("forwards compaction retention to the attached canonical session", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });
+    await session.submit("attach");
+    const controls = session as typeof session & Pick<import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession, "extendCompactionRollbackRetention">;
+    expect(controls.extendCompactionRollbackRetention).toBeTypeOf("function");
+    await controls.extendCompactionRollbackRetention!({ attemptId: "attempt-1", extendedUntilMs: 2000000000000 });
+    expect(harness.requests).toContainEqual({ method: "session.extendCompactionRollbackRetention", params: { sessionId: "session-1", attemptId: "attempt-1", extendedUntilMs: 2000000000000 } });
+  });
+
   it("keeps cold status-line rendering unavailable without creating an agent or control client", async () => {
     const harness = daemonHarness();
     const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps });

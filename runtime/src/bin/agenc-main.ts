@@ -1048,6 +1048,10 @@ type TuiSessionShape = Pick<
     readonly feedback?: string;
     readonly signal?: AbortSignal;
   }) => Promise<unknown>;
+  extendCompactionRollbackRetention?: (params: {
+    readonly attemptId: string;
+    readonly extendedUntilMs: number;
+  }) => Promise<unknown>;
   setPendingProviderSwitch?: (
     pending: { provider: string; model: string; profile?: string } | null,
   ) => void;
@@ -2184,6 +2188,16 @@ async function createDeferredDaemonPromptTuiSession(params: {
         );
       }
       return live.partialCompactFromMessage(compactParams);
+    },
+    extendCompactionRollbackRetention: async (retentionParams) => {
+      const live = liveSession;
+      if (live === null) {
+        throw new Error("No conversation has started. There is no compaction to retain.");
+      }
+      if (typeof live.extendCompactionRollbackRetention !== "function") {
+        throw new Error("Compaction retention is not supported by this daemon session.");
+      }
+      return live.extendCompactionRollbackRetention(retentionParams);
     },
     applyProviderModelSelection: async (selection) => {
       const live = liveSession as TuiSessionShape | null;
