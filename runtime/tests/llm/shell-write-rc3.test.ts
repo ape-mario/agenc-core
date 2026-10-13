@@ -25,6 +25,8 @@ describe("RC3 shell write guard", () => {
     expect(decision.blocked).toBe(true);
     expect(decision.observedTargets).toContain("/repo/src/nested");
     expect(classifyShellWorkspaceWritePolicy({ ...input, args: { command: 'echo "$(node -e foo)"' } }).indeterminate).toBe(true);
+    expect(classifyShellWorkspaceWritePolicy({ ...input, args: { command: 'echo "$(node -e foo)"' }, validationPhase: "preflight" }).blocked).toBe(false);
+    expect(classifyShellWorkspaceWritePolicy({ ...input, args: { command: 'echo "$(node -e foo)"' }, allowWorkspaceWrites: true }).blocked).toBe(false);
     expect(classifyShellWorkspaceWritePolicy({ ...input, args: { command: 'echo "$(echo \'$(touch .git/config)\')"' } }).blocked).toBe(false);
   });
   it("routes a content write through preflight then permits an approved edit", () => {

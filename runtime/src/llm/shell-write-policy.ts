@@ -3121,7 +3121,8 @@ export function classifyShellWorkspaceWritePolicy(
   // has a prompt or a kernel boundary to be routed to; refusing it only made
   // the model rewrite `echo "$(id)"` and `for f in *; do ... done` until they
   // parsed. The decision still reports `indeterminate` for callers.
-  if (collected.indeterminate && !bypassesApprovalsAndSandbox) {
+  if (collected.indeterminate && !bypassesApprovalsAndSandbox &&
+    params.validationPhase !== "preflight" && params.allowWorkspaceWrites !== true) {
     messages.push(buildIndeterminatePolicyMessage(observedTargets, fileWriteTools()));
   }
 

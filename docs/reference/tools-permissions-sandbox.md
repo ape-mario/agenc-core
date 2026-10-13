@@ -570,6 +570,11 @@ an approval card for a shell edit rather than rejecting an edit the user can
 approve. Literal shell mutation targets are tracked for file-history restore,
 including newly created files; dynamic targets may not be fully tracked.
 Read operands, globs, pipes and redirects to `/dev/null` do not count as writes.
+Read-only substitutions such as `$(pwd)` run without a write approval. Embedded
+literal writes are classified, including protected targets. Opaque substitutions
+retain their unknown-write classification and require edit permission or an
+approval; preflight leaves that decision to the permission path. The OS sandbox
+continues to enforce outside-workspace boundaries in restricted modes.
 
 Protected writes and removals remain refused, including `.git`, `.agenc`,
 `.agents`, the AgenC home, shell and git config files and dangerous root

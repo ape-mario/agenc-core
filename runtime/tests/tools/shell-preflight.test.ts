@@ -55,7 +55,6 @@ function dispatchFixture(tool: Tool, args: Record<string, unknown>) {
 
 describe("shell policy before approval", () => {
   const blockedCommands = [
-    "git commit -m \"$(cat <<'EOF'\naudit commit\nEOF\n)\"",
     "rm -rf .git",
   ];
   for (const name of ["exec_command", "system.bash", "write_stdin"]) {
