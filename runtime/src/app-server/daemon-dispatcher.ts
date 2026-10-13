@@ -1,3 +1,4 @@
+import { PermissionModeTransitionPrecommitError } from "../permissions/permission-mode.js";
 import { PrintInvocation, validatePrintInvokeParams } from "./print-invocation.js";
 import { promoteOneShotRun } from "../durability/one-shot-durability.js";
 import { ROUTINE_SESSION_PREPARE_CAPABILITY, type RoutineSessionPreparation } from "../routines/session-preparation.js";
@@ -5364,6 +5365,11 @@ function mapDispatchError(
   if (error instanceof DaemonOperationTimeoutError) {
     return errorResponse(id, -32000, error.message, {
       code: error.code, operation: error.operation, timeoutMs: error.timeoutMs,
+    });
+  }
+  if (error instanceof PermissionModeTransitionPrecommitError) {
+    return errorResponse(id, -32602, error.message, {
+      code: "PERMISSION_MODE_TRANSITION_REJECTED", authorityPhase: "precommit",
     });
   }
   if (error instanceof PermissionRuleMutationPrecommitError) {

@@ -336,6 +336,16 @@ describe("daemon config/model state refresh + atomicity", () => {
     expect(bootstrap.mock.calls[0]?.[0]).toMatchObject({ executionAdmissionAutonomous: true, runtimeOptions: { interactiveTaskBudget: true } });
   });
 
+  it("marks a rejected auto transition as precommit and permits a subsequent default transition", async () => {
+    const { runner, session } = makeRunnerHarness({ configStore: { current: () => ({ disable_auto_mode: true }) } });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    await runner.setAgentPermissionMode("parent-session", { sessionId: "session_1", mode: "plan" });
+    await expect(runner.setAgentPermissionMode("parent-session", { sessionId: "session_1", mode: "auto" })).rejects.toMatchObject({ name: "PermissionModeTransitionPrecommitError" });
+    expect(session.permissionModeRegistry.current().mode).toBe("plan");
+    await runner.setAgentPermissionMode("parent-session", { sessionId: "session_1", mode: "default" });
+    expect(session.permissionModeRegistry.current().mode).toBe("default");
+  });
+
   // GAP #12: an unknown profile must be a true no-op — the shared config store
   // must NOT have been reloaded (mutated + subscribers fired) before the
   // unknown-profile error surfaces.

@@ -47,6 +47,14 @@ import {
   isWiderPermissionMode,
 } from "./session-tool-policy.js";
 
+/** A pure mode validation failed before registry or authority publication. */
+export class PermissionModeTransitionPrecommitError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "PermissionModeTransitionPrecommitError";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Mode constants + predicates
 // ---------------------------------------------------------------------------

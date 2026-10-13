@@ -70,6 +70,7 @@ import {
   canCycleToAuto,
   createDisabledAutoModeContext,
   transitionPermissionMode,
+  PermissionModeTransitionPrecommitError,
 } from "../permissions/permission-mode.js";
 import {
   applyPermissionRulesSnapshot,
@@ -3982,29 +3983,38 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         if (sameModeAutoAuthorityRevoked) {
           nextCtx = createDisabledAutoModeContext(liveCurrent);
         } else {
-          const transitioned = runWithCurrentRuntimeSession(
-            active.bootstrap.session,
-            () => {
-              if (target !== "bypassPermissions") {
+          let transitioned: ReturnType<typeof transitionPermissionMode>;
+          try {
+            transitioned = runWithCurrentRuntimeSession(
+              active.bootstrap.session,
+              () => {
+                if (target !== "bypassPermissions") {
+                  return transitionPermissionMode(
+                    transitionContext.mode,
+                    target,
+                    transitionContext,
+                  );
+                }
+                if (workspacePath === undefined) {
+                  throw new Error(
+                    "Switching to bypassPermissions requires a canonical workspace",
+                  );
+                }
                 return transitionPermissionMode(
                   transitionContext.mode,
                   target,
                   transitionContext,
+                  { workspacePath },
                 );
-              }
-              if (workspacePath === undefined) {
-                throw new Error(
-                  "Switching to bypassPermissions requires a canonical workspace",
-                );
-              }
-              return transitionPermissionMode(
-                transitionContext.mode,
-                target,
-                transitionContext,
-                { workspacePath },
-              );
-            },
-          );
+              },
+            );
+          } catch (error) {
+            // This callback computes the next context and has not returned a
+            // registry update, prepared effect, or durable settings event.
+            throw new PermissionModeTransitionPrecommitError(
+              error instanceof Error ? error.message : String(error), { cause: error },
+            );
+          }
           if ("error" in transitioned) {
             throw new Error(
               "Switching to bypassPermissions requires explicit consent for this exact cwd",
