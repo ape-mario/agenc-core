@@ -809,6 +809,60 @@ The Landlock fallback cannot express a read-only carve-out inside a writable
 root, and home-as-workspace would also grant the agent write access to the
 entire home directory.
 
+### AgenC home under writable sandbox roots
+
+A different layout: `AGENC_HOME` itself sits **under** a writable sandbox
+ancestor. CI and tests often put home under `TMPDIR`; a workspace that is a
+parent of home has the same shape. That ambient grant must not make config,
+cookies, or plugin storage writable to a confined child.
+
+`protectAgencHomeUnderWritableRoot`
+(`runtime/src/sandbox/agenc-home-protection.ts`) adds the canonical home to
+`reservedReadOnlyPaths` through `protectDesktopAuthority`. Detection walks
+`getWritableRootsWithCwd` on the **granted** profile (`grantedProfile`), so a
+per-command extra write root that contains home still reserves it without
+widening the base profile. `sandboxAgencHome` canonicalizes the bound
+session home (`configStore.homeContext.path`) and prefers it over the
+environment, including symlink aliases.
+
+The reservation applies only when
+`sandboxModeRequiresPlatformIsolation` is true (`read_only` /
+`workspace_write`):
+
+| Surface | When |
+| --- | --- |
+| `permissionProfileForRuntimeContext` | File-tool runtime check |
+| `SandboxExecutionBroker.#protectProfile` | Every confined spawn |
+| Per-command `additionalPermissions` | Re-check after a later grant introduces a containing root |
+
+`danger-full-access` and `external_sandbox` skip platform isolation; the
+reservation is not applied. Explicit unsandboxed modes remain operator
+trust. There is no env or `config.toml` override.
+
+A separately authorized child, such as a plugin's private data directory
+that does not contain home, keeps that narrower write grant. The rest of
+home stays unwritable.
+
+**Host vs sandbox.** Sandboxed children cannot write home. `Write` / `Edit`
+and `extractMemories` may still persist the owning session's plan file and
+the durable memory roots (`$AGENC_HOME/memory/`, the project memory
+directory) on the **host** through `agencHomeCarveOutAllowsWrite`. That
+check uses the original unprotected profile so an operator deny, a
+reserved path already on the profile, or an SDK/cowork memory-path
+override still wins. Shell redirects never reach it
+(`shellAccess === null`). `config.toml` and the rest of home stay
+blocked. Unrestricted and `external_sandbox` policies never open through
+the carve-out.
+
+**Landlock vs bubblewrap.** Bubblewrap can express the reservation:
+`--ro-bind` home after `--bind` of the writable ancestor. Landlock cannot
+subtract a child from a writable root, so the spawn fails closed as
+`[sandbox_policy_unexpressible]` with
+`reserved Desktop authority paths require non-overridable read-only carve-outs; bubblewrap is required`.
+Restore bubblewrap; do not treat this as the `.git` / `.agenc`
+unexpressible case, and do not reinstall the helper. Distinct from
+[home-as-workspace helper containment](#home-workspace-vs-helper-containment).
+
 ### Linux launcher argv contract
 
 `agenc-linux-sandbox` (`runtime/src/sandbox/linux-launcher/cli.ts`) fails
@@ -896,6 +950,7 @@ Docker sandbox driver and SSH remote exec targets remain roadmap items
 | `[sandbox_required_unavailable]` + helper "outside the writable workspace" after a stock Linux install | The workspace is `$HOME` (or contains it). Open a project directory. Do not reinstall. |
 | `[sandbox_landlock_fallback]` from `agenc doctor` | Bubblewrap is unusable; Linux is ready only via Landlock. On Ubuntu 24.04+ install the AppArmor profile in [install.md](../install.md). Otherwise restore `bwrap` or accept the fallback limits. |
 | `[sandbox_policy_unexpressible]` on shell or workspace-write stdio MCP | Landlock cannot keep `.git` / `.agenc` read-only inside a writable project. Restore bubblewrap, use `sandbox_mode = "read-only"`, or choose `danger-full-access`. Plugin-declared MCP servers keep a tighter, Landlock-expressible profile. `Grep` / `Glob` / `Orient` use a narrowed read-only child and usually keep working. |
+| `[sandbox_policy_unexpressible]` + `reserved Desktop authority paths require non-overridable read-only carve-outs` | `AGENC_HOME` sits under a writable workspace or session temp ancestor. Landlock cannot keep that home read-only. Restore bubblewrap, or move `AGENC_HOME` off the writable root. Do not reinstall the helper. Distinct from home-as-workspace helper containment. See [AgenC home under writable sandbox roots](#agenc-home-under-writable-sandbox-roots). |
 | `/proc` or `/sys` reads fail with `EACCES` on Landlock fallback | Expected. The fallback never grants those roots, including under full-disk-read. Restore bubblewrap for a private procfs, or avoid `/proc`-dependent commands. |
 | Windows restricted-mode spawn refused | Native restricted-token isolation is unimplemented. Use WSL2, `external_sandbox`, or the deliberate danger-mode escape hatch. |
 

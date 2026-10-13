@@ -397,6 +397,10 @@ process that can rewrite its jailer is not jailed. The remediation names the
 home workspace and tells you to open a project directory — do not reinstall
 the helper. See
 [tools-permissions-sandbox.md](reference/tools-permissions-sandbox.md).
+A different pitfall: putting `AGENC_HOME` under a writable sandbox ancestor
+(`TMPDIR`, a parent workspace) does not make home writable to sandboxed
+children. See
+[AgenC home under writable sandbox roots](reference/tools-permissions-sandbox.md#agenc-home-under-writable-sandbox-roots).
 
 ## Release/publish procedure
 

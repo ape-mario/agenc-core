@@ -229,6 +229,10 @@ Override home:
 export AGENC_HOME=/var/lib/agenc
 ```
 
+When that home sits under a writable sandbox ancestor (CI `TMPDIR`, a parent
+workspace), sandboxed children see it as reserved read-only. See
+[tools-permissions-sandbox.md](tools-permissions-sandbox.md#agenc-home-under-writable-sandbox-roots).
+
 ## Transports & auth
 
 Unix socket paths are limited by UTF-8 byte length: 107 usable bytes on Linux,

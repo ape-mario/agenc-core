@@ -62,7 +62,12 @@ and adding a boundary regression test.
   rejected. A workspace that contains the user's home (the default for a bare
   `agenc` in a fresh terminal) cannot satisfy that containment rule; the
   probe still refuses, but remediation names the home workspace and points at
-  a project directory instead of a reinstall. The helper's own argv parser
+  a project directory instead of a reinstall. When `AGENC_HOME` itself sits
+  under a writable workspace or session temp ancestor, that home is reserved
+  read-only for sandboxed children; Landlock cannot express the reservation
+  and refuses with `[sandbox_policy_unexpressible]`. See
+  [tools-permissions-sandbox.md](../reference/tools-permissions-sandbox.md#agenc-home-under-writable-sandbox-roots).
+  The helper's own argv parser
   (`linux-launcher/cli.ts`) also fails closed: policy cwd is required and
   never inferred, value flags are accepted once, unknown profile fields and
   NUL bytes are rejected, and `globScanMaxDepth` cannot exceed 128. Landlock

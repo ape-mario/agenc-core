@@ -162,7 +162,11 @@ The extraction child (`services/extractMemories`) forks the full history on
 every third eligible terminating turn by default (`DEFAULT_MIN_ELIGIBLE_TURNS`),
 sees only the file read/write tools (`MEMORY_EXTRACTION_TOOL_ALLOWLIST`) inside
 the memory directory, and never blocks a turn: in-flight runs are drained at
-session shutdown. Every gate that stops a run and every failed run emits a
+session shutdown. `Write` / `extractMemories` may persist those durable
+memory roots on the host even when `AGENC_HOME` is reserved read-only for
+sandboxed children; operator denies and shell redirects still win. See
+[AgenC home under writable sandbox roots](tools-permissions-sandbox.md#agenc-home-under-writable-sandbox-roots).
+Every gate that stops a run and every failed run emits a
 `warning` event with cause `memory_extraction_skipped` or
 `memory_extraction_failed` (session log only; not shown in the transcript).
 The same run may also propose a draft skill; those outcomes use cause
