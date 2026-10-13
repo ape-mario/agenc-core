@@ -622,13 +622,27 @@ export function markAnthropicReasoningIncludedInCompletion(
  * https://platform.claude.com/docs/en/build-with-claude/prompt-caching#tracking-cache-performance
  */
 export function withAnthropicProcessedTokenTotal(usage: LLMUsage): LLMUsage {
+  // Malformed negative cache counters must never credit previously spent tokens.
+  const cachedInputTokens = usage.cachedInputTokens === undefined
+    ? undefined
+    : Math.max(0, usage.cachedInputTokens);
+  const cacheCreationInputTokens = usage.cacheCreationInputTokens === undefined
+    ? undefined
+    : Math.max(0, usage.cacheCreationInputTokens);
   const totalTokens =
     usage.promptTokens +
     usage.completionTokens +
-    (usage.cachedInputTokens ?? 0) +
-    (usage.cacheCreationInputTokens ?? 0);
-  if (totalTokens === usage.totalTokens) return usage;
-  return { ...usage, totalTokens };
+    (cachedInputTokens ?? 0) +
+    (cacheCreationInputTokens ?? 0);
+  if (totalTokens === usage.totalTokens &&
+    cachedInputTokens === usage.cachedInputTokens &&
+    cacheCreationInputTokens === usage.cacheCreationInputTokens) return usage;
+  return {
+    ...usage,
+    totalTokens,
+    ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
+    ...(cacheCreationInputTokens !== undefined ? { cacheCreationInputTokens } : {}),
+  };
 }
 
 export function parseAnthropicMessagesResponse(
