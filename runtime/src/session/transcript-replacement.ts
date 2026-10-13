@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { LLMMessage } from "../llm/types.js";
+import { isHiddenGoalContinuation } from "./hidden-goal-history.js";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | {
@@ -52,6 +53,7 @@ function llmMessageToRuntimeTranscriptMessages(
   message: LLMMessage,
   index: number,
 ): RuntimeTranscriptMessage[] {
+  if (isHiddenGoalContinuation(message)) return [];
   switch (message.role) {
     case "system":
     case "developer":

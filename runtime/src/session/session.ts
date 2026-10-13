@@ -35,6 +35,7 @@ import { SessionWriteBehindQueue, withSessionWriteBehind } from "./write-behind.
  */
 
 import { randomUUID } from "node:crypto";
+import { isHiddenGoalContinuation } from "./hidden-goal-history.js";
 import { isKnownEmptyProviderReasoning } from "../llm/types.js";
 import { persistDisplayAttachments } from "./display-artifact-store.js";
 import { boundDisplayCompletionEvent } from "./display-completion.js";
@@ -2124,6 +2125,7 @@ function lastTextBlock(content: LLMMessage["content"]): string {
 
 function isSelectableHistoryUserMessage(message: LLMMessage): boolean {
   if (message.role !== "user") return false;
+  if (isHiddenGoalContinuation(message)) return false;
   const invocationChannel = message.runtimeOnly?.agentInvocation;
   if (invocationChannel !== undefined) {
     // The three authenticated user-role records are one logical invocation,

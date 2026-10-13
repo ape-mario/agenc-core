@@ -2893,6 +2893,26 @@ describe("Session.partialCompactFromMessage", () => {
 });
 
 describe("Session.rewindConversationToMessage", () => {
+  it("keeps the first Write when selecting the second after hidden goal feedback", async () => {
+    const session = buildSession();
+    const retained = [
+      { role: "user" as const, content: "goal prompt", runtimeOnly: { userMessageId: "goal-prompt", responseItemId: "goal-prompt" } },
+      { role: "user" as const, content: '<goal_gate round="1" of="1">\nContinue.\n</goal_gate>' },
+      { role: "user" as const, content: "Write ONE", runtimeOnly: { userMessageId: "one-prompt", responseItemId: "one-prompt" } },
+      { role: "assistant" as const, content: "Created ONE" },
+    ];
+    session.rolloutStore = { isDegraded: false, appendRollout: vi.fn() } as unknown as Session["rolloutStore"];
+    await session.state.with((state) => {
+      state.history = [...retained,
+        { role: "user", content: "Write TWO", runtimeOnly: { userMessageId: "two-prompt", responseItemId: "two-prompt" } },
+        { role: "assistant", content: "Wrote TWO" },
+      ];
+    });
+    const result = await session.rewindConversationToMessage({ messageOrdinal: 2 });
+    expect(result.ok).toBe(true);
+    expect(session.snapshotHistoryMessages()).toEqual(retained);
+  });
+
   it("commits a durable replacement history before the selected active message", async () => {
     const appendRollout = vi.fn();
     const session = buildSession();
