@@ -1056,6 +1056,9 @@ type TuiSessionShape = Pick<
     readonly attemptId: string;
     readonly extendedUntilMs: number;
   }) => Promise<unknown>;
+  rewindConversationToMessage?: (params: { readonly messageOrdinal: number }) => Promise<unknown>;
+  previewFileRewind?: (params: { readonly messageOrdinal: number }) => Promise<unknown>;
+  rewindFilesToMessage?: (params: { readonly messageOrdinal: number }) => Promise<unknown>;
   setPendingProviderSwitch?: (
     pending: { provider: string; model: string; profile?: string } | null,
   ) => void;
@@ -2192,6 +2195,27 @@ async function createDeferredDaemonPromptTuiSession(params: {
         );
       }
       return live.partialCompactFromMessage(compactParams);
+    },
+    rewindConversationToMessage: async (rewindParams) => {
+      const live = liveSession;
+      if (live === null || typeof live.rewindConversationToMessage !== "function") {
+        throw new Error("No live conversation is available to rewind.");
+      }
+      return live.rewindConversationToMessage(rewindParams);
+    },
+    previewFileRewind: async (rewindParams) => {
+      const live = liveSession;
+      if (live === null || typeof live.previewFileRewind !== "function") {
+        throw new Error("No live conversation is available to preview a file rewind.");
+      }
+      return live.previewFileRewind(rewindParams);
+    },
+    rewindFilesToMessage: async (rewindParams) => {
+      const live = liveSession;
+      if (live === null || typeof live.rewindFilesToMessage !== "function") {
+        throw new Error("No live conversation is available to restore files.");
+      }
+      return live.rewindFilesToMessage(rewindParams);
     },
     rollbackCompaction: async (rollbackParams) => {
       const live = liveSession;

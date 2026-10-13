@@ -338,6 +338,19 @@ function daemonHarness(
 }
 
 describe("deferred daemon input ownership", () => {
+  it("forwards rewind preview and both restore actions to canonical daemon history", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });
+    await session.submit("attach");
+    const controls = session as typeof session & Pick<import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession, "rewindConversationToMessage" | "previewFileRewind" | "rewindFilesToMessage">;
+    for (const [name, method] of [["previewFileRewind", "session.previewFileRewind"], ["rewindFilesToMessage", "session.rewindFilesToMessage"], ["rewindConversationToMessage", "session.rewindConversationToMessage"]] as const) {
+      expect(controls[name]).toBeTypeOf("function");
+      await controls[name]!({ messageOrdinal: 2 });
+      expect(harness.client.request).toHaveBeenLastCalledWith(method, { sessionId: "session-1", messageOrdinal: 2 });
+    }
+    expect(harness.startPromptAgent).toHaveBeenCalledOnce();
+  });
+
   it("reloads cold config without requiring session MCP authority", async () => {
     const harness = daemonHarness();
     const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps });
