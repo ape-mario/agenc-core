@@ -292,7 +292,8 @@ export function responseItemToLlmMessage(item: ResponseItem): LLMMessage {
       ? {
           runtimeOnly: {
             ...(item.id !== undefined
-              ? { responseItemId: item.id }
+              ? { responseItemId: item.id,
+                  ...(item.role === "user" ? { userMessageId: item.id } : {}) }
               : {}),
             ...(item.toolResultIntegrity !== undefined
               ? { toolResultIntegrity: item.toolResultIntegrity }

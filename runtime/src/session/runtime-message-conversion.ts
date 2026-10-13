@@ -66,6 +66,9 @@ export type AgenCRuntimeMessage = Omit<
 };
 
 type RuntimeOnlyProjectionSource = {
+  readonly responseItemId?: string;
+  readonly userMessageId?: string;
+  readonly compactionHistory?: NonNullable<LLMMessage["runtimeOnly"]>["compactionHistory"];
   readonly toolResultIntegrity?: NonNullable<
     NonNullable<LLMMessage["runtimeOnly"]>["toolResultIntegrity"]
   >;
@@ -310,12 +313,24 @@ export function projectRuntimeOnly(
 ): Pick<LLMMessage, "runtimeOnly"> {
   if (
     runtimeOnly?.toolResultIntegrity === undefined &&
-    runtimeOnly?.agentInvocation === undefined
+    runtimeOnly?.agentInvocation === undefined &&
+    runtimeOnly?.responseItemId === undefined &&
+    runtimeOnly?.userMessageId === undefined &&
+    runtimeOnly?.compactionHistory === undefined
   ) {
     return {};
   }
   return {
     runtimeOnly: {
+      ...(runtimeOnly.responseItemId !== undefined
+        ? { responseItemId: runtimeOnly.responseItemId }
+        : {}),
+      ...(runtimeOnly.userMessageId !== undefined
+        ? { userMessageId: runtimeOnly.userMessageId }
+        : {}),
+      ...(runtimeOnly.compactionHistory !== undefined
+        ? { compactionHistory: runtimeOnly.compactionHistory }
+        : {}),
       ...(runtimeOnly.toolResultIntegrity !== undefined
         ? { toolResultIntegrity: runtimeOnly.toolResultIntegrity }
         : {}),

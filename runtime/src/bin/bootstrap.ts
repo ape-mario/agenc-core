@@ -2146,6 +2146,10 @@ async function bootstrapLocalRuntimeSessionScoped(
 
         const deferredCost = deferredSetup !== undefined && oneShotFastModeSelected(runtimeOptions, startup.config)
           ? deferSidecar(s.eventLog) : undefined;
+        // The daemon can emit its first user prompt before the first request
+        // initializes sidecars. Retain that file-history barrier as well.
+        const deferredFileHistory = deferredSetup !== undefined
+          ? deferSidecar(s.eventLog) : undefined;
         const initializeSidecars = async (): Promise<void> => {
         s.abortController.signal.throwIfAborted();
         const projectDir = getProjectDir(
@@ -2179,9 +2183,8 @@ async function bootstrapLocalRuntimeSessionScoped(
               at: Date.now(),
             }),
         });
-        sidecarManager.register(
-          new FileHistorySidecar({ fileHistory, workspaceRoot }),
-        );
+        const fileHistorySidecar = new FileHistorySidecar({ fileHistory, workspaceRoot });
+        sidecarManager.register(deferredFileHistory?.attach(fileHistorySidecar) ?? fileHistorySidecar);
         s.attachFileHistory(fileHistory);
 
         errorLogSidecar = new ErrorLogSidecar({

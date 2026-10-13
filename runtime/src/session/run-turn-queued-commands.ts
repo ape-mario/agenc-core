@@ -200,7 +200,7 @@ function drainQueuedCommandsAfterTools(params: {
           : // Durable prompts emit a `user_message` event with `id: uuid`
             // below — stamp the same id so file-history rewind can find
             // the sidecar's barrier snapshot for this message.
-            { userMessageId: uuid }),
+            { userMessageId: uuid, responseItemId: uuid }),
       },
     });
     if (durableUserPrompt) {
