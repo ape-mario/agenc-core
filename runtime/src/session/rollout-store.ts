@@ -2026,12 +2026,36 @@ export class RolloutStore {
           sourceMeta.payload.source === "interactive-root") ||
          (/^c2-reviewed-rollback:[a-f0-9]{64}$/u.test(sourceMeta.payload.originator) &&
           sourceMeta.payload.source === "interactive-root-reviewed-rollback"));
+      // Branches have no agent_runs row until their first interactive resume.
+      // Copy only the source's presentation profile, not its runtime options
+      // (which include permission/sandbox inputs). Older roots retain this
+      // profile in the exact project-local run row instead of session_meta.
+      let sourceLightMode = sourceMeta?.type === "session_meta"
+        ? sourceMeta.payload.lightMode : undefined;
+      if (interactiveSource) {
+        const row = this.stateDriver.prepareState<[string], { metadata_json: string | null }>(
+          "SELECT metadata_json FROM agent_runs WHERE id = ?",
+        ).get(rollback.source_session_id);
+        if (row?.metadata_json != null) {
+          const metadata: unknown = JSON.parse(row.metadata_json);
+          if (isRecord(metadata) && isRecord(metadata.runtimeOptions) &&
+              metadata.runtimeOptions.lightMode !== undefined) {
+            if (typeof metadata.runtimeOptions.lightMode !== "boolean") {
+              throw new CompactionTransactionError("commit_failed", "source has invalid persisted Light mode");
+            }
+            sourceLightMode = metadata.runtimeOptions.lightMode;
+          }
+        }
+      }
       target.open({
         sessionId: rollback.target_session_id,
         timestamp: new Date(rollback.recorded_at_ms).toISOString(),
         cwd: this.store.cwd,
         originator: lineageOriginator,
-        ...(interactiveSource ? { source: "interactive-root-reviewed-rollback" } : {}),
+        ...(interactiveSource ? {
+          source: "interactive-root-reviewed-rollback",
+          ...(sourceLightMode !== undefined ? { lightMode: sourceLightMode } : {}),
+        } : {}),
         agencVersion: this.store.agencVersion,
       });
       reservation.opened = true;
