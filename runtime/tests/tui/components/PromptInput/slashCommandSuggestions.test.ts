@@ -6,12 +6,14 @@ function localCommand(opts: {
   name: string;
   description: string;
   aliases?: string[];
+  argumentHint?: string;
 }): Command {
   return {
     type: "local",
     name: opts.name,
     description: opts.description,
     aliases: opts.aliases,
+    argumentHint: opts.argumentHint,
     load: async () => ({
       call: async () => ({ type: "text", value: "" }),
     }),
@@ -208,4 +210,16 @@ describe("slash command suggestions", () => {
       (suggestions[0]?.metadata as Command | undefined)?.description,
     ).toBe(rawDescription);
   });
+});
+
+
+it('matches the slash picker Enter hint to completion versus execution', () => {
+  const commands = [localCommand({ name: 'model', description: 'Choose a model' })];
+  expect(generateCommandSuggestions('/mod', commands, EMPTY_RUNTIME_STATE)[0]?.enterAction).toBe('run');
+  expect(generateCommandSuggestions('/model', commands, EMPTY_RUNTIME_STATE)[0]?.enterAction).toBe('run');
+});
+
+it('labels required-argument selections as completion', () => {
+  const commands = [localCommand({ name: 'review', description: 'Review target', argumentHint: '<target>' })];
+  expect(generateCommandSuggestions('/rev', commands, EMPTY_RUNTIME_STATE)[0]?.enterAction).toBe('complete');
 });

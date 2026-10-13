@@ -289,9 +289,16 @@ function commandSourceTag(cmd: Command): string | undefined {
   return undefined
 }
 
+/** Required arguments keep a picker selection in the composer for completion. */
+export function commandRequiresArguments(command: Command): boolean {
+  if (command.type === 'prompt' && (command.argNames ?? []).length > 0) return true
+  return /^\s*<[^>]+>/.test(command.argumentHint ?? '')
+}
+
 function createCommandSuggestionItem(
   cmd: Command,
   matchedAlias?: string,
+  query = '',
 ): SuggestionItem {
   const commandName = getCommandName(cmd)
   // Only show the alias if the user typed it
@@ -309,6 +316,9 @@ function createCommandSuggestionItem(
     tag: isProtocol ? '◆' : isWorkflow ? 'workflow' : commandSourceTag(cmd),
     description: fullDescription,
     metadata: cmd,
+    enterAction: (commandName.toLowerCase() === query || (cmd.aliases ?? []).some(alias => alias.toLowerCase() === query))
+      ? (cmd.type !== 'prompt' || (cmd.argNames ?? []).length === 0 ? 'run' : 'complete')
+      : (commandRequiresArguments(cmd) ? 'complete' : 'run'),
     color: isProtocol ? 'worker' : undefined,
   }
 }
@@ -503,7 +513,7 @@ export function generateCommandSuggestions(
     const cmd = result.r.item.command
     // Only show alias in parentheses if the user typed an alias
     const matchedAlias = findMatchedAlias(query, cmd.aliases)
-    return createCommandSuggestionItem(cmd, matchedAlias)
+    return createCommandSuggestionItem(cmd, matchedAlias, query)
   })
   // Skip the prepend if hiddenExact is already in fuseSuggestions — this
   // happens when isHidden flips false→true mid-session (OAuth expiry,
@@ -515,7 +525,7 @@ export function generateCommandSuggestions(
     const hiddenId = getCommandId(hiddenExact)
     if (!fuseSuggestions.some(s => s.id === hiddenId)) {
       return ensureUniqueSuggestionIds([
-        createCommandSuggestionItem(hiddenExact),
+        createCommandSuggestionItem(hiddenExact, undefined, query),
         ...fuseSuggestions,
       ])
     }
