@@ -455,10 +455,16 @@ function rawToolResultContent(
   for (const block of content) {
     if (
       block?.type === 'tool_result' &&
-      block.tool_use_id === toolUseId &&
-      typeof block.content === 'string'
+      block.tool_use_id === toolUseId
     ) {
-      return block.content;
+      if (typeof block.content === 'string') return block.content;
+      if (Array.isArray(block.content)) {
+        return block.content
+          .filter((part): part is { type: 'text'; text: string } =>
+            part?.type === 'text' && typeof part.text === 'string')
+          .map(part => part.text)
+          .join('\n');
+      }
     }
   }
   return null;
