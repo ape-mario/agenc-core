@@ -64,7 +64,8 @@ export async function applyProviderSwitch(
     }) => Promise<void> | void;
   } = {},
 ): Promise<ProviderModelSelectionOutcome> {
-  const current = readSessionSelection(session);
+  // The accepted next-turn pair takes precedence over the running binding.
+  const current = readSessionSelection(session, { includePending: true });
   let selection;
   try {
     selection = resolveSessionProviderModelSelection(
