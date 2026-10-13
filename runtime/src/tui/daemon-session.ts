@@ -1530,7 +1530,16 @@ export function createDaemonTuiSession<
     cancelActiveTurn: async (reason?: string) => {
       const expectedTurnId = activeDaemonTurnId();
       if (expectedTurnId !== undefined) {
-        await cancelDaemonTurn(expectedTurnId, reason);
+        const cancellation = cancelDaemonTurn(expectedTurnId, reason);
+        // This only ends the client's activity indicator. The daemon still
+        // owns cancellation, process cleanup, and durable effect settlement.
+        // Capture cancellation authority before clearing the local snapshot.
+        broadcastDaemonEvent({
+          id: `tui-cancel-${expectedTurnId}`,
+          type: "turn_aborted",
+          payload: { turnId: expectedTurnId, reason: reason ?? "interrupted" },
+        });
+        await cancellation;
         return;
       }
       // A pending submission's stream id is local, not cancellation authority.

@@ -1886,7 +1886,7 @@ describe("AgenC TUI daemon session adapter", () => {
         },
       },
     });
-    expect(session.activeTurn?.unsafePeek()).toEqual({ turnId: "daemon-turn" });
+    expect(session.activeTurn?.unsafePeek()).toBeNull();
 
     client.emit("session_1", {
       method: "event.session_event",
