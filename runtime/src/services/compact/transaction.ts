@@ -34,6 +34,7 @@ import {
   accountCompactionCall,
   buildCompactionMapReducePlan,
   canonicalCompactionSourceMessages,
+  compactionSourceRefAlias,
   structuredReductionMessages,
   type CompactionMapReducePlan,
 } from "./plan.js";
@@ -927,7 +928,7 @@ async function runSummaryTree(params: {
         content = params.summarizer({
           stage,
           messages,
-          allowedSourceRefIds: sourceRefs.map((ref) => ref.ref_id),
+          allowedSourceRefIds: sourceRefs.map((_, index) => compactionSourceRefAlias(index)),
           maxOutputTokens: params.plan.output_reserve_tokens,
         });
       } catch (error) {
@@ -999,7 +1000,20 @@ async function runSummaryTree(params: {
       );
     }
     const allowedIds = new Set(sourceRefs.map((ref) => ref.ref_id));
-    const validated = parseCompactionBodyV1(response.content, allowedIds);
+    const aliases = new Map(sourceRefs.map((ref, index) => [compactionSourceRefAlias(index), ref.ref_id]));
+    const wireBody = parseCompactionBodyV1(response.content, new Set(aliases.keys())).body;
+    const bindRecords = (records: typeof wireBody.facts) => records.map((record) => ({
+      ...record,
+      source_ref_ids: record.source_ref_ids.map((id) => aliases.get(id)!),
+    }));
+    // Validate model labels exactly, then restore the frozen canonical IDs.
+    // Re-validate the bound body so all durable size/provenance limits still
+    // cover the actual identifiers, not only their shorter wire aliases.
+    const validated = parseCompactionBodyV1(canonicalizeJson({
+      ...wireBody,
+      facts: bindRecords(wireBody.facts),
+      open_actions: bindRecords(wireBody.open_actions),
+    }), allowedIds);
     // The runtime knows every tool call/result pair of the span and pins
     // them into the summary itself. A model that echoes them anyway must
     // match exactly; one that leaves them out has done nothing wrong.
