@@ -2731,10 +2731,18 @@ function PromptInput({
       action: "chat:submit",
       context: "Chat",
       handler: () => {
-        void onSubmit(lastInternalInputRef.current);
+        const currentInput = lastInternalInputRef.current;
+        const offset = cursorOffsetRef.current;
+        if (currentInput[offset - 1] === "\\") {
+          pushToBuffer(currentInput, offset, pastedContentsRef.current);
+          trackAndSetInput(`${currentInput.slice(0, offset - 1)}\n${currentInput.slice(offset)}`);
+          setCurrentCursorOffset(offset);
+          return;
+        }
+        void onSubmit(currentInput);
       },
     });
-  }, [keybindingContext, promptKeyboardActive, onSubmit]);
+  }, [keybindingContext, promptKeyboardActive, onSubmit, trackAndSetInput, setCurrentCursorOffset, pushToBuffer]);
 
   // Chat context keybindings for editing shortcuts
   // Note: history:previous/history:next are NOT handled here. They are passed as
