@@ -973,7 +973,7 @@ function effectivePreviousModelContextWindow(previousTurnSettings: {
 async function runPreSamplingCompact(
   session: Session,
   ctx: TurnContext,
-  querySource: string,
+  _querySource: string,
   state?: TurnState,
   options: Pick<RunAutoCompactOptions, "onAdvisoryRefusal" | "onDurableHistoryReplaced"> = {},
 ): Promise<boolean> {
@@ -982,7 +982,7 @@ async function runPreSamplingCompact(
     ctx,
     state,
   );
-  let preSamplingCompacted = await maybeRunPreviousModelInlineCompact(
+  const preSamplingCompacted = await maybeRunPreviousModelInlineCompact(
     session,
     ctx,
     // Model downshift is a separate safety path, not the local proactive gate.
@@ -992,22 +992,9 @@ async function runPreSamplingCompact(
     state,
     options,
   );
-  const autoCompactLimit = getPreSamplingAutoCompactTokenLimit(ctx);
-  if (
-    autoCompactLimit !== undefined &&
-    activeContextTokensBefore >= autoCompactLimit
-  ) {
-    const contextLimitCompacted = await runAutoCompact(
-      session,
-      ctx,
-      "do_not_inject",
-      "context_limit",
-      "pre_turn",
-      state,
-      { propagateErrors: true, querySource, ...options },
-    );
-    preSamplingCompacted = preSamplingCompacted || contextLimitCompacted;
-  }
+  // General context pressure is evaluated after query preparation, before
+  // every physical provider dispatch. Only a model downshift needs this
+  // separate earlier path to summarize with the previous larger model.
   return preSamplingCompacted;
 }
 
