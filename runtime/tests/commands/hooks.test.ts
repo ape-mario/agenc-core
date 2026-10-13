@@ -207,6 +207,22 @@ function daemonCtx(
 }
 
 describe("/hooks command (daemon path)", () => {
+  it("advertises only supported daemon hook actions in overview and usage", async () => {
+    const overview = await hooksCommand.execute(daemonCtx("list"));
+    expect(overview.kind).toBe("text");
+    if (overview.kind === "text") {
+      expect(overview.text).toContain("/hooks diagnostics");
+      expect(overview.text).not.toContain("/hooks test");
+      expect(overview.text).not.toContain("clear-diagnostics");
+    }
+    const invalid = await hooksCommand.execute(daemonCtx("badargument"));
+    expect(invalid.kind).toBe("error");
+    if (invalid.kind === "error") {
+      expect(invalid.message).not.toContain("test");
+      expect(invalid.message).not.toContain("clear-diagnostics");
+    }
+  });
+
   it("renders the daemon's real hooks via the status RPC", async () => {
     const result = await hooksCommand.execute(daemonCtx("list"));
     expect(result.kind).toBe("text");
