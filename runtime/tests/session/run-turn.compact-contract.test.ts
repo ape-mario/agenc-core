@@ -70,7 +70,12 @@ describe("runTurn compact contract", () => {
     await drain(runTurn(session, mkCtx(), "hello"));
 
     expect(seen).toHaveLength(1);
-    expect(seen[0]).toEqual([{ role: "user", content: "hello" }]);
+    const userMessageId = seen[0]?.[0]?.runtimeOnly?.userMessageId;
+    expect(userMessageId).toMatch(/^user-msg-/);
+    expect(seen[0]).toEqual([{
+      role: "user", content: "hello",
+      runtimeOnly: { userMessageId, responseItemId: userMessageId },
+    }]);
   });
 
   test("pre-turn auto compact leaves history intact without a rollout owner", async () => {

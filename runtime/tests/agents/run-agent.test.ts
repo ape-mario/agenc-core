@@ -5084,9 +5084,12 @@ describe("runAgent", () => {
       expect(provider.chatStream).toHaveBeenCalledTimes(2);
       const secondMessages = (provider.chatStream as ReturnType<typeof vi.fn>)
         .mock.calls[1]![0] as LLMMessage[];
+      const userMessageId = secondMessages.at(-1)?.runtimeOnly?.userMessageId;
+      expect(userMessageId).toMatch(/^user-msg-/);
       expect(secondMessages.at(-1)).toEqual({
         role: "user",
         content: "second task",
+        runtimeOnly: { userMessageId, responseItemId: userMessageId },
       });
       const notifications = session.mailbox.drain();
       expect(notifications).toEqual([
@@ -5439,9 +5442,12 @@ describe("runAgent", () => {
       expect(provider.chatStream).toHaveBeenCalledTimes(2);
       const secondMessages = (provider.chatStream as ReturnType<typeof vi.fn>)
         .mock.calls[1]![0] as LLMMessage[];
+      const userMessageId = secondMessages.at(-1)?.runtimeOnly?.userMessageId;
+      expect(userMessageId).toMatch(/^user-msg-/);
       expect(secondMessages.at(-1)).toEqual({
         role: "user",
         content: "context note\n\ndo the next task",
+        runtimeOnly: { userMessageId, responseItemId: userMessageId },
       });
     } finally {
       await stopKeepAliveRun(iter, live.abortController);
@@ -5498,9 +5504,13 @@ describe("runAgent", () => {
       expect(provider.chatStream).toHaveBeenCalledTimes(2);
       const calls = (provider.chatStream as ReturnType<typeof vi.fn>).mock
         .calls;
-      expect((calls[1]![0] as LLMMessage[]).at(-1)).toEqual({
+      const user = (calls[1]![0] as LLMMessage[]).at(-1);
+      const userMessageId = user?.runtimeOnly?.userMessageId;
+      expect(userMessageId).toMatch(/^user-msg-/);
+      expect(user).toEqual({
         role: "user",
         content: "first queued task",
+        runtimeOnly: { userMessageId, responseItemId: userMessageId },
       });
     } finally {
       await stopKeepAliveRun(iter, live.abortController);
