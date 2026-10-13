@@ -2205,10 +2205,20 @@ function toCompactRuntimeMessages(
         : {}),
       ...(message.toolName !== undefined ? { toolName: message.toolName } : {}),
       ...(message.phase !== undefined ? { phase: message.phase } : {}),
+      ...(message.providerReasoningContent !== undefined
+        ? { providerReasoningContent: message.providerReasoningContent }
+        : {}),
+      ...(message.providerReasoningProvenance !== undefined
+        ? { providerReasoningProvenance: { ...message.providerReasoningProvenance } }
+        : {}),
       ...(message.runtimeOnly?.toolResultIntegrity !== undefined ||
-      message.runtimeOnly?.agentInvocation !== undefined
+      message.runtimeOnly?.agentInvocation !== undefined ||
+      message.runtimeOnly?.compactionHistory !== undefined
         ? {
             runtimeOnly: {
+              ...(message.runtimeOnly?.compactionHistory !== undefined
+                ? { compactionHistory: { ...message.runtimeOnly.compactionHistory } }
+                : {}),
               ...(message.runtimeOnly?.toolResultIntegrity !== undefined
                 ? {
                     toolResultIntegrity:
