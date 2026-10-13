@@ -25,6 +25,7 @@ import { buildEditDiffPreview } from '../edit-diff-preview.js';
 import { isFixedRerunSuccess } from './fixedRerunLink.js';
 import { AURA_LIFECYCLE_GLYPHS } from '../../utils/theme.js';
 import { useFullscreenMode } from '../context/fullscreenModeContext.js';
+import { summarizeToolError } from '../tool-error-text.js';
 type Props = {
   param: AgenCToolUseBlockParam;
   addMargin: boolean;
@@ -478,13 +479,7 @@ function failedToolRowReason(
   if (kind === 'edit') {
     return summarizeFileEditError(rawResult) ?? undefined;
   }
-  const errorText = extractTag(rawResult, 'tool_use_error') ?? rawResult;
-  const cleaned = errorText.replace(/<\/?error>/g, '').trim();
-  const firstLine = cleaned
-    .split('\n')
-    .map(line => line.trim())
-    .find(line => line.length > 0);
-  return firstLine ? firstLineOf(firstLine) : undefined;
+  return firstLineOf(summarizeToolError(rawResult));
 }
 
 function selectPermissionMode(state: {

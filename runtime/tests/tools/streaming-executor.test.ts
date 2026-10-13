@@ -244,7 +244,7 @@ describe("StreamingToolExecutor (I-65 + I-41)", () => {
     expect(results).toEqual(["a", "b", "c"]);
   });
 
-  test("Bash error cascades sibling-abort", async () => {
+  test("Bash error leaves an independent read runnable", async () => {
     let bashErrored = 0;
     const exec = new StreamingToolExecutor({
       ...mockGuardedDispatch(async (call) => {
@@ -278,17 +278,15 @@ describe("StreamingToolExecutor (I-65 + I-41)", () => {
     }
     expect(bashErrored).toBe(1);
     expect(results[0]).toMatchObject({ id: "bash1", status: "completed" });
-    // Sibling read gets a synthetic error after bash failed.
+    // The failed call has no declared dependency on its sibling read.
     const read = results.find((r) => r.id === "read1");
     expect(read).toBeDefined();
-    expect(read?.status).toBe("synthetic_error");
-    expect(read?.content).toContain(
-      "sibling tool errored; this tool was cancelled",
-    );
+    expect(read?.status).toBe("completed");
+    expect(read?.content).toBe("safe");
     expect(read?.content).not.toContain("Streaming fallback occurred");
   });
 
-  test("exec_command error cascades sibling-abort", async () => {
+  test("exec_command error leaves an independent write runnable", async () => {
     const dispatched: string[] = [];
     const siblingReasons: string[] = [];
     const exec = new StreamingToolExecutor({
@@ -325,14 +323,12 @@ describe("StreamingToolExecutor (I-65 + I-41)", () => {
       });
     }
 
-    expect(dispatched).toEqual(["shell1"]);
-    expect(siblingReasons).toEqual(["bash_error:exec_command"]);
+    expect(dispatched).toEqual(["shell1", "write1"]);
+    expect(siblingReasons).toEqual([]);
     const write = results.find((r) => r.id === "write1");
     expect(write).toBeDefined();
-    expect(write?.status).toBe("synthetic_error");
-    expect(write?.content).toContain(
-      "sibling tool errored; this tool was cancelled",
-    );
+    expect(write?.status).toBe("completed");
+    expect(write?.content).toBe("ran Write");
   });
 
   test("results carry the real execution duration", async () => {
@@ -394,7 +390,7 @@ describe("StreamingToolExecutor (I-65 + I-41)", () => {
     expect(siblingReasons).toEqual([]);
   });
 
-  test("[bash(error), FileRead]: a still-queued read is cancelled and warns once", async () => {
+  test("[bash(error), FileRead]: a still-queued read runs without a cancellation", async () => {
     const { exec, dispatched, siblingReasons } = shellErrorExecutor();
     exec.addTool(
       makeBlock("shell1", "exec_command"),
@@ -405,13 +401,10 @@ describe("StreamingToolExecutor (I-65 + I-41)", () => {
 
     const results = await drainResults(exec);
 
-    expect(dispatched).toEqual(["shell1"]);
-    expect(siblingReasons).toEqual(["bash_error:exec_command"]);
+    expect(dispatched).toEqual(["shell1", "read1"]);
+    expect(siblingReasons).toEqual([]);
     expect(results[0]).toMatchObject({ id: "shell1", status: "completed" });
-    expect(results[1]).toMatchObject({ id: "read1", status: "synthetic_error" });
-    expect(results[1]?.content).toContain(
-      "sibling tool errored; this tool was cancelled",
-    );
+    expect(results[1]).toMatchObject({ id: "read1", status: "completed", content: "read read1" });
   });
 
   test.skipIf(process.platform === "win32")(

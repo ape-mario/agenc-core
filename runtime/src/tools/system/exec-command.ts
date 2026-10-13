@@ -985,6 +985,16 @@ function sandboxAutoAllow(
   const appState = context.getAppState();
   const permissions = context.toolPermissionContext?.(appState) ??
     appState.toolPermissionContext;
+  // The sandbox's auto-allow must not skip the user's approval of a
+  // workspace edit in default mode. Preflight reserves hard refusals for
+  // protected targets; an ordinary content write goes through this card.
+  if (permissions.mode === "default" && classifyShellWorkspaceWritePolicy({
+    toolName: "exec_command",
+    args: { command: args.cmd, cwd: args.workdir },
+    workspaceRoot: config?.cwd ?? config?.allowedPaths?.[0],
+  }).blocked) {
+    return { behavior: "ask", message: "Allow this shell command to change workspace files?" };
+  }
   // The auto-mode classifier re-runs tool checks with the mode set to
   // acceptEdits (evaluator.ts, tryAcceptEditsSimulation). autoModeActive
   // outside auto mode means plan with auto, which keeps its classifier.

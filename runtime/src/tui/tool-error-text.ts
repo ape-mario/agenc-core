@@ -80,6 +80,11 @@ export function summarizeToolError(raw: string): string {
   return message.length > 0 ? message : "failed";
 }
 
+/** Decode historical/synthetic result envelopes before displaying an error. */
+export function unwrapToolError(raw: string): string {
+  return readableToolError(raw);
+}
+
 /** Whether text still carries raw tool-error wrappers. */
 export function looksLikeRawToolError(text: string): boolean {
   return text.includes("<tool_use_error>") || /\[exec exit_code=-?\d+/.test(text);

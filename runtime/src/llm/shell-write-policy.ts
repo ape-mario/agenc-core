@@ -154,6 +154,8 @@ export interface ShellWorkspaceWritePolicyInput {
    * approval path.
    */
   readonly allowWorkspaceDeletions?: boolean;
+  /** Workspace content writes are permitted by the mode or this call's approval. */
+  readonly allowWorkspaceWrites?: boolean;
   /** Extra roots (the AgenC home) that a shell command may never remove. */
   readonly protectedRoots?: readonly string[];
   /** Resolve current protected roots only when the command has mutation targets. */
@@ -1503,7 +1505,12 @@ function readFindCommandLine(
       FIND_FILE_PRIMARIES.get(name) ??
       FIND_PRIMARY_ARGUMENTS.get(name) ??
       (name === "-files0-from" || FIND_NEWER_RE.test(name) ? 1 : undefined);
-    if (arity === undefined || index + arity > args.length) {
+    if (arity === undefined) {
+      // An unknown literal primary makes find fail. It cannot introduce a
+      // write; continue reading so explicit actions still get checked.
+      continue;
+    }
+    if (index + arity > args.length) {
       unread = true;
       continue;
     }
@@ -2990,6 +2997,9 @@ export function classifyShellWorkspaceWritePolicy(
   }
   const routedTargets = writes.filter(
     (target) =>
+      params.allowWorkspaceWrites !== true &&
+      params.bypassesApprovalsAndSandbox !== true &&
+      params.validationPhase !== "preflight" &&
       !protectedTargets.includes(target) &&
       workspaceRelation(workspaceRoot, target) === "inside" &&
       !isWorkspaceGeneratedOutputPath(workspaceRoot, target),
@@ -3097,6 +3107,25 @@ export function collectShellWorkspaceDeletionTargets(params: {
   const decision = classifyShellWorkspaceWritePolicy({
     ...params,
     allowWorkspaceDeletions: true,
+    allowWorkspaceWrites: true,
   });
   return decision.blocked ? [] : decision.deletionTargets;
+}
+
+/** Literal workspace mutations for the file-history sidecar, including new files. */
+export function collectShellWorkspaceMutationTargets(params: {
+  readonly toolName: string;
+  readonly args: Record<string, unknown>;
+  readonly workspaceRoot: string;
+}): readonly string[] {
+  const decision = classifyShellWorkspaceWritePolicy({
+    ...params,
+    allowWorkspaceDeletions: true,
+    allowWorkspaceWrites: true,
+  });
+  return decision.observedTargets.filter((target) =>
+    !decision.blockedTargets.includes(target) &&
+    !decision.blockedDeletions.includes(target) &&
+    workspaceRelation(params.workspaceRoot, target) === "inside",
+  );
 }

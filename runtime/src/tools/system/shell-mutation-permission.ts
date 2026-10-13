@@ -32,6 +32,7 @@ const PROMPT_FREE_APPROVAL_POLICIES: ReadonlySet<
 
 export interface ShellWorkspaceMutationPermission {
   readonly allowWorkspaceDeletions: boolean;
+  readonly allowWorkspaceWrites: boolean;
   readonly protectedRoots: readonly string[];
   /** Directories the user added with `--add-dir` or approved during the session. */
   readonly additionalRoots: readonly string[];
@@ -237,6 +238,7 @@ export function shellWorkspaceMutationPermission(
   const context = readToolRuntimeContext(args);
   return {
     allowWorkspaceDeletions: shellWorkspaceDeletionsAllowed(context),
+    allowWorkspaceWrites: shellWorkspaceDeletionsAllowed(context),
     protectedRoots: shellDeletionProtectedRoots(context),
     additionalRoots: shellAdditionalWriteRoots(context),
     bypassesApprovalsAndSandbox: shellBypassesApprovalsAndSandbox(context),
@@ -253,6 +255,7 @@ export function deferredShellWorkspaceMutationPermission(
   const context = readToolRuntimeContext(args);
   return {
     allowWorkspaceDeletions: shellWorkspaceDeletionsAllowed(context),
+    allowWorkspaceWrites: shellWorkspaceDeletionsAllowed(context),
     resolveProtectedRoots: () => shellDeletionProtectedRoots(context),
     additionalRoots: shellAdditionalWriteRoots(context),
     bypassesApprovalsAndSandbox: shellBypassesApprovalsAndSandbox(context),
