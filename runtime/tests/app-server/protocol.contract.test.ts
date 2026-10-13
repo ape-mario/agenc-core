@@ -196,6 +196,7 @@ const expectedInternalMethods = [
   "session.previewFileRewind",
   "session.rewindFilesToMessage",
   "session.shell.execute",
+  "session.setProviderKey",
   "session.setModel",
   "session.setPermissionMode",
   "session.permissions.mutateRule",
