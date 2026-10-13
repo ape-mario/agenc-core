@@ -20,7 +20,7 @@ import {
   CompactionCleanupPendingError,
   finalizeCompactionTransaction,
 } from "../services/compact/finalize-transaction.js";
-import { formatCompactionOperatorDisplay } from "../services/compact/operator.js";
+import { formatCompactionOperatorDisplay, compactionCannotShrinkDisplay } from "../services/compact/operator.js";
 import type { CompactedItem } from "../session/rollout-item.js";
 import {
   extractMessageText,
@@ -193,6 +193,10 @@ export function executeCompactCommand(
         session: ctx.session,
         ctx: allocated.turnContext,
         customInstructions: ctx.argsRaw,
+      }).catch((error: unknown) => {
+        const message = compactionCannotShrinkDisplay(error);
+        if (message !== undefined) throw new Error(message, { cause: error });
+        throw error;
       });
       return {
         kind: "compact",
