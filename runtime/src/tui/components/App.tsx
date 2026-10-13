@@ -86,7 +86,7 @@ import {
 } from "../state/AppState.js";
 import { useSettings } from "../hooks/useSettings.js";
 import { useMainLoopModel } from "../hooks/useMainLoopModel.js";
-import { StatusEffortContext, StatusContextUsageContext } from "../context/statusEffortContext.js";
+import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext } from "../context/statusEffortContext.js";
 import { readSessionSelection } from "../../session/provider-model-selection.js";
 import {
   getSessionEffortLabelForContext,
@@ -4956,6 +4956,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     <SessionUsageContext value={transcript.sessionUsage ?? null}>
     <StatusEffortContext value={statusEffortLabel}>
     <StatusContextUsageContext value={contextUsagePercent}>
+    <StatusTurnBusyContext value={isLoading || shellAbortController !== null}>
       <AnimatedTerminalTitle isAnimating={titleIsAnimating} title={title} />
       <GlobalKeybindingHandlers
         screen={screen as any}
@@ -5015,6 +5016,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       <LedgerVerificationOverlay />
       {exitFlow}
 
+    </StatusTurnBusyContext>
     </StatusContextUsageContext>
     </StatusEffortContext>
     </SessionUsageContext>

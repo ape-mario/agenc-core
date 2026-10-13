@@ -8,6 +8,7 @@ import {
   FullscreenLayout,
   shouldShowFileTreeGutter,
   statusLineSegments,
+  workspacePathLabel,
 } from "./FullscreenLayout.js";
 import { AppStateProvider, getDefaultAppState } from "../state/AppState.js";
 import { Box, Text } from "../ink.js";
@@ -208,5 +209,15 @@ describe("FullscreenLayout modal viewport", () => {
     for (const line of lines) {
       expect(line.length).toBeLessThanOrEqual(columns);
     }
+  });
+});
+
+describe('workspacePathLabel', () => {
+  test('abbreviates only the actual home prefix and keeps nested directories', () => {
+    expect(workspacePathLabel('/home/paul/claude-agenc-work/tq1-tui-round3/ws', '/home/paul'))
+      .toBe('~/claude-agenc-work/tq1-tui-round3/ws');
+    expect(workspacePathLabel('/home/paul', '/home/paul')).toBe('~');
+    expect(workspacePathLabel('/opt/ws', '/home/paul')).toBe('/opt/ws');
+    expect(workspacePathLabel('/home/paulish/ws', '/home/paul')).toBe('/home/paulish/ws');
   });
 });
