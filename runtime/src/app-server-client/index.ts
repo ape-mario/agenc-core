@@ -559,14 +559,30 @@ export type AgenCDaemonOnlyTuiSession = Omit<AgenCBridgeSession, "services"> & {
   };
 };
 
+function daemonTuiRuleSnapshot(configStore: ConfigStore) {
+  const snapshot = readPermissionRulesSnapshot(configStore);
+  // The daemon snapshot owns mode capabilities. Hydrate rule sources without
+  // letting a client-side policy snapshot override those authoritative flags.
+  return { ...snapshot, bypassPermissionsModeDisabled: false, disableAutoMode: false };
+}
+
 /** Apply one canonical daemon settings successor to the client-side TUI shim. */
 export async function applyDaemonTuiRuntimeSettingsAuthority(
   session: AgenCDaemonOnlyTuiSession,
   cwd: string,
   settings: RunRuntimeSettingsSnapshot,
 ): Promise<void> {
-  const permissionContext = daemonTuiPermissionContext(cwd, settings, undefined);
   const registry = session.services.permissionModeRegistry;
+  const current = registry.current();
+  const permissionContext = applyPermissionRulesSnapshot({
+    ...daemonTuiPermissionContext(cwd, settings, undefined),
+    alwaysAllowRules: current.alwaysAllowRules,
+    alwaysDenyRules: current.alwaysDenyRules,
+    alwaysAskRules: current.alwaysAskRules,
+    additionalWorkingDirectories: current.additionalWorkingDirectories,
+    ...(current.strippedDangerousRules !== undefined
+      ? { strippedDangerousRules: current.strippedDangerousRules } : {}),
+  }, daemonTuiRuleSnapshot(session.services.configStore));
   if (typeof registry.update !== "function") {
     throw new Error("daemon TUI session cannot apply live permission settings");
   }
@@ -799,11 +815,16 @@ async function createBoundAgenCDaemonOnlyTuiContext(
       runtimeSettings,
       options.permissionMode,
     );
+    // Runtime settings carry modes and capabilities, not rule buckets. A
+    // resumed/attached TUI must still project the saved canonical rules.
+    permissionContext = applyPermissionRulesSnapshot(
+      permissionContext, runtimeSettings === undefined
+        ? readPermissionRulesSnapshot(configStore) : daemonTuiRuleSnapshot(configStore),
+    );
     if (runtimeSettings === undefined) {
       // A cold shim has no daemon snapshot yet. Restore only exact workspace
       // consent, through the same identity validator and source-aware policy
       // used by runtime initialization. Live attach snapshots stay authoritative.
-      permissionContext = applyPermissionRulesSnapshot(permissionContext, readPermissionRulesSnapshot(configStore));
       if (permissionContext.bypassPermissionsModeDisabledByPolicy !== true) {
         try {
           for (const accepted of loadBypassPermissionsConsent(configStore.stateRepository, options.cwd, { reload: true })) {

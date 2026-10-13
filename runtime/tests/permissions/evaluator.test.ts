@@ -312,6 +312,55 @@ describe("hasPermissionsToUseTool — step 1c tool.checkPermissions", () => {
 // Step 1d / 1e / 1f / 1g — bypass-immune conditions
 // ---------------------------------------------------------------------------
 
+describe("command-specific deny floor", () => {
+  it.each(["default", "acceptEdits", "plan", "dontAsk", "auto", "bypassPermissions"] as const)(
+    "refuses exact, prefix, wildcard and wrapped commands before any allow in %s", async (mode) => {
+      for (const [toolName, ruleContent, cmd] of [
+        ["exec_command", "printf DENIED", "printf DENIED"],
+        ["Bash", "printf DENIED", "pwd; printf DENIED"],
+        ["exec_command", "printf:*", "printf DENIED"],
+        ["Bash", "printf DEN*", "bash -c 'printf DENIED'"],
+        ...[
+          "env printf DENIED", "env -i -u PATH LANG=C printf DENIED",
+          "command -p printf DENIED", "nice -n 5 printf DENIED", "nohup printf DENIED",
+          "timeout --signal=TERM 2s printf DENIED", "xargs -n1 printf DENIED",
+          "sudo -n -u nobody printf DENIED", "sh -c 'printf DENIED'",
+          "env -- nice -5 timeout 2 bash -ec 'printf DENIED'", "/usr/bin/printf DENIED",
+          "env -S 'printf DENIED'", "env --unknown printf ALLOWED", "bash script.sh",
+          "printf $(printf DENIED)", "LANG=C printf DENIED", "printf 'DENIED'",
+        ].map(cmd => ["exec_command", "printf DENIED", cmd]),
+      ]) {
+        const { context } = buildHarness({ mode, allowRules: [{ toolName: "exec_command" }], denyRules: [{ toolName: toolName!, ruleContent }] });
+        const tool = makeTool({ name: "exec_command", checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
+        expect(await hasPermissionsToUseTool(tool, { cmd }, context)).toMatchObject({
+          behavior: "deny", decisionReason: { type: "rule" },
+        });
+      }
+    },
+  );
+  it("does not turn an unmatched command into a rule deny", async () => {
+    const { context } = buildHarness({ denyRules: [{ toolName: "exec_command", ruleContent: "printf DENIED" }] });
+    const tool = makeTool({ name: "exec_command", checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
+    for (const cmd of ["printf ALLOWED", "env -i LANG=C printf ALLOWED", "nice -n5 printf ALLOWED", "timeout 2 sh -c 'printf ALLOWED'"]) {
+      expect((await hasPermissionsToUseTool(tool, { cmd }, context)).behavior).toBe("allow");
+    }
+  });
+  it("matches executable fields even when unused command or args fields are supplied", async () => {
+    const { context } = buildHarness({
+      allowRules: [{ toolName: "exec_command" }],
+      denyRules: [{ toolName: "exec_command", ruleContent: "printf DENIED" }],
+    });
+    for (const [name, input] of [
+      ["exec_command", { cmd: "printf DENIED", command: "printf ALLOWED", args: ["ALLOWED"] }],
+      ["write_stdin", { chars: "printf DENIED\n", cmd: "printf ALLOWED", command: "printf ALLOWED" }],
+      ["system.bash", { command: "printf", args: ["DENIED"], cmd: "printf ALLOWED" }],
+    ] as const) {
+      const tool = makeTool({ name, checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
+      expect((await hasPermissionsToUseTool(tool, input, context)).behavior).toBe("deny");
+    }
+  });
+});
+
 describe("hasPermissionsToUseTool — step 1d tool returns deny", () => {
   it("returns the tool's deny decision", async () => {
     const tool = makeTool({
