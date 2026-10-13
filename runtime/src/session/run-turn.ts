@@ -3230,6 +3230,13 @@ async function* runTurnKernelInner(
           const requestFits = () => preparedRequestFitsContext(
             request, session, ctx, signal, requestedModel,
           );
+          if (!deferredCompaction && proactiveDispatchCompactionAttempted) {
+            // A successful shrink may fall below the proactive threshold
+            // while admission's calibrated or native count still cannot fit.
+            // Every re-prepared request must pass the same hard fit check.
+            proactiveDispatchCompactionAttempted = false;
+            return requestFits();
+          }
           const autoCompactLimit = getPreSamplingAutoCompactTokenLimit(ctx);
           /*
            * The post-tool gate measures the query that was just sent. Tool
@@ -3246,10 +3253,6 @@ async function* runTurnKernelInner(
             autoCompactLimit !== undefined &&
             getActiveContextTokenUsage(session, ctx, state) >= autoCompactLimit;
           if (!deferredCompaction && preparedOverThreshold) {
-            if (proactiveDispatchCompactionAttempted) {
-              proactiveDispatchCompactionAttempted = false;
-              return requestFits();
-            }
             proactiveDispatchCompactionAttempted = true;
             persistNewResponseItems();
             const compacted = await runAutoCompact(
