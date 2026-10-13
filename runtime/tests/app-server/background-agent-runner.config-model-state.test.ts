@@ -309,6 +309,40 @@ function makeRunnerHarness(opts: {
 }
 
 describe("daemon config/model state refresh + atomicity", () => {
+  it("retains a live model choice when an unrelated reload still resolves the startup model", async () => {
+    const config = { model_provider: "deepseek", model: "deepseek-flash", swarmMode: true };
+    const { runner, session } = makeRunnerHarness({
+      configStore: { current: () => config, reload: async () => ({ ...config, swarmMode: false }) },
+      sessionConfiguration: { provider: { slug: "deepseek" }, collaborationMode: { model: "deepseek-v4-pro" } },
+    });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    const result = await runner.applyAgentConfig("parent-session", { sessionId: "session_1", reload: true });
+    expect(result).toMatchObject({ applied: true, model: "deepseek-v4-pro" });
+    expect(session.pendingProviderSwitch).toMatchObject({ provider: "deepseek", model: "deepseek-v4-pro" });
+  });
+
+  it("still applies a model changed in the freshly resolved configuration", async () => {
+    const config = { model_provider: "deepseek", model: "deepseek-v4-pro" };
+    const { runner, session } = makeRunnerHarness({
+      configStore: { current: () => config, reload: async () => ({ ...config, model: "deepseek-flash" }) },
+      sessionConfiguration: { provider: { slug: "deepseek" }, collaborationMode: { model: "deepseek-v4-pro" } },
+    });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    await runner.applyAgentConfig("parent-session", { sessionId: "session_1", reload: true });
+    expect(session.pendingProviderSwitch).toMatchObject({ model: "deepseek-flash" });
+  });
+
+  it("an explicit profile can replace a live model even when the base configuration is unchanged", async () => {
+    const config = { model_provider: "deepseek", model: "deepseek-flash", profiles: { reset: { model: "deepseek-flash", model_provider: "deepseek" } } };
+    const { runner, session } = makeRunnerHarness({
+      configStore: { current: () => config, reload: async () => config },
+      sessionConfiguration: { provider: { slug: "deepseek" }, collaborationMode: { model: "deepseek-v4-pro" } },
+    });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    await runner.applyAgentConfig("parent-session", { sessionId: "session_1", reload: true, profile: "reset" });
+    expect(session.pendingProviderSwitch).toMatchObject({ model: "deepseek-flash", profile: "reset" });
+  });
+
   it.each([{ taskBudgetLevel: "eco", tokens: 1_000_000 }, { taskBudgetLevel: "balanced", tokens: 2_400_000 }, { taskBudgetLevel: "max", tokens: 0 }, { taskTokenBudget: 3_000_000, tokens: 3_000_000 }])("applies saved $tokens tokens with an immutable root config and no model change", async ({ tokens, ...update }) => {
     const { runner, session, stateObject } = makeRunnerHarness({ configStore: {
       current: () => ({ task_token_budget: 2_400_000 }), reload: async () => ({ task_token_budget: tokens }),

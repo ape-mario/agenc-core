@@ -4523,18 +4523,28 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           typeof preparedResolved.model === "string" ||
           typeof preparedResolved.model_provider === "string"
         ) {
+          const previousConfig = configStore.current();
+          const liveSelection = readSessionSelection(session, {
+            includePending: true,
+            fallbackConfig: preparedConfig,
+          });
+          // Reloading an unrelated setting must not reapply an unchanged
+          // startup model over a later live choice. A changed configured pair
+          // or an explicit profile is still a new model-selection request.
+          const keepLiveSelection = params.profile === undefined &&
+            previousConfig.model === preparedConfig.model &&
+            previousConfig.model_provider === preparedConfig.model_provider;
+          const reloadProvider = keepLiveSelection ? liveSelection.provider : preparedResolved.model_provider;
+          const reloadModel = keepLiveSelection ? liveSelection.model : preparedResolved.model;
           preparedReloadSelection = resolveProviderModelSelection(
             preparedConfig,
-            readSessionSelection(session, {
-              includePending: true,
-              fallbackConfig: preparedConfig,
-            }),
+            liveSelection,
             {
-              ...(typeof preparedResolved.model_provider === "string"
-                ? { model_provider: preparedResolved.model_provider }
+              ...(typeof reloadProvider === "string"
+                ? { model_provider: reloadProvider }
                 : {}),
-              ...(typeof preparedResolved.model === "string"
-                ? { model: preparedResolved.model }
+              ...(typeof reloadModel === "string"
+                ? { model: reloadModel }
                 : {}),
             },
           );
