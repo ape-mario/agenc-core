@@ -564,28 +564,24 @@ The SDK mirrors the split: `createSession({ bypassApprovals: true })` sends
 `permissionMode: "bypassPermissions"` and leaves the sandbox on, while
 `dangerouslyBypassApprovalsAndSandbox: true` remains the no-sandbox option.
 
-The shell write policy follows the same split. It refuses shell commands that
-write workspace files outside the generated roots (`build`, `dist`, `logs`,
-`.cache`, `tmp`, `coverage`; use Edit or Write), that remove or move files
-outside the workspace, the system temp directory, or a directory added with
-`--add-dir`, that remove protected paths (the workspace root, `/`, the home,
-`.git`, `.agenc`, `.agents`, the AgenC home, shell and git config files), and
-commands whose write targets it cannot determine (variables, globs, command
-substitution). Removals inside the workspace or an added directory run
-without a prompt in `bypassPermissions`, `acceptEdits` and `auto`, and after
-approval otherwise. When approvals are bypassed **and** no sandbox applies
-(`--dangerously-bypass-approvals-and-sandbox`, or `bypassPermissions` on a
-host that cannot sandbox) nothing but this policy would gate a shell mutation,
-so the two guards that only route a mutation to a prompt or the sandbox are
-lifted: undeterminable targets run, and removals outside the workspace are
-allowed. Workspace content writes still belong to Edit and Write, and the
-protected paths stay refused. `--bypass-approvals` alone keeps every guard;
-the sandbox is the boundary there. `exec_command`'s `workdir` follows the
-same rule: the workspace, a directory added with `--add-dir`, or anywhere
-under the full bypass. The policy is evaluated with the session's mode and
-sandbox at preflight as well as at execution (the dispatcher attaches a
-provisional runtime context before a tool's `preflight`), so the two phases
-decide alike.
+The shell write policy permits workspace content writes in `bypassPermissions`,
+`acceptEdits` and `auto`, and after approval otherwise. Default mode presents
+an approval card for a shell edit rather than rejecting an edit the user can
+approve. Literal shell mutation targets are tracked for file-history restore,
+including newly created files; dynamic targets may not be fully tracked.
+Read operands, globs, pipes and redirects to `/dev/null` do not count as writes.
+
+Protected writes and removals remain refused, including `.git`, `.agenc`,
+`.agents`, the AgenC home, shell and git config files and dangerous root
+removals. Outside-workspace deletion guards and the sandbox remain unchanged.
+Only the combined approvals-and-sandbox bypass lifts the existing guards for
+undeterminable targets and outside removals. `exec_command`'s `workdir` keeps
+its existing workspace/additional-directory checks.
+
+Calls in a model tool batch settle independently. A failed shell call does not
+cancel other calls; the model receives every result before deciding what to do
+next. Compact TUI errors appear once on the failed tool row, with protocol
+JSON decoded to a readable reason. Expanded transcript mode retains details.
 
 A refusal names only the editing tools the session has, read from the
 session's own tool registry, and prefers the ones in the model's tool list:

@@ -811,6 +811,7 @@ export class StreamingToolExecutor {
               callId: tool.toolCall.id,
             });
             emitOn(session, "error", {
+              callId: tool.toolCall.id,
               cause: `permission_denied:${tool.toolCall.name}`,
               message,
             });
@@ -920,6 +921,7 @@ export class StreamingToolExecutor {
               : {}),
             onNoApprovalResolver: (ctx) => {
               emitOn(session, "error", {
+                callId: tool.toolCall.id,
                 cause: "no_approval_resolver",
                 message: `approval required for ${ctx.toolName} but no resolver is wired`,
               });
