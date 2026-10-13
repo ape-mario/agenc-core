@@ -4144,7 +4144,7 @@ export class Session {
             ].map(cloneLlmMessage);
       const event = createHistoryReplacedEvent({
         replacementHistory,
-        id: `history-replaced-${task.subId}`,
+        id: `history-replaced-${compactionResult.transaction?.attempt_id ?? task.subId}`,
       });
       const attemptId = compactionResult.transaction?.attempt_id;
       const displayText = formatCompactionOperatorDisplay(
