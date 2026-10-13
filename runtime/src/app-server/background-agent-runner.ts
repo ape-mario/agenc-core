@@ -2342,7 +2342,8 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
   /**
    * `session.goal`: the one place a goal is set, paused, resumed or cleared.
    * The goal is session state journaled outside the conversation; this only
-   * changes that state. Work starts when the client submits the next turn.
+   * changes that state. Clearing also stops the captured running goal turn.
+   * Work starts when the client submits the next turn.
    */
   async updateAgentSessionGoal(
     agentId: string,
@@ -2394,10 +2395,26 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
             detectedVerification: built.detected,
           });
         }
-        case "clear":
+        case "clear": {
           if (current === undefined) return refuse("No goal is set.");
+          const goalTurnId = current.status === "active"
+            ? runtimeActiveTurnId(session) ?? active.messageSubmission?.turnId
+            : undefined;
           commitSessionGoal(session, { ...current, status: "cleared" }, "cleared");
+          if (goalTurnId !== undefined) {
+            // Use the captured turn, so cancellation cannot interrupt a new
+            // prompt that starts while the old turn is finishing its cleanup.
+            const stopped = await this.interruptAgentTurnIfMatches(
+              agentId,
+              "goal_cancelled",
+              goalTurnId,
+            );
+            if (!stopped.cancelled && !stopped.stale) {
+              throw new Error("Goal cleared, but the active turn could not be interrupted.");
+            }
+          }
           return reply(undefined, { message: `Goal cleared: ${current.objective}` });
+        }
         case "pause":
           if (current === undefined) return refuse("No goal is set.");
           if (current.status !== "active") {
