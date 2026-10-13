@@ -1742,6 +1742,9 @@ export async function drainInFlight(
             toolCallId: callId,
             toolName,
             content: modelFacingContent,
+            ...(result.isError === true
+              ? { runtimeOnly: { toolResultIsError: true as const } }
+              : {}),
           });
         }
       }

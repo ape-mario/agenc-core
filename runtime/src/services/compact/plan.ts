@@ -1253,6 +1253,7 @@ function messageForDigest(message: RuntimeMessage): unknown {
     ...(message.runtimeOnly?.toolResultIntegrity !== undefined
       ? { tool_result_integrity: message.runtimeOnly.toolResultIntegrity }
       : {}),
+    ...(message.runtimeOnly?.toolResultIsError === true ? { tool_result_is_error: true } : {}),
     ...(message.runtimeOnly?.agentInvocation !== undefined
       ? { agent_invocation: message.runtimeOnly.agentInvocation }
       : {}),

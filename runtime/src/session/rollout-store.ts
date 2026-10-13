@@ -1956,6 +1956,34 @@ export class RolloutStore {
   private materializeReviewedRollbackTarget(
     rollback: CompactionRollbackCommittedV1,
   ): void {
+    // A completed branch owns its own writer and may have advanced. Check its
+    // authenticated initial projection without taking its lease. Recovery only
+    // needs exclusive access when that original materialization is incomplete.
+    const target = this.reviewedRollbackTargetStore(rollback);
+    if (existsSync(target.rolloutPath)) {
+      const items = target.readAll();
+      const metadata = items.filter(item => item.type === "session_meta");
+      const projected = items.flatMap(item => item.type === "response_item" ? [item.payload] : []);
+      if (
+        metadata.length === 1 && metadata[0]!.type === "session_meta" &&
+        metadata[0]!.payload.sessionId === rollback.target_session_id &&
+        metadata[0]!.payload.originator === reviewedRollbackTargetOriginator(rollback) &&
+        projected.length >= rollback.source_history.length &&
+        rollback.source_history.every((message, index) => {
+          const actual = canonicalizeSourceJson(projected[index]);
+          if (actual === canonicalizeSourceJson(message)) return true;
+          // Interactive branches bind a copied tool receipt to their own run.
+          return message.toolResultIntegrity !== undefined && actual === canonicalizeSourceJson({
+            ...message,
+            toolResultIntegrity: {
+              ...message.toolResultIntegrity,
+              runId: rollback.target_session_id,
+              resultId: deterministicToolResultId(rollback.target_session_id, message.toolResultIntegrity.toolCallId),
+            },
+          });
+        })
+      ) return;
+    }
     const reservation = this.reserveReviewedRollbackTarget(rollback);
     try {
       this.completeReviewedRollbackTarget(rollback, reservation);
@@ -1964,9 +1992,9 @@ export class RolloutStore {
     }
   }
 
-  private reserveReviewedRollbackTarget(
+  private reviewedRollbackTargetStore(
     rollback: CompactionRollbackCommittedV1,
-  ): ReviewedRollbackTargetReservation {
+  ): SessionStore {
     if (
       rollback.rollback_mode !== "reviewed_branch" ||
       rollback.target_session_id === this.sessionId
@@ -2000,6 +2028,13 @@ export class RolloutStore {
         "reviewed rollback target resolves outside the project session root",
       );
     }
+    return target;
+  }
+
+  private reserveReviewedRollbackTarget(
+    rollback: CompactionRollbackCommittedV1,
+  ): ReviewedRollbackTargetReservation {
+    const target = this.reviewedRollbackTargetStore(rollback);
     const reservation = { target, opened: false };
     try {
       target.acquireExclusiveReservation();
@@ -3299,7 +3334,28 @@ export class RolloutStore {
 
   assertModelExecutionAllowed(): void {
     if (this.rootReviewGateActive && this.hasPendingEffectReviews()) {
-      throw new Error(`run ${this.sessionId} requires effect review before model execution`);
+      let callIds: string[] = [];
+      try {
+        callIds = this.stateDriver.prepareState<[string, string], { readonly call_id: string }>(
+          `SELECT call_id FROM run_effects
+           WHERE session_id = ? AND review_status = 'pending'
+             AND recovery_category IN ('side-effecting', 'interactive')
+           UNION SELECT tool_call_id AS call_id FROM in_flight_tool_calls
+           WHERE session_id = ? AND status = 'poisoned'
+           LIMIT 8`,
+        ).all(this.sessionId, this.sessionId).map(row => row.call_id);
+      } catch {
+        // Failed recovery details must not lift the gate.
+      }
+      const review = callIds.length > 0
+        ? callIds.map(id => `/resolve ${id} <disposition>`).join("; ")
+        : "/resolve <tool-call-id> <disposition>";
+      throw new Error(
+        `run ${this.sessionId} requires effect review before model execution. ` +
+        `Inspect the interrupted tool outcome, then run ${review}. ` +
+        "Choose confirmed_committed if it took effect, confirmed_no_effect if you verified no effect, " +
+        "or remains_unknown to keep execution blocked. Resend your prompt after review.",
+      );
     }
   }
 

@@ -1066,6 +1066,9 @@ function messageToLlmMessages(message: Message): LLMMessage[] {
             role: "tool",
             toolCallId: part.tool_use_id,
             content: toolResultContentToText(part.content),
+            ...(part.is_error === true
+              ? { runtimeOnly: { toolResultIsError: true as const } }
+              : {}),
           });
         } else if (part.type === "text") {
           userParts.push({ type: "text", text: part.text });

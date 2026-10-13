@@ -2276,8 +2276,12 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           : `session ${params.sessionId} already has an active or queued turn`,
       );
     }
-    if (!active.deferredDurableResumePendingReview &&
-        !active.deferredDurableResumeStarting) {
+    // Cancellation can still be settling tool outcomes. Check effect review
+    // inside the submission queue below, after that cleanup, before execution.
+    // A recovered turn already waiting for operator review has no cleanup to
+    // finish. Refuse it with the actionable review error instead of queuing
+    // forever behind the review barrier.
+    if (active.deferredDurableResumePendingReview === true) {
       active.bootstrap.rolloutStore.assertModelExecutionAllowed?.();
     }
     // A history the live tool-pair validator has closed cannot take the user

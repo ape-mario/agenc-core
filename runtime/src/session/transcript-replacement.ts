@@ -89,7 +89,7 @@ function llmMessageToRuntimeTranscriptMessages(
               type: "tool_result",
               tool_use_id: message.toolCallId ?? `tool-${index}`,
               content: contentToText(message.content),
-              is_error: false,
+              is_error: message.runtimeOnly?.toolResultIsError === true,
             }],
           },
           isMeta: true,

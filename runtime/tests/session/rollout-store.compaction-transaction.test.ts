@@ -430,6 +430,40 @@ describe("RolloutStore transactional compaction", () => {
     }
   });
 
+  it("reopens the source while its completed reviewed branch has a live writer", () => {
+    const store = openStore("resume-source-with-live-branch");
+    const cwd = store.store.cwd;
+    const transaction = commitSmallCompaction(store, "live-branch-attempt");
+    store.markProjectionComplete(transaction.intent.attempt_id);
+    store.rollbackCompaction({
+      attemptId: transaction.intent.attempt_id,
+      nowMs: transaction.committedAtMs + 2,
+      reviewedBranchTargetSessionId: "live-reviewed-branch",
+    });
+    const target = new SessionStore({
+      cwd, sessionId: "live-reviewed-branch", agencVersion: "0.13.0",
+      agencHome: temporaryHome, resume: true,
+    });
+    target.acquireExclusiveReservation();
+    const metadata = target.readAll().find(item => item.type === "session_meta");
+    if (metadata?.type !== "session_meta") throw new Error("branch metadata missing");
+    target.open(metadata.payload);
+    target.appendRollout({
+      type: "response_item", payload: { role: "user", content: "later branch work" },
+    }, { durable: true });
+    store.close();
+    try {
+      const resumed = openStore("resume-source-with-live-branch", { resume: true }, cwd);
+      resumed.close();
+      expect(existsSync(target.lockPath)).toBe(true);
+      expect(target.readAll().at(-1)).toMatchObject({
+        type: "response_item", payload: { content: "later branch work" },
+      });
+    } finally {
+      target.close();
+    }
+  });
+
   it("allows same-session rollback across exact automatic turn bookkeeping", () => {
     const store = openStore("automatic-bookkeeping-rollback");
     try {

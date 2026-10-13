@@ -133,6 +133,7 @@ export interface ResponseItem {
   readonly providerReasoning?: ProviderReasoningReplay;
   /** Checkpoint-v2 identity for the exact durable tool-result body. */
   readonly toolResultIntegrity?: ToolResultIntegrity;
+  readonly toolResultIsError?: true;
   /** Durable authority/channel identity for a versioned agent invocation. */
   readonly agentInvocation?: AgentInvocationChannelMetadata;
   /** Authenticated by the enclosing compaction commit digest. */

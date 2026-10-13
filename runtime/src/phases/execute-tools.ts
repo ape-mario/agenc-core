@@ -116,6 +116,7 @@ export function toolResultMessage(
     toolName,
     content,
     runtimeOnly: {
+      ...(result.isError === true ? { toolResultIsError: true as const } : {}),
       toolResultIntegrity: (deferTextIntegrity ? createDeferredTextToolResultIntegrity : createToolResultIntegrity)({
         runId,
         toolCallId: callId,
