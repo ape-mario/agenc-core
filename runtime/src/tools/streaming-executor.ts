@@ -68,6 +68,7 @@ import {
 } from "./router.js";
 import { resolveTimeoutMs, parseToolArgsWithBigInt } from "./execution.js";
 import { normalizeModelToolArgs } from "./argument-validation.js";
+import { modelToolAliasTarget, resolveModelToolAlias } from "./model-tool-aliases.js";
 import {
   suggestToolForUnknownName,
   type ToolSuggestion,
@@ -549,7 +550,7 @@ export class StreamingToolExecutor {
    * every `tool_use` block receives a paired `tool_result` and keeps
    * the model from seeing orphaned tool calls on the next turn. When a
    * tool the model can use clearly matches the name (`Read` -> `FileRead`),
-   * the error names it; the call itself is never redirected.
+   * an exact compatibility alias uses that tool's normal guarded dispatch.
    */
   addTool(block: ToolUseBlock, toolCall: LLMToolCall): void {
     if (this.closed || this.isAborting) {
@@ -596,8 +597,7 @@ export class StreamingToolExecutor {
     const validationStarted = performance.now();
     const isKnown = this.isKnownToolCall(toolCall);
     if (!isKnown) {
-      // Never an alias: the call fails here. With a clear match, the error
-      // names the tool this session can call instead.
+      // Names outside the exact compatibility table still fail here.
       const suggestion = this.suggestToolName(toolCall.name);
       const rejection = unknownToolResult(toolCall.name, toolCall.id, suggestion);
       const syntheticResult = { ...rejection, metadata: { ...rejection.metadata,
@@ -923,7 +923,11 @@ export class StreamingToolExecutor {
   private readonly concurrencyClassOverrides = new Map<string, ConcurrencyClass>();
 
   private resolveModelToolName(toolName: string): string {
-    return toolName;
+    if (modelToolAliasTarget(toolName) === undefined) return toolName;
+    return resolveModelToolAlias(toolName, [
+      ...this.registry.tools.map(tool => tool.name),
+      ...(this.liveToolDispatch?.router.getSpecs() ?? []).map(spec => spec.tool.name),
+    ]);
   }
 
   /**
@@ -1490,9 +1494,10 @@ export class StreamingToolExecutor {
           );
         }
         tool.hasDispatched = true;
+        const executionCall = { ...tool.toolCall, name: this.resolveModelToolName(tool.toolCall.name) };
         if (this.liveToolDispatch) {
           return await this.liveToolDispatch.router.dispatchModelToolCall(
-            tool.toolCall,
+            executionCall,
             {
               ...this.liveToolDispatch.options,
               // Derived signal (childAbort + drainCancel). The router's
@@ -1520,7 +1525,7 @@ export class StreamingToolExecutor {
         }
         if (this.runToolUseFn) {
           // Derived signal so a drainCancel abort cancels this dispatch.
-          return await this.runToolUseFn(tool.toolCall, dispatchSignal);
+          return await this.runToolUseFn(executionCall, dispatchSignal);
         }
         return {
           content: JSON.stringify({
@@ -1617,7 +1622,8 @@ export class StreamingToolExecutor {
   }
 
   private isSiblingAbortShellTool(toolName: string): boolean {
-    return toolName === this.bashToolName || toolName === "exec_command";
+    const canonicalName = this.resolveModelToolName(toolName);
+    return canonicalName === this.bashToolName || canonicalName === "exec_command";
   }
 
   /**
@@ -1640,18 +1646,19 @@ export class StreamingToolExecutor {
     submittedAtMs: number,
     acquireSignal?: AbortSignal,
   ): ToolRuntimeCallContext {
-    const routed = toolCallFromLLMToolCall(tool.toolCall, {
+    const resolvedName = this.resolveModelToolName(tool.toolCall.name);
+    const routed = toolCallFromLLMToolCall({ ...tool.toolCall, name: resolvedName }, {
       session: this.liveToolDispatch?.options.session,
     });
     const definition = this.registry.tools.find(
-      (candidate) => candidate.name === tool.toolCall.name,
+      (candidate) => candidate.name === resolvedName,
     );
     const supportsParallelToolCalls = this.liveToolDispatch
       ? this.liveToolDispatch.router.toolSupportsParallel(routed)
       : definition?.supportsParallelToolCalls ?? tool.isConcurrencySafe;
     return {
       callId: tool.toolCall.id,
-      toolName: tool.toolCall.name,
+      toolName: resolvedName,
       runtimeKind: runtimeKindForPayload(routed.payload),
       classification: tool.classification,
       supportsParallelToolCalls,

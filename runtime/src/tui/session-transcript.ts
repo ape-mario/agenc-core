@@ -17,6 +17,7 @@ import type {
 import type { AgenCBridgeSession } from "./session-types.js";
 import { clampMarkerLine, looksLikeRawToolError, summarizeToolError } from "./tool-error-text.js";
 import { nonEmptyString } from "../utils/stringUtils.js";
+import { modelToolAliasTarget } from "../tools/model-tool-aliases.js";
 import { formatRealtimeItemSummary } from "./realtime/state.js";
 import {
   isPermissionDeniedToolResult,
@@ -845,7 +846,7 @@ function pushToolResult(
     // "without matching start" phrasing from the user-facing lead-in.
     out.push(
       makeSystemMessage(
-        `A tool result arrived out of order and was recovered: ${stringResult(rawResult)}`,
+        `A tool result arrived out of order and was recovered: ${isError ? summarizeToolError(stringResult(rawResult)) : stringResult(rawResult)}`,
         isError ? "error" : "warning",
         nextUuid(),
       ),
@@ -1435,6 +1436,7 @@ export function formatStructuredToolResult(
   eventType: string,
   payload: Record<string, unknown>,
 ): readonly { readonly type: "text"; readonly text: string }[] {
+  toolName = modelToolAliasTarget(toolName) ?? toolName;
   // Skill loads return the ENTIRE skill prompt as the tool result — 12k+
   // characters of instructions for the model, not conversation. Rendering it
   // verbatim buries the chat under the full skill text on every invocation

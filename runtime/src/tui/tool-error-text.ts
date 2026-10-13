@@ -18,6 +18,31 @@ export function parseClampMarker(
   return { hidden: Number(match[1]), unit: match[2] as "lines" | "characters" };
 }
 
+/** Decode protocol envelopes for display only. The model and journal keep them. */
+export function readableToolError(raw: unknown, depth = 0): string {
+  if (depth > 4) return "Tool execution failed";
+  if (Array.isArray(raw)) {
+    return raw.map(part => readableToolError(part, depth + 1)).join(" ");
+  }
+  if (raw !== null && typeof raw === "object") {
+    const record = raw as Record<string, unknown>;
+    for (const key of ["error", "message", "content", "text"]) {
+      if (Object.hasOwn(record, key) && record[key] !== undefined) {
+        return readableToolError(record[key], depth + 1);
+      }
+    }
+    return typeof record.code === "string" || typeof record.code === "number"
+      ? `Tool execution failed (code ${record.code})` : "Tool execution failed";
+  }
+  if (typeof raw !== "string") return "Tool execution failed";
+  const trimmed = raw.trim();
+  if (/^[\[{]/.test(trimmed) && !trimmed.startsWith("[exec ")) {
+    try { return readableToolError(JSON.parse(trimmed), depth + 1); }
+    catch { return "Tool execution failed"; }
+  }
+  return raw;
+}
+
 /**
  * One readable line from a raw tool error: drops the tag wrappers the model
  * protocol uses (`<tool_use_error>`), machine prefixes such as
@@ -26,6 +51,7 @@ export function parseClampMarker(
  * leads with the exit code when there is one.
  */
 export function summarizeToolError(raw: string): string {
+  raw = readableToolError(raw);
   const exit = /\[exec exit_code=(-?\d+)[^\]]*\]/.exec(raw);
   const lines = raw
     .replace(/<\/?(?:tool_use_error|tool-error|tool-error-name)>/g, "")
@@ -41,6 +67,7 @@ export function summarizeToolError(raw: string): string {
       (line) =>
         line.length > 0 &&
         !/^[\w.]+ error$/.test(line) &&
+        !line.startsWith("Received raw arguments:") &&
         parseClampMarker(line) === null,
     );
   // A shell failure ends with its reason; any other error reads as one
@@ -49,7 +76,7 @@ export function summarizeToolError(raw: string): string {
     const reason = lines.at(-1) ?? "";
     return reason.length > 0 ? `exit ${exit[1]}, ${reason}` : `exit ${exit[1]}`;
   }
-  const message = lines.join(" ");
+  const message = lines.join(" ").replace(/\s+/g, " ");
   return message.length > 0 ? message : "failed";
 }
 

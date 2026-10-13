@@ -159,13 +159,10 @@ describe("TUI tool rendering helpers", () => {
       count: 2,
     });
 
-    expect(summary).toContain('"content":"[6 chars]"');
-    expect(summary).toContain('"old_string":"[3 chars]"');
-    expect(summary).toContain('"new_string":"[4 chars]"');
-    expect(summary).toContain('"reason":"needs spacing"');
-    expect(summary).toContain('"count":2');
+    expect(summary).toBe('content=[6 chars] old_string=[3 chars] new_string=[4 chars]');
     expect(summary).not.toContain("secret");
-    expect(tool.renderToolUseMessage("raw")).toBe('{"value":"raw"}');
+    expect(summary).not.toContain("{");
+    expect(tool.renderToolUseMessage("raw")).toBe('value=raw');
   });
 
   test("BUG 3: TodoWrite header is a readable step count + active item, NOT raw {\"todos\"} JSON", () => {
