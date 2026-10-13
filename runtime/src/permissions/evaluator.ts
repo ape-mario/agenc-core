@@ -298,10 +298,13 @@ export async function checkRuleBasedPermissions(
     appState.toolPermissionContext.mode === "plan" || sessionReadOnlyDelegation(context.session) !== undefined
   );
 
-  // 1a. Whole-tool deny rule.
+  const ruleInput = typeof input === "object" && input !== null && !Array.isArray(input)
+    ? input as Record<string, unknown> : undefined;
+  // 1a. Whole-tool and shell command deny rules, before any approval path.
   const denyRule = getDenyRuleForTool(
     appState.toolPermissionContext,
     tool.name,
+    ruleInput,
   );
   if (denyRule) {
     return Object.freeze({
@@ -341,6 +344,7 @@ export async function checkRuleBasedPermissions(
   const askRule = getAskRuleForTool(
     appState.toolPermissionContext,
     tool.name,
+    ruleInput,
   );
   if (askRule) {
     const canSandboxAutoAllow =

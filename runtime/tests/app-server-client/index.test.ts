@@ -748,6 +748,37 @@ describe("app-server-client daemon helpers", () => {
     }
   });
 
+  it("projects saved deny rules on attach and preserves session rules across mode changes", async () => {
+    const agencHome = mkdtempSync(join(tmpdir(), "agenc-resume-rule-home-"));
+    const workspace = mkdtempSync(join(tmpdir(), "agenc-resume-rule-workspace-"));
+    writeFileSync(join(agencHome, "config.toml"), 'config_version = 2\n[permissions]\ndeny = ["exec_command(printf DENIED)"]\n');
+    const settings = {
+      permissionMode: "default" as const, prePlanMode: null, autoModeActive: false,
+      autoModeAvailable: false, bypassPermissionsModeAvailable: false,
+      bypassPermissionsWorkspace: null, bypassPermissionsConsentWorkspace: null,
+      provider: "grok", model: "grok-live-model", profile: null, reasoningEffort: null,
+      modelVerbosity: null, serviceTier: null, hooksDisabled: false,
+    };
+    const context = await createAgenCDaemonOnlyTuiContext({
+      env: { ...process.env, AGENC_HOME: agencHome, HOME: agencHome }, cwd: workspace,
+      conversationId: "resume-rules", runtimeOptions: resolveAgentRuntimeOptions({}, { simpleMode: true }),
+      runtimeSettings: settings,
+    });
+    try {
+      const registry = context.baseSession.services.permissionModeRegistry;
+      expect(registry.current().alwaysDenyRules.userSettings).toEqual(["exec_command(printf DENIED)"]);
+      await registry.update({ ...registry.current(), alwaysDenyRules: { ...registry.current().alwaysDenyRules, session: ["Bash(printf SESSION)"] } });
+      await applyDaemonTuiRuntimeSettingsAuthority(context.baseSession, workspace, { ...settings, permissionMode: "acceptEdits" });
+      expect(registry.current().mode).toBe("acceptEdits");
+      expect(registry.current().alwaysDenyRules.userSettings).toEqual(["exec_command(printf DENIED)"]);
+      expect(registry.current().alwaysDenyRules.session).toEqual(["Bash(printf SESSION)"]);
+    } finally {
+      await context.close();
+      rmSync(agencHome, { recursive: true, force: true });
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   it("keeps immutable dangerous sandbox authority across live permission changes", async () => {
     const agencHome = mkdtempSync(
       join(tmpdir(), "agenc-live-bypass-exit-home-"),

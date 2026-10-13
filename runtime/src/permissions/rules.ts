@@ -25,6 +25,14 @@ import {
   immutableToolPermissionContext,
 } from "./types.js";
 import { isRemovedLiveToolName, permissionRuleToolName } from "./tool-names.js";
+import {
+  MAX_SUBCOMMANDS_FOR_SECURITY_CHECK,
+  getFirstWordPrefix,
+  getSimpleCommandPrefix,
+  parseShellWrapperSubcommandsForPermission,
+  shellWrapperCodeSubcommandsForPermission,
+  splitCommand,
+} from "../shell-command/parser.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Escape helpers (parens + backslash)
@@ -301,19 +309,66 @@ export function toolAlwaysAllowedRule(
 export function getDenyRuleForTool(
   ctx: ToolPermissionContext,
   toolName: string,
-  _toolInput?: Record<string, unknown>,
+  toolInput?: Record<string, unknown>,
 ): PermissionRule | null {
   const tool = toolLikeFromName(toolName);
-  return getDenyRules(ctx).find((r) => matchRule(r, tool)) ?? null;
+  return getDenyRules(ctx).find((r) => matchRule(r, tool)) ??
+    shellContentRuleForInput(ctx, toolName, "deny", toolInput);
 }
 
 export function getAskRuleForTool(
   ctx: ToolPermissionContext,
   toolName: string,
-  _toolInput?: Record<string, unknown>,
+  toolInput?: Record<string, unknown>,
 ): PermissionRule | null {
   const tool = toolLikeFromName(toolName);
-  return getAskRules(ctx).find((r) => matchRule(r, tool)) ?? null;
+  return getAskRules(ctx).find((r) => matchRule(r, tool)) ??
+    shellContentRuleForInput(ctx, toolName, "ask", toolInput);
+}
+
+/** Shell restrictions are a floor before prompts, hooks, modes or grants. */
+function shellContentRuleForInput(
+  ctx: ToolPermissionContext,
+  toolName: string,
+  behavior: "deny" | "ask",
+  input: Record<string, unknown> | undefined,
+): PermissionRule | null {
+  if (!SHELL_TOOL_FAMILY.includes(toolName) || input === undefined) return null;
+  const rules = getRuleByContentsForTool(ctx, toolName, behavior);
+  if (rules.size === 0) return null;
+  const command = typeof input.cmd === "string" ? input.cmd
+    : typeof input.command === "string" ? input.command
+    : toolName === "write_stdin" && typeof input.chars === "string" ? input.chars
+    : undefined;
+  if (command === undefined || command.trim().length === 0) return null;
+  // system.bash also accepts direct command/args invocations.
+  const fullCommand = Array.isArray(input.args) && input.args.every((arg) => typeof arg === "string")
+    ? [command, ...input.args].join(" ") : command;
+  const pending = [fullCommand.trim()];
+  const seen = new Set<string>();
+  while (pending.length > 0) {
+    const candidate = pending.shift()!;
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    // An over-limit command cannot safely escape configured restrictions
+    // through an approval prompt. Refuse rather than guessing it unmatched.
+    if (seen.size > MAX_SUBCOMMANDS_FOR_SECURITY_CHECK) {
+      return rules.values().next().value ?? null;
+    }
+    const matched = findMatchingContentRule(rules, candidate, {
+      prefix: getSimpleCommandPrefix(candidate),
+      firstWord: getFirstWordPrefix(candidate),
+    });
+    if (matched !== null) return matched;
+    pending.push(
+      ...(parseShellWrapperSubcommandsForPermission(candidate) ?? splitCommand(candidate)),
+      ...shellWrapperCodeSubcommandsForPermission(candidate),
+    );
+    if (pending.length > MAX_SUBCOMMANDS_FOR_SECURITY_CHECK * 2) {
+      return rules.values().next().value ?? null;
+    }
+  }
+  return null;
 }
 
 /**

@@ -312,6 +312,30 @@ describe("hasPermissionsToUseTool — step 1c tool.checkPermissions", () => {
 // Step 1d / 1e / 1f / 1g — bypass-immune conditions
 // ---------------------------------------------------------------------------
 
+describe("command-specific deny floor", () => {
+  it.each(["default", "acceptEdits", "plan", "dontAsk", "auto", "bypassPermissions"] as const)(
+    "refuses exact, prefix, wildcard and wrapped commands before any allow in %s", async (mode) => {
+      for (const [toolName, ruleContent, cmd] of [
+        ["exec_command", "printf DENIED", "printf DENIED"],
+        ["Bash", "printf DENIED", "pwd; printf DENIED"],
+        ["exec_command", "printf:*", "printf DENIED"],
+        ["Bash", "printf DEN*", "bash -c 'printf DENIED'"],
+      ]) {
+        const { context } = buildHarness({ mode, allowRules: [{ toolName: "exec_command" }], denyRules: [{ toolName: toolName!, ruleContent }] });
+        const tool = makeTool({ name: "exec_command", checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
+        expect(await hasPermissionsToUseTool(tool, { cmd }, context)).toMatchObject({
+          behavior: "deny", decisionReason: { type: "rule" },
+        });
+      }
+    },
+  );
+  it("does not turn an unmatched command into a rule deny", async () => {
+    const { context } = buildHarness({ denyRules: [{ toolName: "exec_command", ruleContent: "printf DENIED" }] });
+    const tool = makeTool({ name: "exec_command", checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
+    expect((await hasPermissionsToUseTool(tool, { cmd: "printf ALLOWED" }, context)).behavior).toBe("allow");
+  });
+});
+
 describe("hasPermissionsToUseTool — step 1d tool returns deny", () => {
   it("returns the tool's deny decision", async () => {
     const tool = makeTool({

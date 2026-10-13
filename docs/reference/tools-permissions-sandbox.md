@@ -512,6 +512,12 @@ before reporting success. An edit before the first message creates a session
 without starting a model turn. Use `--persist user` to retain a rule in
 `config.toml` for new sessions; `/permissions export` displays the current
 rules. A matching deny wins over allow rules in every mode, including bypass.
+Shell deny and ask rules with command content are checked before any approval
+prompt, including exact commands, wildcard/prefix patterns, compound commands
+and recognized shell wrappers. An approval cannot override a matching deny.
+Commands exceeding the bounded rule-check limit are refused when shell deny
+rules are configured. Saved rules remain visible after restart and resume;
+live mode changes preserve the rule projection.
 Legacy `Bash` deny and ask rules restrict the canonical shell tool family
 (`exec_command`, `system.bash`, and process continuation tools). Legacy `Bash`
 allow rules remain invalid; use canonical tool names for grants.
