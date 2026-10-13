@@ -4288,6 +4288,21 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     }
   });
 
+  test("lets a local task modal own Escape instead of the turn cancel handler", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const dispatcher = await import("../../commands/dispatcher.js");
+    const spy = vi.spyOn(dispatcher, "dispatchSlashCommand").mockImplementationOnce(async (_parsed, ctx) => {
+      ctx.appState?.setToolJSX?.({ isLocalJSXCommand: true, shouldHidePromptInput: true, jsx: React.createElement("ink-text", null, "task detail") });
+      return { result: { kind: "skip" }, command: { name: "tasks" } } as never;
+    });
+    try {
+      await withRenderedApp(<AgenCTuiApp session={createSession()} isInteractive={false} />, async () => {
+        await providerProbe.promptSubmits.at(-1)!("/tasks", { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() });
+        await vi.waitFor(() => expect(providerProbe.cancelRequestProps.at(-1)?.isLocalJSXCommand).toBe(true));
+      });
+    } finally { spy.mockRestore(); }
+  });
+
   test("hides the main composer while the /agents wizard owns input", async () => {
     const { AgenCTuiApp } = await import("./App.js");
     const dispatcher = await import("../../commands/dispatcher.js");

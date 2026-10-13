@@ -4977,6 +4977,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
             : {})}
         isSearchingHistory={isSearchingHistory}
         isHelpOpen={helpOpen}
+        isLocalJSXCommand={isLocalJSXCommandActive}
         inputMode={mode as never}
         inputValue={input}
         streamMode={cancelStreamMode as never}
