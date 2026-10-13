@@ -4,7 +4,7 @@ This artifact records bounded current and historical-reference observations.
 Every row is informational: no result is a performance threshold or gate.
 Generated inputs are synthetic and created only for the benchmark process.
 
-- JSON SHA-256: `7fbf5eb74c97529f90df8acace2217fbd0b5da9efe59bbe0830657da056fd540`
+- JSON SHA-256: `b5c1042b47addf2ffe8a414830af87a97f6a99d0d7c5101c168b030c7b578389`
 - Source revision: `b1e941e836e2fa783c9198ada170964d865fca2e`
 - Production tree: `runtime/src` at Git object `55bf1258aa33ed7b00353111d3299532abd0aac2`
 - Loaded production closure: `91` module bindings across `2` cases
