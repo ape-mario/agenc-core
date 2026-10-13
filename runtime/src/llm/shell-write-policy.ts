@@ -16,6 +16,7 @@ import {
   lexShellCommand,
   type ShellToken,
 } from "../utils/shell/command-line.js";
+import { readShellSubstitutions } from "../utils/shell/substitutions.js";
 import { analyzeSedWrites } from "../utils/shell/sed-writes.js";
 import {
   parseWriteCommandOperands,
@@ -733,6 +734,7 @@ function collectMoveTargets(
 
 /** Where the command runs, as far as the targets depend on it. */
 interface ShellWriteEnvironment {
+  readonly substitutionDepth?: number;
   /** `sed` may be BSD sed on this host (macOS and the BSDs). */
   readonly bsdSed: boolean;
   readonly workspaceRoot: string;
@@ -2384,6 +2386,32 @@ function walkList(
   return current;
 }
 
+// These programs only read or print, or have a dedicated mutation analyzer
+// above. An unknown program inside a substitution stays indeterminate even
+// when it names no targets: an interpreter may hide arbitrary file writes.
+const KNOWN_SUBSTITUTION_COMMANDS = new Set([
+  ":", "pwd", "whoami", "id", "echo", "printf", "ls", "cat", "head", "tail",
+  "wc", "basename", "dirname", "readlink", "realpath", "cd",
+  "touch", "truncate", "tee", "cp", "mv", "install", "ln", "rm", "rmdir", "unlink", "dd",
+]);
+function substitutionCommandsAreKnown(command: string): boolean {
+  const parsed = lexShellCommand(command);
+  if (parsed.malformed || parsed.hasComment) return false;
+  let segment: ShellToken[] = [];
+  const known = (): boolean => {
+    const words = stripRedirections(segment);
+    segment = [];
+    if (words.length === 0) return true;
+    const word = words[writeCommandWordIndex(words)];
+    return word !== undefined && !word.requiresExpansion && KNOWN_SUBSTITUTION_COMMANDS.has(basename(word.value));
+  };
+  for (const token of parsed.tokens) {
+    if (isShellCommandSeparator(token)) { if (!known()) return false; }
+    else segment.push(token);
+  }
+  return known();
+}
+
 /**
  * The targets of a command line that changes directory, each command read
  * in every directory it may run in: `cd x && cmd` runs cmd in x, `cd x; cmd`
@@ -2448,13 +2476,29 @@ function collectShellCommandWriteTargets(
   cwd: string,
   environment: ShellWriteEnvironment,
 ): ShellWriteTargetCollection {
-  const parsed = lexShellCommand(commandLine);
+  let parsed = lexShellCommand(commandLine);
+  const substitutions = emptyTargetCollection();
+  if (parsed.hasCommandSubstitution) {
+    const read = readShellSubstitutions(commandLine);
+    const depth = environment.substitutionDepth ?? 0;
+    substitutions.indeterminate = !read.complete || read.commands.length === 0 || depth >= 16;
+    if (depth < 16) {
+      for (const command of read.commands) {
+        const child = collectShellCommandWriteTargets(command, cwd, { ...environment, substitutionDepth: depth + 1 });
+        mergeTargetCollections(substitutions, child);
+        substitutions.indeterminate ||= !substitutionCommandsAreKnown(command);
+      }
+    }
+    if (lineChangesDirectory(parsed.tokens) && writesAnything(substitutions)) substitutions.indeterminate = true;
+    parsed = { ...parsed, hasCommandSubstitution: substitutions.indeterminate };
+  }
   const homeMayChange = environment.homeMayChange === true || lineMayChangeHome(parsed.tokens);
   const collection = collectLineWriteTargets(
     parsed,
     cwd,
     homeMayChange ? { ...environment, homeMayChange } : environment,
   );
+  mergeTargetCollections(collection, substitutions);
   if (
     homeMayChange &&
     parsed.tokens.some((token) => LEADING_HOME_RE.test(token.value)) &&

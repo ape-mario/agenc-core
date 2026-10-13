@@ -59,8 +59,6 @@ describe("classifyShellWorkspaceWritePolicy", () => {
   );
 
   it.each([
-    "echo $(touch src/file)", 'echo "$(touch src/file)"', "echo `touch src/file`",
-    "cat <(touch src/file)", "echo $\\\n(touch src/file)",
     "cat <<EOF\n$(touch src/file)\nEOF", "echo 'open", 'echo "open', "cat <<EOF\nbody",
   ])("fails closed for active substitution or malformed input: %s", (command) => {
     const decision = classify(command);

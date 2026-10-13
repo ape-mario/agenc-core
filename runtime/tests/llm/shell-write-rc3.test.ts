@@ -10,6 +10,23 @@ describe("RC3 shell write guard", () => {
     expect(classifyShellWorkspaceWritePolicy({ ...input, args: { command } }).blocked).toBe(false);
     expect(classifyShellWorkspaceWritePolicy({ ...input, args: { command: "find . -unsupported" } }).blocked).toBe(false);
   });
+  it.each(['printf "%s\\n" "$(pwd)"', 'echo $(pwd)', 'echo "`pwd`"', 'echo "$((1+2))"', 'echo "$(echo $(pwd))"']) ("allows a read-only substitution: %s", (command) => {
+    const decision = classifyShellWorkspaceWritePolicy({ ...input, args: { command } });
+    expect(decision.blocked).toBe(false);
+    expect(decision.indeterminate).toBe(false);
+  });
+  it.each(['echo "$(touch .git/config)"', 'echo "$(echo $(touch .git/config))"', 'echo "`touch .git/config`"']) ("retains protected embedded writes in bypass: %s", (command) => {
+    const decision = classifyShellWorkspaceWritePolicy({ ...input, args: { command }, bypassesApprovalsAndSandbox: true });
+    expect(decision.blocked).toBe(true);
+    expect(decision.blockedTargets).toContain("/repo/.git/config");
+  });
+  it("classifies embedded workspace writes, and keeps opaque substitutions guarded", () => {
+    const decision = classifyShellWorkspaceWritePolicy({ ...input, args: { command: 'echo "$(touch src/nested)"' } });
+    expect(decision.blocked).toBe(true);
+    expect(decision.observedTargets).toContain("/repo/src/nested");
+    expect(classifyShellWorkspaceWritePolicy({ ...input, args: { command: 'echo "$(node -e foo)"' } }).indeterminate).toBe(true);
+    expect(classifyShellWorkspaceWritePolicy({ ...input, args: { command: 'echo "$(echo \'$(touch .git/config)\')"' } }).blocked).toBe(false);
+  });
   it("routes a content write through preflight then permits an approved edit", () => {
     expect(classifyShellWorkspaceWritePolicy(input).blocked).toBe(true);
     expect(classifyShellWorkspaceWritePolicy({ ...input, validationPhase: "preflight" }).blocked).toBe(false);
