@@ -3286,6 +3286,10 @@ async function* runTurnKernelInner(
                 onAdvisoryRefusal: deferCompactionRefusal,
               },
             );
+            // A rejected summary can still have reported provider usage and
+            // raised this conversation's calibration. Recount before deciding
+            // whether the unchanged request fits after a refusal.
+            pressure = undefined;
             if (compacted) {
               session.bindProviderConversation();
               return false;

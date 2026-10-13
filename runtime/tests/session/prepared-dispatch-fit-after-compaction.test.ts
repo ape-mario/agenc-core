@@ -16,7 +16,7 @@ afterEach(() => {
   tokenAccountingService.clear();
 });
 
-for (const accounting of ["native", "calibrated fallback", "calibrated fallback below raw threshold"] as const) {
+for (const accounting of ["native", "calibrated fallback", "calibrated fallback below raw threshold", "calibration raised by advisory refusal"] as const) {
   for (const fits of [false, true]) {
     test(`${accounting}: a replacement below the proactive threshold ${fits ? "is sent when it fits" : "ends compact_failed when it cannot fit"}`, async () => {
       tokenAccountingService.clear();
@@ -37,7 +37,7 @@ for (const accounting of ["native", "calibrated fallback", "calibrated fallback 
             countedComponents: ["system", "messages", "tools", "provider_framing"],
           }),
         } });
-      } else {
+      } else if (accounting !== "calibration raised by advisory refusal") {
         // Admission learns this factor from previous reported provider usage.
         // The proactive estimate remains uncalibrated, so the replacement
         // can fall below its threshold while still failing hard admission.
@@ -57,7 +57,7 @@ for (const accounting of ["native", "calibrated fallback", "calibrated fallback 
         return {
           content: first ? "Read one result." : "done",
           toolCalls: first ? [{ id: "read-1", name: "read_probe", arguments: "{}" }] : [],
-          ...(first ? { providerReasoningContent: "r".repeat(accounting === "calibrated fallback below raw threshold" ? 120_000 : 400_000),
+          ...(first ? { providerReasoningContent: "r".repeat(accounting === "calibrated fallback below raw threshold" ? 120_000 : accounting === "calibration raised by advisory refusal" ? 280_000 : 400_000),
             providerReasoningProvenance: { provider: provider.name, model } } : {}),
           usage: { promptTokens: 1_000, completionTokens: 1, totalTokens: 1_001 },
           model, finishReason: first ? "tool_calls" : "stop",
@@ -79,12 +79,23 @@ for (const accounting of ["native", "calibrated fallback", "calibrated fallback 
       let attempts = 0;
       setAutoCompactImplForTests(async () => {
         attempts++;
+        if (accounting === "calibration raised by advisory refusal" && attempts === 1) {
+          // A real admitted summary response can raise the same conversation
+          // calibration even when its candidate is rejected or cannot shrink.
+          const seed = await tokenAccountingService.count(createTokenAccountingRequest({
+            provider: provider.name, model, calibrationScope: "conv-test",
+            messages: [{ role: "user", content: "measured compaction response" }],
+            options: { model }, contextWindowTokens: 100_000, reservedOutputTokens: 32_000,
+          }));
+          tokenAccountingService.recordProviderUsage(seed, seed.inputTokens * 4);
+          return { wasCompacted: false, skippedCode: "no_shrink", consecutiveFailures: 1 };
+        }
         return { wasCompacted: true, compactionResult: {
           message: replacement, replacementHistory: [{ role: "user", content: replacement }],
         } };
       });
       await drain(runTurn(session, ctx, "Read once and finish."));
-      expect(attempts).toBe(1);
+      expect(attempts).toBe(accounting === "calibration raised by advisory refusal" ? 2 : 1);
       expect(requests).toHaveLength(fits ? 2 : 1);
       const terminals = events.map(event => classifyTurnTerminal(event.msg));
       if (fits) {
