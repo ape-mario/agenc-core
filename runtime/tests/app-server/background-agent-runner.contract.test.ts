@@ -2208,6 +2208,45 @@ describe("AgenC delegate background-agent runner", () => {
     expect(harness.control.sendInput).not.toHaveBeenCalled();
   });
 
+  it("[managed-thread] checks effect review after cancelled submission cleanup before the next queued prompt", async () => {
+    const started = Promise.withResolvers<void>();
+    const cleanup = Promise.withResolvers<void>();
+    const id = "session-next-prompt-after-cancel";
+    const harness = makeTopLevelRunner({
+      conversationId: id,
+      threadInitialStatus: { status: "pending_init" } as AgentStatus,
+      scopedTurnCancellation: true,
+    });
+    let pendingReview = false;
+    Object.assign(harness.rolloutStore, {
+      assertModelExecutionAllowed: () => {
+        if (pendingReview) throw new Error("requires effect review before model execution");
+      },
+    });
+    harness.control.sendInput.mockImplementationOnce(async () => {
+      harness.setActiveTurn("cancelled-before-cleanup");
+      harness.stub.pushStatus({ status: "running", turnId: "cancelled-before-cleanup", startedAtMs: 1 });
+      started.resolve();
+      await cleanup.promise;
+      harness.stub.pushStatus({ status: "interrupted", turnId: "cancelled-before-cleanup", endedAtMs: 2, reason: "user_cancel" } as AgentStatus);
+    });
+    await harness.runner.startAgent({ objective: "cancelled prompt cleanup", deferInitialTurn: true, unattendedAllow: [], unattendedDeny: [] });
+    const input = (suffix: string) => ({ sessionId: id, content: suffix, originalContent: suffix,
+      messageId: `message-${suffix}`, streamId: `stream-${suffix}`, acceptedAt: "2026-08-27T00:00:00.000Z" });
+    const first = harness.runner.submitAgentMessage(id, input("first"));
+    await started.promise;
+    await harness.runner.interruptAgentTurnIfMatches(id, "user_cancel", "cancelled-before-cleanup");
+    pendingReview = true;
+    const second = harness.runner.submitAgentMessage(id, input("second"));
+    void second.catch(() => {});
+    await Promise.resolve();
+    expect(harness.control.sendInput).toHaveBeenCalledOnce();
+    pendingReview = false;
+    cleanup.resolve();
+    await first;
+    await expect(second).resolves.toMatchObject({ disposition: "started" });
+  });
+
   it("[managed-thread] queues direct shell until a cancelled message submission finishes cleanup", async () => {
     const messageStarted = Promise.withResolvers<void>();
     const releaseMessageCleanup = Promise.withResolvers<void>();

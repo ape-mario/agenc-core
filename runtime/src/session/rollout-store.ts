@@ -3334,7 +3334,28 @@ export class RolloutStore {
 
   assertModelExecutionAllowed(): void {
     if (this.rootReviewGateActive && this.hasPendingEffectReviews()) {
-      throw new Error(`run ${this.sessionId} requires effect review before model execution`);
+      let callIds: string[] = [];
+      try {
+        callIds = this.stateDriver.prepareState<[string, string], { readonly call_id: string }>(
+          `SELECT call_id FROM run_effects
+           WHERE session_id = ? AND review_status = 'pending'
+             AND recovery_category IN ('side-effecting', 'interactive')
+           UNION SELECT tool_call_id AS call_id FROM in_flight_tool_calls
+           WHERE session_id = ? AND status = 'poisoned'
+           LIMIT 8`,
+        ).all(this.sessionId, this.sessionId).map(row => row.call_id);
+      } catch {
+        // Failed recovery details must not lift the gate.
+      }
+      const review = callIds.length > 0
+        ? callIds.map(id => `/resolve ${id} <disposition>`).join("; ")
+        : "/resolve <tool-call-id> <disposition>";
+      throw new Error(
+        `run ${this.sessionId} requires effect review before model execution. ` +
+        `Inspect the interrupted tool outcome, then run ${review}. ` +
+        "Choose confirmed_committed if it took effect, confirmed_no_effect if you verified no effect, " +
+        "or remains_unknown to keep execution blocked. Resend your prompt after review.",
+      );
     }
   }
 
