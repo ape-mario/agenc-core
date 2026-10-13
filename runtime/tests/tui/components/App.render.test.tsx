@@ -1275,6 +1275,41 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     );
   });
 
+  test("refreshes the skill picker when a project skill is created", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const { skillChangeDetector } = await import("../../skills/change-detector.js");
+    resetShellSurfaceProbe();
+    commandDiscoveryProbe.mockResolvedValue([]);
+    const session = createSession();
+    await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
+      await vi.waitFor(() => expect(commandDiscoveryProbe).toHaveBeenCalled());
+      commandDiscoveryProbe.mockResolvedValue([{ name: "created-live", type: "prompt", loadedFrom: "skills", userInvocable: true }]);
+      skillChangeDetector.notify({ changedPaths: ["/workspace/.agenc/skills/created-live/SKILL.md"] });
+      await vi.waitFor(() => expect(providerProbe.promptProps.at(-1)?.commands).toContainEqual(expect.objectContaining({ name: "created-live" })));
+    });
+  });
+
+  test.each([true, false])("loads edited skill metadata before invocation without config reload: invocable %s", async invocable => {
+    const { AgenCTuiApp } = await import("./App.js");
+    resetShellSurfaceProbe();
+    const previous = vi.fn(async () => [{ type: "text", text: "OLD_SKILL_BODY" }]);
+    const edited = vi.fn(async () => [{ type: "text", text: "EDITED_SKILL_BODY" }]);
+    const skill = { name: "editable-live", type: "prompt", loadedFrom: "skills", userInvocable: true,
+      progressMessage: "Loading", contentLength: 1, getPromptForCommand: previous };
+    commandDiscoveryProbe.mockResolvedValue([skill]);
+    const session = { ...createSession(), submit: vi.fn(async () => {}) };
+    const helpers = { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() };
+    await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
+      await vi.waitFor(() => expect(providerProbe.promptProps.at(-1)?.commands).toContainEqual(expect.objectContaining({ name: "editable-live" })));
+      // An immediate edit can precede the watcher's debounced notification.
+      commandDiscoveryProbe.mockResolvedValue([{ ...skill, userInvocable: invocable, getPromptForCommand: edited }]);
+      await providerProbe.promptSubmits.at(-1)!("$editable-live", helpers);
+      expect(edited).toHaveBeenCalledTimes(invocable ? 1 : 0);
+      expect(previous).not.toHaveBeenCalled();
+      expect(session.submit).toHaveBeenCalledTimes(invocable ? 1 : 0);
+    });
+  });
+
   test.each(["failure", "pending", "removed"] as const)(
     "invalidates dynamic command display and execution after a %s reload",
     async (outcome) => {

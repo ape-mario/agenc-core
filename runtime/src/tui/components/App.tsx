@@ -163,6 +163,7 @@ import {
   isCommandEnabled,
   listTuiCommandList,
 } from "../../commands.js";
+import { skillChangeDetector } from "../../skills/change-detector.js";
 import { listAgentRoleDefinitions } from "../../agents/role-definitions.js";
 import { getAgentDefinitionsWithOverrides } from "../../tools/AgentTool/loadAgentsDir.js";
 import {
@@ -2859,18 +2860,25 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     process.cwd();
   const dynamicCommandPluginStorageRoot =
     props.session.services.runtimeOptions?.pluginStorageRoot;
+  const [skillCommandRevision, setSkillCommandRevision] = useState(0);
+  useEffect(() => skillChangeDetector.subscribe(() => {
+    props.session.services.skillsManager?.clearSkillCaches?.();
+    setSkillCommandRevision(revision => revision + 1);
+  }), [props.session]);
   const dynamicCommandSource = useMemo(
     () => ({
       cwd: dynamicCommandsCwd,
       pluginStorageRoot: dynamicCommandPluginStorageRoot,
       skillsManager: props.session.services.skillsManager,
       config,
+      skillCommandRevision,
     }),
     [
       dynamicCommandsCwd,
       dynamicCommandPluginStorageRoot,
       props.session.services.skillsManager,
       config,
+      skillCommandRevision,
     ],
   );
   const [dynamicCommandSnapshot, setDynamicCommandSnapshot] = useState<{
@@ -3872,9 +3880,27 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         }
       }
       if (parsedDollarSkill !== null) {
+        let invocationCommands = commands;
+        // An edit can precede the file watcher's debounce. Refresh only for
+        // explicit skill use, with this session's captured discovery authority.
+        // A pending/failed config generation remains unavailable as before.
+        if (dynamicCommandSource.pluginStorageRoot !== undefined &&
+            dynamicCommandSnapshot.source === dynamicCommandSource &&
+            dynamicCommandSnapshot.status === "ready") {
+          startPendingSubmission();
+          dynamicCommandSource.skillsManager?.clearSkillCaches?.();
+          const refreshed = await getCommands(dynamicCommandSource.cwd, {
+            pluginStorageRoot: dynamicCommandSource.pluginStorageRoot,
+            skillsManager: dynamicCommandSource.skillsManager,
+          }, dynamicCommandSource.config);
+          const visible = refreshed.filter(command => command.userInvocable !== false &&
+            command.isHidden !== true && isCommandEnabled(command));
+          setDynamicCommandSnapshot({ source: dynamicCommandSource, status: "ready", commands: visible });
+          invocationCommands = [...builtinTuiCommands, ...visible];
+        }
         const command = findCommand(
           parsedDollarSkill.commandName,
-          commands as unknown as Command[],
+          invocationCommands as unknown as Command[],
         );
         if (isDollarSkillCommand(command)) {
           await submitPromptCommand(parsedDollarSkill, command, text_0);
@@ -3980,6 +4006,9 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       commandRegistry,
       createSlashCommandContext,
       commands,
+      builtinTuiCommands,
+      dynamicCommandSource,
+      dynamicCommandSnapshot,
       runLocalControlCommand,
       submitToSession,
       setComposerInput,
