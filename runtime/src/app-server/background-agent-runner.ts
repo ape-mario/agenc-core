@@ -3700,6 +3700,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     active: ActiveBackgroundAgent,
     replacementEvent: JsonObject,
   ): Promise<void> {
+    clearPreparedContextPressure(active.bootstrap.session);
     const id =
       typeof replacementEvent.id === "string"
         ? replacementEvent.id
