@@ -637,6 +637,11 @@ async function compactConversationTransactionBody(
         { cause: new AggregateError([error, recordError]) },
       );
     }
+    if (error instanceof CompactionCannotReduceError && error.code === "no_shrink") {
+      // Publish the attempt only after its durable failure record succeeds.
+      // Preserve the typed rejection and the unchanged source history.
+      error.message += `; history was not changed.\nCompaction attempt ID: ${attemptId}`;
+    }
     // Reject invalid model output without replacing a byte of source history.
     // Do not turn arbitrary provider, budget, storage, or cancellation errors
     // into advisory outcomes. The failure record must succeed first.

@@ -3801,6 +3801,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
             showTransientResult(display, {
               display: result.kind === "error" ? "error" : undefined,
               persistent: [
+                "compact",
                 "login",
                 "logout",
                 "grok-login",
