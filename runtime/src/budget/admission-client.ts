@@ -151,6 +151,8 @@ export interface ExecutionAdmissionClient {
   }): readonly AdmissionJournalEvent[];
   getUsageSummary?(): AdmissionUsageSummary;
   /** Root task spend, including dispatched attempts whose usage remains unknown. */
+  /** Trusted operator action; changes only the root task token allowance. Zero removes it. */
+  setTaskTokenBudget?(tokens: number): number;
   getTaskBudgetUsage?(): { readonly tokens: number; readonly calls: number };
   /** This bound run/task's usage only, excluding delegated descendants. */
   getDirectUsageSummary?(): AdmissionUsageSummary;

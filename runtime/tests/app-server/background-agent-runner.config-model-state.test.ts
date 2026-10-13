@@ -307,6 +307,29 @@ function makeRunnerHarness(opts: {
 }
 
 describe("daemon config/model state refresh + atomicity", () => {
+  it("applies a saved task budget to the current root without changing model state", async () => {
+    const { runner, session, stateObject } = makeRunnerHarness({ configStore: {
+      current: () => ({ task_token_budget: 2_400_000 }), reload: async () => ({ task_token_budget: 0 }),
+    } });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    Object.assign(session, { config: { taskTokenBudget: 2_400_000 } });
+    const before = stateObject.sessionConfiguration;
+    const result = await runner.applyAgentConfig("parent-session", { sessionId: "session_1", taskBudgetLevel: "max" });
+    expect(result).toMatchObject({ applied: true, taskTokenBudget: 0 });
+    expect(session.config.taskTokenBudget).toBe(0);
+    expect(stateObject.sessionConfiguration).toBe(before);
+  });
+  it("keeps an explicit task budget override when the saved user choice changes", async () => {
+    const { runner, session } = makeRunnerHarness({ configStore: {
+      current: () => ({ task_token_budget: 500 }), reload: async () => ({ task_token_budget: 500 }),
+    } });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    Object.assign(session, { config: { taskTokenBudget: 500 } });
+    const result = await runner.applyAgentConfig("parent-session", { sessionId: "session_1", taskBudgetLevel: "max" });
+    expect(result).toMatchObject({ taskTokenBudget: 500, summary: expect.stringContaining("override") });
+    expect(session.config.taskTokenBudget).toBe(500);
+  });
+
   // GAP #12: an unknown profile must be a true no-op — the shared config store
   // must NOT have been reloaded (mutated + subscribers fired) before the
   // unknown-profile error surfaces.

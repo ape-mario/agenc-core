@@ -2883,6 +2883,26 @@ describe("AgenC TUI daemon session adapter", () => {
     expect(client.requests.at(-1)?.method).toBe("message.stream");
   });
 
+  it("reloads the running daemon and applies a task budget without changing model settings", async () => {
+    const client = createClient();
+    const request = client.request.bind(client);
+    client.request = async (method, params, options) => {
+      if (method === "session.applyConfig" && params?.taskBudgetLevel === "max") {
+        client.requests.push({ method, params });
+        return { sessionId: "session_1", applied: true, taskTokenBudget: 0, summary: "Budget updated" } as never;
+      }
+      return request(method, params, options) as never;
+    };
+    const config = { taskTokenBudget: 2_400_000 };
+    const session = createDaemonTuiSession({ baseSession: { ...createBaseSession(), config } as never, client, sessionId: "session_1", clientId: "tui_1" });
+    expect(await session.applyDaemonConfig?.({ taskBudgetLevel: "max" })).toMatchObject({ taskTokenBudget: 0 });
+    expect(config.taskTokenBudget).toBe(0);
+    expect(client.requests).toEqual([
+      { method: "daemon.reload", params: {} },
+      { method: "session.applyConfig", params: { sessionId: "session_1", taskBudgetLevel: "max" } },
+    ]);
+  });
+
   it("reloads daemon-global config before applying it to the live session", async () => {
     const client = createClient();
     const session = createDaemonTuiSession({

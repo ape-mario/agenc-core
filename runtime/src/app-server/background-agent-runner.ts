@@ -1,3 +1,5 @@
+import { setSessionTaskTokenBudget } from "../session/task-budget.js";
+import { TASK_BUDGET_LEVELS, isTaskBudgetLevel, taskBudgetLabel } from "../config/task-budget.js";
 import { promoteOneShotRun, selectRelaxedOneShot } from "../durability/one-shot-durability.js";
 /**
  * Starts daemon-owned background agents through the existing delegate runtime.
@@ -4280,6 +4282,21 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       throw new Error(`AgenC daemon agent not running: ${agentId}`);
     }
     const session = active.bootstrap.session;
+    if (params.taskBudgetLevel !== undefined) {
+      if (!isTaskBudgetLevel(params.taskBudgetLevel) || params.reasoningEffort !== undefined || params.modelVerbosity !== undefined || params.profile !== undefined) throw new Error("A task budget update cannot change other session settings");
+      const store = session.services.configStore;
+      if (store === undefined) throw new Error("No live config authority is available");
+      return withRuntimeSettingsMutation(active, async () => {
+        const staged = await store.prepareReload();
+        try {
+          const requested = TASK_BUDGET_LEVELS[params.taskBudgetLevel!];
+          const configured = staged.config.task_token_budget ?? requested;
+          const effective = setSessionTaskTokenBudget(session, configured);
+          return { applied: true, taskTokenBudget: effective,
+            summary: `Current session budget: ${taskBudgetLabel(effective)}.${configured !== requested ? " Explicit CLI or project settings override the saved choice." : ""}` };
+        } finally { staged.rollback(); staged.settle(); }
+      });
+    }
     if (params.reasoningEffort !== undefined || params.modelVerbosity !== undefined) {
       if (params.reload !== undefined || params.profile !== undefined) {
         throw new Error("An effort or response detail update cannot reload other configuration");

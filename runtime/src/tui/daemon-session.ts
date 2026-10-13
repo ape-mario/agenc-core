@@ -329,6 +329,7 @@ export interface AgenCTuiBridgeSession extends AgenCCompactProgressControls {
     disabled: boolean,
   ): Promise<SessionHooksSetDisabledResult>;
   applyDaemonConfig?(params: {
+    readonly taskBudgetLevel?: "eco" | "balanced" | "max";
     profile?: string;
     reload?: boolean;
     /** Apply only this effort to the idle session; null clears it. */
@@ -1743,19 +1744,28 @@ export function createDaemonTuiSession<
       runRuntimeSettingsAuthorityMutation(async () => {
         await awaitRuntimeSettingsAuthority();
         try {
-          if (p.reload === true) {
+          if (p.reload === true || p.taskBudgetLevel !== undefined) {
             // session.applyConfig refreshes only this agent's live config
             // store; reload the daemon-global snapshot first.
             await client.request("daemon.reload", {});
           }
           const result = await client.request("session.applyConfig", {
             sessionId,
+            ...(p.taskBudgetLevel !== undefined ? { taskBudgetLevel: p.taskBudgetLevel } : {}),
             ...(p.profile !== undefined ? { profile: p.profile } : {}),
             ...(p.reload !== undefined ? { reload: p.reload } : {}),
             ...(p.reasoningEffort !== undefined
               ? { reasoningEffort: p.reasoningEffort }
               : {}),
           } satisfies SessionApplyConfigParams);
+          if (p.taskBudgetLevel !== undefined) {
+            if (!Number.isSafeInteger(result.taskTokenBudget) || result.taskTokenBudget! < 0) {
+              throw new Error("daemon omitted the accepted task budget");
+            }
+            const localConfig = (baseSession as unknown as { config?: { taskTokenBudget?: number } }).config;
+            if (localConfig !== undefined) localConfig.taskTokenBudget = result.taskTokenBudget;
+            return result;
+          }
           if (!result.applied) return result;
           if (
             result.provider === undefined ||

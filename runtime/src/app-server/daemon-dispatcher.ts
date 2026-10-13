@@ -4560,7 +4560,7 @@ function validateSessionApplyConfigParams(
   const validated = validateObjectShape(params, {
     methodName: "session.applyConfig",
     stringFields: ["sessionId", "profile"],
-    valueFields: ["reload", "modelVerbosity", "reasoningEffort"],
+    valueFields: ["reload", "modelVerbosity", "reasoningEffort", "taskBudgetLevel"],
   });
   validateRequiredString(validated, "session.applyConfig", "sessionId");
   // Null clears the session's effort so it follows the model default.
@@ -4583,6 +4583,11 @@ function validateSessionApplyConfigParams(
   }
   if (validated.reload !== undefined && typeof validated.reload !== "boolean") {
     throw invalidParams("session.applyConfig param 'reload' must be a boolean");
+  }
+  if (validated.taskBudgetLevel !== undefined &&
+      (typeof validated.taskBudgetLevel !== 'string' || !['eco', 'balanced', 'max'].includes(validated.taskBudgetLevel) ||
+       validated.reasoningEffort !== undefined || validated.modelVerbosity !== undefined || validated.profile !== undefined)) {
+    throw invalidParams("session.applyConfig taskBudgetLevel must be eco, balanced, or max and cannot change other session settings");
   }
   return validated as SessionApplyConfigParams;
 }

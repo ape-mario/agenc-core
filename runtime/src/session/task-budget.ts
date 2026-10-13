@@ -23,10 +23,16 @@ export class TaskBudget {
   private lastReservation = 0;
   private announced = false;
   private stopped = false;
+  private operatorLimit: number | null = null;
   private extensionAnnounced = false;
   constructor(private readonly hardLimit?: number, readonly maxCalls?: number,
     private readonly progressLimit?: () => number) {}
-  get limit(): number | undefined { return this.progressLimit?.() ?? this.hardLimit; }
+  get limit(): number | undefined { return this.operatorLimit === null ? (this.progressLimit?.() ?? this.hardLimit) : this.operatorLimit === 0 ? undefined : this.operatorLimit; }
+  setTokenLimit(tokens: number): void {
+    this.operatorLimit = tokens;
+    this.stopped = false;
+    this.announced = false;
+  }
   stop(): void { this.stopped = true; }
   get reached(): boolean {
     return this.stopped || (this.limit !== undefined && this.tokens >= this.limit) ||
@@ -118,4 +124,17 @@ export function taskBudgetOf(session: Session): TaskBudget | undefined {
     budget.calls = Math.max(budget.calls, usage?.modelCalls ?? 0);
   }
   return budget;
+}
+
+/** Host/operator-only update; never resets usage or independent call/cost limits. */
+export function setSessionTaskTokenBudget(session: Session, tokens: number): number {
+  if (!Number.isSafeInteger(tokens) || tokens < 0) throw new TypeError("Invalid task token allowance");
+  const admission = session.services?.executionAdmission;
+  if (admission !== undefined && admission.setTaskTokenBudget === undefined) {
+    throw new Error("This admission authority cannot update a task allowance");
+  }
+  const effective = admission?.setTaskTokenBudget?.(tokens) ?? tokens;
+  (session.config as { taskTokenBudget?: number }).taskTokenBudget = effective;
+  budgets.get(session)?.setTokenLimit(effective);
+  return effective;
 }

@@ -744,6 +744,35 @@ export class ExecutionAdmissionRepository {
     });
   }
 
+  /** Explicit host/operator update. Spend, holds, call caps and effect state survive. */
+  setRootTaskTokenBudget(ownerRunId: string, key: string, tokens: number | undefined): void {
+    if (tokens !== undefined) normalizeNonNegativeInteger(tokens, "task token allowance");
+    this.#writeTransaction(() => {
+      const allocation = this.#requireAllocationLocked(key);
+      if (allocation.owner_run_id !== ownerRunId || allocation.parent_scope_key !== null) {
+        throw new ExecutionAdmissionStateError("Only the root operator can change its task allowance");
+      }
+      this.#driver.prepareState("UPDATE execution_admission_allocations SET max_tokens = ?, updated_at = ? WHERE scope_key = ?")
+        .run(tokens ?? null, this.#timestamp(), key);
+      // Queued work has no effect yet. Refresh only this shared token scope,
+      // preserving estimates, approvals, deadlines and every other cap.
+      const queued = this.#driver.prepareState<[], { id: string; input_json: string }>(
+        "SELECT id, input_json FROM agent_jobs WHERE status IN ('queued', 'approval_required') AND admission_run_id IS NOT NULL",
+      ).all();
+      for (const job of queued) {
+        const request = parseRequest(job.input_json);
+        if (!request.budgetScopes?.some(scope => scope.key === key)) continue;
+        const scopes = request.budgetScopes.map(scope => {
+          if (scope.key !== key) return scope;
+          const { maxTokens: _oldTokens, ...rest } = scope;
+          return { ...rest, ...(tokens !== undefined ? { maxTokens: tokens } : {}) };
+        });
+        this.#driver.prepareState("UPDATE agent_jobs SET input_json = ? WHERE id = ?")
+          .run(JSON.stringify({ ...request, budgetScopes: scopes }), job.id);
+      }
+    });
+  }
+
   listBoundRunIds(): readonly string[] {
     return this.#driver
       .prepareState<[], { readonly run_id: string }>(

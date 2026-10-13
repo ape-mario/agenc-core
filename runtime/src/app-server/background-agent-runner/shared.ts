@@ -459,6 +459,7 @@ export interface AgenCBackgroundAgentSetHooksDisabledResult {
 }
 
 export interface AgenCBackgroundAgentApplyConfigParams {
+  readonly taskBudgetLevel?: "eco" | "balanced" | "max";
   readonly sessionId: string;
   /** Null clears the session's effort so it follows the model default. */
   readonly reasoningEffort?: string | null;
@@ -468,6 +469,7 @@ export interface AgenCBackgroundAgentApplyConfigParams {
 }
 
 export interface AgenCBackgroundAgentApplyConfigResult {
+  readonly taskTokenBudget?: number;
   readonly applied: boolean;
   readonly provider?: string;
   readonly model?: string;

@@ -1059,6 +1059,7 @@ type TuiSessionShape = Pick<
   getDaemonHooksStatus?: () => Promise<unknown>;
   setDaemonHooksDisabled?: (disabled: boolean) => Promise<unknown>;
   applyDaemonConfig?: (params: {
+    taskBudgetLevel?: "eco" | "balanced" | "max";
     profile?: string;
     reload?: boolean;
   }) => Promise<unknown>;
@@ -2337,6 +2338,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
         return {
           sessionId: "pending",
           applied: false,
+          ...(configParams.taskBudgetLevel !== undefined ? { taskTokenBudget: configStore.current().task_token_budget ?? 0 } : {}),
           summary:
             staged.length > 0
               ? `${staged.join("; ")}; the first conversation will use it.`
