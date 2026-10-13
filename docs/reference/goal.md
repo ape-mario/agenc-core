@@ -51,6 +51,16 @@ of the conversation, so compaction cannot drop or paraphrase it, and it is
 restated at the top of every later turn. A reopened session gets an open goal
 back **paused**; `/goal resume` continues it.
 
+In a Git workspace, setting a goal also journals the content and mode identities
+of existing tracked changes and untracked files. Review compares against that
+baseline, so unchanged files that predate the goal are not attributed to it.
+Later edits, deletions and restorations still appear in the integrity check.
+The reviewer also sees the current diff against the starting commit, which can
+include pre-existing changes. Older goals without a baseline keep the
+conservative comparison against that commit and all untracked files, with a
+visible note that some files may predate the goal. An incomplete or unreadable
+baseline prevents setting the goal rather than silently omitting files.
+
 `/goal` does not change the permission mode. In `default` mode the agent's
 edits, and the runtime's verification command, still ask for approval. Use
 `acceptEdits` or approve the command for the session to let a goal run alone.

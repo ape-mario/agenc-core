@@ -2376,6 +2376,23 @@ export interface SessionGoalBudget extends JsonObject {
     readonly deadlineAt?: string;
 }
 
+export interface SessionGoalFileIdentity extends JsonObject {
+    readonly kind: "file" | "symlink";
+    readonly mode: number;
+    readonly sha256: string;
+}
+
+export interface SessionGoalBaselineFile extends JsonObject {
+    readonly path: string;
+    readonly identity: SessionGoalFileIdentity | null;
+}
+
+export interface SessionGoalWorkingTreeBaseline extends JsonObject {
+    readonly version: 1;
+    readonly trackedChanges: SessionGoalBaselineFile[];
+    readonly untrackedFiles: SessionGoalBaselineFile[];
+}
+
 export interface SessionGoalVerdict extends JsonObject {
     readonly verdict: "met" | "not_met" | "impossible" | "blocked" | "verification_failed";
     readonly reason: string;
@@ -2396,6 +2413,7 @@ export interface SessionGoalSnapshot extends JsonObject {
     readonly startedAt: string;
     readonly startCostUsd: number;
     readonly baseCommit?: string;
+    readonly worktreeBaseline?: SessionGoalWorkingTreeBaseline;
     readonly lastVerdict?: SessionGoalVerdict;
     readonly pauseReason?: string;
 }

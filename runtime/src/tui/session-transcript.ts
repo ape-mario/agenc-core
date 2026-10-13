@@ -329,6 +329,7 @@ const USER_VISIBLE_WARNING_CAUSES: ReadonlySet<string> = new Set([
   "goal_blocked",
   "goal_impossible",
   "goal_judge_unavailable",
+  "goal_worktree_baseline_unavailable",
   // Provider / mode change the user just observed
   "provider_switched",
   "provider_switch_rejected",
