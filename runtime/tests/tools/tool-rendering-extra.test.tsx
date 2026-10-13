@@ -497,7 +497,7 @@ describe("Tool error cross-cutting dispatch", () => {
     expect(props.content).toContain("<tool-error-name>FileRead</tool-error-name>");
   });
 
-  test("createTuiTool().renderToolUseErrorMessage with an arbitrary plain object falls back to short JSON in the <tool-error> body (third branch — neither string nor Error instance)", () => {
+  test("createTuiTool().renderToolUseErrorMessage preserves error kind and code in plain text", () => {
     const tool = createTuiTool("Bash");
     const node = tool.renderToolUseErrorMessage({ code: 17, kind: "EEXIST" });
     expect((node as { type: unknown }).type).toBe(ToolErrorView);
@@ -505,6 +505,7 @@ describe("Tool error cross-cutting dispatch", () => {
     expect(props.content).toContain("<tool-error-name>Bash</tool-error-name>");
     expect(props.content).toContain("EEXIST");
     expect(props.content).toContain("17");
+    expect(props.content).not.toContain("{\"code\"");
   });
 
   test("createTuiTool().renderToolUseErrorMessage handles null without throwing", () => {

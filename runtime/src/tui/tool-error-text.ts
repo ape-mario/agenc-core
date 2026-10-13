@@ -31,8 +31,14 @@ export function readableToolError(raw: unknown, depth = 0): string {
         return readableToolError(record[key], depth + 1);
       }
     }
-    return typeof record.code === "string" || typeof record.code === "number"
-      ? `Tool execution failed (code ${record.code})` : "Tool execution failed";
+    const label = (value: unknown): string | undefined => {
+      if (typeof value !== "string" && typeof value !== "number") return undefined;
+      return String(value).replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || undefined;
+    };
+    const kind = label(record.kind);
+    const code = label(record.code);
+    const details = [kind, code === undefined ? undefined : `code ${code}`].filter(Boolean);
+    return details.length > 0 ? `Tool execution failed (${details.join(", ")})` : "Tool execution failed";
   }
   if (typeof raw !== "string") return "Tool execution failed";
   const trimmed = raw.trim();
