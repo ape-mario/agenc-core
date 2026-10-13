@@ -4515,6 +4515,41 @@ describe("AgenC delegate background-agent runner", () => {
     }
   });
 
+  it("clears the goal durably before interrupting its captured active turn", async () => {
+    const h = makeTopLevelRunner({
+      conversationId: "session-goal-cancel-active",
+      scopedTurnCancellation: true,
+    });
+    const started = await h.runner.startAgent({
+      objective: "goal host", unattendedAllow: [], unattendedDeny: [],
+    });
+    const call = (action: "set" | "clear") => h.runner.updateAgentSessionGoal!(
+      started.agentId,
+      { sessionId: started.agentId, action, ...(action === "set" ? {
+        request: { objective: "finish the goal", verify: [], noVerify: true },
+      } : {}) } as never,
+    );
+    try {
+      await call("set");
+      h.setActiveTurn("goal-turn");
+      h.abortTurnIfActive.mockImplementationOnce(async (turnId) => {
+        const changes = h.session.emit.mock.calls
+          .map(([event]) => event as { msg?: { type?: string; payload?: { cause?: string } } })
+          .filter((event) => event.msg?.type === "goal_changed");
+        expect(changes.at(-1)?.msg?.payload?.cause).toBe("cleared");
+        expect(turnId).toBe("goal-turn");
+        h.setActiveTurn("next-user-turn");
+        return true;
+      });
+      expect(await call("clear")).toMatchObject({ ok: true, message: "Goal cleared: finish the goal" });
+      expect(h.abortTurnIfActive).toHaveBeenCalledExactlyOnceWith("goal-turn", "interrupted");
+      expect(h.activeTurn.unsafePeek()?.turnId).toBe("next-user-turn");
+      expect(h.session.markStoppedByUser).toHaveBeenCalledOnce();
+    } finally {
+      await h.runner.stopAgent(started.agentId).catch(() => undefined);
+    }
+  });
+
   it("binds the owning session while a partial compaction runs in a multi-session daemon", async () => {
     // Compaction samples the provider through the ambient "current session"
     // the way a turn does. With two sessions live the unscoped fallback
