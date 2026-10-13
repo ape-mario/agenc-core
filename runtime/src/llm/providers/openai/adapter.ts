@@ -1,4 +1,5 @@
 import { oneShotFastModeActive } from "../../../one-shot-fast-mode.js";
+import { deepSeekReasoningOnlyReplayProvenance } from "../../deepseek-reasoning-only-replay.js";
 import { openAiModelRequiresResponses, openAiModelRequiresBufferedResponse } from "../../registry/openai-current-models.js";
 /**
  * OpenAI provider adapter.
@@ -1089,10 +1090,7 @@ export class OpenAIProvider implements LLMProvider {
           tools: requestTools,
           options,
         });
-        const providerCapabilityHints =
-          chatCompletionsCapabilityHintsForProvider(this.name, model, {
-            managedGateway: this.config.managedRequestId,
-          });
+        const providerCapabilityHints = this.chatCapabilityHints(model);
         const response = await session.requestJson<Record<string, unknown>>({
           api: "chat_completions",
           headers,
@@ -1498,14 +1496,17 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   private fastCapabilityMemo: { model: string; provider: string; managed: boolean | undefined;
+    reasoningOnlyReplay: boolean;
     value: ReturnType<typeof chatCompletionsCapabilityHintsForProvider> } | undefined;
 
   private chatCapabilityHints(model: string): ReturnType<typeof chatCompletionsCapabilityHintsForProvider> {
     const managed = this.config.managedRequestId;
+    const reasoningOnlyReplay = deepSeekReasoningOnlyReplayProvenance(this.name, model) !== undefined;
     const memo = this.fastCapabilityMemo;
-    if (oneShotFastModeActive() && memo?.model === model && memo.provider === this.name && memo.managed === managed) return memo.value;
-    const value = chatCompletionsCapabilityHintsForProvider(this.name, model, { managedGateway: managed });
-    if (oneShotFastModeActive()) this.fastCapabilityMemo = { model, provider: this.name, managed, value };
+    if (oneShotFastModeActive() && memo?.model === model && memo.provider === this.name && memo.managed === managed && memo.reasoningOnlyReplay === reasoningOnlyReplay) return memo.value;
+    const base = chatCompletionsCapabilityHintsForProvider(this.name, model, { managedGateway: managed });
+    const value = reasoningOnlyReplay ? { ...base, preservesReasoningOnlyMessages: true } : base;
+    if (oneShotFastModeActive()) this.fastCapabilityMemo = { model, provider: this.name, managed, reasoningOnlyReplay, value };
     return value;
   }
 

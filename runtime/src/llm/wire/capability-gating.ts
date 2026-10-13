@@ -101,6 +101,8 @@ export interface ChatCompletionsCapabilityHints {
    * unchanged before the corresponding tool results are submitted.
    */
   readonly replaysReasoningContent?: boolean;
+  /** Opt-in native DeepSeek retention of empty-visible assistant reasoning. */
+  readonly preservesReasoningOnlyMessages?: boolean;
   /** Provider-specific assistant reasoning field used for parse and replay. */
   readonly reasoningContentField?: "reasoning_content" | "reasoning";
   /** Older compatible runtimes may emit the legacy name while replay uses canonical. */

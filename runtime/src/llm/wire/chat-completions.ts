@@ -610,6 +610,11 @@ export function buildChatCompletionsRequest(
   const preparedMessages = prepareMessagesForWire(
     input.messages,
     input.options,
+    input.tools.length > 0 && input.options?.disableThinkingForRecovery !== true &&
+      input.providerCapabilityHints?.replaysReasoningContent === true &&
+      input.providerCapabilityHints.preservesReasoningOnlyMessages === true
+      ? { preserveReasoningOnlyFor: input.providerCapabilityHints.reasoningContentProvenance }
+      : undefined,
   );
   const normalizedMessages = input.providerCapabilityHints?.runtimeContextInToolResults
     ? projectRuntimeContextIntoToolResults(preparedMessages)
@@ -1102,7 +1107,12 @@ export function parseChatCompletionsResponse(
     ? { ...request, messages: [...request.messages] } : request;
   let metrics: LLMResponse["requestMetrics"];
   const requestMetrics = (): NonNullable<LLMResponse["requestMetrics"]> => metrics ??= withEndpointMarkers(
-    withSerializedMetrics(collectRequestMetrics(prepareMessagesForWire(metricsRequest.messages), metricsRequest.tools),
+    withSerializedMetrics(collectRequestMetrics(prepareMessagesForWire(metricsRequest.messages, metricsRequest.options,
+      metricsRequest.tools.length > 0 && metricsRequest.options?.disableThinkingForRecovery !== true &&
+        metricsRequest.providerCapabilityHints?.preservesReasoningOnlyMessages === true &&
+        metricsRequest.providerCapabilityHints.replaysReasoningContent === true
+        ? { preserveReasoningOnlyFor: metricsRequest.providerCapabilityHints.reasoningContentProvenance }
+        : undefined), metricsRequest.tools),
       buildChatCompletionsRequest(metricsRequest), metricsRequest.options), "/chat/completions", response);
   if (!oneShotFastModeActive()) requestMetrics();
 
