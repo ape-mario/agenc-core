@@ -115,10 +115,14 @@ export function buildPostCompactMessages(
           }
         : {}),
       ...(message.toolResultIntegrity !== undefined ||
+      message.toolResultIsError === true ||
       message.agentInvocation !== undefined ||
       message.compactionHistory !== undefined
         ? {
             runtimeOnly: {
+              ...(message.toolResultIsError === true
+                ? { toolResultIsError: true as const }
+                : {}),
               ...(message.toolResultIntegrity !== undefined
                 ? { toolResultIntegrity: message.toolResultIntegrity }
                 : {}),

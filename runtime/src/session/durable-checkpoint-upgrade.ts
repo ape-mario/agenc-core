@@ -17,10 +17,10 @@ import {
   LEGACY_DURABLE_CHECKPOINT_VERSION,
   DurableCheckpointReadError,
   MAX_CHECKPOINT_PREFIX_MESSAGES,
-  computeCheckpointPrefixHashV3,
+  computeCheckpointPrefixHashV4,
   readTurnCheckpoint,
   validateCheckpointPrefix,
-  validateCheckpointPrefixV3,
+  validateCheckpointPrefixV4,
   type DurableCheckpointPrefixDeferral,
   type DurableCheckpointPrefixFailure,
 } from "./durable-checkpoint-reader.js";
@@ -241,6 +241,10 @@ export function planLegacyDurableCheckpointUpgrade(params: {
         );
       }
 
+      // Existing current-schema v4 rows retain their declared digest algorithm.
+      // Rewriting their checkpoints would also rewrite history already bound
+      // into a later compaction source. Only older checkpoint schemas upgrade.
+      const requiresCurrentHash = readable.sourceVersion !== DURABLE_CHECKPOINT_READ_VERSION;
       const persistedMessageCount = readable.checkpoint.persistedMessageCount;
       if (persistedMessageCount > history.length) {
         return invalid(
@@ -311,7 +315,7 @@ export function planLegacyDurableCheckpointUpgrade(params: {
       if (readable.version === 1) {
         let prefixHash: string;
         try {
-          prefixHash = computeCheckpointPrefixHashV3(
+          prefixHash = computeCheckpointPrefixHashV4(
             history,
             persistedMessageCount,
           );
@@ -327,7 +331,7 @@ export function planLegacyDurableCheckpointUpgrade(params: {
           ...readable.checkpoint,
           checkpointVersion: DURABLE_CHECKPOINT_READ_VERSION,
           toolResultIntegrityVersion: 1,
-          prefixHashVersion: 3,
+          prefixHashVersion: 4,
           prefixHash,
         };
         item = {
@@ -339,10 +343,10 @@ export function planLegacyDurableCheckpointUpgrade(params: {
         };
         checkpointsUpgraded += 1;
         changed = true;
-      } else if (readable.sourceVersion !== DURABLE_CHECKPOINT_READ_VERSION) {
+      } else if (requiresCurrentHash) {
         let prefixHash: string;
         try {
-          prefixHash = computeCheckpointPrefixHashV3(
+          prefixHash = computeCheckpointPrefixHashV4(
             history,
             persistedMessageCount,
           );
@@ -358,7 +362,7 @@ export function planLegacyDurableCheckpointUpgrade(params: {
           ...readable.checkpoint,
           checkpointVersion: DURABLE_CHECKPOINT_READ_VERSION,
           toolResultIntegrityVersion: 1,
-          prefixHashVersion: 3,
+          prefixHashVersion: 4,
           prefixHash,
         };
         item = {
@@ -370,12 +374,14 @@ export function planLegacyDurableCheckpointUpgrade(params: {
         };
         checkpointsUpgraded += 1;
         changed = true;
-      } else {
+      } else if (readable.version === DURABLE_CHECKPOINT_READ_VERSION) {
         checkpoint = readable.checkpoint;
+      } else {
+        throw new Error("noncurrent checkpoint escaped its hash upgrade");
       }
 
-      if (readable.sourceVersion !== DURABLE_CHECKPOINT_READ_VERSION) {
-        const validation = validateCheckpointPrefixV3({
+      if (requiresCurrentHash) {
+        const validation = validateCheckpointPrefixV4({
           checkpoint,
           expectedRunId: params.runId,
           messages: history,

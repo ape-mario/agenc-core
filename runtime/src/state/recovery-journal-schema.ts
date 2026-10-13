@@ -244,6 +244,7 @@ const isResponseItemShape = objectShape(
     // The recovery envelope is additive. The checkpoint-v2 reader validates
     // the exact integrity shape, body digest, and owning run before replay.
     toolResultIntegrity: isUnknown,
+    toolResultIsError: (value: unknown): value is true => value === true,
     // The strict checkpoint reader authenticates the three-channel sequence,
     // reader version, envelope digest, and per-channel content identity.
     agentInvocation: isUnknown,
@@ -257,7 +258,9 @@ type ResponseItemPayload = RolloutPayload<"response_item">;
 const isResponseItem: Validator<
   ResponseItemPayload,
   AllKeys<ResponseItemPayload>
-> = (value): value is ResponseItemPayload => isResponseItemShape(value);
+> = (value): value is ResponseItemPayload =>
+  isResponseItemShape(value) &&
+  (value.toolResultIsError === undefined || value.role === "tool");
 
 const isSessionAgentTask = objectShape({
   agentRuntimeId: isString,

@@ -223,7 +223,7 @@ import {
 } from "./durable-turns.js";
 import {
   DURABLE_CHECKPOINT_WRITE_VERSION,
-  computeCheckpointPrefixHashV3,
+  computeCheckpointPrefixHashV4,
 } from "./durable-checkpoint-reader.js";
 import {
   createToolResultIntegrity,
@@ -2667,7 +2667,7 @@ async function* runTurnKernelInner(
     const buildMsg = (): Extract<EventMsg, { type: "turn_checkpoint" }> => {
       const durablePrefix = messages.map((message) => projectCheckpointMessage(message));
       for (const message of durablePrefix) requireSealedToolResult(message);
-      const prefixHash = computeCheckpointPrefixHashV3(durablePrefix, durablePrefix.length);
+      const prefixHash = computeCheckpointPrefixHashV4(durablePrefix, durablePrefix.length);
       return {
         type: "turn_checkpoint",
         payload: {
@@ -2679,7 +2679,7 @@ async function* runTurnKernelInner(
           prefixHash,
           checkpointVersion: DURABLE_CHECKPOINT_WRITE_VERSION,
           toolResultIntegrityVersion: 1,
-          prefixHashVersion: 3,
+          prefixHashVersion: 4,
           resumableState,
         },
       };

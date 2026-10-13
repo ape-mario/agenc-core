@@ -1993,17 +1993,21 @@ export function normalizeHistoryMessages(
         model?: unknown;
       };
       toolResultIntegrity?: ToolResultIntegrity;
+      toolResultIsError?: unknown;
       agentInvocation?: AgentInvocationChannelMetadata;
       compactionHistory?: CompactionHistoryMarkerV1;
       runtimeOnly?: {
         responseItemId?: unknown;
         userMessageId?: unknown;
         toolResultIntegrity?: ToolResultIntegrity;
+        toolResultIsError?: unknown;
         agentInvocation?: AgentInvocationChannelMetadata;
         compactionHistory?: CompactionHistoryMarkerV1;
       };
     };
     const durable = durableHistoryMetadata(candidate);
+    const toolResultIsError = candidate.role === "tool" &&
+      (candidate.runtimeOnly?.toolResultIsError === true || candidate.toolResultIsError === true);
     if (
       candidate.role !== "system" &&
       candidate.role !== "developer" &&
@@ -2045,10 +2049,12 @@ export function normalizeHistoryMessages(
       typeof candidate.id === "string" ||
       typeof candidate.runtimeOnly?.userMessageId === "string" ||
       durable.toolResultIntegrity !== undefined ||
+      toolResultIsError ||
       durable.agentInvocation !== undefined ||
       durable.compactionHistory !== undefined
         ? {
             runtimeOnly: {
+              ...(toolResultIsError ? { toolResultIsError: true as const } : {}),
               ...(typeof candidate.runtimeOnly?.responseItemId === "string"
                 ? { responseItemId: candidate.runtimeOnly.responseItemId }
                 : typeof candidate.id === "string"
@@ -2217,10 +2223,14 @@ function toCompactRuntimeMessages(
         ? { providerReasoningProvenance: { ...message.providerReasoningProvenance } }
         : {}),
       ...(message.runtimeOnly?.toolResultIntegrity !== undefined ||
+      message.runtimeOnly?.toolResultIsError === true ||
       message.runtimeOnly?.agentInvocation !== undefined ||
       message.runtimeOnly?.compactionHistory !== undefined
         ? {
             runtimeOnly: {
+              ...(message.runtimeOnly?.toolResultIsError === true
+                ? { toolResultIsError: true as const }
+                : {}),
               ...(message.runtimeOnly?.compactionHistory !== undefined
                 ? { compactionHistory: { ...message.runtimeOnly.compactionHistory } }
                 : {}),
