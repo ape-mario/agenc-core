@@ -24,6 +24,7 @@ export class TaskBudget {
   private lastReservation = 0;
   private announced = false;
   private stopped = false;
+  checkpointStopped = false;
   private operatorLimit: number | null = null;
   checkpointAllowance: number | undefined;
   checkpointWarningLimit: number | undefined;
@@ -35,6 +36,7 @@ export class TaskBudget {
     if (!checkpoint) this.checkpointAllowance = tokens === 0 ? undefined : tokens;
     this.operatorLimit = tokens;
     this.stopped = false;
+    this.checkpointStopped = false;
     this.announced = false;
   }
   stop(): void { this.stopped = true; }
@@ -165,6 +167,7 @@ const checkpointWaits = new WeakMap<Session, Promise<boolean>>();
 export async function continueInteractiveTaskBudget(session: Session, reserve = 0, signal?: AbortSignal): Promise<boolean> {
   const budget = taskBudgetOf(session);
   if (!budget) return true;
+  if (budget.checkpointStopped) return false;
   if (budget.maxCalls !== undefined && budget.calls >= budget.maxCalls) return false;
   if (budget.limit === undefined) return true;
   if (!interactiveTaskBudget(session)) return false;
@@ -192,7 +195,11 @@ export async function continueInteractiveTaskBudget(session: Session, reserve = 
       ],
     }] }, signal);
     const choice = response?.answers.task_budget?.answers[0];
-    if (choice !== "Continue" && choice !== "Remove the limit for this task") return false;
+    if (choice !== "Continue" && choice !== "Remove the limit for this task") {
+      budget.checkpointStopped = true;
+      budget.stop();
+      return false;
+    }
     const next = choice === "Continue" ? limit + allowance : 0;
     if (!Number.isSafeInteger(next)) throw new Error("Task allowance is too large");
     const effective = setSessionTaskTokenBudget(session, next, true);

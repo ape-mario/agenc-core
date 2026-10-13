@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { mkSession } from "../fixtures.js";
-import { continueInteractiveTaskBudget, taskBudgetOf } from "../../src/session/task-budget.js";
+import { continueInteractiveTaskBudget, prepareInteractiveTaskBudgetCall, setSessionTaskTokenBudget, taskBudgetOf } from "../../src/session/task-budget.js";
 
 it("pauses without changing history, continues by one allowance, then asks again", async () => {
   const { session, events } = mkSession();
@@ -31,11 +31,27 @@ it("removes the limit for this task, and Stop does not extend it", async () => {
   const request = vi.spyOn(session, "requestUserInput").mockResolvedValueOnce({ answers: { task_budget: { answers: ["Stop here"] } } });
   expect(await continueInteractiveTaskBudget(session)).toBe(false);
   expect(budget.limit).toBe(100);
+  expect(await continueInteractiveTaskBudget(session)).toBe(false);
+  expect(request).toHaveBeenCalledTimes(1);
+  setSessionTaskTokenBudget(session, 100);
   request.mockResolvedValueOnce({ answers: { task_budget: { answers: ["Remove the limit for this task"] } } });
   expect(await continueInteractiveTaskBudget(session)).toBe(true);
   expect(budget.limit).toBeUndefined();
   expect(await continueInteractiveTaskBudget(session)).toBe(true);
   expect(request).toHaveBeenCalledTimes(2);
+});
+it("finishes a declined pre-admission checkpoint without asking again during cleanup", async () => {
+  const { session } = mkSession();
+  Object.assign(session.services, { runtimeOptions: { ...session.services.runtimeOptions, interactiveTaskBudget: true } });
+  Object.assign(session.config, { taskTokenBudget: 100 });
+  const request = vi.spyOn(session, "requestUserInput").mockResolvedValue({ answers: { task_budget: { answers: ["Stop here"] } } });
+  await expect(prepareInteractiveTaskBudgetCall(session, 101)).rejects.toThrow("Task budget reached");
+  expect(await continueInteractiveTaskBudget(session)).toBe(false);
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(taskBudgetOf(session)!.tokens).toBe(0);
+  setSessionTaskTokenBudget(session, 200);
+  expect(await continueInteractiveTaskBudget(session)).toBe(true);
+  expect(request).toHaveBeenCalledTimes(1);
 });
 it("headless and routine work keep a hard cap with no question", async () => {
   for (const runtimeOptions of [{ nonInteractive: true }, { routineRun: true }]) {
