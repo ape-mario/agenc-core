@@ -2915,6 +2915,7 @@ export class Session {
     });
     const baseInstructions = await assembleBaseInstructionsForModel({
       session: this,
+      ...(configSnapshot !== undefined ? { configSnapshot } : {}),
       ctx: promptContext,
       registry: this.services.registry,
       provider: provider.binding.provider,

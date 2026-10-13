@@ -1013,6 +1013,26 @@ describe("assembleSystemPrompt", () => {
     expect(simple).not.toContain("# Memory directories");
   });
 
+  test("provider reload prepares output style from the staged snapshot before publication", async () => {
+    const home = mkdtempSync(join(tmpdir(), "agenc-staged-style-"));
+    onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+    const configStore = new ConfigStore({ home, cwd: home, env: { HOME: home, AGENC_HOME: home } });
+    const current = configStore.current();
+    const prepared = await assembleBaseInstructionsForModel({
+      session: { services: { configStore, runtimeOptions: { pluginStorageRoot: home } } },
+      ctx: fakeCtx({ cwd: home }),
+      registry: { tools: [] },
+      provider: "deepseek",
+      permissionContext: null,
+      profile: "light",
+      configSnapshot: { ...current, outputStyle: "Learning" },
+    });
+    expect(prepared).toContain("# Learning Style Active");
+    expect(prepared).not.toContain("# Explanatory Style Active");
+    expect(configStore.current()).toBe(current);
+    expect(configStore.current().outputStyle).not.toBe("Learning");
+  });
+
   test("base instructions carry the completion contract only for non-interactive sessions", async () => {
     const registry = { tools: [{ name: "FileRead" }, { name: "exec_command" }] };
     const assemble = (runtimeOptions: Record<string, unknown>, env?: NodeJS.ProcessEnv) =>

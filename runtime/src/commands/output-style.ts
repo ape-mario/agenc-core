@@ -216,6 +216,20 @@ async function applyOutputStyleSwitchWithAuthority(
     return `Output style switch failed: ${result.error.message}`;
   }
 
+  const bridge = ctx.session as unknown as {
+    applyDaemonConfig?: (params: { reload: boolean }) => Promise<{ applied: boolean; sessionId?: string; summary?: string }>;
+  };
+  if (typeof bridge.applyDaemonConfig === "function") {
+    try {
+      const applied = await bridge.applyDaemonConfig({ reload: true });
+      if (!applied.applied && applied.sessionId !== "pending") {
+        throw new Error(applied.summary ?? "daemon did not accept the style reload");
+      }
+    } catch (error) {
+      return `Output style saved as "${target}", but this session did not take it: ${error instanceof Error ? error.message : String(error)}. Run /config reload to retry.`;
+    }
+  }
+
   clearAllOutputStylesCache();
   const nextStyles = await loadCommandOutputStyles(ctx);
   const persisted = configuredOutputStyle(ctx);

@@ -970,13 +970,14 @@ export async function assembleSystemPromptSnapshot(
 async function resolveOutputStyleFromSession(
   session: SystemPromptSessionSnapshot,
   cwd: string,
+  configSnapshot?: ReturnType<ConfigStore["current"]>,
 ): Promise<OutputStyleInput | null> {
   const pluginStorageRoot = session.services?.runtimeOptions?.pluginStorageRoot;
   const configStore = session.services?.configStore;
   if (typeof pluginStorageRoot !== "string" || configStore === undefined) {
     return null;
   }
-  const config = configStore.current();
+  const config = configSnapshot ?? configStore.current();
   const allStyles = await runWithCanonicalSettingsAuthority(configStore, () =>
     getAllOutputStyles(cwd, pluginStorageRoot, config),
   );
@@ -995,6 +996,7 @@ export async function assembleBaseInstructionsForModel(params: {
   readonly promptIdentity?: { readonly provider: string; readonly model: string };
   readonly permissionContext: ToolPermissionContext | null;
   readonly profile: SystemPromptProfile;
+  readonly configSnapshot?: ReturnType<ConfigStore["current"]>;
 }): Promise<string> {
   const enabledToolNames = new Set(
     params.registry.tools.map((tool) => tool.name),
@@ -1019,6 +1021,7 @@ export async function assembleBaseInstructionsForModel(params: {
     outputStyle: await resolveOutputStyleFromSession(
       params.session,
       params.ctx.cwd,
+      params.configSnapshot,
     ),
   });
   return snapshot.text;
