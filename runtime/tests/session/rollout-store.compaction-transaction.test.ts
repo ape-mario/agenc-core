@@ -1894,6 +1894,24 @@ describe("RolloutStore transactional compaction", () => {
     }
   });
 
+  it("allows immediate rollback after a bound retention extension and rejected repeat", () => {
+    const cwd = createTestWorkspace();
+    temporaryWorkspaces.push(cwd);
+    const store = openStore("retention-immediate-rollback", {}, cwd);
+    try {
+      const transaction = commitSmallCompaction(store, "retention-immediate-attempt");
+      const attemptId = transaction.intent.attempt_id;
+      store.markProjectionComplete(attemptId);
+      store.markCleanupComplete(attemptId);
+      const until = transaction.committedAtMs + COMPACTION_ROLLBACK_RETENTION_MS + 60_000;
+      store.extendCompactionRollbackRetention(attemptId, until);
+      expect(() => store.extendCompactionRollbackRetention(attemptId, until)).toThrow(/strictly increase/);
+      expect(store.rollbackCompaction({ attemptId, nowMs: transaction.committedAtMs + 1 }).rollback_mode).toBe("same_session");
+    } finally {
+      store.close();
+    }
+  });
+
   it("rebuilds a rollback extension from canonical after SQLite loss", () => {
     const cwd = createTestWorkspace();
     temporaryWorkspaces.push(cwd);
