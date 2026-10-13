@@ -222,7 +222,10 @@ function linuxSandboxStatus(
   },
 ): RuntimePlatformSandboxStatus {
   const candidate = stringValue(turn.agencLinuxSandboxExe) ??
-    stringValue(turn.config?.agencLinuxSandboxExe);
+    stringValue(turn.config?.agencLinuxSandboxExe) ??
+    // A session started in bypass has no helper in its startup snapshot.
+    // After a mode change, the live broker owns the restored sandbox.
+    context.invocation.session?.services?.sandboxExecutionBroker?.status().helperPath;
   if (candidate === undefined) {
     return {
       available: false,

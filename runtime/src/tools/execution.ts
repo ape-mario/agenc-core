@@ -1336,6 +1336,7 @@ export async function runToolUse(
     const message = `invalid JSON arguments for tool ${toolNameDisplay(invocation.toolName)}`;
     if (opts.eventLog) {
       emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
         cause: "invalid_args",
         message,
       });
@@ -1363,6 +1364,7 @@ export async function runToolUse(
   if (initialPreflight !== null) {
     if (opts.eventLog) {
       emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
         cause: "schema_validation_failed",
         message: initialPreflight.content,
       });
@@ -1447,6 +1449,7 @@ export async function runToolUse(
       });
       if (opts.eventLog) {
         emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
           cause: "pre_hook_denied",
           message,
         });
@@ -1541,6 +1544,7 @@ export async function runToolUse(
         }
         if (opts.eventLog) {
           emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
             cause:
               permissionDecision.source === "pre-tool-use-hook"
                 ? "permission_denied:hook"
@@ -1567,6 +1571,7 @@ export async function runToolUse(
           });
           if (opts.eventLog) {
             emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
               cause:
                 permissionDecision.source === "pre-tool-use-hook"
                   ? "permission_denied:hook_ask_without_prompt"
@@ -1616,6 +1621,7 @@ export async function runToolUse(
         const message = err instanceof Error ? err.message : String(err);
         if (opts.eventLog) {
           emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
             cause: "aborted",
             message,
           });
@@ -1629,6 +1635,7 @@ export async function runToolUse(
       const message = err instanceof Error ? err.message : String(err);
       if (opts.eventLog) {
         emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
           cause: "permission_evaluator_threw",
           message,
         });
@@ -1706,6 +1713,7 @@ export async function runToolUse(
           : "Permission denied");
       if (opts.eventLog) {
         emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
           cause: `permission_denied:${approval.source}`,
           message,
         });
@@ -1749,7 +1757,7 @@ export async function runToolUse(
         if (cause === "stale_modal_decision") {
           emitWarningEvent(opts.eventLog, subId, cause, message);
         } else {
-          emitErrorEvent(opts.eventLog, subId, { cause, message });
+          emitErrorEvent(opts.eventLog, subId, { callId: invocation.callId, cause, message });
         }
       }
       return errorOutput({
@@ -1804,6 +1812,7 @@ export async function runToolUse(
         );
       } else {
         emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
           cause: `transaction_guard:${decision.code ?? decision.verdict}`,
           message,
         });
@@ -2030,22 +2039,26 @@ export async function runToolUse(
         cls === "shell_interrupted"
       ) {
         emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
           cause: cls === "timeout" ? "tool_timeout" : "aborted",
           message,
           streamError: cls === "timeout",
         });
       } else if (cls === "mcp_auth") {
         emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
           cause: "mcp_auth_required",
           message,
         });
       } else if (cls === "mcp_tool_call") {
         emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
           cause: "mcp_tool_call_failed",
           message,
         });
       } else {
         emitErrorEvent(opts.eventLog, subId, {
+          callId: invocation.callId,
           cause: `tool_threw:${cls}`,
           message,
         });

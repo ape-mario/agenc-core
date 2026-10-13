@@ -883,6 +883,7 @@ export class ToolRouter {
         callId: toolCall.id,
       });
       emitErrorEvent(opts.session.eventLog, toolCall.id, {
+            callId: toolCall.id,
         cause: "ledger_turn_non_read_only_tool_denied",
         message,
       });
@@ -1004,6 +1005,7 @@ export class ToolRouter {
           callId: toolCall.id,
         });
         emitErrorEvent(opts.session.eventLog, toolCall.id, {
+            callId: toolCall.id,
           cause: "pre_hook_denied",
           message,
         });
@@ -1076,6 +1078,7 @@ export class ToolRouter {
             );
           }
           emitErrorEvent(opts.session.eventLog, toolCall.id, {
+            callId: toolCall.id,
             cause:
               guardianPermissionDecision.source === "pre-tool-use-hook"
                 ? "permission_denied:hook"
@@ -1820,6 +1823,7 @@ function preflightToolCall(
   });
   if (result !== null) {
     emitErrorEvent(invocation.session.eventLog, invocation.callId, {
+      callId: invocation.callId,
       cause: "schema_validation_failed",
       message: result.content,
     });
