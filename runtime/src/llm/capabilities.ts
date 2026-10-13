@@ -10,6 +10,7 @@ import { supportsGrokServerSideTools } from "./provider-native-search.js";
 import { normalizeProviderIdentity } from "../provider-identity.js";
 import { ollamaCloudModel } from "./registry/ollama-cloud-models.js";
 import { isOpenAiReasoningFamilyModel } from "./registry/openai-reasoning-models.js";
+import { isRegisteredMetaChatModel } from "./registry/meta-models.js";
 
 export interface ProviderModelCapabilities {
   readonly provider: string;
@@ -247,12 +248,6 @@ function isGeminiThinkingModel(model: string): boolean {
   return matchesModelFamily(model, /(?:^|[/:])gemini-2\.5(?:$|[-_.:])/);
 }
 
-function isMetaMuseSparkModel(model: string): boolean {
-  return matchesModelFamily(
-    model,
-    /(?:^|[/:])muse-spark-(?:1\.3(?:-contributor)?|1\.2(?:-contributor)?|1\.1)$/,
-  );
-}
 
 function isCerebrasReasoningModel(model: string): boolean {
   return matchesModelFamily(
@@ -469,11 +464,11 @@ const PROVIDER_CAPABILITIES: Readonly<Record<string, ProviderCapabilityDefinitio
   },
   meta: {
     ...HOSTED_CHAT_COMPATIBLE_CAPABILITIES,
-    supportsImageInput: isMetaMuseSparkModel,
-    supportsStructuredOutput: isMetaMuseSparkModel,
-    supportsStructuredOutputWithTools: isMetaMuseSparkModel,
-    acceptsImageHistory: isMetaMuseSparkModel,
-    acceptsReasoningEffort: isMetaMuseSparkModel,
+    supportsImageInput: isRegisteredMetaChatModel,
+    supportsStructuredOutput: isRegisteredMetaChatModel,
+    supportsStructuredOutputWithTools: isRegisteredMetaChatModel,
+    acceptsImageHistory: isRegisteredMetaChatModel,
+    acceptsReasoningEffort: isRegisteredMetaChatModel,
   },
   "ollama-cloud": {
     ...HOSTED_CHAT_COMPATIBLE_CAPABILITIES,

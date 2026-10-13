@@ -58,7 +58,7 @@ Credential values are not written into the canonical config snapshot.
 | OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `AGENC_OPENROUTER_HTTP_REFERER`, `AGENC_OPENROUTER_TITLE` |
 | Groq | `GROQ_API_KEY`, `GROQ_BASE_URL` |
 | DeepSeek | `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`; `AGENC_SHARED_PREFIX_TAIL` (shared cached prefix, below) |
-| Meta | `MODEL_API_KEY`, `META_BASE_URL` |
+| Meta | `MODEL_API_KEY`, `META_BASE_URL` (Muse Code's `META_API_KEY` is not read) |
 | QwenCloud Pay-As-You-Go | `DASHSCOPE_API_KEY`, then `QWEN_API_KEY`; `DASHSCOPE_BASE_URL`, then `QWEN_BASE_URL` |
 | QwenCloud Token Plan | `QWEN_TOKEN_PLAN_API_KEY`, then `DASHSCOPE_TOKEN_PLAN_API_KEY`; `QWEN_TOKEN_PLAN_BASE_URL`, then `DASHSCOPE_TOKEN_PLAN_BASE_URL` |
 | Cerebras | `CEREBRAS_API_KEY`, `CEREBRAS_BASE_URL` |
@@ -126,7 +126,9 @@ reasoning item a response returns stays with the assistant message it
 preceded. Later requests to the same provider and model replay it right before
 that message's function calls, or before its text when it called none. A model
 or provider switch drops it. Requests with `store: true` and other providers
-on the Responses wire are unchanged. Non-reasoning models and calls with
+on the Responses wire are unchanged, except Meta's Muse Wonder, which always
+replays its encrypted reasoning and ignores this switch (see
+[providers.md](providers.md)). Non-reasoning models and calls with
 reasoning effort `none` do not enable replay. Models that default to no reasoning
 enable it only when a reasoning effort is selected. ChatGPT still requests
 encrypted content for its stateless backend contract when replay is disabled;

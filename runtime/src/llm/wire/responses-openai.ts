@@ -74,6 +74,54 @@ export interface OpenAIResponsesRequestOptions {
    * invents one.
    */
   readonly functionCallItemId?: (callId: string) => string | undefined;
+  /**
+   * `auto_only`: the destination accepts no tool choice but `auto` (Meta
+   * Model API). `required` and named choices go out as `auto`, and `none`
+   * goes out as a request without tools.
+   */
+  readonly toolChoicePolicy?: "auto_only";
+  /**
+   * Tag the text of an assistant turn that also called tools with
+   * `phase: "commentary"`. Meta's Responses guide requires the tag on
+   * intermediate text replayed before a function call and says a dropped
+   * phase can degrade quality.
+   */
+  readonly assistantCommentaryPhase?: boolean;
+  /** Reasoning effort values the destination accepts; others are omitted. */
+  readonly reasoningEffortAllowedValues?: ReadonlySet<string>;
+}
+
+/**
+ * Whether a `tool_choice: "none"` request goes out without its tools, which
+ * is how an `auto_only` destination is asked not to call one.
+ */
+function omitsToolsForChoice(request: OpenAIResponsesRequestOptions): boolean {
+  return request.toolChoicePolicy === "auto_only" &&
+    request.options?.toolChoice === "none";
+}
+
+/**
+ * The canonical tool names a request advertised. Returned calls decode only
+ * against these, so a call to a tool the request left out does not resolve.
+ */
+export function advertisedResponsesToolNames(
+  request: OpenAIResponsesRequestOptions,
+): string[] {
+  return omitsToolsForChoice(request)
+    ? []
+    : request.tools.map((tool) => tool.function.name);
+}
+
+/** The requested effort when the destination accepts it. */
+function acceptedReasoningEffort(
+  request: OpenAIResponsesRequestOptions,
+): LLMChatOptions["reasoningEffort"] {
+  const effort = request.options?.reasoningEffort;
+  return effort !== undefined &&
+    request.reasoningEffortAllowedValues !== undefined &&
+    !request.reasoningEffortAllowedValues.has(effort)
+    ? undefined
+    : effort;
 }
 
 // A type alias rather than an interface so an item is a plain wire record.
@@ -424,6 +472,9 @@ export function buildOpenAIResponsesRequest(
         responseInput.push({
           type: "message",
           role: "assistant",
+          ...(input.assistantCommentaryPhase === true && toolCalls.length > 0
+            ? { phase: "commentary" }
+            : {}),
           content,
         });
       }
@@ -496,16 +547,19 @@ export function buildOpenAIResponsesRequest(
   if (instructions.length > 0) {
     body.instructions = instructions;
   }
-  const tools = toOpenAIResponsesTools(input.tools);
+  const omitTools = omitsToolsForChoice(input);
+  const tools = toOpenAIResponsesTools(omitTools ? [] : input.tools);
   if (tools.length > 0) body.tools = tools;
-  if (input.options?.toolChoice !== undefined) {
+  if (input.options?.toolChoice !== undefined && !omitTools) {
     // Responses uses a flat named choice; Chat Completions nests function.name.
     // https://developers.openai.com/api/docs/guides/function-calling#tool-choice
     const choice = input.options.toolChoice;
-    body.tool_choice = typeof choice === "string" ? choice : {
-      type: "function",
-      name: encodeMcpToolNameForWire(choice.name),
-    };
+    body.tool_choice = input.toolChoicePolicy === "auto_only"
+      ? "auto"
+      : typeof choice === "string" ? choice : {
+        type: "function",
+        name: encodeMcpToolNameForWire(choice.name),
+      };
   }
   if (input.options?.parallelToolCalls !== undefined) {
     body.parallel_tool_calls = input.options.parallelToolCalls;
@@ -535,12 +589,13 @@ export function buildOpenAIResponsesRequest(
   ) {
     body.include = ["reasoning.encrypted_content"];
   }
-  if (input.options?.reasoningEffort !== undefined) {
+  const reasoningEffort = acceptedReasoningEffort(input);
+  if (reasoningEffort !== undefined) {
     body.reasoning = {
       ...(body.reasoning && typeof body.reasoning === "object"
         ? (body.reasoning as Record<string, unknown>)
         : {}),
-      effort: input.options.reasoningEffort,
+      effort: reasoningEffort,
     };
   }
   // Reasoning replay should retain the provider's summary as well as
@@ -549,8 +604,8 @@ export function buildOpenAIResponsesRequest(
   // An omitted effort can still run reasoning at the model's default tier.
   // Explicit summary choices and non-reasoning requests stay authoritative.
   const useReplaySummaryDefault = replayProvider !== undefined &&
-    input.options?.reasoningEffort !== "none" &&
-    (input.options?.reasoningEffort !== undefined ||
+    reasoningEffort !== "none" &&
+    (reasoningEffort !== undefined ||
       !openAiModelDefaultsToNoReasoning(input.model)) &&
     (input.options?.reasoningSummary === undefined ||
       input.options.reasoningSummaryIsDefault === true);
@@ -638,7 +693,7 @@ export function parseOpenAIResponsesResponse(
   const incompleteToolCalls = initialFinishReason === "length"
     ? functionCalls.flatMap((item, index) => {
       const name = decodeMcpToolNameFromWire(String(item.name ?? "").trim(),
-        request.tools.map((tool) => tool.function.name));
+        advertisedResponsesToolNames(request));
       if (!name || name.length > 256) return [];
       const id = String(item.call_id ?? item.id ?? "").trim() || `incomplete-${index}`;
       return [{ id, name }];
@@ -648,7 +703,7 @@ export function parseOpenAIResponsesResponse(
       id: String(item.call_id ?? item.id ?? ""),
       // Decode the strict-regex wire name before dispatch.
       name: decodeMcpToolNameFromWire(String(item.name ?? ""),
-        request.tools.map((tool) => tool.function.name)),
+        advertisedResponsesToolNames(request)),
       arguments: String(item.arguments ?? "{}"),
     })),
     "OpenAI Responses response emitted invalid function_call",

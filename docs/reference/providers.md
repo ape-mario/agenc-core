@@ -160,7 +160,7 @@ they run only through the Grok Build CLI ACP path. See
 | `openrouter` | OpenRouter | `x-ai/grok-4.5` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `OPENROUTER_BASE_URL` | `api-key` |
 | `groq` | Groq | `openai/gpt-oss-120b` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` | `GROQ_BASE_URL` | `api-key` |
 | `deepseek` | DeepSeek | `deepseek-v4-flash` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` | `DEEPSEEK_BASE_URL` | `api-key` |
-| `meta` | Meta | `muse-spark-1.3` | `https://api.meta.ai/v1` | `MODEL_API_KEY` | `META_BASE_URL` | `api-key` |
+| `meta` | Meta | `muse-wonder-1.0` | `https://api.meta.ai/v1` | `MODEL_API_KEY` | `META_BASE_URL` | `api-key` |
 | `qwen` | QwenCloud Pay-As-You-Go | `qwen3.8-max` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | `DASHSCOPE_API_KEY`, `QWEN_API_KEY` | `DASHSCOPE_BASE_URL`, `QWEN_BASE_URL` | `api-key` |
 | `qwen-token-plan` | QwenCloud Token Plan | `qwen3.8-max` | `https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1` | `QWEN_TOKEN_PLAN_API_KEY`, `DASHSCOPE_TOKEN_PLAN_API_KEY` | `QWEN_TOKEN_PLAN_BASE_URL`, `DASHSCOPE_TOKEN_PLAN_BASE_URL` | `api-key` |
 | `ollama-cloud` | Ollama Cloud | `deepseek-v4.1-flash` | `https://ollama.com/v1` | `OLLAMA_API_KEY` | None (fixed Cloud endpoint) | `api-key` |
@@ -274,8 +274,12 @@ consumed by this direct SigV4 provider. Bedrock model discovery and token
 counting receive the same captured credentials explicitly; they do not invoke
 the AWS SDK profile, shared-file, instance-metadata, or web-identity chains.
 
-Meta Model API uses `MODEL_API_KEY` and the OpenAI-compatible
-`/chat/completions` transport. Its LLM catalog includes `muse-spark-1.3`,
+Meta Model API uses `MODEL_API_KEY`, the key variable Meta documents for the
+Model API, sent as a bearer token. Meta's own Muse Code CLI reads
+`META_API_KEY` instead; AgenC does not read that variable. Muse Spark models use
+the OpenAI-compatible `/chat/completions` transport and Muse Wonder uses
+`/responses` (below). The default model is `muse-wonder-1.0`. The LLM
+catalog includes `muse-wonder-1.0`, `muse-spark-1.3`,
 `muse-spark-1.3-contributor`, `muse-spark-1.2`,
 `muse-spark-1.2-contributor`, and `muse-spark-1.1`. The `/models` entries
 `muse-image-1.0` and `muse-voice-transcribe-1.0` are media APIs, so they remain
@@ -297,9 +301,44 @@ request. Streams must include a terminal `finish_reason`; malformed or cut
 streams fail instead of being accepted as completed answers, and tool calls
 require `finish_reason: "tool_calls"` before dispatch. This follows Meta's
 [Chat Completions contract](https://dev.meta.ai/docs/protocols/chat-completions).
-Exact per-token pricing is not published in the authoritative
-provider documentation, so AgenC reports the cost as unknown instead of
-treating its conservative fallback estimate as authoritative.
+Per-token prices for every registered Muse model come from Meta's
+[pricing page](https://dev.meta.ai/docs/pricing-rate-limits).
+
+Muse Wonder (`muse-wonder-1.0`) uses Meta's Responses API. It is the only Meta
+surface that carries the model's reasoning from one turn to the next; Chat
+Completions redacts reasoning for external keys
+([protocols](https://dev.meta.ai/docs/protocols),
+[reasoning](https://dev.meta.ai/docs/reasoning)). Requests are stateless
+(`store: false`) and ask for `reasoning.encrypted_content`. Each encrypted
+reasoning item stays with the assistant message it preceded and goes back on
+later requests to the same provider and model, in the same position as OpenAI
+replay. A model or provider switch drops it. Meta replay is always on for Muse
+Wonder, because the model cannot run without reasoning;
+`AGENC_OPENAI_REASONING_REPLAY` does not apply to it. Assistant text from a turn
+that also called tools goes back with `phase: "commentary"`, as Meta's
+[Responses guide](https://dev.meta.ai/docs/protocols/responses) requires for
+intermediate text before a function call.
+
+Muse Wonder takes `reasoning.effort` values `minimal`, `low`, `medium`, `high`,
+`xhigh`, and `max`. Its catalog default is `high`, which model pickers such as
+Desktop start at; a session that sets no effort uses the global
+`reasoning_effort` default (`medium`). Meta rejects `none`, so AgenC omits it
+and the model reasons at its own default level. An unset reasoning summary requests
+`auto`. Tool choice follows the same `auto`-only rule as Muse Spark, and
+structured output uses `text.format`. The model is registered with a
+1,048,576-token context window. Meta does not publish a separate output limit
+for Muse Wonder, so AgenC keeps the 131,072-token limit Meta documents for
+Muse Spark on the same endpoints. Usage reports cached input tokens and
+reasoning tokens. A stream that ends with an `error` event or `response.failed`
+carrying `server_shutting_down`, `service_overloaded`, `backend_unavailable`,
+or `server_error` is retried like a server error; a 402 billing error is
+terminal ([error handling](https://dev.meta.ai/docs/error-handling)).
+
+Muse Wonder Full is not on the Model API. Meta offers it only inside its Muse
+Code CLI on the Power Usage and Maximum Usage subscription plans, and that
+subscription credential works only in Muse Code, so AgenC does not register it
+([models](https://dev.meta.ai/docs/models),
+[subscriptions](https://dev.meta.ai/docs/muse-code/subscriptions)).
 
 MiniMax keeps AgenC's 131,072-token output reservation while its [API reference](https://platform.minimax.io/docs/api-reference/text-chat-openai)
 sets exact upper limits of 524,288 for M3 and 204,800 for every listed M2 variant.
@@ -818,7 +857,7 @@ rejects or silently ignores. An undefined `acceptsX` flag still means
 
 | Field | Who gets it |
 | --- | --- |
-| `reasoning_effort` | OpenAI reasoning-family slugs (`gpt-5`, `o1`, `o3`, `o4`, `codex`, `chatgpt-5`). Grok 4.3 / 4.5 / 4.6, `grok-4-20-multi-agent` / `grok-4.20-multi-agent`, and `grok-build-latest`. Meta Muse Spark models for `minimal`, `low`, `medium`, `high`, and `xhigh` only. Z.AI GLM-5.3 models and native Kimi K3 for `low`, `high`, and `max` only. Cerebras `gpt-oss-120b` for `low`, `medium`, `high`; Cerebras `qwen-3.8-27b` and `gemma-4-31b` for `none`, `low`, `medium`, `high`. NVIDIA NIM families below, and only values in that family's enum. Everyone else: stripped. `/effort` on a local model is a no-op on the wire. |
+| `reasoning_effort` | OpenAI reasoning-family slugs (`gpt-5`, `o1`, `o3`, `o4`, `codex`, `chatgpt-5`). Grok 4.3 / 4.5 / 4.6, `grok-4-20-multi-agent` / `grok-4.20-multi-agent`, and `grok-build-latest`. Meta Muse Spark models for `minimal`, `low`, `medium`, `high`, and `xhigh`, plus `max` on standard-tier `muse-spark-1.3` (Muse Wonder uses the Responses wire). Z.AI GLM-5.3 models and native Kimi K3 for `low`, `high`, and `max` only. Cerebras `gpt-oss-120b` for `low`, `medium`, `high`; Cerebras `qwen-3.8-27b` and `gemma-4-31b` for `none`, `low`, `medium`, `high`. NVIDIA NIM families below, and only values in that family's enum. Everyone else: stripped. `/effort` on a local model is a no-op on the wire. |
 | `tool_choice` | Meta and Z.AI accept only `auto`. `required` and named choices are normalized to `auto`; `none` omits both the tools and choice fields. Native Kimi K3 additionally accepts `required`; Kimi K2.7/K2.6 normalize it to `auto`, and all native Kimi models normalize named choices because they are incompatible with thinking. Requests above the Z.AI or Kimi 128-function limit fail locally rather than dropping tools. Cerebras omits tool-choice/parallel controls whenever no tool definitions are attached, as required by API v2. Other compatible providers keep the requested value. |
 | `stop` | Meta rejects stop sequences, so its adapter strips them. Z.AI receives only the first sequence from a caller list. Other compatible providers keep caller-supplied sequences. |
 | `service_tier` | `openai` and `azure-openai`; explicit Cerebras pass-through remains for configured dedicated endpoints, while its shared catalog advertises no selectable tier |

@@ -426,7 +426,7 @@ export const BUILT_IN_PROVIDER_DEFINITIONS = Object.freeze({
   }),
   meta: providerDefinition({
     name: "Meta",
-    defaultModel: "muse-spark-1.3",
+    defaultModel: "muse-wonder-1.0",
     baseURL: "https://api.meta.ai/v1",
     credentials: apiKeyCredentials(["MODEL_API_KEY"]),
     baseURLEnvVars: ["META_BASE_URL"],
