@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { useEffect, useMemo, useReducer } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
+import { getInkInstance } from "./ink/instances.js";
 
 import type { LLMMessage, StreamingToolUse } from "../llm/types.js";
 import {
@@ -3599,6 +3600,21 @@ export function useSessionTranscript(
     sessionCostUsd: 0,
     sessionUsage: null,
   });
+
+  // A wholesale replacement can shrink a tall, scrolled transcript to a
+  // summary. Repaint the committed scene instead of trusting cached terminal
+  // cells from the old history. Ordinary streaming updates keep their fast path.
+  const head = state.events[0];
+  const replacementKey = head !== undefined && isTranscriptResetEvent(head)
+    ? eventKey(head) : null;
+  const previousReplacementKey = useRef<string | null>(null);
+  const hadTranscriptEvents = useRef(false);
+  useLayoutEffect(() => {
+    if (replacementKey !== null && replacementKey !== previousReplacementKey.current &&
+        hadTranscriptEvents.current) getInkInstance()?.forceRedraw();
+    previousReplacementKey.current = replacementKey;
+    hadTranscriptEvents.current = state.events.length > 0;
+  }, [replacementKey, state.events]);
 
   useEffect(() => {
     dispatch({ kind: "reset", events: initialEvents(session) });
