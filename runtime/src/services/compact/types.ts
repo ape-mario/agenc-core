@@ -87,12 +87,28 @@ export type CompactContext = {
 };
 
 export type CompactProgressEvent =
+  | CompactionProgressEvent
   | {
       readonly type: "hooks_start";
       readonly hookType: "pre_compact" | "post_compact" | "session_start";
     }
   | { readonly type: "compact_start" }
   | { readonly type: "compact_end" };
+
+/** Observable operation progress only. It cannot authorize or replace history. */
+export interface CompactionProgressEvent {
+  readonly type: "compact_progress";
+  readonly attemptId: string;
+  readonly phase: "prepare" | "summary" | "validate" | "commit" | "complete" | "failed" | "refused";
+  readonly percent: number;
+  readonly startedAtMs: number;
+  readonly beforeTokens: number;
+  readonly afterTokens?: number;
+  readonly summaryTokensReceived?: number;
+  readonly targetSummaryTokens?: number;
+  readonly summaryTokensEstimated?: boolean;
+  readonly reason?: string;
+}
 
 export type CompactCleanupDeps = {
   readonly clearReadFileState?: () => void;

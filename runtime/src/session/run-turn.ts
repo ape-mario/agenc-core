@@ -2,7 +2,8 @@ import { assistantMessageFromResponse, parseToolUseBlocks, admittedModelStepId }
 import { cumulativeUsage } from "./cumulative-usage.js";
 import { runMinimalTurn } from "./minimal-turn.js";
 import { oneShotFastModeActive, bypassFastModeEnabled, withOneShotFastMode } from "../one-shot-fast-mode.js";
-import { usesLocalToolProfile } from "../llm/wire/capability-gating.js";
+import { recordPreparedContextPressure } from "./prepared-context-pressure.js";
+import { getEffectiveContextWindowSize } from "../services/compact/thresholds.js";
 import { resolveMainLoopReasoningEffort } from "./session-reasoning-effort.js";
 import { admitReasoningCapSample, clearReasoningCapPolicyForTransition } from "./reasoning-cap-policy.js";
 /**
@@ -1424,7 +1425,7 @@ class DeferredCompactionError extends Error {}
 
 interface PreparedRequestContextPressure {
   readonly fits: boolean;
-  readonly fallbackProactiveTokens?: number;
+  readonly inputTokens: number;
 }
 
 async function preparedRequestContextPressure(
@@ -1436,7 +1437,7 @@ async function preparedRequestContextPressure(
 ): Promise<PreparedRequestContextPressure> {
   const configuredWindow = request.contextWindowTokens;
   if (configuredWindow === undefined || !Number.isFinite(configuredWindow) || configuredWindow <= 0) {
-    return { fits: false };
+    return { fits: false, inputTokens: Number.POSITIVE_INFINITY };
   }
   const window = Math.floor(configuredWindow);
   const provider = session.services.provider;
@@ -1489,6 +1490,18 @@ async function preparedRequestContextPressure(
       : {}),
     signal,
   });
+  const compactionWindow = getEffectiveContextWindowSize({ options: {
+    mainLoopModel: ctx.modelInfo.slug, contextWindowTokens: window,
+  } });
+  recordPreparedContextPressure(session, {
+    provider: providerName, model,
+    inputTokens: accounting.inputTokens,
+    effectiveWindowTokens: compactionWindow,
+    autoCompactThresholdTokens: getPreSamplingAutoCompactTokenLimit(ctx) ?? compactionWindow,
+    reservedOutputTokens: accounting.reservedOutputTokens,
+    source: accounting.source,
+    measuredAtMs: Date.now(),
+  });
   // Admission may lower the output ceiling while retaining every input token.
   // Checking the nominal ceiling here would force compaction on requests the
   // actual provider boundary can safely admit, notably small Ollama windows.
@@ -1497,13 +1510,7 @@ async function preparedRequestContextPressure(
       accounting, window, maxOutputTokens,
       profile?.contextSafetyBufferTokens ?? 0,
     ) !== undefined,
-    ...(accounting.source === "conservative_fallback" && accounting.admissible
-      ? {
-          fallbackProactiveTokens: usesLocalToolProfile(ctx.modelProviderId)
-            ? accounting.inputTokens
-            : accounting.totalTokens,
-        }
-      : {}),
+    inputTokens: accounting.admissible ? accounting.inputTokens : Number.POSITIVE_INFINITY,
   };
 }
 
@@ -3247,6 +3254,9 @@ async function* runTurnKernelInner(
           const requestPressure = () => pressure ??= preparedRequestContextPressure(
             request, session, ctx, signal, requestedModel,
           );
+          // Every physical model dispatch measures the assembled request,
+          // including the first sample, native counts, images and fresh tools.
+          const measuredPressure = await requestPressure();
           const requestFits = async () => (await requestPressure()).fits;
           if (!deferredCompaction && proactiveDispatchCompactionAttempted) {
             // A successful shrink may fall below the proactive threshold
@@ -3263,18 +3273,16 @@ async function* runTurnKernelInner(
            * before that gate runs again. On a provider without a native
            * tokenizer the conservative-fallback estimate is already the
            * number admission will refuse on, so compact from it while the
-           * request is still unsent (#2520). Pre-turn compaction covers the
-           * first sample; this only guards later dispatches.
+           * request is still unsent (#2520). Check the first sample and every
+           * later physical dispatch, including provider-native token counts.
            */
           const preparedOverThreshold =
             !deferredCompaction &&
-            state.turnCount > 1 &&
             autoCompactLimit !== undefined &&
             // Admission learns conservative fallback calibration from prior
             // provider usage. Keep that scoped factor on the proactive path
             // too; the synchronous estimate omits it.
-            ((await requestPressure()).fallbackProactiveTokens ??
-              getActiveContextTokenUsage(session, ctx, state)) >= autoCompactLimit;
+            measuredPressure.inputTokens >= autoCompactLimit;
           if (!deferredCompaction && preparedOverThreshold) {
             proactiveDispatchCompactionAttempted = true;
             persistNewResponseItems();

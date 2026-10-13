@@ -45,6 +45,8 @@ import {
   compactionWallTimeExceeded,
 } from "./transaction-limits.js";
 import { getCompactionSystemPrompt } from "./prompt.js";
+import { estimateMessagesTokens } from "./_deps/runtime.js";
+import { createCompactionProgress, type CompactionProgressReporter } from "./progress.js";
 import {
   canonicalizeJson,
   createCompactionSummaryV1,
@@ -113,7 +115,6 @@ import { durableRedactionDropsProviderReplay } from "../../session/message-histo
 import type { ProviderReasoningReplay } from "../../llm/types.js";
 import { omitAlteredBinaryCarriers } from "../../llm/content-conversion.js";
 
-const COMPACTION_BOUNDARY_MESSAGE = "Conversation compacted transactionally";
 const COMPACTION_UNKNOWN_MODEL = "unknown";
 const COMPACTION_DETAIL_DIGEST_DOMAIN = "agenc.compaction-failure.v1\0";
 
@@ -190,11 +191,20 @@ export async function compactConversationTransactionally(
     );
   }
   const attemptId = `compact-${randomUUID()}`;
-  const lease = await acquireCompactionTransactionLease(adapter, attemptId);
+  const progress = createCompactionProgress(context, attemptId,
+    estimateMessagesTokens(options.completeSourceMessages, context, { inputOnly: true }));
+  let lease: CompactionTransactionLease;
+  try {
+    lease = await acquireCompactionTransactionLease(adapter, attemptId);
+  } catch (error) {
+    progress.fail(error);
+    throw error;
+  }
   let admissionScope: CompactionAdmissionScope;
   try {
     admissionScope = createCompactionAdmissionScope(context, attemptId);
   } catch (error) {
+    progress.fail(error);
     await lease.release();
     throw error;
   }
@@ -206,7 +216,11 @@ export async function compactConversationTransactionally(
       deadline,
       adapter,
       attemptId,
+      progress,
     );
+  } catch (error) {
+    progress.fail(error);
+    throw error;
   } finally {
     deadline.dispose();
     if (deadline.hasPendingWork()) {
@@ -268,6 +282,7 @@ async function compactConversationTransactionBody(
   deadline: CompactionDeadline,
   adapter: CompactionTransactionAdapter,
   attemptId: string,
+  progress: CompactionProgressReporter,
 ): Promise<CompactionResult> {
   deadline.assertActive();
   const provider = context.provider;
@@ -459,6 +474,7 @@ async function compactConversationTransactionBody(
     }
     intentCommitted = true;
     deadline.assertActive();
+    progress.send("summary", 10);
     const run = await deadline.wait(runSummaryTree({
       context,
       ...(options.summarizer !== undefined ? { summarizer: options.summarizer } : {}),
@@ -472,8 +488,10 @@ async function compactConversationTransactionBody(
       model,
       reasoningEffort,
       startedAt,
+      progress,
     }));
     deadline.assertActive();
+    progress.send("validate", 85);
     const compactionContext = renderCompactionContext(run.finalSummary.body);
     const rawSummaryMessage = options.createSummaryMessage(compactionContext);
     const historyMarkerBase = {
@@ -527,6 +545,8 @@ async function compactConversationTransactionBody(
     }));
     deadline.assertActive();
     const replacementHistory = replacementRuntime.map(toProjectionMessage);
+    progress.setBeforeTokens(shrink.source.inputTokens);
+    progress.send("commit", 95, { afterTokens: shrink.candidate.inputTokens });
     const committedAtMs = Date.now();
     const commitInput = {
       intent,
@@ -601,12 +621,15 @@ async function compactConversationTransactionBody(
       configuration_digest: configurationDigest,
       committed,
     };
+    progress.send("complete", 100, { afterTokens: shrink.candidate.inputTokens });
     return {
       ...candidateResult,
       preCompactTokenCount: shrink.source.inputTokens,
       postCompactTokenCount: shrink.candidate.inputTokens,
       truePostCompactTokenCount: shrink.candidate.inputTokens,
-      userDisplayMessage: buildCompactionDisplayMessage([
+      userDisplayMessage: buildCompactionDisplayMessage(
+        shrink.source.inputTokens, shrink.candidate.inputTokens,
+        (performance.now() - startedAt) / 1000, [
         ...hookDiagnostics,
         ...(shrink.observation.savings_policy === "manual_proportional" ? [
           `Resume this session with AgenC ${MANUAL_PROPORTIONAL_COMPACTION_READER_RUNTIME} or later; older versions cannot read this short compaction. Upgrade AgenC, then run agenc daemon restart.`,
@@ -837,9 +860,12 @@ function renderCompactionContext(body: CompactionSummaryBodyV1): string {
 }
 
 function buildCompactionDisplayMessage(
+  beforeTokens: number,
+  afterTokens: number,
+  elapsedSeconds: number,
   hookDiagnostics: readonly string[],
 ): string {
-  return [COMPACTION_BOUNDARY_MESSAGE, ...hookDiagnostics].join("\n");
+  return [`Compacted ${beforeTokens.toLocaleString("en-US")} to ${afterTokens.toLocaleString("en-US")} tokens in ${Math.round(elapsedSeconds)}s`, ...hookDiagnostics].join("\n");
 }
 
 async function runSummaryTree(params: {
@@ -855,6 +881,7 @@ async function runSummaryTree(params: {
   readonly model: string;
   readonly reasoningEffort: LLMChatOptions["reasoningEffort"];
   readonly startedAt: number;
+  readonly progress: CompactionProgressReporter;
 }): Promise<{
   readonly finalSummary: CompactionSummaryV1;
   readonly summaryDag: CompactionSummaryDagV1;
@@ -902,6 +929,7 @@ async function runSummaryTree(params: {
     }
     let response: { readonly content: string; readonly finishReason: string };
     let outputTokenUpperBound: number;
+    params.progress.summary(callCount - 1, params.plan.planned_provider_calls, 0, params.plan.output_reserve_tokens, true);
     if (params.summarizer !== undefined) {
       // Emergency ladder tier (#2497): the summary is produced locally and
       // nothing reaches a provider. The step still passes through execution
@@ -971,6 +999,8 @@ async function runSummaryTree(params: {
         contextWindowTokens: params.plan.context_window_tokens,
         outputReserveTokens: params.plan.output_reserve_tokens,
         remainingInputTokens: MAX_COMPACTION_TOTAL_INPUT_TOKENS - inputTokens,
+        onSummaryTokens: (received) => params.progress.summary(callCount - 1,
+          params.plan.planned_provider_calls, received, params.plan.output_reserve_tokens),
       });
       inputTokens = safeBudgetSum(
         inputTokens,
@@ -985,6 +1015,9 @@ async function runSummaryTree(params: {
       response = invocation.response;
       outputTokenUpperBound = invocation.outputTokenUpperBound;
     }
+    params.progress.summary(callCount - 1, params.plan.planned_provider_calls,
+      conservativeOutputTokenEstimate(response.content), params.plan.output_reserve_tokens, true);
+    params.progress.summary(callCount, params.plan.planned_provider_calls, 0, params.plan.output_reserve_tokens, true);
     if (response.finishReason !== "stop") {
       throw new CompactionTransactionError(
         "provider_non_stop",
@@ -1298,6 +1331,7 @@ async function invokeCompactionProvider(params: {
   readonly contextWindowTokens: number;
   readonly outputReserveTokens: number;
   readonly remainingInputTokens: number;
+  readonly onSummaryTokens: (received: number) => void;
 }) {
   const provider = params.context.provider!;
   const session = params.context.admissionSession!;
@@ -1353,7 +1387,14 @@ async function invokeCompactionProvider(params: {
     providerName: params.providerName,
     ...(signal !== undefined ? { signal } : {}),
     invoke: async (admittedOptions) => {
-      const candidate = await provider.chat([...params.messages], admittedOptions);
+      let summaryBytes = 0;
+      const candidate = await provider.chatStream([...params.messages], (chunk) => {
+        const bytes = Buffer.byteLength(chunk.content ?? "", "utf8");
+        summaryBytes = chunk.resetBuffer === true ? bytes : summaryBytes + bytes;
+        // Display-only conservative text-token estimate. The completed response
+        // still passes the original native/output accounting and every bound.
+        params.onSummaryTokens(Math.ceil(summaryBytes / 2));
+      }, admittedOptions);
       const outputAccounting = await countCompactionProviderOutput({
         context: params.context,
         providerName: params.providerName,

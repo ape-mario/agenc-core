@@ -3726,6 +3726,14 @@ export interface SessionSnapshotResult extends JsonObject {
     readonly windowTokens: number;
     /** Daemon-owned capacity after effective-model and compaction-window policy. */
     readonly effectiveWindowTokens?: number;
+    /** The prepared main request's input pressure, including image accounting. */
+    readonly compactionInputTokens?: number;
+    /** Same effective denominator used by the pre-request compaction gate. */
+    readonly compactionWindowTokens?: number;
+    /** Exact configured trigger in the same input-token accounting scale. */
+    readonly compactionThresholdTokens?: number;
+    /** Reported separately; never subtracted from the window denominator. */
+    readonly compactionReservedOutputTokens?: number;
     readonly messageTokens: number;
     readonly systemPromptTokens: number;
     /** Always-loaded built-in tool schemas. */
