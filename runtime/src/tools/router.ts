@@ -1,4 +1,5 @@
 import { stripModelSuppliedAgenCInternalArgs } from "./internal-args.js";
+import { modelToolAliasTarget, resolveModelToolAlias } from "./model-tool-aliases.js";
 /**
  * Tool router: spec registry, tool-call construction, and dispatch.
  *
@@ -833,6 +834,9 @@ export class ToolRouter {
     toolCall: LLMToolCall,
     opts: LiveToolDispatchOptions,
   ): Promise<ToolDispatchResult> {
+    const canonicalName = modelToolAliasTarget(toolCall.name) === undefined ? toolCall.name
+      : resolveModelToolAlias(toolCall.name, this.getSpecs().map(spec => spec.tool.name));
+    if (canonicalName !== toolCall.name) toolCall = { ...toolCall, name: canonicalName };
     const spec = this.findSpec(toolCall.name);
     if (spec === undefined) {
       return this.dispatchModelToolCallUnfenced(toolCall, opts);

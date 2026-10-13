@@ -8,7 +8,9 @@ import { stringWidth } from "./ink/stringWidth.js";
 import { stripUnderlineAnsi } from "./components/shell/OutputLine.js";
 import { selectAgenCTuiGlyphs } from "./glyphs.js";
 import { ResultLine } from "./components/v2/primitives.js";
-import { parseClampMarker, summarizeToolError } from "./tool-error-text.js";
+import { parseClampMarker, readableToolError, summarizeToolError } from "./tool-error-text.js";
+import { modelToolAliasTarget } from "../tools/model-tool-aliases.js";
+import { summarizeToolInput } from "./message-renderers/toolRowPreview.js";
 import { AskUserQuestionTool } from "../tools/ask-user-question/tui-tool.js";
 import { formatToolPathForDisplay } from "../tools/system/agent-path-hints.js";
 import { isRecord } from "../utils/record.js";
@@ -377,7 +379,7 @@ export function ToolErrorView({
   readonly content: string;
 }): React.ReactElement {
   // One red line under the failed step, like every other result: the reason
-  // without wrappers or machine prefixes. ctrl+o keeps the raw text.
+  // without wrappers or machine prefixes. The stored result stays intact.
   const message = extractToolTag(content, "tool-error") ?? content;
   return <ResultLine failed>{summarizeToolError(message)}</ResultLine>;
 }
@@ -587,16 +589,6 @@ function objectFromUnknown(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : { value };
 }
 
-function shortJson(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    const text = JSON.stringify(value);
-    if (text.length <= 140) return text;
-    return `${text.slice(0, 137)}...`;
-  } catch {
-    return String(value);
-  }
-}
 
 /**
  * Build a readable error message from a FAILED structured tool result — the
@@ -780,11 +772,12 @@ function isMcpToolName(name: string): boolean {
 }
 
 function mcpInputSummary(record: Record<string, unknown>): string {
-  const entries = Object.entries(record);
-  if (entries.length === 0) return "";
-  return entries
-    .map(([key, value]) => `${key}: ${shortJson(value)}`)
-    .join(", ");
+  return Object.entries(record).slice(0, 3).map(([key, value]) => {
+    const preview = Array.isArray(value) ? `${value.length} items`
+      : value !== null && typeof value === "object" ? "structured input"
+      : truncateInline(String(value));
+    return `${key}: ${preview}`;
+  }).join(", ");
 }
 
 function toolUseSummaryForInput(name: string, input: unknown): string {
@@ -853,7 +846,7 @@ function toolUseSummaryForInput(name: string, input: unknown): string {
       sanitized[key] = value;
     }
   }
-  const summary = shortJson(sanitized);
+  const summary = summarizeToolInput(sanitized);
   return summary.length > 0 ? summary : name;
 }
 
@@ -890,11 +883,12 @@ function activityDescriptionForTool(name: string, input: unknown): string {
 }
 
 export function createTuiTool(name: string): any {
+  const presentationName = modelToolAliasTarget(name) ?? name;
   if (name === "AskUserQuestion") {
     return AskUserQuestionTool;
   }
   const fileReadOverrides =
-    name === "FileRead"
+    presentationName === "FileRead"
       ? {
           getPath(input: unknown) {
             return filePathFromInput(input);
@@ -951,15 +945,15 @@ export function createTuiTool(name: string): any {
       return input;
     },
     userFacingName(input: unknown) {
-      return userFacingNameForInput(name, input);
+      return userFacingNameForInput(presentationName, input);
     },
     getActivityDescription(input: unknown) {
-      return activityDescriptionForTool(name, input);
+      return activityDescriptionForTool(presentationName, input);
     },
     renderToolUseMessage(input: unknown) {
       return name === "Skill"
         ? skillToolUseMessage(input)
-        : toolUseSummaryForInput(name, input);
+        : toolUseSummaryForInput(presentationName, input);
     },
     renderToolResultMessage(
       content: unknown,
@@ -974,7 +968,7 @@ export function createTuiTool(name: string): any {
       // can exercise the routing logic without dragging the upstream
       // component chain into vitest.
       const joined = resultTextForTuiTool(content);
-      const target = pickToolResultDispatch(name, joined);
+      const target = pickToolResultDispatch(presentationName, joined);
       switch (target) {
         case "suppress":
           // Edit/MultiEdit/Write SUCCESS: the result body ("…updated
@@ -1035,7 +1029,7 @@ export function createTuiTool(name: string): any {
             ? (error as { message: string }).message
             : Array.isArray(error)
               ? messageFromStructuredErrorBlocks(error)
-              : shortJson(error);
+              : readableToolError(error);
       const envelope = `<tool-error-name>${name}</tool-error-name>\n<tool-error>${message}</tool-error>`;
       return <ToolErrorView content={envelope} />;
     },

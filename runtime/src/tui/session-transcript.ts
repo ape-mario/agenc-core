@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { useEffect, useMemo, useReducer } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
+import { getInkInstance } from "./ink/instances.js";
 
 import type { LLMMessage, StreamingToolUse } from "../llm/types.js";
 import {
@@ -17,6 +18,7 @@ import type {
 import type { AgenCBridgeSession } from "./session-types.js";
 import { clampMarkerLine, looksLikeRawToolError, summarizeToolError } from "./tool-error-text.js";
 import { nonEmptyString } from "../utils/stringUtils.js";
+import { modelToolAliasTarget } from "../tools/model-tool-aliases.js";
 import { formatRealtimeItemSummary } from "./realtime/state.js";
 import {
   isPermissionDeniedToolResult,
@@ -845,7 +847,7 @@ function pushToolResult(
     // "without matching start" phrasing from the user-facing lead-in.
     out.push(
       makeSystemMessage(
-        `A tool result arrived out of order and was recovered: ${stringResult(rawResult)}`,
+        `A tool result arrived out of order and was recovered: ${isError ? summarizeToolError(stringResult(rawResult)) : stringResult(rawResult)}`,
         isError ? "error" : "warning",
         nextUuid(),
       ),
@@ -1435,6 +1437,7 @@ export function formatStructuredToolResult(
   eventType: string,
   payload: Record<string, unknown>,
 ): readonly { readonly type: "text"; readonly text: string }[] {
+  toolName = modelToolAliasTarget(toolName) ?? toolName;
   // Skill loads return the ENTIRE skill prompt as the tool result — 12k+
   // characters of instructions for the model, not conversation. Rendering it
   // verbatim buries the chat under the full skill text on every invocation
@@ -3597,6 +3600,21 @@ export function useSessionTranscript(
     sessionCostUsd: 0,
     sessionUsage: null,
   });
+
+  // A wholesale replacement can shrink a tall, scrolled transcript to a
+  // summary. Repaint the committed scene instead of trusting cached terminal
+  // cells from the old history. Ordinary streaming updates keep their fast path.
+  const head = state.events[0];
+  const replacementKey = head !== undefined && isTranscriptResetEvent(head)
+    ? eventKey(head) : null;
+  const previousReplacementKey = useRef<string | null>(null);
+  const hadTranscriptEvents = useRef(false);
+  useLayoutEffect(() => {
+    if (replacementKey !== null && replacementKey !== previousReplacementKey.current &&
+        hadTranscriptEvents.current) getInkInstance()?.forceRedraw();
+    previousReplacementKey.current = replacementKey;
+    hadTranscriptEvents.current = state.events.length > 0;
+  }, [replacementKey, state.events]);
 
   useEffect(() => {
     dispatch({ kind: "reset", events: initialEvents(session) });

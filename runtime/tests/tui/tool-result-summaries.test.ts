@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { clampGenericToolResult } from "../../src/tui/session-transcript.js";
-import { summarizeResultText } from "../../src/tui/tool-rendering.js";
+import { clampGenericToolResult, formatStructuredToolResult } from "../../src/tui/session-transcript.js";
+import { createTuiTool, summarizeResultText } from "../../src/tui/tool-rendering.js";
 import { pickToolResultDispatch } from "../../src/tui/tool-result-routing.js";
 import { summarizeToolError } from "../../src/tui/tool-error-text.js";
 
@@ -86,5 +86,26 @@ describe("summarizeToolError", () => {
         "first line\n… +12 more lines (ctrl+o for the full result)",
       ),
     ).toBe("first line");
+  });
+});
+
+describe("readable unknown tool rows", () => {
+  it("decodes nested error envelopes into a readable line", () => {
+    const raw = JSON.stringify({ tool_use_id: "unknown", is_error: true, content: "<tool_use_error>Error: No such tool available: UnknownMystery</tool_use_error>" });
+    expect(summarizeToolError(raw)).toBe("Error: No such tool available: UnknownMystery");
+    expect(summarizeToolError(JSON.stringify({ error: { message: "Missing file", code: "ENOENT" } }))).toBe("Missing file");
+    expect(summarizeToolError(JSON.stringify({ debug: { unsafe: "machine details" } }))).toBe("Tool execution failed");
+  });
+  it("summarizes unknown arguments without JSON braces or nested payloads", () => {
+    const tool = createTuiTool("UnknownMystery");
+    expect(tool.renderToolUseMessage({ path: "/ws/read.txt", payload: { debug: "machine details" } })).toBe("/ws/read.txt");
+    expect(tool.renderToolUseMessage({ count: 2, enabled: true, payload: { debug: "machine details" } })).toBe("count=2 enabled=true");
+  });
+});
+
+describe("Read alias result projection", () => {
+  it("preserves the actual read line count instead of counting a generic preview", () => {
+    const result = Array.from({ length: 230 }, (_, index) => `${490 + index}→SAFE_LINE_${490 + index}`).join("\n");
+    expect(formatStructuredToolResult("Read", "tool_call_completed", { result, metadata: { numLines: 230 }, isError: false })).toEqual([{ type: "text", text: "<read-lines>1-230</read-lines>" }]);
   });
 });
