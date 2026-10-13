@@ -1553,6 +1553,7 @@ function initialState(props: AgenCTuiProps, roleWorkspaceCwd: string): any {
   );
   return {
     ...defaults,
+    lightMode: props.session.services.runtimeOptions?.lightMode === true,
     mainLoopModel: startupModel(props),
     mainLoopModelForSession: startupModel(props),
     toolPermissionContext: initialPermissionContext(props),

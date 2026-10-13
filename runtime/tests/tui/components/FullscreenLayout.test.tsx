@@ -112,6 +112,12 @@ describe("FullscreenLayout modal viewport", () => {
     },
   );
 
+  test("marks Light next to the mode without changing other status facts", () => {
+    const regular = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort");
+    const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort", true);
+    expect(light).toEqual({ ...regular, mode: "default mode · Light" });
+  });
+
   test("shows each status fact once with plain mode labels", () => {
     expect(
       statusLineSegments(100, "~/project", "grok-4-fast", "bypassPermissions", "main", "$0.04"),
