@@ -132,6 +132,7 @@ async function runAgenCAutoCompact(params: {
     );
     const compactContext = {
       ...toolUseContext,
+      liveUserMessageId: state.liveUserMessageId,
       options: {
         ...toolUseContext.options,
         tools: request.tools,

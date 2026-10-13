@@ -2283,6 +2283,11 @@ async function* runTurnKernelInner(
       responseItemId: seedUserMessageId,
     };
   }
+  const liveSeedRequestId = seedUserMessageId ?? (opts.resume === undefined
+    ? `user-request-${crypto.randomUUID()}` : undefined);
+  if (liveSeedRequestId !== undefined) {
+    user.runtimeOnly = { ...user.runtimeOnly, responseItemId: liveSeedRequestId };
+  }
   let state: TurnState = buildInitialTurnState(ctx, user, {
     priorMessages: priorFull,
     modelInstructions,
@@ -2290,6 +2295,11 @@ async function* runTurnKernelInner(
       ? { initialSkipCacheWrite: opts.skipCacheWrite }
       : {}),
   });
+  state.liveUserMessageId = opts.resume !== undefined
+    ? priorFull.findLast((message) => message.role === "user" &&
+        message.runtimeOnly?.compactionHistory === undefined &&
+        message.runtimeOnly?.responseItemId !== undefined)?.runtimeOnly?.responseItemId
+    : liveSeedRequestId;
   // Phase 4c: restate an active goal at the top of every root human turn. The
   // goal is session state, not conversation, so a compacted history or a
   // fresh user prompt still starts from the objective verbatim (goal drift

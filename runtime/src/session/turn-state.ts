@@ -281,6 +281,9 @@ export interface TurnState {
    *  assistant message + tool results. */
   messages: LLMMessage[];
 
+  /** Actual caller request, distinct from synthetic output-recovery prompts. */
+  liveUserMessageId?: string;
+
   /** Post-compact/post-snip/post-microcompact projection of `messages`
    *  used for the actual model request. Rebuilt each iteration from
    *  `getMessagesAfterCompactBoundary(messages)` then mutated by

@@ -240,6 +240,9 @@ async function compactConversationImpl(
   const automatic = context.compactionMode !== "manual" &&
     context.options?.querySource !== "compact";
   const keepCount = options.keepCount ?? chooseKeepCount(summaryInputMessages);
+  const lastUserIndex = automatic
+    ? automaticCompactionLiveUserIndex(messages, context.liveUserMessageId)
+    : -1;
   // chooseKeepCount picks a positional split. resolveAtomicSliceIndex
   // walks that index forward past any leading `role: "tool"` message
   // so the kept suffix never starts with a tool_result whose parent
@@ -248,16 +251,12 @@ async function compactConversationImpl(
   // compatible endpoint 400s on an orphaned tool message).
   const candidateSplit = Math.max(0, summaryInputMessages.length - keepCount);
   const toolPairSafeSplitIndex = automatic
-    ? automaticCompactionSplit(messages, getEffectiveContextWindowSize(context), options.keepCount === 0)
+    ? automaticCompactionSplit(messages, getEffectiveContextWindowSize(context), options.keepCount === 0, context.liveUserMessageId)
     : resolveAtomicSliceIndex(summaryInputMessages, candidateSplit);
   const splitIndex = moveSplitBeforeAgentInvocation(
     summaryInputMessages,
     toolPairSafeSplitIndex,
   );
-  const lastUserIndex = automatic ? messages.findLastIndex((message) =>
-    (message.role ?? message.message?.role) === "user" &&
-    message.isMeta !== true && message.runtimeOnly?.compactionHistory === undefined,
-  ) : -1;
   const isProtected = (message: RuntimeMessage, index: number): boolean =>
     isAgentInvocationMessage(message) || index === lastUserIndex;
   const protectedInvocationMessages = messages
@@ -433,6 +432,7 @@ export function automaticCompactionSplit(
   messages: readonly RuntimeMessage[],
   contextWindow: number,
   degraded = false,
+  liveUserMessageId?: string,
 ): number {
   if (messages.length === 0) return 0;
   const beforeExchange = (candidate: number): number => {
@@ -440,13 +440,19 @@ export function automaticCompactionSplit(
     while (index > 0 && isToolRoleMessage(messages[index]!)) index -= 1;
     return index;
   };
-  let split = beforeExchange(messages.length - 1);
+  // Output-recovery prompts can follow the last completed tool exchange.
+  // They do not make its result safe to summarize before the model uses it.
+  const latestToolIndex = messages.findLastIndex(isToolRoleMessage);
+  const liveUserIndex = automaticCompactionLiveUserIndex(messages, liveUserMessageId);
+  let split = Math.min(beforeExchange(messages.length - 1),
+    latestToolIndex <= liveUserIndex ? messages.length - 1 : beforeExchange(latestToolIndex));
   if (degraded) return split;
   const budgetBytes = Math.floor(contextWindow * 0.4 * 2);
   const messageBytes = (message: RuntimeMessage): number =>
     (message.runtimeOnly?.toolResultIntegrity?.persisted.byteLength ??
       Buffer.byteLength(JSON.stringify(message.content ?? message.message?.content ?? ""), "utf8")) +
-    Buffer.byteLength(JSON.stringify(message.toolCalls ?? []), "utf8");
+    Buffer.byteLength(JSON.stringify(message.toolCalls ?? []), "utf8") +
+    Buffer.byteLength(message.providerReasoningContent ?? "", "utf8");
   let bytes = messages.slice(split).reduce((sum, message) => sum + messageBytes(message), 0);
   while (split > 0 && messages.length - split < 12) {
     const previous = beforeExchange(split - 1);
@@ -456,6 +462,23 @@ export function automaticCompactionSplit(
     split = previous;
   }
   return split;
+}
+
+export function automaticCompactionLiveUserIndex(
+  messages: readonly RuntimeMessage[],
+  liveUserMessageId?: string,
+): number {
+  const index = messages.findLastIndex((message) =>
+    (message.originalRole ?? message.role ?? message.message?.role) === "user" &&
+    message.isMeta !== true && message.runtimeOnly?.compactionHistory === undefined &&
+    (liveUserMessageId === undefined ||
+      message.runtimeOnly?.responseItemId === liveUserMessageId ||
+      message.runtimeOnly?.userMessageId === liveUserMessageId));
+  if (liveUserMessageId !== undefined && index < 0) {
+    throw new CompactionCannotReduceError("no_shrink",
+      "the live user request is missing from the compaction source; history was not changed");
+  }
+  return index;
 }
 
 /**
