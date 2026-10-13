@@ -204,6 +204,31 @@ describe("/effort Grok catalog levels", () => {
 describe("/effort picker and live session", () => {
   beforeEach(() => settings.update.mockClear());
 
+  test("unsupported saved effort reads the effective wire default on every surface", () => {
+    const auth = { ...TEST_REMOTE_AUTH_SESSION_CONTEXT, provider: "deepseek" };
+    expect(getSessionEffortLabelForContext("deepseek-flash", "medium", auth)).toBe("high effort");
+    expect(getEffortNotificationText("medium", "deepseek-flash", auth)).toContain("high · /effort");
+    expect(getSessionEffortLabelForContext("deepseek-flash", "xhigh", auth)).toBe("max effort");
+  });
+
+  test("starts on the effective row and unchanged Enter preserves an unsupported saved choice", async () => {
+    const { context } = commandContext("deepseek-flash", "", { provider: "deepseek", effortValue: "medium" });
+    const setToolJSX = vi.fn();
+    const applyDaemonConfig = vi.fn();
+    (context as { appState: Record<string, unknown> }).appState.setToolJSX = setToolJSX;
+    (context as { session: Record<string, unknown> }).session.applyDaemonConfig = applyDaemonConfig;
+    await effortCommand.execute(context);
+    const { snapshot, onSelect } = setToolJSX.mock.calls[0]![0].jsx.props;
+    expect(snapshot.rows[snapshot.activeIndex].choice).toBe("high");
+    expect(snapshot.rows[0].detail).toContain("high");
+    expect(await onSelect("high")).toMatchObject({ shouldClose: true });
+    expect(settings.update).not.toHaveBeenCalled();
+    expect(applyDaemonConfig).not.toHaveBeenCalled();
+    await onSelect("default");
+    expect(settings.update).toHaveBeenCalledWith("userSettings", { reasoning_effort: undefined });
+    expect(applyDaemonConfig).toHaveBeenCalledWith({ reasoningEffort: null });
+  });
+
   test("opens a picker of the current model's levels", async () => {
     const { context } = commandContext("gemini-3.1-pro-preview", "", { provider: "gemini" });
     const setToolJSX = vi.fn();

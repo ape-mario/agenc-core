@@ -27,6 +27,7 @@ import {
   createEmptyAttributionState,
 } from '../../utils/commitAttribution.js'
 import type { EffortValue } from '../../utils/effort.js'
+import { reasoningEffortToEffortLevel } from '../../utils/effort.js'
 import type { FileHistoryState } from '../../utils/fileHistory.js'
 import type { REPLHookContext } from '../../utils/hooks/postSamplingHooks.js'
 import type { SessionHooksState } from '../../utils/hooks/sessionHooks.js'
@@ -509,7 +510,7 @@ export function getDefaultAppStateForProviderEnvironment(
     },
     authVersion: 0,
     initialMessage: null,
-    effortValue: undefined,
+    effortValue: reasoningEffortToEffortLevel(initialSettings.reasoning_effort),
     // `/swarm` is persisted in user settings. A fresh TUI must reflect that
     // value immediately; waiting for a later file-change event left routing
     // enabled in the daemon while the badge and local command state said off.

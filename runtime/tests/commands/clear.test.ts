@@ -56,6 +56,50 @@ function mkctx(session: Session): SlashCommandContext {
 }
 
 describe("clearCommand", () => {
+  it.each([100, 3000, 0])("restores the freshly resolved cap %i instead of the old config snapshot", async (resolvedCap) => {
+    const { session } = mkSession();
+    Object.assign(session.config, { taskTokenBudget: 100 });
+    const budget = taskBudgetOf(session)!;
+    budget.tokens = 63;
+    budget.calls = 2;
+    const prepared = {
+      config: { task_token_budget: resolvedCap },
+      rollback: vi.fn(),
+      settle: vi.fn(),
+      commit: vi.fn(),
+    };
+    const prepareReload = vi.fn(async () => prepared);
+    Object.assign(session.services, { configStore: {
+      current: () => ({ task_token_budget: 0 }),
+      prepareReload,
+    } });
+    setSessionTaskTokenBudget(session, 0, true);
+    await clearSession(session);
+    expect(session.config.taskTokenBudget).toBe(resolvedCap);
+    expect(budget.tokens).toBe(63);
+    expect(budget.calls).toBe(2);
+    expect(prepareReload).toHaveBeenCalledOnce();
+    expect(prepared.rollback).toHaveBeenCalledOnce();
+    expect(prepared.settle).toHaveBeenCalledOnce();
+    expect(prepared.commit).not.toHaveBeenCalled();
+  });
+
+  it("leaves history and the live allowance intact when fresh configuration cannot be resolved", async () => {
+    const { session } = mkSession();
+    Object.assign(session.config, { taskTokenBudget: 100 });
+    const history = await session.state.with(state => {
+      state.history.push({ role: "user", content: "keep this conversation" });
+      return state.history;
+    });
+    Object.assign(session.services, { configStore: {
+      current: () => ({ task_token_budget: 0 }),
+      prepareReload: vi.fn(async () => { throw new Error("Invalid saved config"); }),
+    } });
+    await expect(clearSession(session)).rejects.toThrow("Invalid saved config");
+    expect(history).toHaveLength(1);
+    expect(session.config.taskTokenBudget).toBe(100);
+  });
+
   it("restores the configured cap after checkpoint Remove without erasing spent usage", async () => {
     const { session } = mkSession();
     Object.assign(session.config, { taskTokenBudget: 100 });

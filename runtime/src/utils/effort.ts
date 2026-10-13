@@ -362,7 +362,7 @@ function resolveAppliedEffortForOptionalContext(
   appStateEffortValue: EffortValue | undefined,
   context?: ProviderAuthReadContext,
 ): EffortValue | undefined {
-  const resolved =
+  let resolved =
     appStateEffortValue ??
     getDefaultEffortForModelForOptionalContext(model, context)
   if (resolved === 'max') {
@@ -375,8 +375,19 @@ function resolveAppliedEffortForOptionalContext(
     }
     // API rejects 'max' on non-Opus-4.6 models — downgrade to 'high'.
     if (!modelSupportsMaxEffortForOptionalContext(model, context)) {
-      return 'high'
+      resolved = 'high'
     }
+  }
+  const registeredLevels = getRegisteredEffortLevels(model, context)
+  if (resolved === 'xhigh' && registeredLevels !== undefined &&
+      !registeredLevels.includes('xhigh')) {
+    resolved = registeredLevels.includes('max') ? 'max' : 'high'
+  }
+  if (typeof resolved === 'string' && registeredLevels !== undefined &&
+      !registeredLevels.includes(resolved)) {
+    // The wire drops unsupported levels, leaving the provider default.
+    const native = getNativeDefaultReasoningEffortForContext(model, context)
+    return native !== undefined && isAvailableEffortLevel(native) ? native : undefined
   }
   return resolved
 }
@@ -690,12 +701,28 @@ export function getSessionEffortLabelForContext(
   context: ProviderAuthReadContext,
 ): string | null {
   if (effortValue === 'none') return 'effort off'
-  if (effortValue !== undefined) {
-    return `${getDisplayedEffortLevelForContext(model, effortValue, context)} effort`
+  const effective = effortValue === undefined ? undefined : resolveAppliedEffortForContext(model, effortValue, context)
+  if (effective !== undefined) {
+    return `${convertEffortValueToLevelForContext(effective, context)} effort`
   }
   const modelDefault = getModelDefaultReasoningEffortForContext(model, context)
   if (modelDefault === undefined) return null
   return modelDefault === 'none' ? 'effort off' : `${nativeEffortLabel(modelDefault)} effort`
+}
+
+/** Explain an unsupported saved/session level without rewriting the setting. */
+export function getUnsupportedEffortNoticeForContext(
+  model: string,
+  effortValue: EffortValue | 'none' | undefined,
+  context: ProviderAuthReadContext,
+): string | undefined {
+  if (typeof effortValue !== 'string' || effortValue === 'none') return undefined
+  const levels = getRegisteredEffortLevels(model, context)
+  if (levels === undefined || levels.includes(effortValue)) return undefined
+  if (effortValue === 'max' && levels.includes('xhigh')) return undefined
+  if (effortValue === 'xhigh' && levels.includes('max')) return undefined
+  const effective = getSessionEffortLabelForContext(model, effortValue, context) ?? 'the model default'
+  return `${model} does not support ${effortValue} effort; using ${effective}.`
 }
 
 /** How a native effort reads in the TUI: "none" means effort is off. */
