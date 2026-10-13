@@ -303,7 +303,7 @@ function makeRunnerHarness(opts: {
     argv: ["node", "agenc"],
     now: () => "2026-05-09T00:00:00.000Z",
   });
-  return { runner, session, stateObject };
+  return { runner, session, stateObject, bootstrap };
 }
 
 describe("daemon config/model state refresh + atomicity", () => {
@@ -328,6 +328,12 @@ describe("daemon config/model state refresh + atomicity", () => {
     const result = await runner.applyAgentConfig("parent-session", { sessionId: "session_1", taskBudgetLevel: "max" });
     expect(result).toMatchObject({ taskTokenBudget: 500, summary: expect.stringContaining("override") });
     expect(session.config.taskTokenBudget).toBe(500);
+  });
+
+  it.each([undefined, { nonInteractive: false }])("marks root TUI sessions for checkpoints even though daemon admission is autonomous (%j)", async runtimeOptions => {
+    const { runner, bootstrap } = makeRunnerHarness({ configStore: { current: () => ({}) } });
+    await runner.startAgent({ objective: "work", cwd: "/workspace", metadata: { mode: "tui" }, runtimeOptions: runtimeOptions as never });
+    expect(bootstrap.mock.calls[0]?.[0]).toMatchObject({ executionAdmissionAutonomous: true, runtimeOptions: { interactiveTaskBudget: true } });
   });
 
   // GAP #12: an unknown profile must be a true no-op — the shared config store

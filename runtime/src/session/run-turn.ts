@@ -315,7 +315,7 @@ export type {
   AutoCompactImpl,
 } from "./run-turn-compaction.js";
 
-import { taskBudgetOf } from "./task-budget.js";
+import { taskBudgetOf, continueInteractiveTaskBudget, interactiveTaskBudget } from "./task-budget.js";
 import { StepLimitTrail, stepLimitReminder, stepLimitWrapup, STEP_LIMIT_WRAPUP_INSTRUCTION } from "./step-limit-wrapup.js";
 
 export interface RunTurnOptions {
@@ -2863,7 +2863,7 @@ async function* runTurnKernelInner(
       };
       return terminal;
     }
-    if (taskBudget?.reached) {
+    if (taskBudget?.reached && !await continueInteractiveTaskBudget(session, 0, signal)) {
       yield await finishTaskBudget();
       return { reason: "task_budget" };
     }
@@ -2953,11 +2953,11 @@ async function* runTurnKernelInner(
     }
 
     taskBudgetOf(session); // Include durable usage from delegated work.
-    if (taskBudget?.reached) {
+    if (taskBudget?.reached && !await continueInteractiveTaskBudget(session, 0, signal)) {
       yield await finishTaskBudget();
       return { reason: "task_budget" };
     }
-    const taskReminder = taskBudget?.reminder();
+    const taskReminder = interactiveTaskBudget(session) && taskBudget?.maxCalls === undefined ? undefined : taskBudget?.reminder();
     if (taskReminder) state.messages.push(taskReminder);
 
     // Guardian-rejection circuit-breaker interrupt.
@@ -3295,7 +3295,7 @@ async function* runTurnKernelInner(
         if (result.assistantText.length > 0) {
           lastContent = result.assistantText;
         }
-        if (taskBudget?.reached) {
+        if (taskBudget?.reached && !await continueInteractiveTaskBudget(session, 0, signal)) {
           yield await finishTaskBudget();
           return { reason: "task_budget" };
         }
@@ -3351,7 +3351,7 @@ async function* runTurnKernelInner(
         };
         return terminal;
       }
-      if (taskBudget?.reached) {
+      if (taskBudget?.reached && !await continueInteractiveTaskBudget(session, 0, signal)) {
         yield await finishTaskBudget();
         return { reason: "task_budget" };
       }
@@ -3390,7 +3390,7 @@ async function* runTurnKernelInner(
 
     // Finish only after tool blocks from the admitted response are dispatched.
     // Pending blocks are handled below, before the post-tool budget check.
-    if (taskBudget?.reached && state.toolUseBlocks.length === 0) {
+    if (taskBudget?.reached && state.toolUseBlocks.length === 0 && !await continueInteractiveTaskBudget(session, 0, signal)) {
       yield await finishTaskBudget();
       return { reason: "task_budget" };
     }
@@ -3539,7 +3539,7 @@ async function* runTurnKernelInner(
         // the turn with a warning plus compact_failed so rollout
         // reducers see a closed boundary without killing the run.
         await drainInFlight(state, ctx, session);
-        if (taskBudget?.reached) {
+        if (taskBudget?.reached && !await continueInteractiveTaskBudget(session, 0, signal)) {
           yield await finishTaskBudget();
           return { reason: "task_budget" };
         }
@@ -3878,7 +3878,7 @@ async function* runTurnKernelInner(
 
     // Actual usage may have crossed the cap. Tool results are now available;
     // persist them with the partial summary instead of attempting compaction.
-    if (taskBudget?.reached) {
+    if (taskBudget?.reached && !await continueInteractiveTaskBudget(session, 0, signal)) {
       yield await finishTaskBudget();
       return { reason: "task_budget" };
     }

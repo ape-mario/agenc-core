@@ -38,7 +38,7 @@ import {
   anthropicSupportsFastMode,
 } from "../llm/providers/anthropic/fast-mode.js";
 import { xaiSendsPriorityProcessing } from "../llm/providers/grok/priority-processing.js";
-import { taskBudgetOf } from "../session/task-budget.js";
+import { taskBudgetOf, prepareInteractiveTaskBudgetCall } from "../session/task-budget.js";
 import { AdmissionDeniedError } from "./admission-client.js";
 import { hitM4DurabilityFailpoint } from "../durability/failpoints.js";
 import { isLLMPreGenerationRejection, LLMManagedAdmissionError } from "../llm/errors.js";
@@ -504,12 +504,21 @@ export async function runAdmittedModelCall(
   params: AdmittedModelCallOptions,
 ): Promise<LLMResponse> {
   const taskBudget = taskBudgetOf(params.session);
+  const client = params.session.services.executionAdmission;
   const invoke = (options: LLMChatOptions): Promise<LLMResponse> => {
     if (!taskBudget) return params.invoke(options);
-    return taskBudget.invoke((options.accountedInputTokens ?? 0) +
-      (options.maxOutputTokens ?? 0), () => params.invoke(options));
+    return (async () => {
+      const reserve = (options.accountedInputTokens ?? 0) + (options.maxOutputTokens ?? 0);
+      // Admission checked the checkpoint before acquiring its lease. Reading
+      // durable usage again here would count that same lease a second time and
+      // could pause after markDispatched. Embedders without admission still
+      // need the local checkpoint before invoking the provider.
+      if (client === undefined) {
+        await prepareInteractiveTaskBudgetCall(params.session, reserve, params.signal);
+      }
+      return taskBudget.invoke(reserve, () => params.invoke(options));
+    })();
   };
-  const client = params.session.services.executionAdmission;
   const providerFactoryOptions = readProviderFactoryOptions(params.provider);
   // A few structurally typed embedding/test providers predate the explicit
   // identity fields on this boundary. Keep the admission path fail-safe at
@@ -817,6 +826,7 @@ export async function runAdmittedModelCall(
       }
     : undefined;
   let lease;
+  await prepareInteractiveTaskBudgetCall(params.session, maxInputTokens + admittedMaxOutputTokens, params.signal);
   if (taskBudget?.limit !== undefined &&
       taskBudget.tokens + maxInputTokens + admittedMaxOutputTokens > taskBudget.limit) {
     taskBudget.stop();

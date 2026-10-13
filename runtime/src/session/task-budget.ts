@@ -1,3 +1,4 @@
+import { getSessionGoal } from "../goal/session-goal.js";
 import { createTaskBudgetProgress } from "./task-budget-progress.js";
 import { DEFAULT_TASK_TOKEN_BUDGET } from "../config/task-budget.js";
 import type { LLMMessage, LLMResponse, LLMUsage } from "../llm/types.js";
@@ -24,11 +25,14 @@ export class TaskBudget {
   private announced = false;
   private stopped = false;
   private operatorLimit: number | null = null;
+  checkpointAllowance: number | undefined;
+  checkpointWarningLimit: number | undefined;
   private extensionAnnounced = false;
   constructor(private readonly hardLimit?: number, readonly maxCalls?: number,
-    private readonly progressLimit?: () => number) {}
+    private readonly progressLimit?: () => number) { this.checkpointAllowance = hardLimit; }
   get limit(): number | undefined { return this.operatorLimit === null ? (this.progressLimit?.() ?? this.hardLimit) : this.operatorLimit === 0 ? undefined : this.operatorLimit; }
-  setTokenLimit(tokens: number): void {
+  setTokenLimit(tokens: number, checkpoint = false): void {
+    if (!checkpoint) this.checkpointAllowance = tokens === 0 ? undefined : tokens;
     this.operatorLimit = tokens;
     this.stopped = false;
     this.announced = false;
@@ -127,7 +131,7 @@ export function taskBudgetOf(session: Session): TaskBudget | undefined {
 }
 
 /** Host/operator-only update; never resets usage or independent call/cost limits. */
-export function setSessionTaskTokenBudget(session: Session, tokens: number): number {
+export function setSessionTaskTokenBudget(session: Session, tokens: number, checkpoint = false): number {
   if (!Number.isSafeInteger(tokens) || tokens < 0) throw new TypeError("Invalid task token allowance");
   const admission = session.services?.executionAdmission;
   if (admission !== undefined && admission.setTaskTokenBudget === undefined) {
@@ -135,6 +139,68 @@ export function setSessionTaskTokenBudget(session: Session, tokens: number): num
   }
   const effective = admission?.setTaskTokenBudget?.(tokens) ?? tokens;
   (session.config as { taskTokenBudget?: number }).taskTokenBudget = effective;
-  budgets.get(session)?.setTokenLimit(effective);
+  budgets.get(session)?.setTokenLimit(effective, checkpoint);
   return effective;
+}
+
+export function interactiveTaskBudget(session: Session): boolean {
+  const options = session.services.runtimeOptions;
+  const scope = session.services.executionAdmission?.scope;
+  return options?.interactiveTaskBudget === true && options.nonInteractive === false && options.routineRun !== true &&
+    session.config.autonomousMode !== true && scope?.parentRunId === undefined &&
+    session.permissionModeRegistry.current().unattendedPolicy === undefined &&
+    getSessionGoal(session)?.status !== "active";
+}
+
+const checkpointWaits = new WeakMap<Session, Promise<boolean>>();
+/** Pauses before the next model lease. A human may raise only this task cap. */
+export async function continueInteractiveTaskBudget(session: Session, reserve = 0, signal?: AbortSignal): Promise<boolean> {
+  const budget = taskBudgetOf(session);
+  if (!budget) return true;
+  if (budget.maxCalls !== undefined && budget.calls >= budget.maxCalls) return false;
+  if (budget.limit === undefined) return true;
+  if (!interactiveTaskBudget(session)) return false;
+  const limit = budget.limit;
+  const allowance = budget.checkpointAllowance ?? limit;
+  if (budget.tokens >= limit - allowance * 0.2 && budget.checkpointWarningLimit !== limit) {
+    budget.checkpointWarningLimit = limit;
+    session.emit({ id: session.nextInternalSubId(), msg: { type: "warning", payload: {
+      cause: "task_budget_near_limit", message: `Task budget: ${budget.tokens.toLocaleString("en-US")} of ${limit.toLocaleString("en-US")} tokens used. A checkpoint will ask before more work crosses the allowance.`,
+    } } });
+  }
+  if (!budget.reached && budget.tokens + reserve <= limit) return true;
+  const waiting = checkpointWaits.get(session);
+  if (waiting !== undefined) return waiting;
+  const ask = async (): Promise<boolean> => {
+    const cost = session.services.executionAdmission?.getUsageSummary?.().costUsd;
+    const price = typeof cost === "number" && Number.isFinite(cost) ? ` (about $${cost.toFixed(2)})` : " (cost unavailable)";
+    const response = await session.requestUserInput(`task-budget-checkpoint-${session.nextInternalSubId()}`, { questions: [{
+      id: "task_budget", header: "Task budget", isOther: false, isSecret: false,
+      question: `This task used ${budget.tokens.toLocaleString("en-US")} of ${limit.toLocaleString("en-US")} tokens${price}. The next model call needs more room. Continue?`,
+      options: [
+        { label: "Continue", description: `Add another ${allowance.toLocaleString("en-US")} tokens and ask at the next checkpoint.` },
+        { label: "Remove the limit for this task", description: "Continue without task token checkpoints. Independent limits still apply." },
+        { label: "Stop here", description: "Keep the partial result and stop this turn." },
+      ],
+    }] }, signal);
+    const choice = response?.answers.task_budget?.answers[0];
+    if (choice !== "Continue" && choice !== "Remove the limit for this task") return false;
+    const next = choice === "Continue" ? limit + allowance : 0;
+    if (!Number.isSafeInteger(next)) throw new Error("Task allowance is too large");
+    const effective = setSessionTaskTokenBudget(session, next, true);
+    // An independent admission ceiling cannot be raised by this card.
+    return effective === 0 || effective > limit;
+  };
+  const pending = ask();
+  checkpointWaits.set(session, pending);
+  try { return await pending; } finally { checkpointWaits.delete(session); }
+}
+
+export async function prepareInteractiveTaskBudgetCall(session: Session, reserve: number, signal?: AbortSignal): Promise<void> {
+  const budget = taskBudgetOf(session);
+  if (!budget || !interactiveTaskBudget(session)) return;
+  while (budget.limit !== undefined && (budget.reached || budget.tokens + reserve > budget.limit)) {
+    if (!await continueInteractiveTaskBudget(session, reserve, signal)) { budget.stop(); throw new TaskBudgetReachedError(); }
+  }
+  await continueInteractiveTaskBudget(session, 0, signal);
 }

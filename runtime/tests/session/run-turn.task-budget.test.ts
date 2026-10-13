@@ -21,6 +21,7 @@ it("warns once, finishes the last tool and persists a bounded final summary", as
     recoveryCategory:"idempotent",execute:async () => { await Promise.resolve(); finishedTools++; return {content:"passed",isError:false}; }}],
     toLLMTools:()=>[],dispatch:async()=>({content:"",isError:false}) } as unknown as ToolRegistry;
   const {session,events} = mkSession({provider,registry});
+  Object.assign(session.services, { runtimeOptions: { ...session.services.runtimeOptions, nonInteractive: true } });
   Object.assign(session.config,{taskMaxCalls:5});
   const phases: PhaseEvent[]=[];
   for await (const phase of runTurn(session,mkCtx(),"Fix and check")) phases.push(phase);
@@ -42,6 +43,7 @@ it.each(["stop", "length"] as const)("retains the last admitted answer when fini
       usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, availability: "reported", provenance: "provider" } };
   };
   const { session } = mkSession({ provider });
+  Object.assign(session.services, { runtimeOptions: { ...session.services.runtimeOptions, nonInteractive: true } });
   Object.assign(session.config, { taskTokenBudget: 0, taskMaxCalls: 1 });
   const phases: PhaseEvent[] = [];
   for await (const phase of runTurn(session, mkCtx(), "Check and report")) phases.push(phase);
@@ -59,7 +61,7 @@ it("drains the final tool and summarizes when actual usage crosses the token cap
       usage:{promptTokens:100000,completionTokens:1,totalTokens:100001,availability:"reported",provenance:"provider"}};
   };
   const registry = {tools:[{name:"probe",description:"check",inputSchema:{type:"object"},requiresApproval:false,recoveryCategory:"idempotent",execute:async()=>{await Promise.resolve();completed=true;return {content:"passed",isError:false};}}],toLLMTools:()=>[],dispatch:async()=>({content:"",isError:false})} as unknown as ToolRegistry;
-  const {session}=mkSession({provider,registry});Object.assign(session.config,{taskTokenBudget:100000});
+  const {session}=mkSession({provider,registry});Object.assign(session.services, { runtimeOptions: { ...session.services.runtimeOptions, nonInteractive: true } });Object.assign(session.config,{taskTokenBudget:100000});
   const phases:PhaseEvent[]=[];
   for await(const phase of runTurn(session,mkCtx(),"Check")) phases.push(phase);
   expect(calls).toBe(1);expect(completed).toBe(true);

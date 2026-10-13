@@ -536,10 +536,11 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     // A routine run is marked in its immutable runtime options, so the shell
     // sandbox, the dispatch path and MCP questions can tell it apart without
     // reading permission state that changes or is fenced mid-run.
-    const runtimeOptions = routineRun || params.runtimeOptions?.relaxedOneShot !== undefined
+    const runtimeOptions = routineRun || params.runtimeOptions?.relaxedOneShot !== undefined || params.metadata?.mode === "tui" || params.runtimeOptions?.interactiveTaskBudget !== undefined
       ? Object.freeze({
           ...params.runtimeOptions,
           ...(routineRun ? { routineRun: true } : {}),
+          interactiveTaskBudget: params.metadata?.mode === "tui" && params.runtimeOptions?.nonInteractive !== true && !routineRun && params.metadata?.goalRun !== true,
           ...(params.runtimeOptions?.relaxedOneShot !== undefined ? {
             relaxedOneShot: selectRelaxedOneShot({ requested: params.runtimeOptions.relaxedOneShot,
               nonInteractive: params.runtimeOptions.nonInteractive, source: params.metadata?.source,
@@ -1089,11 +1090,12 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         // closed instead of bringing the session back unrestricted.
         const toolPolicy = sessionToolPolicyFromMetadata(params.metadata);
         // A restored routine run stays marked as one (see startAgent).
-        const restoreRuntimeOptions = isRoutineRun(params.metadata) || params.runtimeOptions?.relaxedOneShot !== undefined
+        const restoreRuntimeOptions = isRoutineRun(params.metadata) || params.runtimeOptions?.relaxedOneShot !== undefined || params.metadata?.mode === "tui" || params.runtimeOptions?.interactiveTaskBudget !== undefined
           ? Object.freeze({
               ...params.runtimeOptions,
               ...(params.runtimeOptions?.relaxedOneShot !== undefined ? { relaxedOneShot: false } : {}),
               ...(isRoutineRun(params.metadata) ? { routineRun: true } : {}),
+              interactiveTaskBudget: params.metadata?.mode === "tui" && params.runtimeOptions?.nonInteractive !== true && !isRoutineRun(params.metadata) && params.metadata?.goalRun !== true,
             })
           : params.runtimeOptions;
         // Same ambient-authority scope as first start: restores also run

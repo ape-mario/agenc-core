@@ -1511,3 +1511,33 @@ describe("runAdmittedModelCall Chat Completions cache-write reconciliation", () 
     );
   });
 });
+
+test("does not ask after dispatch or count the new model lease twice at an interactive checkpoint", async () => {
+  const state = harness({});
+  let held = 0;
+  const requestUserInput = vi.fn(async () => null);
+  Object.assign(state.session, {
+    config: { taskTokenBudget: 217 },
+    permissionModeRegistry: { current: () => ({}) },
+    requestUserInput, emit: vi.fn(), nextInternalSubId: () => "checkpoint",
+  });
+  Object.assign(state.session.services, { runtimeOptions: { nonInteractive: false, interactiveTaskBudget: true } });
+  Object.assign(state.admission, { getTaskBudgetUsage: () => ({ tokens: held, calls: 0 }) });
+  const originalAcquire = state.acquire.getMockImplementation()!;
+  state.acquire.mockImplementation(async input => {
+    const lease = await originalAcquire(input);
+    held = input.maxInputTokens + input.maxOutputTokens;
+    return lease;
+  });
+  Object.assign(state.provider, { tokenCountCapability: {
+    capabilityVersion: "checkpoint-reservation-control", adapterRevision: "test",
+    countTokens: async () => ({ inputTokens: 17, complete: true, confidence: "exact", countedComponents: ["system", "messages", "provider_framing"] }),
+  } });
+  const invoke = vi.fn(async () => response());
+  await expect(callOptions(state, { maxOutputTokens: 200 }, invoke)).resolves.toMatchObject({ content: "ok" });
+  expect(state.acquire).toHaveBeenCalledOnce();
+  expect(state.admission.markDispatched).toHaveBeenCalledOnce();
+  expect(requestUserInput).not.toHaveBeenCalled();
+  expect(invoke).toHaveBeenCalledOnce();
+  expect(state.holdUnknown).not.toHaveBeenCalled();
+});
