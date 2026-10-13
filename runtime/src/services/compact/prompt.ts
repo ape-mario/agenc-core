@@ -33,6 +33,7 @@ Compression:
 - State each detail once. Combine related completed commands and their results into one concise fact; do not separately repeat what was requested, what was executed, and what the assistant replied.
 - Preserve exact values, file names, constraints and unresolved actions that affect the next turn. Completed one-time formatting instructions and repeated acknowledgments need not be copied verbatim.
 - Record what was learned from tool results: relevant file contents, function behavior, computed values, errors and test outcomes. Saying only that a file was read or a command ran loses the evidence needed to continue.
+- Never infer the task scope from a file listing. Use the current-request retention preference to narrow pending work; do not expand a requested subset into every file that happens to exist.
 - Record edits and completed steps with their outcomes, plus the exact next unfinished step. Preserve progress counters and completed item identifiers so continuation does not repeat reads or finished work. Treat older pending actions superseded by later user requests as superseded, not current work.
 - Keep facts concise, omit repetitive output, and use empty lists when there are no relevant facts or open actions. The summary should be substantially shorter than its input.`;
 

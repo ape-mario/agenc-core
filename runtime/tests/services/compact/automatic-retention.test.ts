@@ -30,4 +30,16 @@ describe("automatic continuation retention", () => {
       .rejects.toThrow(/cannot free room.*latest tool results/);
     expect(current).toEqual(history.slice(2));
   });
+  test("keeps recent parser edits beside a large current-step read", () => {
+    const recent: RuntimeMessage[] = [
+      { role: "user", content: "old".repeat(20_000) },
+      { role: "assistant", content: "parser fixed", toolCalls: [{ id: "edit", name: "Write", arguments: JSON.stringify({ content: "correct parser".repeat(80) }) }] },
+      { role: "tool", toolCallId: "edit", content: "write succeeded" },
+      { role: "assistant", content: "batch01 parsed", toolCalls: [{ id: "batch", name: "exec_command", arguments: '{}' }] },
+      { role: "tool", toolCallId: "batch", content: "batch01 total150 latency72625".repeat(140) },
+      { role: "assistant", content: "inspect remaining data", toolCalls: [{ id: "chunk", name: "FileRead", arguments: '{}' }] },
+      { role: "tool", toolCallId: "chunk", content: "x".repeat(13_000) },
+    ];
+    expect(automaticCompactionSplit(recent, 31_129)).toBe(1);
+  });
 });

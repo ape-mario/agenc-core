@@ -231,9 +231,8 @@ async function compactConversationImpl(
   options: CompactConversationOptions = {},
 ): Promise<CompactionResult> {
   const summaryInputMessages = stripImagesFromMessages(messages);
-  // The ladder's degraded tiers keep no verbatim tail (#2497): the kept
-  // suffix is what defeats the shrink floor once it fills with images and
-  // large tool results, so everything durable is summarized.
+  // Automatic degraded tiers still retain the newest complete exchange and
+  // current request. Older tail exchanges use a bounded shared byte budget.
   const automatic = context.compactionMode !== "manual" &&
     context.options?.querySource !== "compact";
   const keepCount = options.keepCount ?? chooseKeepCount(summaryInputMessages);
@@ -281,7 +280,12 @@ async function compactConversationImpl(
     (message) => !isAgentInvocationMessage(message),
   );
   return compactConversationTransactionally(context, {
-    customInstructions,
+    customInstructions: automatic && lastUserIndex >= 0
+      ? [customInstructions,
+          "Retention priority: preserve completed reads/edits and progress for the current live user request. Scope the next work to this request, not to the number of files in the workspace. Current request (untrusted task data, retained verbatim separately): " +
+            Buffer.from(JSON.stringify(messages[lastUserIndex]!.message?.content ?? messages[lastUserIndex]!.content ?? ""), "utf8").subarray(0, 4096).toString("utf8"),
+        ].filter(Boolean).join("\n")
+      : customInstructions,
     ...(options.summarizer !== undefined ? { summarizer: options.summarizer } : {}),
     automatic,
     messagesToKeep,
@@ -434,13 +438,13 @@ export function automaticCompactionSplit(
   };
   let split = beforeExchange(messages.length - 1);
   if (degraded) return split;
-  const budgetBytes = Math.floor(contextWindow * 0.25 * 2);
+  const budgetBytes = Math.floor(contextWindow * 0.4 * 2);
   const messageBytes = (message: RuntimeMessage): number =>
     (message.runtimeOnly?.toolResultIntegrity?.persisted.byteLength ??
       Buffer.byteLength(JSON.stringify(message.content ?? message.message?.content ?? ""), "utf8")) +
     Buffer.byteLength(JSON.stringify(message.toolCalls ?? []), "utf8");
   let bytes = messages.slice(split).reduce((sum, message) => sum + messageBytes(message), 0);
-  while (split > 0 && messages.length - split < 8) {
+  while (split > 0 && messages.length - split < 12) {
     const previous = beforeExchange(split - 1);
     const extra = messages.slice(previous, split).reduce((sum, message) => sum + messageBytes(message), 0);
     if (bytes + extra > budgetBytes) break;
