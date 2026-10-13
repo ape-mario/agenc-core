@@ -3286,7 +3286,7 @@ function PromptInput({
       autoModeOptInDialog)
     : null;
   useSetPromptOverlayDialog(fullscreenPromptDialog);
-  useRegisterOverlay("prompt-overlay-dialog", fullscreenPromptDialog !== null);
+  useRegisterOverlay(modeSwitcherElement !== null ? "mode-switcher-toast" : "prompt-overlay-dialog", fullscreenPromptDialog !== null);
   if (showBashesDialog && !isFullscreen) {
     return backgroundTasksDialogElement;
   }

@@ -269,6 +269,13 @@ describe('overlayContext coverage swarm 054', () => {
     }
   })
 
+  test('keeps mode-toast keybindings active while preserving other modal ownership', async () => {
+    appStateHarness.state = { activeOverlays: new Set(['mode-switcher-toast']) };
+    await expect(renderToString(<OverlayStatus />, 40)).resolves.toContain('active:nonmodal');
+    appStateHarness.state = { activeOverlays: new Set(['mode-switcher-toast', 'select']) };
+    await expect(renderToString(<OverlayStatus />, 40)).resolves.toContain('active:modal');
+  });
+
   test('distinguishes any overlay from modal overlays', async () => {
     appStateHarness.state = {
       activeOverlays: new Set(),

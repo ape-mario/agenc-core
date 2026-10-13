@@ -19,7 +19,7 @@ import { AppStoreContext, useAppState } from '../state/AppState.js';
 import type { AppState } from '../state/AppStateStore.js';
 
 // Non-modal overlays that shouldn't disable TextInput focus
-const NON_MODAL_OVERLAYS = new Set(['autocomplete']);
+const NON_MODAL_OVERLAYS = new Set(['autocomplete', 'mode-switcher-toast']);
 
 /**
  * Hook to register a component as an active overlay.
