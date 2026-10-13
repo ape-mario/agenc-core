@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import type { LLMMessage, LLMTool } from "../types.js";
+import { encodeMcpToolNameForWire } from "./mcp-tool-naming.js";
 import {
+  advertisedResponsesToolNames,
   buildOpenAIResponsesRequest,
   parseOpenAIResponsesResponse,
 } from "./responses-openai.js";
@@ -769,6 +771,104 @@ describe("buildOpenAIResponsesRequest", () => {
       name: tools[0]!.name,
     });
   });
+
+  test("omits tools when an auto_only destination is asked not to call one", () => {
+    const request = buildOpenAIResponsesRequest({
+      model: "muse-wonder-1.0",
+      messages: [{ role: "user", content: "summarize" }],
+      tools: TEST_TOOLS,
+      toolChoicePolicy: "auto_only",
+      options: { toolChoice: "none" },
+    });
+    expect(request.tools).toBeUndefined();
+    expect(request.tool_choice).toBeUndefined();
+  });
+
+  test("keeps tools and sends auto when auto_only rewrites required or a named choice", () => {
+    for (const toolChoice of ["required", { type: "function", name: "shell" }] as const) {
+      const request = buildOpenAIResponsesRequest({
+        model: "muse-wonder-1.0",
+        messages: [{ role: "user", content: "go" }],
+        tools: TEST_TOOLS,
+        toolChoicePolicy: "auto_only",
+        options: { toolChoice },
+      });
+      expect(request.tool_choice).toBe("auto");
+      expect(request.tools).toEqual([
+        expect.objectContaining({ type: "function", name: "shell" }),
+      ]);
+    }
+  });
+
+  test("strips a reasoning effort the destination does not accept", () => {
+    const allowed = new Set(["minimal", "low", "medium", "high", "xhigh"]);
+    const stripped = buildOpenAIResponsesRequest({
+      model: "muse-wonder-1.0",
+      messages: [{ role: "user", content: "think" }],
+      tools: [],
+      options: { reasoningEffort: "max" },
+      reasoningEffortAllowedValues: allowed,
+    });
+    expect(stripped.reasoning).toBeUndefined();
+
+    const kept = buildOpenAIResponsesRequest({
+      model: "muse-wonder-1.0",
+      messages: [{ role: "user", content: "think" }],
+      tools: [],
+      options: { reasoningEffort: "high" },
+      reasoningEffortAllowedValues: allowed,
+    });
+    expect(kept.reasoning).toEqual({ effort: "high" });
+
+    const unrestricted = buildOpenAIResponsesRequest({
+      model: "muse-wonder-1.0",
+      messages: [{ role: "user", content: "think" }],
+      tools: [],
+      options: { reasoningEffort: "max" },
+    });
+    expect(unrestricted.reasoning).toEqual({ effort: "max" });
+
+    const emptyAllowlist = buildOpenAIResponsesRequest({
+      model: "muse-wonder-1.0",
+      messages: [{ role: "user", content: "think" }],
+      tools: [],
+      options: { reasoningEffort: "high" },
+      reasoningEffortAllowedValues: new Set(),
+    });
+    expect(emptyAllowlist.reasoning).toBeUndefined();
+  });
+});
+
+describe("advertisedResponsesToolNames", () => {
+  const request = {
+    model: "muse-wonder-1.0",
+    messages: [] as LLMMessage[],
+    tools: TEST_TOOLS,
+  };
+
+  test("is empty only when auto_only omits tools for toolChoice none", () => {
+    expect(advertisedResponsesToolNames({
+      ...request,
+      toolChoicePolicy: "auto_only",
+      options: { toolChoice: "none" },
+    })).toEqual([]);
+    expect(advertisedResponsesToolNames({
+      ...request,
+      toolChoicePolicy: "auto_only",
+      options: { toolChoice: "auto" },
+    })).toEqual(["shell"]);
+    expect(advertisedResponsesToolNames({
+      ...request,
+      toolChoicePolicy: "auto_only",
+      options: { toolChoice: "required" },
+    })).toEqual(["shell"]);
+    // Without auto_only, none is a wire choice and the catalog stays advertised.
+    expect(advertisedResponsesToolNames({
+      ...request,
+      options: { toolChoice: "none" },
+    })).toEqual(["shell"]);
+    expect(advertisedResponsesToolNames(request)).toEqual(["shell"]);
+  });
 });
 
 describe("parseOpenAIResponsesResponse", () => {
@@ -880,6 +980,128 @@ describe("parseOpenAIResponsesResponse", () => {
     expect(response.toolCalls).toEqual([]);
     expect(response.incompleteToolCalls).toEqual(reason === "max_output_tokens"
       ? [{ id: "call_cut", name: "spawn_agent" }] : undefined);
+  });
+
+  test("does not resolve a hashed tool alias when auto_only omitted the catalog", () => {
+    const longToolName = `mcp.plugin-${"shared-prefix-".repeat(5)}.search`;
+    const wireName = encodeMcpToolNameForWire(longToolName);
+    expect(wireName).toMatch(/^toolh__/);
+    const omitted = {
+      model: "muse-wonder-1.0",
+      messages: [] as LLMMessage[],
+      tools: [
+        {
+          type: "function" as const,
+          function: {
+            name: longToolName,
+            description: "A long tool that was disabled for this request.",
+            parameters: { type: "object", properties: {} },
+          },
+        },
+      ],
+      toolChoicePolicy: "auto_only" as const,
+      options: { toolChoice: "none" as const },
+    };
+
+    expect(() =>
+      parseOpenAIResponsesResponse(
+        "muse-wonder-1.0",
+        {
+          status: "completed",
+          output: [
+            {
+              type: "function_call",
+              call_id: "call_unadvertised",
+              name: wireName,
+              arguments: "{}",
+            },
+          ],
+        },
+        omitted,
+      ),
+    ).toThrow(/unknown hashed tool name/i);
+
+    expect(() =>
+      parseOpenAIResponsesResponse(
+        "muse-wonder-1.0",
+        {
+          status: "incomplete",
+          incomplete_details: { reason: "max_output_tokens" },
+          output: [
+            {
+              type: "function_call",
+              call_id: "call_cut",
+              name: wireName,
+              arguments: '{"q":"',
+            },
+          ],
+        },
+        omitted,
+      ),
+    ).toThrow(/unknown hashed tool name/i);
+  });
+
+  test("maps a hashed alias only against the tools that request advertised", () => {
+    const longToolName = `mcp.plugin-${"shared-prefix-".repeat(5)}.search`;
+    const wireName = encodeMcpToolNameForWire(longToolName);
+    const response = parseOpenAIResponsesResponse(
+      "muse-wonder-1.0",
+      {
+        status: "completed",
+        output: [
+          {
+            type: "function_call",
+            call_id: "call_search",
+            name: wireName,
+            arguments: "{}",
+          },
+        ],
+      },
+      {
+        model: "muse-wonder-1.0",
+        messages: [],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: longToolName,
+              description: "Search.",
+              parameters: { type: "object", properties: {} },
+            },
+          },
+        ],
+      },
+    );
+    expect(response.toolCalls).toEqual([
+      { id: "call_search", name: longToolName, arguments: "{}" },
+    ]);
+  });
+
+  test("keeps a plain wire name when auto_only omitted the catalog", () => {
+    const response = parseOpenAIResponsesResponse(
+      "muse-wonder-1.0",
+      {
+        status: "completed",
+        output: [
+          {
+            type: "function_call",
+            call_id: "call_plain",
+            name: "shell",
+            arguments: "{}",
+          },
+        ],
+      },
+      {
+        model: "muse-wonder-1.0",
+        messages: [],
+        tools: TEST_TOOLS,
+        toolChoicePolicy: "auto_only",
+        options: { toolChoice: "none" },
+      },
+    );
+    expect(response.toolCalls).toEqual([
+      { id: "call_plain", name: "shell", arguments: "{}" },
+    ]);
   });
 
   test("records responses endpoint markers in request metrics", () => {

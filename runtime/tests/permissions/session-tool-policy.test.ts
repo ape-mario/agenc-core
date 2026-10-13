@@ -32,7 +32,10 @@ import {
   type PermissionMode,
   type ToolPermissionContext,
 } from "../../src/permissions/types.js";
-import { applyUnattendedPermissionPolicyToContext } from "../../src/permissions/unattended-policy.js";
+import {
+  applyUnattendedPermissionPolicyToContext,
+  toolPolicyDenyDecision,
+} from "../../src/permissions/unattended-policy.js";
 import type { Session } from "../../src/session/session.js";
 
 describe("sessionToolPolicyIssue", () => {
@@ -159,6 +162,39 @@ describe("noFsWriteTools", () => {
     const plain = normalizeSessionToolPolicy({ enabledTools });
     expect(sameSessionToolPolicy(granted, plain)).toBe(false);
     expect(sameSessionToolPolicy(granted, normalizeSessionToolPolicy({ enabledTools: [...enabledTools].reverse(), noFsWriteTools: ["mcp.task.view_task"] }))).toBe(true);
+  });
+
+  it("accepts plugin-scoped MCP names and restores the grant from metadata", () => {
+    const policy = {
+      enabledTools: ["system.searchTools", "mcp.plugin:srv.tool-1", "FileRead"],
+      noFsWriteTools: ["mcp.plugin:srv.tool-1"],
+    };
+    expect(sessionToolPolicyIssue(policy)).toBeUndefined();
+    const normalized = normalizeSessionToolPolicy(policy);
+    expect(sessionToolPolicyNoFsWriteTools(normalized, "plugin:srv")).toEqual(["tool-1"]);
+    expect(sessionToolPolicyNoFsWriteTools(normalized, "plugin")).toBeUndefined();
+    expect(
+      sessionToolPolicyFromMetadata({ [TOOL_POLICY_METADATA_KEY]: policy }),
+    ).toEqual(normalized);
+    expect(
+      sameSessionToolPolicy(
+        normalized,
+        sessionToolPolicyFromMetadata({ [TOOL_POLICY_METADATA_KEY]: policy })!,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("toolPolicyDenyDecision", () => {
+  it("is a bypass-immune deny with a stable audit reason", () => {
+    expect(toolPolicyDenyDecision("system.bash")).toEqual({
+      behavior: "deny",
+      message: "Permission to use system.bash was denied: it is not enabled for this session.",
+      decisionReason: {
+        type: "other",
+        reason: "session tool policy: system.bash is not enabled",
+      },
+    });
   });
 });
 
