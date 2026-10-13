@@ -712,6 +712,23 @@ const isSessionUsage: Validator<
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
+const isGoalBaselinePath: Validator<string> = (value): value is string =>
+  typeof value === "string" && value.length > 0 &&
+  !/^(?:[\\/]|[A-Za-z]:)/u.test(value) &&
+  !value.split(/[\\/]/u).some((part) => part === ".." || part === ".");
+const isGoalFileMode: Validator<number> = (value): value is number =>
+  isNonNegativeInteger(value) && value <= 0o7777;
+const isGoalContentHash: Validator<string> = (value): value is string =>
+  typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+const isGoalBaselineFile = objectShape({
+  path: isGoalBaselinePath,
+  identity: nullable(objectShape({
+    kind: oneOf("file", "symlink"),
+    mode: isGoalFileMode,
+    sha256: isGoalContentHash,
+  })),
+});
+
 const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
   session_meta: objectShape(
     {
@@ -1052,6 +1069,11 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
         },
         {
           baseCommit: isString,
+          worktreeBaseline: objectShape({
+            version: literal(1),
+            trackedChanges: arrayOf(isGoalBaselineFile),
+            untrackedFiles: arrayOf(isGoalBaselineFile),
+          }),
           pauseReason: isString,
           lastVerdict: objectShape({
             verdict: oneOf(

@@ -49,6 +49,7 @@ import { buildLiveToolDispatchOptions } from "../phases/execute-tools.js";
 import { isGoalRestorable, type SessionGoal } from "../goal/goal.js";
 import { buildSessionGoal } from "../goal/intake.js";
 import { defaultGoalGateDeps, resolveGoalBaseCommit } from "../goal/runtime-deps.js";
+import { captureGoalWorkingTreeBaseline } from "../goal/worktree-baseline.js";
 import {
   commitSessionGoal,
   getSessionGoal,
@@ -2404,7 +2405,11 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
             defaultMaxRounds: active.bootstrap.configStore.current().goal?.max_rounds,
           });
           if (!built.ok) return refuse(built.message);
-          return reply(commitSessionGoal(session, built.goal, "set"), {
+          const baseline = await captureGoalWorkingTreeBaseline(cwd, built.goal.baseCommit);
+          return reply(commitSessionGoal(session, {
+            ...built.goal,
+            ...(baseline === undefined ? {} : { worktreeBaseline: baseline }),
+          }, "set"), {
             detectedVerification: built.detected,
           });
         }
