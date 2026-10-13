@@ -334,6 +334,20 @@ describe("command-specific deny floor", () => {
     const tool = makeTool({ name: "exec_command", checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
     expect((await hasPermissionsToUseTool(tool, { cmd: "printf ALLOWED" }, context)).behavior).toBe("allow");
   });
+  it("matches executable fields even when unused command or args fields are supplied", async () => {
+    const { context } = buildHarness({
+      allowRules: [{ toolName: "exec_command" }],
+      denyRules: [{ toolName: "exec_command", ruleContent: "printf DENIED" }],
+    });
+    for (const [name, input] of [
+      ["exec_command", { cmd: "printf DENIED", command: "printf ALLOWED", args: ["ALLOWED"] }],
+      ["write_stdin", { chars: "printf DENIED\n", cmd: "printf ALLOWED", command: "printf ALLOWED" }],
+      ["system.bash", { command: "printf", args: ["DENIED"], cmd: "printf ALLOWED" }],
+    ] as const) {
+      const tool = makeTool({ name, checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
+      expect((await hasPermissionsToUseTool(tool, input, context)).behavior).toBe("deny");
+    }
+  });
 });
 
 describe("hasPermissionsToUseTool — step 1d tool returns deny", () => {

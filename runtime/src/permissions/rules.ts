@@ -336,13 +336,15 @@ function shellContentRuleForInput(
   if (!SHELL_TOOL_FAMILY.includes(toolName) || input === undefined) return null;
   const rules = getRuleByContentsForTool(ctx, toolName, behavior);
   if (rules.size === 0) return null;
-  const command = typeof input.cmd === "string" ? input.cmd
-    : typeof input.command === "string" ? input.command
-    : toolName === "write_stdin" && typeof input.chars === "string" ? input.chars
-    : undefined;
+  // Ignore unused fields: they must not hide the command the tool executes.
+  const command = toolName === "exec_command"
+    ? typeof input.cmd === "string" ? input.cmd : undefined
+    : toolName === "write_stdin"
+      ? typeof input.chars === "string" ? input.chars : undefined
+      : typeof input.command === "string" ? input.command : undefined;
   if (command === undefined || command.trim().length === 0) return null;
   // system.bash also accepts direct command/args invocations.
-  const fullCommand = Array.isArray(input.args) && input.args.every((arg) => typeof arg === "string")
+  const fullCommand = toolName === "system.bash" && Array.isArray(input.args) && input.args.every((arg) => typeof arg === "string")
     ? [command, ...input.args].join(" ") : command;
   const pending = [fullCommand.trim()];
   const seen = new Set<string>();
