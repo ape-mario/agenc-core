@@ -916,7 +916,6 @@ function PromptInput({
   const promptModalOverlayActive =
     isExternalEditorActive ||
     upstreamModalOverlayActive ||
-    showModeSwitcher ||
     showAutoModeOptIn ||
     autoModeOptInPreview ||
     Boolean(showBashesDialog);
@@ -2736,6 +2735,7 @@ function PromptInput({
       action: "chat:submit",
       context: "Chat",
       handler: () => {
+        dismissModeSwitcherToast();
         const currentInput = lastInternalInputRef.current;
         const offset = cursorOffsetRef.current;
         if (currentInput[offset - 1] === "\\") {
@@ -2747,7 +2747,7 @@ function PromptInput({
         void onSubmit(currentInput);
       },
     });
-  }, [keybindingContext, promptKeyboardActive, onSubmit, trackAndSetInput, setCurrentCursorOffset, pushToBuffer]);
+  }, [keybindingContext, promptKeyboardActive, onSubmit, trackAndSetInput, setCurrentCursorOffset, pushToBuffer, dismissModeSwitcherToast]);
 
   // Chat context keybindings for editing shortcuts
   // Note: history:previous/history:next are NOT handled here. They are passed as

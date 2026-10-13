@@ -94,6 +94,7 @@ function makeRunnerHarness(opts: {
   };
   const rolloutItems: unknown[] = [];
   let lastSeq = 0;
+  let internalEventId = 0;
   const configStore = {
     projectRoot: process.cwd(),
     stateRepository: {
@@ -162,6 +163,7 @@ function makeRunnerHarness(opts: {
     ),
   });
   const session = {
+    nextInternalSubId: () => `config-context-${++internalEventId}`,
     abortController: new AbortController(),
     abortTerminal: vi.fn(),
     conversationId,

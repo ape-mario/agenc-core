@@ -20,6 +20,8 @@ import type { PhaseEvent } from "../phases/events.js";
 import { clearSystemPromptSections } from "../prompts/sections.js";
 import type { Session } from "../session/session.js";
 import { asRecord } from "../utils/record.js";
+import { DEFAULT_TASK_TOKEN_BUDGET } from "../config/task-budget.js";
+import { setSessionTaskTokenBudget } from "../session/task-budget.js";
 import {
   safeExecute,
   type SlashCommand,
@@ -109,6 +111,12 @@ export async function clearSession(session: Session): Promise<void> {
         s.history.length = 0;
       }
     });
+    // Checkpoint choices apply only to this conversation. Restore the
+    // resolved saved/CLI/project allowance, retaining all spent usage.
+    const configStore = session.services.configStore;
+    if (session.config !== undefined && configStore?.current !== undefined) {
+      setSessionTaskTokenBudget(session, configStore.current().task_token_budget ?? DEFAULT_TASK_TOKEN_BUDGET);
+    }
   }
 
   clearSystemPromptSections();

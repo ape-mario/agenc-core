@@ -10,6 +10,8 @@ vi.mock("../prompts/sections.js", () => ({
 }));
 
 import { clearSystemPromptSections } from "../prompts/sections.js";
+import { mkSession } from "../fixtures.js";
+import { taskBudgetOf, setSessionTaskTokenBudget } from "../session/task-budget.js";
 
 function stubSession(opts: {
   history?: unknown[];
@@ -54,6 +56,19 @@ function mkctx(session: Session): SlashCommandContext {
 }
 
 describe("clearCommand", () => {
+  it("restores the configured cap after checkpoint Remove without erasing spent usage", async () => {
+    const { session } = mkSession();
+    Object.assign(session.config, { taskTokenBudget: 100 });
+    const budget = taskBudgetOf(session)!;
+    budget.tokens = 63;
+    budget.calls = 2;
+    Object.assign(session.services, { configStore: { current: () => ({ task_token_budget: 100 }) } });
+    setSessionTaskTokenBudget(session, 0, true);
+    await clearSession(session);
+    expect(session.config.taskTokenBudget).toBe(100);
+    expect(taskBudgetOf(session)!.tokens).toBe(63);
+    expect(taskBudgetOf(session)!.calls).toBe(2);
+  });
   it("exposes only explicit destructive aliases and is immediate", () => {
     expect(clearCommand.aliases).toEqual(["reset", "new"]);
     expect(clearCommand.immediate).toBe(true);

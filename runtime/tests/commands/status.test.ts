@@ -63,6 +63,10 @@ describe("statusCommand", () => {
     const session = Object.assign(stubSession(), { config: { taskTokenBudget: 2_400_000 } });
     expect(collectStatus(session, "/ws", 5000)).toContainEqual({ key: "Task budget", value: "balanced (2,400,000 tokens)" });
   });
+  it("shows saved max from a cold canonical config before materialization", () => {
+    const session = Object.assign(stubSession(), { config: { task_token_budget: 0, budget_level: "max" } });
+    expect(collectStatus(session as never, "/ws", 5000)).toContainEqual({ key: "Task budget", value: "max (no token cap)" });
+  });
   it("collects sessionId, cwd, model, provider, turn count, uptime, permission mode", () => {
     const registry = new PermissionModeRegistry(
       createEmptyToolPermissionContext({ mode: "acceptEdits" }),

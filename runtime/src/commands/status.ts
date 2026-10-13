@@ -1,4 +1,4 @@
-import { DEFAULT_TASK_TOKEN_BUDGET, taskBudgetLabel } from "../config/task-budget.js";
+import { sessionTaskTokenBudget, taskBudgetLabel } from "../config/task-budget.js";
 /**
  * `/status` — show session/runtime status.
  *
@@ -198,7 +198,7 @@ export function collectStatus(
   const selection = readSessionSelection(session, { includePending: true });
   lines.push({ key: "Model", value: selection.model });
   lines.push({ key: "Provider", value: selection.provider });
-  lines.push({ key: "Task budget", value: session.config === undefined ? "unavailable" : taskBudgetLabel(session.config.taskTokenBudget ?? DEFAULT_TASK_TOKEN_BUDGET) });
+  lines.push({ key: "Task budget", value: session.config === undefined ? "unavailable" : taskBudgetLabel(sessionTaskTokenBudget(session.config)) });
 
   // Turn count: prefer the daemon snapshot when available (bridge
   // sessions have no local `state.history`), then the in-process
