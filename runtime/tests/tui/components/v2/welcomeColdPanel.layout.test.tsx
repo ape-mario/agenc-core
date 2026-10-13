@@ -45,6 +45,7 @@ describe('WelcomeColdPanel layout', () => {
 
   // Monochrome-theme SGR truecolor sequences.
   const INACTIVE_SGR = '\u001b[38;2;112;112;112m'
+  const SECONDARY_SGR = '\u001b[38;2;178;178;178m'
   const INK_SGR = '\u001b[38;2;255;255;255m'
 
   // Adjacent Ink Text nodes may insert reset/style SGR codes between the
@@ -56,7 +57,7 @@ describe('WelcomeColdPanel layout', () => {
     return prefix.match(/\u001b\[38;2;[0-9;]+m/gu)?.at(-1)
   }
 
-  it('mutes the keys and the version and inks the labels and the name', async () => {
+  it('mutes keys and version, uses secondary labels, and keeps the name primary', async () => {
     const out = await renderToAnsiString(<WelcomeColdPanel />, {
       columns: 120,
       rows: 40,
@@ -64,8 +65,8 @@ describe('WelcomeColdPanel layout', () => {
     })
 
     expect(sgrBefore(out, 'shift+tab')).toBe(INACTIVE_SGR)
-    expect(sgrBefore(out, 'change mode')).toBe(INK_SGR)
-    expect(sgrBefore(out, 'attach files')).toBe(INK_SGR)
+    expect(sgrBefore(out, 'change mode')).toBe(SECONDARY_SGR)
+    expect(sgrBefore(out, 'attach files')).toBe(SECONDARY_SGR)
     expect(sgrBefore(out, 'agenc')).toBe(INK_SGR)
     expect(sgrBefore(out, VERSION)).toBe(INACTIVE_SGR)
   })
