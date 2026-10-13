@@ -3,6 +3,7 @@ import { COMPACTION_READER_RUNTIME_CAPABILITY } from "../session/compaction-even
 import { REDACTED_SECRET } from "../secrets/sanitizer.js";
 import { runtimeSettingsEqual } from "./runtime-settings-snapshot.js";
 import { createHash, type Hash } from "node:crypto";
+import { isLegacyConfiguredCacheWithinCeiling, recoveryPendingLineCeiling } from "./session-configured-cache.js";
 import {
   parseRolloutLine,
   ROLLOUT_ITEM_VERSION,
@@ -294,7 +295,7 @@ export class StrictCanonicalJournalValidator {
       this.#pendingChunks.push(tail);
       this.#pendingByteLength += tail.byteLength;
     }
-    if (this.#pendingByteLength > this.#maxLineBytes + 1) {
+    if (this.#pendingByteLength > recoveryPendingLineCeiling(this.#pendingChunks, this.#maxLineBytes) + 1) {
       this.#fail(
         "line_byte_limit",
         "canonical journal record exceeds its line byte ceiling",
@@ -440,7 +441,8 @@ export class StrictCanonicalJournalValidator {
     if (content.at(-1) === CARRIAGE_RETURN_BYTE) {
       content = content.subarray(0, -1);
     }
-    if (content.byteLength > this.#maxLineBytes) {
+    if (content.byteLength > this.#maxLineBytes &&
+      !isLegacyConfiguredCacheWithinCeiling(content, this.#maxLineBytes)) {
       this.#fail(
         "line_byte_limit",
         "canonical journal record exceeds its line byte ceiling",

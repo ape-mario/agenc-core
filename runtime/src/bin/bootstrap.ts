@@ -471,7 +471,7 @@ function transcriptEventsFromRollout(
 function transcriptMessagesFrom(
   events: ReadonlyArray<BootstrapTranscriptEvent>,
 ): EventMsg[] {
-  return events.map(
+  return events.filter((event) => event.type !== "session_configured").map(
     (event) =>
       ({
         type: event.type,
