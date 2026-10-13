@@ -3005,6 +3005,28 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     };
   }
 
+  async removeMcpServer(
+    agentId: string,
+    params: AgenCBackgroundAgentMcpServerByNameParams,
+  ): Promise<McpServerMutationResult> {
+    const active = this.#active.get(agentId);
+    if (active === undefined || !isRunnableActiveAgent(active)) {
+      throw new Error(`AgenC daemon agent not running: ${agentId}`);
+    }
+    const removeServer =
+      active.bootstrap.session.services.mcpManager.removeServer;
+    if (typeof removeServer !== "function") {
+      throw new Error("MCP remove is not available for this daemon session.");
+    }
+    const result = await removeServer(params.serverName);
+    return {
+      serverName: result.serverName,
+      success: result.success,
+      toolCount: result.toolCount,
+      ...(result.error !== undefined ? { error: result.error } : {}),
+    };
+  }
+
   async listAgentSessionProcesses(agentId: string): Promise<SessionProcessesListResult> {
     const active = this.#active.get(agentId);
     if (active === undefined || !isRunnableActiveAgent(active)) {

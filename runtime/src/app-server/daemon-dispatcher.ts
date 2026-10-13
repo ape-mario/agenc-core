@@ -510,6 +510,10 @@ function buildServerCapabilities(
       agentManager,
       "disableMcpServerOnSession",
     ),
+    "session.mcp.removeServer": hasMethod(
+      agentManager,
+      "removeMcpServerOnSession",
+    ),
   } satisfies Record<AgenCDaemonKnownMethod, boolean>;
 
   const knownMethods = [
@@ -564,6 +568,7 @@ export interface AgenCDaemonDispatcherOptions {
     | "reconnectMcpServerOnSession"
     | "enableMcpServerOnSession"
     | "disableMcpServerOnSession"
+    | "removeMcpServerOnSession"
     | "partialCompactFromMessage"
     | "rollbackCompaction"
     | "extendCompactionRollbackRetention"
@@ -700,6 +705,7 @@ export class AgenCDaemonJsonRpcDispatcher {
     | "reconnectMcpServerOnSession"
     | "enableMcpServerOnSession"
     | "disableMcpServerOnSession"
+    | "removeMcpServerOnSession"
     | "partialCompactFromMessage"
     | "rollbackCompaction"
     | "extendCompactionRollbackRetention"
@@ -1684,6 +1690,12 @@ export class AgenCDaemonJsonRpcDispatcher {
         if (unbound !== undefined) return unbound;
         return successResponse(id, await this.#agentManager.disableMcpServerOnSession(validated));
       }
+      case "session.mcp.removeServer": {
+        const validated = validateSessionMcpServerByNameParams(params, "session.mcp.removeServer");
+        const unbound = await this.#approverBindingError(id, connection, method, validated.sessionId);
+        if (unbound !== undefined) return unbound;
+        return successResponse(id, await this.#agentManager.removeMcpServerOnSession(validated));
+      }
       case "session.partialCompactFromMessage":
         return successResponse(
           id,
@@ -2155,7 +2167,8 @@ export class AgenCDaemonJsonRpcDispatcher {
       | "session.mcp.addServer"
       | "session.mcp.reconnectServer"
       | "session.mcp.enableServer"
-      | "session.mcp.disableServer",
+      | "session.mcp.disableServer"
+      | "session.mcp.removeServer",
     sessionId: string,
   ): Promise<AgenCDaemonResponse | undefined> {
     if (connection.remoteAccess !== undefined) return undefined;

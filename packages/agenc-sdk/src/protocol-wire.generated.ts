@@ -1353,6 +1353,7 @@ export const AGENC_DAEMON_INTERNAL_METHODS = [
     "session.mcp.reconnectServer",
     "session.mcp.enableServer",
     "session.mcp.disableServer",
+    "session.mcp.removeServer",
 ] as const;
 
 export type AgenCDaemonInternalMethod = (typeof AGENC_DAEMON_INTERNAL_METHODS)[number];

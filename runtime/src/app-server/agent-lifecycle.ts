@@ -3601,6 +3601,38 @@ export class AgenCDaemonAgentManager {
     };
   }
 
+  async removeMcpServerOnSession(
+    params: SessionMcpServerByNameParams,
+  ): Promise<SessionMcpServerMutationResult> {
+    if (this.#sessionManager === undefined) {
+      throw new AgenCDaemonAgentLifecycleError(
+        "INVALID_ARGUMENT",
+        "session.mcp.removeServer requires a daemon session manager",
+      );
+    }
+    if (this.#runner?.removeMcpServer === undefined) {
+      throw new AgenCDaemonAgentLifecycleError(
+        "BACKGROUND_RUNNER_UNAVAILABLE",
+        "session.mcp.removeServer requires a background runner",
+      );
+    }
+    const agentId = await this.#resolveActiveAgentIdForSession(
+      params.sessionId,
+      { allowMcpRemoveServer: true },
+    );
+    const result = await this.#runner.removeMcpServer(agentId, {
+      sessionId: params.sessionId,
+      serverName: params.serverName,
+    });
+    return {
+      sessionId: params.sessionId,
+      serverName: result.serverName,
+      success: result.success,
+      toolCount: result.toolCount,
+      ...(result.error !== undefined ? { error: result.error } : {}),
+    };
+  }
+
   async listSessionProcesses(
     params: SessionProcessesListParams,
   ): Promise<SessionProcessesListResult> {
@@ -4490,6 +4522,7 @@ export class AgenCDaemonAgentManager {
       readonly allowMcpReconnectServer?: boolean;
       readonly allowMcpEnableServer?: boolean;
       readonly allowMcpDisableServer?: boolean;
+      readonly allowMcpRemoveServer?: boolean;
       readonly allowSnapshot?: boolean;
       readonly allowProcessControl?: boolean;
       readonly allowSetModel?: boolean;
@@ -4549,6 +4582,9 @@ export class AgenCDaemonAgentManager {
     const hasMcpDisableServerRunner =
       options.allowMcpDisableServer === true &&
       this.#runner?.disableMcpServer !== undefined;
+    const hasMcpRemoveServerRunner =
+      options.allowMcpRemoveServer === true &&
+      this.#runner?.removeMcpServer !== undefined;
     const hasSnapshotRunner =
       options.allowSnapshot === true &&
       this.#runner?.snapshotAgentSession !== undefined;
@@ -4601,6 +4637,7 @@ export class AgenCDaemonAgentManager {
       !hasMcpReconnectServerRunner &&
       !hasMcpEnableServerRunner &&
       !hasMcpDisableServerRunner &&
+      !hasMcpRemoveServerRunner &&
       !hasSnapshotRunner &&
       !hasProcessControlRunner &&
       !hasSetModelRunner &&

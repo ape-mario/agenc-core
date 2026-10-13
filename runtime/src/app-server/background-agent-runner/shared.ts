@@ -587,6 +587,10 @@ export interface AgenCBackgroundAgentRunner {
     agentId: string,
     params: AgenCBackgroundAgentMcpServerByNameParams,
   ): Promise<McpServerMutationResult>;
+  removeMcpServer?(
+    agentId: string,
+    params: AgenCBackgroundAgentMcpServerByNameParams,
+  ): Promise<McpServerMutationResult>;
   getMcpStatus?(agentId: string): Promise<McpSurfaceSnapshot>;
   partialCompactFromMessage?(
     agentId: string,

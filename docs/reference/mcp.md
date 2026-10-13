@@ -229,6 +229,9 @@ Built-in helpers that help the agent work with MCP resources:
 Slash: `/mcp` opens the MCP connection menu in the TUI. `/mcp status` and
 `/mcp list` show server state; `/mcp tools [server]` inspects tools; and
 `/mcp reconnect|enable|disable <server>` applies session-scoped connection
+
+`/mcp remove <server>` removes a server added for the current session. The MCP menu offers the same action with `d`. Removing a session addition retires its tools and restores any configured server it shadowed. Configured servers must be removed from their configuration source.
+
 changes. `/mcp add <server> <command> [args...]` imports a session-scoped stdio
 server without editing `config.toml`. `/mcp new` (alias `/mcp create`) scaffolds
 a dependency-free project-local stdio server and connects it for the session.
@@ -592,3 +595,8 @@ the daemon-owned admission kernel.
 - Admission token accounting: [`provider-aware-token-accounting.md`](../design/provider-aware-token-accounting.md)
 - Client README: [`../../runtime/src/mcp-client/README.md`](../../runtime/src/mcp-client/README.md)
 - Architecture map: [`../ARCHITECTURE.md`](../ARCHITECTURE.md)
+
+
+## Remove a session server
+
+`/mcp remove <server>` removes a server added for the current session. The MCP menu offers the same action with `d`. Removal retires the added tools and restores any configured server that the session addition shadowed. Remove configured servers from their configuration source.

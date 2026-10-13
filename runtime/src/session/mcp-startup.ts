@@ -1585,6 +1585,24 @@ export function createSessionMcpService(
       toolCount: enabled ? manager.getToolsByServer(name).length : 0,
     };
   };
+  const removeSessionServerUnlocked = async (name: string): Promise<McpServerMutationResult> => {
+    const baseline = overlay;
+    if (!baseline.servers.has(name)) {
+      return mcpMutationFailure(name, new Error(`MCP server "${name}" is not a session addition. Edit its configuration to remove it.`));
+    }
+    const servers = new Map(baseline.servers);
+    servers.delete(name);
+    const candidate = { servers, enabledOverrides: new Map(baseline.enabledOverrides) };
+    try {
+      // Reconcile through canonical policy so removing a shadow restores its
+      // current configured definition and retires every removed tool bridge.
+      const reconciled = await reconcileOverlayState(candidate);
+      overlay = reconciled.overlay;
+      return { serverName: name, success: true, toolCount: manager.getToolsByServer(name).length };
+    } catch (error) {
+      return mcpMutationFailure(name, await rollbackMutation(baseline, error));
+    }
+  };
   const addSessionServerUnlocked = async (
     config: McpSessionServerConfig,
     replace = false,
@@ -1966,6 +1984,8 @@ export function createSessionMcpService(
       enqueueServerMutation(name, () => setServerEnabledUnlocked(name, true)),
     disableServer: (name) =>
       enqueueServerMutation(name, () => setServerEnabledUnlocked(name, false)),
+    removeServer: (name) =>
+      enqueueServerMutation(name, () => removeSessionServerUnlocked(name)),
     addServer: (config, mutationOptions) => {
       // Snapshot at ingress; callers cannot mutate credentials while queued.
       const snapshot = { ...config, ...(config.headers ? { headers: { ...config.headers } } : {}),
