@@ -129,7 +129,7 @@ function getPreservedSelection(
   );
 
   // Return the new index if found, otherwise default to 0
-  return newIndex >= 0 ? newIndex : 0;
+  return newIndex >= 0 ? newIndex : Math.min(prevSelection, newSuggestions.length - 1);
 }
 function buildResumeInputFromSuggestion(suggestion: SuggestionItem): string {
   const metadata = suggestion.metadata as
@@ -1007,10 +1007,10 @@ export function useTypeahead({
           commands,
           runtimeState,
         );
-        setSuggestionsState(() => ({
+        setSuggestionsState((prev) => ({
           commandArgumentHint,
           suggestions: commandItems,
-          selectedSuggestion: commandItems.length > 0 ? 0 : -1,
+          selectedSuggestion: getPreservedSelection(prev.suggestions, prev.selectedSuggestion, commandItems),
         }));
         setSuggestionType(commandItems.length > 0 ? "command" : "none");
 
