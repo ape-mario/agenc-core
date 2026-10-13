@@ -1,3 +1,4 @@
+import { installPreparedCompactionPressure } from "../helpers/prepared-compaction-pressure.js";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { LLMMessage, LLMResponse } from "../../src/llm/types.js";
 import type { TokenAccountingRequest } from "../../src/llm/token-accounting.js";
@@ -23,6 +24,7 @@ function createToolExercise(toolRounds: number, largeResultAt?: number) {
   const requests: LLMMessage[][] = [];
   const outputLimits: Array<number | undefined> = [];
   const provider = mkProvider();
+  installPreparedCompactionPressure(provider, request => JSON.stringify(request.messages).includes("fresh oversized result") ? 4_097 : request.messages.some(m => m.role === "tool") ? 3_050 : 100);
   provider.chatStream = async (messages, _onChunk, options): Promise<LLMResponse> => {
     requests.push([...messages]);
     outputLimits.push(options?.maxOutputTokens);
@@ -102,7 +104,7 @@ describe("advisory compaction refusal", () => {
 
     await drain(runTurn(exercise.session, exercise.ctx, "finish the implementation"));
 
-    expect(exercise.samples()).toBe(5);
+    expect(exercise.samples(), JSON.stringify(exercise.events.map(event => event.msg))).toBe(5);
     expect(compact.mock.calls.filter((call) => call[4] === "before_last_user_message"))
       .toHaveLength(1);
     expect(JSON.stringify(exercise.requests.at(-1))).toContain("fresh result 4");
@@ -265,6 +267,7 @@ describe("advisory compaction refusal", () => {
 
   test("keeps swarm guidance advisory through mandatory re-preparation", async () => {
     const exercise = createToolExercise(0);
+    installPreparedCompactionPressure(exercise.session.services.provider, request => JSON.stringify(request.messages).includes("parallel implementation") ? 4_097 : 100);
     const tracking = getAttachmentTrackingState(exercise.session);
     tracking.lastSwarmRoutingTurnId = exercise.ctx.subId;
     tracking.lastSwarmRoutingDecision = {
