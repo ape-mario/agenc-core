@@ -27,6 +27,7 @@ import {
   appendVolatileInstructions,
   sessionTailCacheEnabled,
 } from "./session-tail-cache.js";
+import { thinkingOffHoldActive, thinkingOffHoldEnabled } from "./thinking-off-hold.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Prompt + tool building
@@ -236,7 +237,9 @@ function buildSamplingRequestContract(
     } }, getSelectedProviderEnvironment()),
     ...(state.reasoningOnlyRecoveryPending === true
       ? { reasoningOnlyRecovery: true as const }
-      : {}),
+      : thinkingOffHoldActive(state) && thinkingOffHoldEnabled(session)
+        ? { thinkingOffHold: true as const }
+        : {}),
     ...(state.maxOutputTokensOverride !== undefined
       ? { maxOutputTokens: state.maxOutputTokensOverride }
       : {}),
