@@ -166,10 +166,8 @@ function effortMenuSnapshot(
   const levels = getAvailableEffortLevelsForContext(model, providerAuthContext);
   const explicit = currentEffortValue(ctx) ??
     reasoningEffortToEffortLevel(getSettingsForSource("userSettings")?.reasoning_effort);
-  const current =
-    typeof explicit === "string" && (levels as readonly string[]).includes(explicit)
-      ? explicit
-      : "default";
+  const effective = getSessionEffortLabelForContext(model, explicit as never, providerAuthContext);
+  const current = levels.find(level => effective === `${level} effort`) ?? "default";
   const modelDefault = getModelDefaultReasoningEffortForContext(model, providerAuthContext);
   const rows: EffortMenuRow[] = [
     {
@@ -234,6 +232,12 @@ export const effortCommand: SlashCommand = {
         if (
           typeof ctx.appState?.setToolJSX === "function" &&
           (await import("./effort-menu.js")).openEffortMenu(ctx, snapshot, async (choice) => {
+            // Enter on the current effective row only closes the picker.
+            // In particular, it must not rewrite an unsupported saved choice
+            // or pin a session that currently follows the model default.
+            if (choice === snapshot.rows[snapshot.activeIndex]?.choice) {
+              return { message: "Effort unchanged.", shouldClose: true };
+            }
             // The picker applies from a key press, after the dispatcher's
             // settings scope ended; bind this invocation's store again.
             const apply = () =>

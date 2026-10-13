@@ -91,6 +91,7 @@ import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext }
 import { readSessionSelection } from "../../session/provider-model-selection.js";
 import {
   getSessionEffortLabelForContext,
+  getUnsupportedEffortNoticeForContext,
   modelSupportsEffortForContext,
 } from "../../utils/effort.js";
 import {
@@ -2687,6 +2688,20 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       context,
     );
   }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel]);
+  const notifiedUnsupportedEfforts = useRef(new Set<string>());
+  useEffect(() => {
+    const selection = readSessionSelection(props.session, { includePending: true });
+    if (selection.provider === "unknown" || selection.model === "unknown") return;
+    // The generic config default is not a saved choice by this user.
+    if (props.session.services.configStore?.provenance?.("reasoning_effort")?.scope === "default") return;
+    const context = { ...remoteAuthSessionContext, provider: selection.provider };
+    const text = getUnsupportedEffortNoticeForContext(selection.model, statusEffortValue, context);
+    if (text === undefined) return;
+    const key = `${selection.provider}:${selection.model}:${statusEffortValue}`;
+    if (notifiedUnsupportedEfforts.current.has(key)) return;
+    notifiedUnsupportedEfforts.current.add(key);
+    addNotification({ key: "unsupported-effort", text, priority: "high", timeoutMs: 15000 });
+  }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel, addNotification]);
   const contextUsagePercent = useMemo(() => {
     if (props.session.getDaemonSessionSnapshot !== undefined) {
       if (residentContext?.session !== props.session ||
