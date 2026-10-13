@@ -851,6 +851,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         }
         const firstSubmitOptions: DaemonSessionSubmitOptions = {
           [DAEMON_USER_PROMPT_PREPARED]: true as const,
+          clientMessageId: `user-initial-${managedThread.threadId}`,
           displayUserMessage:
             params.initialDisplayUserMessage === undefined
               ? messageContentDisplayText(transcriptContent)
@@ -2828,6 +2829,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       });
     }
     const submitOptions: DaemonHumanSessionSubmitOptions = {
+      clientMessageId: params.messageId,
       ...(params.exactOutput !== undefined ? { exactOutput: params.exactOutput } : {}),
       [DAEMON_USER_STOP_GENERATION]: userStopGenerationToRelease,
       [DAEMON_LOCAL_MCP_ACCESS]: params.localMcpAccess === true,
@@ -6055,6 +6057,12 @@ function installDaemonTurnDriverHooks(
           querySource: "sdk",
           exactOutput: opts?.exactOutput,
           displayUserMessage: null,
+          ...(rootHumanTurnText !== undefined && opts?.clientMessageId !== undefined
+            ? { seedUserMessageRuntimeOnly: {
+                userMessageId: opts.clientMessageId,
+                responseItemId: opts.clientMessageId,
+              } }
+            : {}),
           ...(opts?.[DAEMON_USER_STOP_GENERATION] !== undefined
             ? { userStopGenerationToRelease: opts[DAEMON_USER_STOP_GENERATION] }
             : {}),

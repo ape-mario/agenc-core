@@ -40,7 +40,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { collectShellWorkspaceDeletionTargets } from "../llm/shell-write-policy.js";
 import { monotonicMs } from "./_deps/utils.js";
 import { DegradedStore } from "./degraded-store.js";
@@ -698,7 +698,10 @@ export class FileHistorySidecar implements Sidecar {
         this.lastEditStartedAtMs = monotonicMs();
         const args = this.tryParseArgs(msg.payload.args);
         for (const filePath of extractEditedFilePaths(args)) {
-          void this.history.trackEdit(filePath, event.id);
+          // Daemon cwd is AGENC_HOME, while tool paths are relative to the
+          // session workspace. Backups and restores must use the tool path.
+          void this.history.trackEdit(this.workspaceRoot === undefined
+            ? filePath : resolve(this.workspaceRoot, filePath), event.id);
         }
       } else {
         const deleted = this.shellDeletionPaths(

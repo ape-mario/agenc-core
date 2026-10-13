@@ -2272,6 +2272,7 @@ async function* runTurnKernelInner(
     user.runtimeOnly = {
       ...user.runtimeOnly,
       userMessageId: seedUserMessageId,
+      responseItemId: seedUserMessageId,
     };
   }
   let state: TurnState = buildInitialTurnState(ctx, user, {
