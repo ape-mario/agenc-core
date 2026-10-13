@@ -559,7 +559,11 @@ function validProvider(gate?: Promise<void>): CompactHarness["provider"] {
       supportsMaxOutputTokens: true,
     }),
     chat,
-    chatStream: chat,
+    chatStream: (async (messages, onChunk, options) => {
+      const response = await Reflect.apply(chat, undefined, [messages, options]) as LLMResponse;
+      onChunk({ content: response.content, done: true });
+      return response;
+    }) satisfies LLMProvider["chatStream"],
     healthCheck: async () => true,
     tokenCountCapability: {
       capabilityVersion: "compact-test-v1",

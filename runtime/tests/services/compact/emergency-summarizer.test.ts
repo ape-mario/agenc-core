@@ -81,7 +81,7 @@ describe("runtime emergency summarizer", () => {
   // The rollout store requires integrity metadata on tool results; the
   // durable-path cases use text-only history and leave tool handling to the
   // pure summarizer cases above.
-  const durableSource = Array.from({ length: 8 }, (_, index) => ({
+  const durableSource = Array.from({ length: 20 }, (_, index) => ({
     role: index % 2 === 0 ? "user" as const : "assistant" as const,
     content: index === 0
       ? `Please migrate the parity scorer. ${"context ".repeat(300)}`
@@ -105,7 +105,8 @@ describe("runtime emergency summarizer", () => {
       expect(lifecycle.map((item) => item.type)).toEqual(["compaction_intent", "compaction_committed"]);
       const committed = lifecycle.at(-1) as { payload: { summary: { body: { narrative: string; tool_pairs: unknown[] } }; replacement_history: unknown[] } };
       expect(committed.payload.summary.body.narrative).toContain("Original request:\nPlease migrate the parity scorer.");
-      expect(committed.payload.summary.body.narrative).toContain("Latest assistant text:\nGrid written; verifying parity next.");
+      expect(committed.payload.summary.body.narrative).toContain("Latest assistant text:\nWorking message 17:");
+      expect(committed.payload.replacement_history).toContainEqual(expect.objectContaining(durableSource.at(-1)!));
       expect(committed.payload.summary.body.tool_pairs).toEqual([]);
       const history = reduceAll(harness.store.readAll()).state.history;
       expect(history.length).toBeLessThan(before.length);

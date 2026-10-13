@@ -1599,6 +1599,7 @@ describe("runTurn — T6 gap #119 lifecycle emits", () => {
     const appendRollout = vi.fn();
     session.rolloutStore = {
       assertCompactionProjectionReady: () => {},
+      assertToolAdmissionAllowed: () => {},
       append: vi.fn(), appendRollout,
       rolloutPath: "/tmp/checkpoint-projection-test.jsonl",
     } as unknown as Session["rolloutStore"];
@@ -1606,6 +1607,8 @@ describe("runTurn — T6 gap #119 lifecycle emits", () => {
     expect(requests).toBe(2);
     const message = (getState().history as LLMMessage[]).find((item) => item.role === "tool");
     expect(message).toBeDefined();
+    expect(message!.content).toContain("ordinary echo output");
+    expect(message!.runtimeOnly?.toolResultIsError).toBeUndefined();
     expect(message!.runtimeOnly?.toolResultIntegrity).toBeDefined();
     expect(appendRollout.mock.calls.some(([item]) => item.type === "response_item" &&
       item.payload.role === "tool" && item.payload.toolResultIntegrity !== undefined)).toBe(true);
@@ -6921,7 +6924,7 @@ describe("runTurn — runAutoCompact dispatcher", () => {
     );
     expect(firstTracking).toBeUndefined();
     expect(firstSnipTokensFreed).toBe(0);
-    expect(firstInitialContextInjection).toBe("do_not_inject");
+    expect(firstInitialContextInjection).toBe("before_last_user_message");
   });
 
   test("pre-sampling compact preserves the caller querySource", async () => {
@@ -7030,7 +7033,7 @@ describe("runTurn — runAutoCompact dispatcher", () => {
         querySource: "repl_main_thread",
       }),
     );
-    expect(calls[0]?.[4]).toBe("do_not_inject");
+    expect(calls[0]?.[4]).toBe("before_last_user_message");
   });
 
   test("autoCompactIfNeeded is NOT called when total usage is below the threshold", async () => {
@@ -7274,13 +7277,14 @@ describe("runTurn — runAutoCompact dispatcher", () => {
         fn({ history, totalTokenUsage: 0 }),
     };
 
-    setAutoCompactImplForTests(async () => ({
+    setAutoCompactImplForTests(async (messages) => ({
       wasCompacted: true,
       compactionResult: {
         message: "POST-COMPACT SUMMARY",
         replacementHistory: [
           { role: "system", content: "POST-COMPACT SUMMARY" },
           { role: "assistant", content: "KEPT TAIL" },
+          ...messages.filter(message => message.role === "user" && Array.isArray(message.content)),
         ],
         preCompactTokens: 999,
         postCompactTokens: 100,
@@ -7340,7 +7344,7 @@ describe("runTurn — runAutoCompact dispatcher", () => {
     const errors = events.filter(
       (e) =>
         e.msg.type === "warning" &&
-        e.msg.payload.cause === "pre_sampling_compact_failed",
+        e.msg.payload.cause === "mid_turn_compact_failed",
     );
     expect(errors.length).toBeGreaterThanOrEqual(1);
     expect(events).toContainEqual(
@@ -7915,7 +7919,7 @@ describe("runTurn — GOAL #4b Stage 1 durable resume continuation", () => {
     expect(cp.taskBudgetRemaining).toBe(9999);
     expect(cp.checkpointVersion).toBe(4);
     expect(cp.toolResultIntegrityVersion).toBe(1);
-    expect(cp.prefixHashVersion).toBe(3);
+    expect(cp.prefixHashVersion).toBe(4);
     expect(
       appendRollout.mock.calls
         .map((call) => call[0])

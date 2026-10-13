@@ -145,7 +145,7 @@ describe("gaphunt3 #41 — auto-compaction does not count aborts as failures", (
 
     // Provider whose summary call throws once aborted. The abort discriminator
     // must surface the cancel rather than swallowing it into a failure count.
-    const messages = [makeMessage("x".repeat(10_000)), makeMessage("recent request")];
+    const messages = [makeMessage("x".repeat(60_000)), makeMessage("recent request")];
     const harness = createCompactionTransactionHarness(messages, {
       compactionMode: "automatic",
       chat: async () => {
@@ -173,7 +173,7 @@ describe("gaphunt3 #41 — auto-compaction does not count aborts as failures", (
   it("classifies a provider AbortError as a cancel even without an aborted controller", async () => {
     const abortError = new Error("aborted");
     abortError.name = "AbortError";
-    const messages = [makeMessage("x".repeat(10_000)), makeMessage("recent request")];
+    const messages = [makeMessage("x".repeat(60_000)), makeMessage("recent request")];
     const harness = createCompactionTransactionHarness(messages, {
       compactionMode: "automatic",
       chat: async () => {
@@ -201,7 +201,7 @@ describe("gaphunt3 #41 — auto-compaction does not count aborts as failures", (
     // failures are deliberately non-fatal) must still increment the
     // circuit-breaker counter so the abort carve-out does not mask genuine
     // failures.
-    const messages = [makeMessage("x".repeat(10_000)), makeMessage("recent request")];
+    const messages = [makeMessage("x".repeat(60_000)), makeMessage("recent request")];
     const harness = createCompactionTransactionHarness(messages, {
       compactionMode: "automatic",
     });

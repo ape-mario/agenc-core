@@ -7,7 +7,7 @@ import { createCompactionTransactionHarness } from "../../helpers/compaction-tra
 
 afterEach(() => vi.restoreAllMocks());
 
-const source = Array.from({ length: 8 }, (_, index) => ({
+const source = Array.from({ length: 20 }, (_, index) => ({
   role: index % 2 === 0 ? "user" as const : "assistant" as const,
   content: `Original message ${index}: ${"preserve exact history ".repeat(150)}`,
 }));

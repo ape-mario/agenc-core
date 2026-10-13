@@ -1073,7 +1073,11 @@ describe("transactional compaction production path", () => {
         await gate;
         return await baseProvider.chat(messages);
       });
-      const provider = { ...baseProvider, chat, chatStream: chat };
+      const provider = { ...baseProvider, chat, chatStream: (async (messages, onChunk, options) => {
+      const response = await Reflect.apply(chat, undefined, [messages, options]) as LLMResponse;
+      onChunk({ content: response.content, done: true });
+      return response;
+    }) satisfies LLMProvider["chatStream"] };
       const controller = new AbortController();
       const attempt = runRealTransaction(store, source, provider, {
         abortController: controller,
@@ -1428,7 +1432,11 @@ function compactionProvider(
       supportsMaxOutputTokens: true,
     }),
     chat,
-    chatStream: chat,
+    chatStream: (async (messages, onChunk, options) => {
+      const response = await Reflect.apply(chat, undefined, [messages, options]) as LLMResponse;
+      onChunk({ content: response.content, done: true });
+      return response;
+    }) satisfies LLMProvider["chatStream"],
     healthCheck: async () => true,
     tokenCountCapability: {
       capabilityVersion: "c2-contract-v1",
