@@ -40,10 +40,10 @@ describe("task allocation", () => {
   });
   it("explains the active limits and how to increase or disable them", () => {
     const summary = new TaskBudget(100, 3).summary("A decisive check is still needed.");
-    expect(summary).toContain("Limits: 100 tokens, 3 model calls");
-    expect(summary).toContain("--task-token-budget");
+    expect(summary).toContain("0 of 100 tokens");
+    expect(summary).toContain("/budget");
     expect(summary).toContain("--task-max-calls");
-    expect(summary).toContain("Use 0 to disable");
+    expect(summary).toContain("raise or remove");
   });
   it("counts inclusive provider reasoning and cached input once", () => {
     expect(taskUsageTokens({promptTokens:100, completionTokens:30, reasoningOutputTokens:20, cachedInputTokens:80, totalTokens:130})).toBe(130);

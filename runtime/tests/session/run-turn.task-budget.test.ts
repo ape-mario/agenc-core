@@ -65,5 +65,5 @@ it("drains the final tool and summarizes when actual usage crosses the token cap
   const phases:PhaseEvent[]=[];
   for await(const phase of runTurn(session,mkCtx(),"Check")) phases.push(phase);
   expect(calls).toBe(1);expect(completed).toBe(true);
-  expect(phases.at(-1)).toMatchObject({stopReason:"task_budget",content:expect.stringContaining("100001 tokens")});
+  expect(phases.at(-1)).toMatchObject({stopReason:"task_budget",content:expect.stringContaining("100001 of 100000 tokens")});
 });

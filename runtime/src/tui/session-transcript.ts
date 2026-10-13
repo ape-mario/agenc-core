@@ -1899,6 +1899,14 @@ export function adaptTranscriptEvents(
   let isStreaming = false;
   const interruptionNotices = new Set<string>();
   let admissionCancellationNoticeUuid: string | null = null;
+  let pendingTaskBudgetNotice: { message: string; uuid: string } | null = null;
+
+  const flushPendingTaskBudgetNotice = (): void => {
+    if (pendingTaskBudgetNotice !== null) {
+      out.push(makeSystemMessage(pendingTaskBudgetNotice.message, "warning", pendingTaskBudgetNotice.uuid));
+      pendingTaskBudgetNotice = null;
+    }
+  };
 
   const persistAssistantText = (
     content: string,
@@ -1958,6 +1966,7 @@ export function adaptTranscriptEvents(
         sessionUsage = latestSessionUsage(sessionUsage, event);
         break;
       case "history_cleared":
+        pendingTaskBudgetNotice = null;
         out.length = 0;
         seen.clear();
         seen.add(event.key);
@@ -1983,6 +1992,7 @@ export function adaptTranscriptEvents(
         isStreaming = false;
         break;
       case "history_replaced": {
+        pendingTaskBudgetNotice = null;
         out.length = 0;
         seen.clear();
         seen.add(event.key);
@@ -2037,6 +2047,7 @@ export function adaptTranscriptEvents(
       case "turn_start":
       case "turn_started":
         if (typeof payload.turnId !== "string" || payload.turnId !== currentTurnId) {
+          flushPendingTaskBudgetNotice();
           lastAssistantText = "";
           lastAssistantTextForActiveTurn = "";
           interruptionNotices.clear();
@@ -2179,7 +2190,9 @@ export function adaptTranscriptEvents(
         suppressedStreamingToolCallIds.clear();
         suppressedStreamingToolInputIndexes.clear();
         pendingToolInputDeltas.clear();
-        if (event.type === "turn_aborted" && payload.reason === "interrupted") {
+        if (event.type === "turn_failed" && payload.code === "task_budget" && lastAssistantText.startsWith("Partial result: stopped at the task budget.")) {
+          pendingTaskBudgetNotice = null;
+        } else if (event.type === "turn_aborted" && payload.reason === "interrupted") {
           if (!interruptionNotices.has("turn")) {
             interruptionNotices.add("turn");
             out.push(makeSystemMessage("Turn interrupted.", "warning", nextUuid()));
@@ -2191,6 +2204,16 @@ export function adaptTranscriptEvents(
         }
         break;
       case "execution_admission":
+        if (payload.event === "denied" && payload.kind === "model_turn" && payload.reason === "budget_exceeded") {
+          const details = payloadRecord(payload.details);
+          const used = typeof details.usedTokens === "number" ? details.usedTokens + (typeof details.heldTokens === "number" ? details.heldTokens : 0) : null;
+          const max = typeof details.maxTokens === "number" ? details.maxTokens : null;
+          pendingTaskBudgetNotice = { uuid: nextUuid(), message:
+            used !== null && max !== null
+              ? `The task used ${used} of ${max} tokens. Type /budget to raise or remove the cap for this session, then continue.`
+              : "A budget limit stopped this task. Type /budget to review the task allowance, then continue. Independent spending limits still apply." };
+          break;
+        }
         if (payload.event === "dispatched" && payload.kind === "model_turn") {
           currentTurnModelCalls += 1;
         }
@@ -2217,6 +2240,7 @@ export function adaptTranscriptEvents(
         }
         break;
       case "user_message":
+        flushPendingTaskBudgetNotice();
         interruptionNotices.clear();
         admissionCancellationNoticeUuid = null;
         // A submitted user message is a hard visible turn boundary. Some
@@ -2358,6 +2382,7 @@ export function adaptTranscriptEvents(
         realtimeStreamingText = "";
         break;
       case "agent_message":
+        if (typeof payload.message === "string" && payload.message.startsWith("Partial result: stopped at the task budget.")) pendingTaskBudgetNotice = null;
         if (typeof payload.message === "string" && payload.message !== lastAssistantText) {
           const subagent = parseSubagentNotification(payload.message);
           if (subagent !== null) {
@@ -3048,6 +3073,7 @@ export function adaptTranscriptEvents(
     }
   }
 
+  flushPendingTaskBudgetNotice();
   return {
     messages: collapseRepeatedSystemLines(out),
     streamingText:
