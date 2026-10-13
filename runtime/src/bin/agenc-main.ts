@@ -30,6 +30,7 @@ import type { ResolveDaemonToolCallParams } from "../commands/resolve.js";
 import type { ProviderModelSelectionOutcome } from "../contracts/provider-model-selection.js";
 import { ConfigStore } from "../config/store.js";
 import { resolveAgencHome, resolveWorkspace as resolveWorkspaceFromEnv } from "../config/env.js";
+import { resolveBuiltInProviderInfo } from "../llm/registry/provider-info.js";
 import { snapshotProviderEnvironment } from "../llm/provider-options.js";
 import { captureSecureStorageIngress } from "../utils/secureStorage/home.js";
 import { logForDebugging } from "../utils/debug.js";
@@ -1066,6 +1067,7 @@ type TuiSessionShape = Pick<
   setPendingProviderSwitch?: (
     pending: { provider: string; model: string; profile?: string } | null,
   ) => void;
+  useSessionProviderKey?: (provider: string, apiKey: string) => Promise<void>;
   applyProviderModelSelection?: (selection: {
     readonly provider: string;
     readonly model: string;
@@ -1197,6 +1199,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
   let pendingProvider = params.provider;
   let pendingProfile = params.profile;
   let pendingPermissionMode = params.permissionMode;
+  const sessionProviderKeys: Record<string, string> = {};
   let liveSession: TuiSessionShape | null = null;
   let liveSessionPromise: Promise<TuiSessionShape | null> | null = null;
   let liveAgentId: string | null = null;
@@ -1492,6 +1495,11 @@ async function createDeferredDaemonPromptTuiSession(params: {
   const baseServices = isRecord(base.services) ? base.services : {};
   const deferredServices = {
     ...baseServices,
+    get providerEnvironment() {
+      return liveSession?.services?.providerEnvironment ?? snapshotProviderEnvironment({
+        ...params.env, ...sessionProviderKeys,
+      });
+    },
     mcpManager: deferredMcpManager,
   };
   const liveBridgeBaseSession = {
@@ -1747,7 +1755,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
       try {
         const started = await params.deps.startPromptAgent({
           prompt,
-          env: params.env,
+          env: { ...params.env, ...sessionProviderKeys },
           runtimeOptions: params.runtimeOptions,
           cwd: params.cwd,
           ...(pendingModel !== undefined ? { model: pendingModel } : {}),
@@ -2049,6 +2057,25 @@ async function createDeferredDaemonPromptTuiSession(params: {
     // to the daemon-backed session after attach and exposes only empty passive
     // state before then; it intentionally replaces any bootstrap manager.
     services: deferredServices,
+    useSessionProviderKey: async (provider, apiKey) => {
+      if (deferredSessionClosed || liveSessionPromise !== null) {
+        throw new Error("Wait for session startup to finish, then try again.");
+      }
+      const credentials = resolveBuiltInProviderInfo(provider)?.credentials;
+      if (credentials?.kind !== "api-key" || !apiKey.trim() || /\s/u.test(apiKey)) {
+        throw new Error("A provider API key must be a single non-empty token.");
+      }
+      if (liveSession !== null) {
+        if (liveSession.useSessionProviderKey === undefined) {
+          throw new Error("This daemon cannot replace session credentials.");
+        }
+        await liveSession.useSessionProviderKey(provider, apiKey);
+      }
+      // Before the first prompt, no daemon agent exists. Stage only the
+      // provider ingress snapshot for agent.create; hooks and process.env
+      // keep their original environment. Nothing persists this secret.
+      sessionProviderKeys[credentials.apiKey.envVars[0]!] = apiKey;
+    },
     mcpSurfaceSnapshot: currentMcpSurfaceSnapshot,
     refreshMcpSurface: refreshCurrentMcpSurface,
     // Process polling is observational: opening /tasks must not provision an
