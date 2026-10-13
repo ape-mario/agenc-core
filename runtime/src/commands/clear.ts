@@ -103,6 +103,27 @@ export async function clearSession(session: Session): Promise<void> {
   if (typeof clearable.clearDaemonSession === "function") {
     await clearable.clearDaemonSession();
   } else if (typeof clearable.state?.with === "function") {
+    // A saved budget may be newer than the materialized session's store
+    // snapshot. Resolve it before clearing so invalid configuration leaves
+    // the conversation intact, without publishing unrelated live settings.
+    const configStore = session.services.configStore;
+    let configuredCap: number | undefined;
+    if (session.config !== undefined && configStore?.current !== undefined) {
+      if (typeof configStore.prepareReload === "function") {
+        const prepared = await configStore.prepareReload();
+        try {
+          configuredCap = prepared.config.task_token_budget ?? DEFAULT_TASK_TOKEN_BUDGET;
+        } finally {
+          try {
+            prepared.rollback();
+          } finally {
+            prepared.settle();
+          }
+        }
+      } else {
+        configuredCap = configStore.current().task_token_budget ?? DEFAULT_TASK_TOKEN_BUDGET;
+      }
+    }
     await clearable.state.with((s) => {
       if (Array.isArray(s.history)) {
         // Replace the history array in place so any cached ref the caller
@@ -113,9 +134,8 @@ export async function clearSession(session: Session): Promise<void> {
     });
     // Checkpoint choices apply only to this conversation. Restore the
     // resolved saved/CLI/project allowance, retaining all spent usage.
-    const configStore = session.services.configStore;
-    if (session.config !== undefined && configStore?.current !== undefined) {
-      setSessionTaskTokenBudget(session, configStore.current().task_token_budget ?? DEFAULT_TASK_TOKEN_BUDGET);
+    if (configuredCap !== undefined) {
+      setSessionTaskTokenBudget(session, configuredCap);
     }
   }
 
