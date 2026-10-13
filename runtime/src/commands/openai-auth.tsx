@@ -76,6 +76,8 @@ async function executeOpenAiLogin(
     const showLoginNotice = typeof ctx.appState?.setToolJSX === "function"
       ? (await import("./openai-auth-menu.js")).showLoginNotice
       : () => {};
+    const controller = new AbortController();
+    const onCancel = () => controller.abort();
     let result;
     try {
       // Painted stage markers: the desktop tails this hidden TUI, so each
@@ -84,8 +86,9 @@ async function executeOpenAiLogin(
         provider: "openai",
         home,
         environment,
+        signal: controller.signal,
         onProgress: (progress) => {
-          showLoginNotice(ctx, { heading: progress.heading, url: progress.url ?? "" });
+          if (!controller.signal.aborted) showLoginNotice(ctx, { heading: progress.heading, url: progress.url ?? "", onCancel });
         },
       });
     } finally {
@@ -93,7 +96,9 @@ async function executeOpenAiLogin(
     }
     // Stable "Sign-in failed:" prefix: the desktop's hidden-PTY runner
     // matches on it.
-    if (!result.ok) return { kind: "error", message: result.message };
+    if (!result.ok) return result.cancelled
+      ? { kind: "text", text: "ChatGPT sign-in cancelled." }
+      : { kind: "error", message: result.message };
 
     const subscription = result.subscription === true ? " (subscription)" : "";
     return {
