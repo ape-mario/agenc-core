@@ -9,6 +9,8 @@ import {
 } from "../../../utils/messageQueueManager.js";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../../remoteAuthSessionContext.fixture.js";
 
+vi.mock("../../prompt-editor.js", () => ({ editPromptDraft: vi.fn(async () => "edited draft") }));
+
 const harness = vi.hoisted(() => {
   const appState = {
     coordinatorTaskIndex: -1,
@@ -939,6 +941,19 @@ describe("PromptInput render surface", () => {
     vi.mocked(storeImage).mockClear();
     vi.mocked(sendDirectMemberMessage).mockClear();
     vi.mocked(logError).mockClear();
+  });
+
+  test("registers the configured external editor action for the normal composer", async () => {
+    const onInputChange = vi.fn();
+    const rendered = await renderPromptInput({ input: "draft", onInputChange });
+    try {
+      await waitForPromptInputProps();
+      expect(harness.keybindings["chat:externalEditor"]).toBeTypeOf("function");
+      await harness.keybindings["chat:externalEditor"]();
+      const { editPromptDraft } = await import("../../prompt-editor.js");
+      expect(editPromptDraft).toHaveBeenCalledWith("draft");
+      expect(onInputChange).toHaveBeenLastCalledWith("edited draft");
+    } finally { await rendered.dispose(); }
   });
 
   test("does not register the retired fast-mode keybinding", async () => {

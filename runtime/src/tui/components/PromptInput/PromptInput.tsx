@@ -905,6 +905,7 @@ function PromptInput({
   }, [coordinatorTaskCount, coordinatorTaskIndex, minCoordinatorIndex]);
   const [isPasting, setIsPasting] = useState(false);
   const [isExternalEditorActive, setIsExternalEditorActive] = useState(false);
+  const externalEditorActiveRef = useRef(false);
   const [showQuickOpen, setShowQuickOpen] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
@@ -913,6 +914,7 @@ function PromptInput({
   const [showAutoModeOptIn, setShowAutoModeOptIn] = useState(false);
   const [autoModeOptInPreview, setAutoModeOptInPreview] = useState(false);
   const promptModalOverlayActive =
+    isExternalEditorActive ||
     upstreamModalOverlayActive ||
     showModeSwitcher ||
     showAutoModeOptIn ||
@@ -2749,6 +2751,33 @@ function PromptInput({
   // onHistoryUp/onHistoryDown props to TextInput, so that useTextInput's
   // upOrHistoryUp/downOrHistoryDown can try cursor movement first and only
   // fall through to history when the cursor can't move further.
+  const handleExternalEditor = useCallback(async () => {
+    if (externalEditorActiveRef.current) return;
+    externalEditorActiveRef.current = true;
+    setIsExternalEditorActive(true);
+    try {
+      const { editPromptDraft } = await import("../../prompt-editor.js");
+      const edited = await editPromptDraft(expandPastedTextRefs(
+        lastInternalInputRef.current,
+        pastedContentsRef.current,
+      ));
+      if (edited === null) return;
+      pushToBuffer(lastInternalInputRef.current, cursorOffsetRef.current, pastedContentsRef.current);
+      // Text references have been expanded into the editor's draft. Keep
+      // image references attached and let the normal paste path store text.
+      setPastedContentsAndRef(Object.fromEntries(Object.entries(pastedContentsRef.current)
+        .filter(([, content]) => content.type === "image")));
+      trackAndSetInput("");
+      setCurrentCursorOffset(0);
+      onTextPaste(edited);
+    } catch (error) {
+      addNotification({ key: "external-editor-error", text: `Editor failed: ${error instanceof Error ? error.message : String(error)}`, color: "error", priority: "immediate", timeoutMs: 10_000 });
+    } finally {
+      externalEditorActiveRef.current = false;
+      setIsExternalEditorActive(false);
+    }
+  }, [addNotification, onTextPaste, pushToBuffer, setPastedContentsAndRef, trackAndSetInput, setCurrentCursorOffset]);
+
   const chatHandlers = useMemo(
     () => ({
       "chat:undo": handleUndo,
@@ -2760,6 +2789,7 @@ function PromptInput({
         : { "chat:modelPicker": handleModelPicker }),
       "chat:thinkingToggle": handleThinkingToggle,
       "chat:imagePaste": handleImagePaste,
+      "chat:externalEditor": handleExternalEditor,
     }),
     [
       handleUndo,
@@ -2770,6 +2800,7 @@ function PromptInput({
       onOpenModelMenu,
       handleThinkingToggle,
       handleImagePaste,
+      handleExternalEditor,
     ],
   );
   useKeybindings(chatHandlers, {
