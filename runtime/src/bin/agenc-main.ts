@@ -1048,6 +1048,17 @@ type TuiSessionShape = Pick<
     readonly feedback?: string;
     readonly signal?: AbortSignal;
   }) => Promise<unknown>;
+  rollbackCompaction?: (params: {
+    readonly attemptId: string;
+    readonly reviewedBranchTargetSessionId?: string;
+  }) => Promise<unknown>;
+  extendCompactionRollbackRetention?: (params: {
+    readonly attemptId: string;
+    readonly extendedUntilMs: number;
+  }) => Promise<unknown>;
+  rewindConversationToMessage?: (params: { readonly messageOrdinal: number }) => Promise<unknown>;
+  previewFileRewind?: (params: { readonly messageOrdinal: number }) => Promise<unknown>;
+  rewindFilesToMessage?: (params: { readonly messageOrdinal: number }) => Promise<unknown>;
   setPendingProviderSwitch?: (
     pending: { provider: string; model: string; profile?: string } | null,
   ) => void;
@@ -2185,6 +2196,47 @@ async function createDeferredDaemonPromptTuiSession(params: {
         );
       }
       return live.partialCompactFromMessage(compactParams);
+    },
+    rewindConversationToMessage: async (rewindParams) => {
+      const live = liveSession;
+      if (live === null || typeof live.rewindConversationToMessage !== "function") {
+        throw new Error("No live conversation is available to rewind.");
+      }
+      return live.rewindConversationToMessage(rewindParams);
+    },
+    previewFileRewind: async (rewindParams) => {
+      const live = liveSession;
+      if (live === null || typeof live.previewFileRewind !== "function") {
+        throw new Error("No live conversation is available to preview a file rewind.");
+      }
+      return live.previewFileRewind(rewindParams);
+    },
+    rewindFilesToMessage: async (rewindParams) => {
+      const live = liveSession;
+      if (live === null || typeof live.rewindFilesToMessage !== "function") {
+        throw new Error("No live conversation is available to restore files.");
+      }
+      return live.rewindFilesToMessage(rewindParams);
+    },
+    rollbackCompaction: async (rollbackParams) => {
+      const live = liveSession;
+      if (live === null) {
+        throw new Error("No conversation has started. There is no compaction to roll back.");
+      }
+      if (typeof live.rollbackCompaction !== "function") {
+        throw new Error("Compaction rollback is not supported by this daemon session.");
+      }
+      return live.rollbackCompaction(rollbackParams);
+    },
+    extendCompactionRollbackRetention: async (retentionParams) => {
+      const live = liveSession;
+      if (live === null) {
+        throw new Error("No conversation has started. There is no compaction to retain.");
+      }
+      if (typeof live.extendCompactionRollbackRetention !== "function") {
+        throw new Error("Compaction retention is not supported by this daemon session.");
+      }
+      return live.extendCompactionRollbackRetention(retentionParams);
     },
     applyProviderModelSelection: async (selection) => {
       const live = liveSession as TuiSessionShape | null;

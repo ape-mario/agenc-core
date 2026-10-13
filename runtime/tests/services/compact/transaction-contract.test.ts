@@ -921,9 +921,14 @@ describe("transactional compaction production path", () => {
     await withTransactionalStore("transaction-no-shrink", async (store) => {
       const source = appendSourceMessages(store, 2, 32);
       const provider = compactionProvider();
-      await expect(runRealTransaction(store, source, provider)).rejects.toThrow(
-        /required 1024/i,
-      );
+      const failure = await runRealTransaction(store, source, provider).catch(error => error as Error);
+      if (!(failure instanceof Error)) throw new Error("expected compaction rejection");
+      expect(failure.message).toMatch(/required 1024/i);
+      const recorded = store.readAll().find(item => item.type === "compaction_failed");
+      expect(recorded?.type).toBe("compaction_failed");
+      if (recorded?.type !== "compaction_failed") throw new Error("missing failure record");
+      expect(failure.message).toContain(`Compaction attempt ID: ${recorded.payload.attempt_id}`);
+      expect(failure.message).toContain("history was not changed");
       expect(provider.chat).toHaveBeenCalledOnce();
       expect(
         store.readAll().filter(isCompactionLifecycleItem),

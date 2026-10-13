@@ -1251,6 +1251,20 @@ describe("PromptInput render surface", () => {
     }
   });
 
+  test("lets backslash Enter reach the multiline editor instead of submitting a turn", async () => {
+    const onSubmit = vi.fn(async () => {});
+    const onInputChange = vi.fn();
+    const rendered = await renderPromptInput({ input: "draft\\", onSubmit, onInputChange });
+    try {
+      await waitForPromptInputProps();
+      const submit = harness.keybindingRegistrations.find(entry => entry.action === "chat:submit");
+      expect(submit).toBeDefined();
+      (submit!.handler as () => unknown)();
+      expect(onInputChange).toHaveBeenLastCalledWith("draft\n");
+      expect(onSubmit).not.toHaveBeenCalled();
+    } finally { await rendered.dispose(); }
+  });
+
   test("handles mode cycle, image paste miss, and empty prompt submission guards", async () => {
     const onSubmit = vi.fn(async () => {});
     const setToolPermissionContext = vi.fn();

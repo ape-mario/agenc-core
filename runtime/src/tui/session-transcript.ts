@@ -1720,7 +1720,9 @@ export function formatStructuredToolResult(
     }
   }
 
-  return [{ type: "text", text: clampGenericToolResult(stringResult(result)) }];
+  // Keep the bounded result body available to the expanded transcript.
+  // Renderers summarize it for the ordinary chat view.
+  return [{ type: "text", text: stringResult(result) }];
 }
 
 /**

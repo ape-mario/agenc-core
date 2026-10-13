@@ -26,6 +26,7 @@ export type SuggestionItem = {
   displayText: string
   tag?: string
   description?: string
+  enterAction?: 'run' | 'complete'
   metadata?: unknown
   color?: keyof Theme
 }
@@ -368,8 +369,9 @@ export function PromptInputFooterSuggestions({
     ? '1 match'
     : `${suggestions.length} matches`
   const titleRow = getRightAlignedRowParts(headerCopy.title, headerHint, contentWidth)
+  const acceptVerb = suggestions[selectedSuggestion]?.enterAction ?? headerCopy.acceptVerb
   const primaryFooterHint =
-    `${glyphs.arrowUp}${glyphs.arrowDown} navigate ${glyphs.separator} ${glyphs.enter} ${headerCopy.acceptVerb}`
+    `${glyphs.arrowUp}${glyphs.arrowDown} navigate ${glyphs.separator} ${glyphs.enter} ${acceptVerb}`
   const extendedFooterHint =
     `${primaryFooterHint} ${glyphs.separator} esc close`
   // Keep the accept action whole on narrow popups. The filter prompt is

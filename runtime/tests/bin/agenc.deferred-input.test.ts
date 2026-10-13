@@ -5,6 +5,8 @@ import {
   __wrapDaemonTuiSessionWithPromptPreparationForTest,
   sessionConfigurationFromAgenCConfig,
 } from "./agenc-main.js";
+import { configCommand } from "../../src/commands/config.js";
+import type { Session } from "../../src/session/session.js";
 import { ConfigStore } from "../config/store.js";
 import { PermissionModeRegistry } from "../permissions/permission-mode.js";
 import { createEmptyToolPermissionContext } from "../permissions/types.js";
@@ -336,6 +338,51 @@ function daemonHarness(
 }
 
 describe("deferred daemon input ownership", () => {
+  it("forwards rewind preview and both restore actions to canonical daemon history", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });
+    await session.submit("attach");
+    const controls = session as typeof session & Pick<import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession, "rewindConversationToMessage" | "previewFileRewind" | "rewindFilesToMessage">;
+    for (const [name, method] of [["previewFileRewind", "session.previewFileRewind"], ["rewindFilesToMessage", "session.rewindFilesToMessage"], ["rewindConversationToMessage", "session.rewindConversationToMessage"]] as const) {
+      expect(controls[name]).toBeTypeOf("function");
+      await controls[name]!({ messageOrdinal: 2 });
+      expect(harness.client.request).toHaveBeenLastCalledWith(method, { sessionId: "session-1", messageOrdinal: 2 });
+    }
+    expect(harness.startPromptAgent).toHaveBeenCalledOnce();
+  });
+
+  it("reloads cold config without requiring session MCP authority", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps });
+    const result = await configCommand.execute({ session: session as unknown as Session, cwd: process.cwd(), home: process.cwd(), argsRaw: "reload" });
+    expect(result).toMatchObject({ kind: "text", text: expect.stringContaining("MCP refresh staged") });
+    expect(harness.requests).toContainEqual({ method: "daemon.reload", params: {} });
+    expect(harness.startPromptAgent).not.toHaveBeenCalled();
+    expect(harness.requests.some(entry => entry.method.startsWith("session.mcp"))).toBe(false);
+  });
+
+  it("forwards compaction rollback once without replaying a failed mutation", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });
+    await session.submit("attach");
+    const controls = session as typeof session & Pick<import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession, "rollbackCompaction">;
+    expect(controls.rollbackCompaction).toBeTypeOf("function");
+    harness.client.request.mockImplementationOnce(async () => { throw new Error("ambiguous rollback"); });
+    await expect(controls.rollbackCompaction!({ attemptId: "attempt-1", reviewedBranchTargetSessionId: "reviewed-branch" })).rejects.toThrow("ambiguous rollback");
+    expect(harness.client.request).toHaveBeenLastCalledWith("session.rollbackCompaction", { sessionId: "session-1", attemptId: "attempt-1", reviewedBranchTargetSessionId: "reviewed-branch" });
+    expect(harness.startPromptAgent).toHaveBeenCalledOnce();
+  });
+
+  it("forwards compaction retention to the attached canonical session", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });
+    await session.submit("attach");
+    const controls = session as typeof session & Pick<import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession, "extendCompactionRollbackRetention">;
+    expect(controls.extendCompactionRollbackRetention).toBeTypeOf("function");
+    await controls.extendCompactionRollbackRetention!({ attemptId: "attempt-1", extendedUntilMs: 2000000000000 });
+    expect(harness.requests).toContainEqual({ method: "session.extendCompactionRollbackRetention", params: { sessionId: "session-1", attemptId: "attempt-1", extendedUntilMs: 2000000000000 } });
+  });
+
   it("keeps cold status-line rendering unavailable without creating an agent or control client", async () => {
     const harness = daemonHarness();
     const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps });

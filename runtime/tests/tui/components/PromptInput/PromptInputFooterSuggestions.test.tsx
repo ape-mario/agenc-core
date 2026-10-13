@@ -279,3 +279,10 @@ describe('PromptInputFooterSuggestions', () => {
     }
   })
 })
+
+
+it('labels a required-argument command selection as completion', async () => {
+  const output = await renderToString(<PromptInputFooterSuggestions suggestions={[{ id: 'review:local', displayText: '/review', enterAction: 'complete' }]} selectedSuggestion={0} suggestionType="command" />, 80)
+  expect(output).toContain('↵ complete')
+  expect(output).not.toContain('↵ run')
+})

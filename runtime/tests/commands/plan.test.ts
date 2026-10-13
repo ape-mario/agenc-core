@@ -17,6 +17,11 @@ import {
   setPlanSlug,
   writePlan,
 } from "./plan.js";
+import { PassThrough } from "node:stream";
+import React from "react";
+import stripAnsi from "strip-ansi";
+import { createRoot } from "../tui/ink.js";
+import { AppStateProvider, getDefaultAppState } from "../tui/state/AppState.js";
 import { createPlanDashboardSnapshot, planItemsFromText } from "./plan-menu.js";
 import type { SlashCommandContext } from "./types.js";
 import type { Session } from "../session/session.js";
@@ -86,6 +91,28 @@ function planCtx(h: Harness) {
 
 beforeEach(() => {
   clearAllPlanSlugs();
+});
+
+it("advertises Enter as closing the plan editor and reserves approval for ExitPlanMode", async () => {
+  const setToolJSX = vi.fn();
+  const h = mkHarness({ appState: { setToolJSX } });
+  expect(await planCommand.execute(h.ctx)).toEqual({ kind: "skip" });
+  const stdin = Object.assign(new PassThrough(), { isTTY: true, ref() {}, unref() {}, setRawMode() {} });
+  const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false });
+  let output = "";
+  stdout.on("data", chunk => { output += stripAnsi(String(chunk)); });
+  const root = await createRoot({ stdin: stdin as unknown as NodeJS.ReadStream, stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false });
+  try {
+    root.render(React.createElement(AppStateProvider, { initialState: getDefaultAppState(), children: setToolJSX.mock.calls[0][0].jsx }));
+    await new Promise(resolve => setTimeout(resolve, 80));
+    expect(output).not.toContain("accept & run");
+    expect(output).toContain("close");
+    expect(output).toContain("ExitPlanMode");
+    stdin.write("\r");
+    await new Promise(resolve => setTimeout(resolve, 80));
+    expect(setToolJSX).toHaveBeenLastCalledWith(expect.objectContaining({ jsx: null }));
+    expect(h.registry.current().mode).toBe("plan");
+  } finally { root.unmount(); stdin.end(); stdout.end(); }
 });
 
 describe("getPermissionModeRegistry", () => {

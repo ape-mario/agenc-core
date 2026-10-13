@@ -3413,6 +3413,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
           }),
         );
 
+        const selectorModal = providerProbe.fullscreenLayoutProps.at(-1)?.modal;
+        expect(selectorModal).toBeDefined();
         const selectorProps = providerProbe.messageSelectorProps.at(-1)!;
         await (
           selectorProps.onRestoreMessage as (message: unknown) => Promise<void>
@@ -4160,6 +4162,34 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     } finally {
       execute.mockRestore();
     }
+  });
+
+  test("keeps a compaction outcome visible until the next prompt", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const { compactCommand } = await import("../../commands/session-compact-commands.js");
+    const execute = vi.spyOn(compactCommand, "execute").mockImplementation(async () => ({
+      kind: "error", message: "Compaction did not shrink. Compaction attempt ID: attempt-57",
+    }));
+    const submit = vi.fn(async () => {});
+    const session = { ...createSession(), submit } satisfies AgenCBridgeSession;
+    const helpers = { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() };
+    resetShellSurfaceProbe();
+    try {
+      await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
+        vi.useFakeTimers();
+        try {
+          await providerProbe.promptSubmits.at(-1)!("/compact", helpers);
+          await vi.advanceTimersByTimeAsync(4_050);
+          expect(providerProbe.messageProps.at(-1)?.toolJSX).toMatchObject({
+            jsx: { props: { children: { props: { children: "Error: Compaction did not shrink. Compaction attempt ID: attempt-57" } } } },
+          });
+          await providerProbe.promptSubmits.at(-1)!("hello again", helpers);
+          await vi.advanceTimersByTimeAsync(50);
+          expect(providerProbe.messageProps.at(-1)?.toolJSX).toBeNull();
+          expect(submit).toHaveBeenCalledOnce();
+        } finally { vi.useRealTimers(); }
+      });
+    } finally { execute.mockRestore(); }
   });
 
   test("keeps the canonical model menu open after a prior transient result expires", async () => {
