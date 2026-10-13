@@ -85,3 +85,48 @@ test("journal validates and restores the captured baseline; legacy goals retain 
   expect([...conservative].sort()).toEqual(["session-approval.txt", "tests/cache.pyc", "tests/dirty.txt"]);
   expect(buildGoalJudgeUserMessage({ goal: legacy, verification: [], tamperedPaths: conservative, diff: "", diffStat: "" })).toContain("which may predate the goal");
 });
+
+test("review diff excludes pre-existing edits and includes newly created untracked contents", async () => {
+  const { root, commit } = fixture();
+  const baseline = await captureGoalWorkingTreeBaseline(root, commit);
+  writeFileSync(join(root, "goal-final.txt"), "VERIFIED\n");
+  const result = await (defaultGoalGateDeps.diff as (...args: unknown[]) => Promise<{ diff: string; stat: string }>)(root, commit, baseline);
+  expect(result.diff).toContain("+VERIFIED");
+  expect(result.diff).toContain("goal-final.txt");
+  expect(result.diff).not.toContain("tests/dirty.txt");
+  expect(result.diff).not.toContain("pre-existing dirty");
+  expect(result.stat).not.toContain("tests/dirty.txt");
+});
+
+test("durable baseline bytes survive recovery and compare later tracked, untracked and deleted contents exactly", async () => {
+  const { root, commit } = fixture();
+  const home = mkdtempSync(join(canonicalTmpdir(), "goal-content-home-")); roots.push(home);
+  const baseline = await captureGoalWorkingTreeBaseline(root, commit, home);
+  const recovered = JSON.parse(JSON.stringify(baseline));
+  writeFileSync(join(root, "tests/dirty.txt"), "pre-existing dirty\nworker appended\n");
+  writeFileSync(join(root, "tests/target.txt"), "new tracked content\n");
+  writeFileSync(join(root, "session-approval.txt"), "READY AFTER\n");
+  unlinkSync(join(root, "tests/cache.pyc"));
+  const result = await defaultGoalGateDeps.diff(root, commit, recovered, home);
+  expect(result.diff).toContain("+worker appended");
+  expect(result.diff).not.toContain("-original");
+  expect(result.diff).toContain("-READY");
+  expect(result.diff).toContain("+READY AFTER");
+  expect(result.diff).toContain("-pre-existing cache");
+  expect(result.diff).toContain("-before");
+  expect(result.diff).toContain("+new tracked content");
+});
+
+test("missing or corrupt retained bytes and old hash-only dirty baselines never become empty review evidence", async () => {
+  const { root, commit, baseline: old } = fixture();
+  const home = mkdtempSync(join(canonicalTmpdir(), "goal-content-integrity-")); roots.push(home);
+  const baseline = await captureGoalWorkingTreeBaseline(root, commit, home);
+  writeFileSync(join(root, "tests/dirty.txt"), "goal changed existing dirty file\n");
+  await expect(defaultGoalGateDeps.diff(root, commit, old, home)).rejects.toThrow("older goal did not retain starting contents");
+  const sha = baseline!.trackedChanges[0]!.identity!.sha256;
+  const stored = join(home, `.goal-baseline-${sha}.blob`);
+  writeFileSync(stored, "corrupt retained bytes\n");
+  await expect(defaultGoalGateDeps.diff(root, commit, baseline, home)).rejects.toThrow("missing or corrupt");
+  unlinkSync(stored);
+  await expect(defaultGoalGateDeps.diff(root, commit, baseline, home)).rejects.toThrow("missing or corrupt");
+});

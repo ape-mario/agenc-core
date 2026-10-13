@@ -99,7 +99,8 @@ export interface GoalBaselineFile {
 }
 
 export interface GoalWorkingTreeBaseline {
-  readonly version: 1;
+  /** V2 also retains each non-null identity's bytes in the home content store. */
+  readonly version: 1 | 2;
   readonly trackedChanges: readonly GoalBaselineFile[];
   readonly untrackedFiles: readonly GoalBaselineFile[];
 }
@@ -562,7 +563,9 @@ export function buildGoalJudgeUserMessage(input: {
         : "No test or check files changed since the goal was set.",
     ...bulletList(input.tamperedPaths),
     "",
-    "Current diff against the starting commit (may include pre-existing changes):",
+    goal.worktreeBaseline === undefined
+      ? "Current diff against the starting commit (may include pre-existing changes):"
+      : "Diff against the goal's starting working tree (only changes made after the goal was set):",
     "```",
     neutralizeGoalEnvelopeTags(input.diffStat || "(no changes)"),
     "```",

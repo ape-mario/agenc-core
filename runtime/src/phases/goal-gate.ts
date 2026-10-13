@@ -104,7 +104,7 @@ async function askJudge(input: {
   readonly signal?: AbortSignal;
 }): Promise<GoalJudgeOutput | undefined> {
   const { goal, ctx, session, signal } = input;
-  const { stat, diff } = await activeDeps.diff(ctx.cwd, goal.baseCommit);
+  const { stat, diff } = await activeDeps.diff(ctx.cwd, goal.baseCommit, goal.worktreeBaseline, session.services.configStore?.homeContext.path);
   const userMessage = buildGoalJudgeUserMessage({
     goal,
     verification: input.verification,

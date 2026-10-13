@@ -28,6 +28,7 @@ import {
   type GoalWorkingTreeBaseline,
 } from "./goal.js";
 import { changedGoalWorkingTreePaths } from "./worktree-baseline.js";
+import { goalWorkingTreeDiff } from "./worktree-diff.js";
 
 export const DEFAULT_GOAL_VERIFY_TIMEOUT_MS = 10 * 60_000;
 export const GOAL_JUDGE_TIMEOUT_MS = 120_000;
@@ -48,6 +49,8 @@ export interface GoalGateDeps {
   diff(
     cwd: string,
     baseCommit: string | undefined,
+    baseline?: GoalWorkingTreeBaseline,
+    agencHome?: string,
   ): Promise<{ readonly stat: string; readonly diff: string }>;
   /** Raw judge text; throws when the judge could not be reached. */
   judge(input: {
@@ -153,8 +156,9 @@ export const defaultGoalGateDeps: GoalGateDeps = {
     }
     return [...paths];
   },
-  async diff(cwd, baseCommit) {
+  async diff(cwd, baseCommit, baseline, agencHome) {
     if (baseCommit === undefined) return { stat: "", diff: "" };
+    if (baseline !== undefined) return goalWorkingTreeDiff(cwd, baseCommit, baseline, agencHome);
     const [stat, diff] = await Promise.all([
       gitText(["diff", "--stat", baseCommit], cwd),
       gitText(["diff", "--no-color", baseCommit], cwd),

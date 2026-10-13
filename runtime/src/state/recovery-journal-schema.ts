@@ -1070,7 +1070,7 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
         {
           baseCommit: isString,
           worktreeBaseline: objectShape({
-            version: literal(1),
+            version: oneOf(1, 2),
             trackedChanges: arrayOf(isGoalBaselineFile),
             untrackedFiles: arrayOf(isGoalBaselineFile),
           }),
