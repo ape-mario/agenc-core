@@ -2802,11 +2802,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
         overrideMessage: "Running tools",
       }),
     );
-    expect(providerProbe.messageProps.at(-1)).toEqual(
-      expect.objectContaining({
-        streamingText: "I will inspect that now.",
-      }),
-    );
+    expect(providerProbe.messageProps.at(-1)?.streamingText).toBeNull();
+    expect(JSON.stringify(providerProbe.messageProps.at(-1)?.messages)).toContain("I will inspect that now.");
   });
 
   test("keeps spinner visible while assistant text is streaming", async () => {

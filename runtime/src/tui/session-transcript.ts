@@ -2352,6 +2352,7 @@ export function adaptTranscriptEvents(
         streamingText = "";
         break;
       case "tool_call":
+        flushStreamingText(nextUuid);
         if (
           "toolCall" in raw &&
           raw.toolCall &&
@@ -2394,6 +2395,7 @@ export function adaptTranscriptEvents(
       case "tool_call_started":
       case "mcp_tool_call_begin":
       case "exec_command_begin": {
+        flushStreamingText(nextUuid);
         const callId =
           typeof payload.callId === "string" ? payload.callId : null;
         if (callId === null) break;
@@ -2438,6 +2440,7 @@ export function adaptTranscriptEvents(
         break;
       }
       case "tool_input_block_start": {
+        flushStreamingText(nextUuid);
         // Provider-emitted (R6) when a tool_use content
         // block begins streaming. Matches the content_block_start case in
         // messages.ts:3024-3037 that appends a new element to the
