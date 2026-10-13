@@ -185,8 +185,18 @@ describe("pure write command option parser", () => {
   });
 
   it("consumes an option-looking required value, including --", () => {
-    expect(parseWriteCommandOperands("install", ["-m", "--", SOURCE, DEST]).operands).toEqual([SOURCE, DEST]);
-    expect(parseWriteCommandOperands("cp", ["--suffix", "-T", SOURCE, DEST]).noTargetDirectory).toBe(false);
+    expect(parseWriteCommandOperands("install", ["-m", "--", SOURCE, DEST], ["gnu"]).operands).toEqual([SOURCE, DEST]);
+    expect(parseWriteCommandOperands("cp", ["--suffix", "-T", SOURCE, DEST], ["gnu"]).noTargetDirectory).toBe(false);
+    expect(parseWriteCommandOperands("install", ["-m", "--", SOURCE, DEST], ["uutils"]).indeterminate).toBe(true);
+    expect(parseWriteCommandOperands("cp", ["--suffix", "-T", SOURCE, DEST]).indeterminate).toBe(true);
+  });
+
+  it("uses uutils hyphen-value declarations and optional context boundaries", () => {
+    for (const [command, option, value] of [["touch", "--date", "-1day"], ["truncate", "--size", "-10"], ["mkdir", "--mode", "-w"]] as const) {
+      expect(parseWriteCommandOperands(command, [option, value, DEST], ["uutils"]).operands).toEqual([DEST]);
+    }
+    expect(parseWriteCommandOperands("install", ["--context", "-m", "644", SOURCE, DEST], ["uutils"]).operands).toEqual([SOURCE, DEST]);
+    expect(parseWriteCommandOperands("install", ["--context", "--", SOURCE, DEST], ["uutils"]).operands).toEqual([SOURCE, DEST]);
   });
 
   it("reads BSD operands after the first source literally", () => {

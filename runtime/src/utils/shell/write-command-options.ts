@@ -15,6 +15,7 @@ interface OptionTable {
   readonly long: string;
   /** Optional values that also consume a separate word in this implementation. */
   readonly separateOptional?: readonly string[];
+  readonly allowHyphenValues?: readonly string[];
   readonly stopAtOperand?: boolean;
 }
 
@@ -63,8 +64,10 @@ const UUTILS: Record<WriteCommand, OptionTable> = {
     separateOptional: ["context"],
   },
   rm: { short: "dfgiIrRv", long: "dir force interactive? one-file-system no-preserve-root preserve-root recursive verbose progress presume-input-tty" },
+  touch: { ...GNU.touch, allowHyphenValues: ["d", "date"] },
+  truncate: { ...GNU.truncate, allowHyphenValues: ["s", "size"] },
   rmdir: { short: "pv", long: "ignore-fail-on-non-empty parents verbose" },
-  mkdir: { short: "m:pvZ", long: "context: mode: parents verbose" },
+  mkdir: { short: "m:pvZ", long: "context: mode: parents verbose", allowHyphenValues: ["m", "mode"] },
 };
 
 const BSD: Record<WriteCommand, OptionTable> = {
@@ -159,6 +162,10 @@ function readOperands(command: WriteCommand, args: readonly string[], dialect: W
   let errorIndex: number | undefined;
   const optionIndexes: number[] = [];
   let ended = false;
+  function acceptsFollowingValue(option: Option, word: string | undefined): boolean {
+    return word !== undefined && (dialect !== "uutils" || !word.startsWith("-") || word === "-" ||
+      model.table.allowHyphenValues?.includes(option.name) === true);
+  }
   function apply(option: Option, value: string | undefined): void {
     const { name } = option;
     if (name === "t" && command !== "touch" || name === "target-directory") {
@@ -199,9 +206,10 @@ function readOperands(command: WriteCommand, args: readonly string[], dialect: W
       const option = matches[0]!;
       let value = eq < 0 ? undefined : word.slice(eq + 1);
       if (eq >= 0 && option.arity === "none") { error = "unsupported"; break; }
-      if (eq < 0 && (option.arity === "required" || model.table.separateOptional?.includes(option.name))) {
+      if (eq < 0 && (option.arity === "required" ||
+        model.table.separateOptional?.includes(option.name) && acceptsFollowingValue(option, args[index + 1]))) {
         value = args[++index];
-        if (value === undefined && option.arity === "required") { error = "unsupported"; break; }
+        if (!acceptsFollowingValue(option, value)) { error = "unsupported"; break; }
       }
       apply(option, value);
     } else {
@@ -210,8 +218,9 @@ function readOperands(command: WriteCommand, args: readonly string[], dialect: W
         if (!option) { error = "unknown"; errorIndex = optionIndex; break; }
         let value: string | undefined;
         if (option.arity === "required") {
-          value = at + 1 < word.length ? word.slice(at + 1) : args[++index];
-          if (value === undefined) { error = "unsupported"; break; }
+          const attached = at + 1 < word.length;
+          value = attached ? word.slice(at + 1) : args[++index];
+          if (value === undefined || !attached && !acceptsFollowingValue(option, value)) { error = "unsupported"; break; }
         }
         apply(option, value);
         if (option.arity === "required") break;
