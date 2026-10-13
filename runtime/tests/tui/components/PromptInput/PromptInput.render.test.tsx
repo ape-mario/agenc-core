@@ -12,7 +12,7 @@ import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../../remoteAuthSessionContext
 const harness = vi.hoisted(() => {
   const appState = {
     coordinatorTaskIndex: -1,
-    effortValue: undefined,
+    effortValue: undefined as string | undefined,
     expandedView: "transcript",
     footerSelection: null as null | "tasks" | "teams",
     isBriefOnly: false,
@@ -160,6 +160,7 @@ const harness = vi.hoisted(() => {
       harness.keybindings = {};
       harness.inputHandlers = [];
       appState.coordinatorTaskIndex = -1;
+      appState.effortValue = undefined;
       appState.footerSelection = null;
       appState.promptSuggestion = {
         acceptedAt: 0,
@@ -637,7 +638,7 @@ vi.mock("../CoordinatorAgentStatus.js", () => ({
 }));
 
 vi.mock("../EffortIndicator.js", () => ({
-  getEffortNotificationText: () => undefined,
+  getEffortNotificationText: (value: string | undefined) => value === undefined ? undefined : `${value} · /effort`,
 }));
 
 vi.mock("../FullscreenLayout.js", () => ({
@@ -939,6 +940,21 @@ describe("PromptInput render surface", () => {
     vi.mocked(storeImage).mockClear();
     vi.mocked(sendDirectMemberMessage).mockClear();
     vi.mocked(logError).mockClear();
+  });
+
+  test("replaces the effort notification immediately when canonical effort changes", async () => {
+    harness.appState.effortValue = "max";
+    const rendered = await renderPromptInput();
+    try {
+      expect(harness.addNotification).not.toHaveBeenCalled();
+      harness.appState.effortValue = "high";
+      rerenderPromptInput(rendered, { input: "changed" });
+      await vi.waitFor(() => expect(harness.addNotification).toHaveBeenCalledWith(expect.objectContaining({ key: "effort-level", text: "high · /effort" })));
+      expect(harness.removeNotification).toHaveBeenCalledWith("effort-level");
+      expect(harness.removeNotification.mock.invocationCallOrder.at(-1)).toBeLessThan(harness.addNotification.mock.invocationCallOrder.at(-1)!);
+    } finally {
+      await rendered.dispose();
+    }
   });
 
   test("does not register the retired fast-mode keybinding", async () => {

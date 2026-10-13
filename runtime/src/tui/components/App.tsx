@@ -15,6 +15,7 @@ import React, {
 import { FpsMetricsProvider, useFpsMetrics } from "../context/fpsMetrics.js";
 import { StatsProvider, type StatsStore } from "../context/stats.js";
 import { onChangeAppState } from "../state/onChangeAppState.js";
+import { syncRuntimeEffortEventToAppState } from "../state/runtimeEffortSync.js";
 import { syncCollabAgentEventToAppState } from "../state/collabAgentTaskSync.js";
 import { selectAgenCTuiGlyphs } from "../glyphs.js";
 import {
@@ -2524,6 +2525,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         addNotification(recovered.notification);
       }
       syncCollabAgentEventToAppState(event, setAppState);
+      syncRuntimeEffortEventToAppState(event, setAppState);
     });
     return () => {
       unsubscribe();
