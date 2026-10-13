@@ -1,3 +1,4 @@
+import { withSecureStorageDisplaySnapshot } from "../utils/secureStorage/index.js";
 import {
   buildProviderModelCatalog,
   type ProviderSlug,
@@ -13,7 +14,7 @@ import {
 } from "../llm/registry/provider-info.js";
 import { isModelAllowed } from "../utils/model/modelAllowlist.js";
 import type { AgenCConfig } from "../config/schema.js";
-import { readCommandConfig } from "./config-context.js";
+import { readCommandConfig, requireCommandConfigStore } from "./config-context.js";
 import { readBuiltInSessionSelection } from "../session/provider-model-selection.js";
 import { createProviderCommandAccessOverlay } from "./provider-command-access.js";
 import type { SlashCommandContext } from "./types.js";
@@ -230,6 +231,10 @@ function providerRows(params: {
 }
 
 export function readModelMenuSnapshot(ctx: SlashCommandContext): ModelMenuSnapshot {
+  return withSecureStorageDisplaySnapshot(requireCommandConfigStore(ctx).homeContext, () => readModelMenuSnapshotFromStorage(ctx));
+}
+
+function readModelMenuSnapshotFromStorage(ctx: SlashCommandContext): ModelMenuSnapshot {
   const config = readCommandConfig(ctx);
   const sessionSelection = readBuiltInSessionSelection(ctx.session, {
     includePending: true,

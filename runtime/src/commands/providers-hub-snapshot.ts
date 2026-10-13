@@ -1,3 +1,4 @@
+import { withSecureStorageDisplaySnapshot } from "../utils/secureStorage/index.js";
 /**
  * Data for the `/providers` screen: every built-in provider with one plain
  * status ("key saved", "env DEEPSEEK_API_KEY", "running", "not set"), how it
@@ -132,6 +133,10 @@ function rank(connection: ProvidersHubConnection): number {
 }
 
 export function readProvidersHubSnapshot(ctx: SlashCommandContext): ProvidersHubSnapshot {
+  return withSecureStorageDisplaySnapshot(requireCommandConfigStore(ctx).homeContext, () => readProvidersHubSnapshotFromStorage(ctx));
+}
+
+function readProvidersHubSnapshotFromStorage(ctx: SlashCommandContext): ProvidersHubSnapshot {
   const menu = readProviderMenuSnapshot(ctx);
   const home = requireCommandConfigStore(ctx).homeContext;
   const captured = capturedProviderEnvironment(ctx);
