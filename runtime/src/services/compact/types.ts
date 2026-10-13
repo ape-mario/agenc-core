@@ -47,6 +47,7 @@ export type RuntimeMessage = {
   readonly timestamp?: string;
   readonly isMeta?: boolean;
   readonly runtimeOnly?: {
+    readonly toolResultIsError?: true;
     readonly toolResultIntegrity?: ToolResultIntegrity;
     readonly agentInvocation?: AgentInvocationChannelMetadata;
     readonly mergeBoundary?: "user_context";

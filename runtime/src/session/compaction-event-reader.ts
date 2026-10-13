@@ -1395,7 +1395,7 @@ function readProjectionMessage(
     ["role", "content"],
     [
       "toolCalls", "toolCallId", "toolName", "id", "phase", "endTurn",
-      "toolResultIntegrity", "agentInvocation",
+      "toolResultIntegrity", "toolResultIsError", "agentInvocation",
       "compactionHistory", "providerReasoning",
     ],
     "replacement-history message",
@@ -1403,6 +1403,10 @@ function readProjectionMessage(
   const role = text(record.role, "role");
   if (!["system", "developer", "user", "assistant", "tool"].includes(role)) {
     throw malformed("replacement-history role is unsupported");
+  }
+  if (record.toolResultIsError !== undefined &&
+      (record.toolResultIsError !== true || role !== "tool")) {
+    throw malformed("tool-result failure marker requires a failed tool result");
   }
   const content = readProjectionContent(record.content);
   const toolCalls = record.toolCalls === undefined
@@ -1446,6 +1450,7 @@ function readProjectionMessage(
   const result: CompactionProjectionMessageV1 = {
     role: role as CompactionProjectionMessageV1["role"],
     content,
+    ...(record.toolResultIsError === true ? { toolResultIsError: true as const } : {}),
     ...(toolCalls !== undefined ? { toolCalls } : {}),
     ...(toolCallId !== undefined ? { toolCallId } : {}),
     ...(toolName !== undefined ? { toolName } : {}),

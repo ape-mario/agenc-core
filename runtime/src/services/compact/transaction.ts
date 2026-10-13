@@ -1609,6 +1609,9 @@ function toProjectionMessage(message: RuntimeMessage): CompactionProjectionMessa
     ...(message.toolName !== undefined ? { toolName: message.toolName } : {}),
     ...(message.uuid !== undefined ? { id: message.uuid } : {}),
     ...(message.phase !== undefined ? { phase: message.phase } : {}),
+    ...(message.runtimeOnly?.toolResultIsError === true
+      ? { toolResultIsError: true as const }
+      : {}),
     ...(typeof message.providerReasoningContent === "string" &&
     (message.providerReasoningContent.length > 0 ||
       (normalizedRole === "assistant" && (message.toolCalls?.length ?? 0) > 0 &&
@@ -1684,8 +1687,11 @@ function toLlmMessage(message: RuntimeMessage): LLMMessage {
             : {}),
         }
       : {}),
-    ...(projected.compactionHistory !== undefined
-      ? { runtimeOnly: { compactionHistory: projected.compactionHistory } }
+    ...(projected.compactionHistory !== undefined || projected.toolResultIsError === true
+      ? { runtimeOnly: {
+          ...(projected.compactionHistory !== undefined ? { compactionHistory: projected.compactionHistory } : {}),
+          ...(projected.toolResultIsError === true ? { toolResultIsError: true as const } : {}),
+        } }
       : {}),
   };
 }

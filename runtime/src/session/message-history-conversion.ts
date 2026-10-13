@@ -140,6 +140,9 @@ export function llmMessageToResponseItem(message: LLMMessage): ResponseItem {
         }
       : {}),
     ...(message.phase !== undefined ? { phase: message.phase } : {}),
+    ...(message.runtimeOnly?.toolResultIsError === true
+      ? { toolResultIsError: true as const }
+      : {}),
     ...(message.runtimeOnly?.toolResultIntegrity !== undefined
       ? { toolResultIntegrity: message.runtimeOnly.toolResultIntegrity }
       : {}),
@@ -287,10 +290,14 @@ export function responseItemToLlmMessage(item: ResponseItem): LLMMessage {
     // committed compaction boundary and summary messages.
     ...(item.id !== undefined ||
     item.toolResultIntegrity !== undefined ||
+    item.toolResultIsError === true ||
     item.agentInvocation !== undefined ||
     item.compactionHistory !== undefined
       ? {
           runtimeOnly: {
+            ...(item.toolResultIsError === true
+              ? { toolResultIsError: true as const }
+              : {}),
             ...(item.id !== undefined
               ? { responseItemId: item.id,
                   ...(item.role === "user" ? { userMessageId: item.id } : {}) }

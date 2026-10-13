@@ -355,6 +355,7 @@ export interface CompactionProjectionMessageV1 {
   readonly endTurn?: boolean;
   readonly providerReasoning?: ProviderReasoningReplay;
   readonly toolResultIntegrity?: ToolResultIntegrity;
+  readonly toolResultIsError?: true;
   readonly agentInvocation?: AgentInvocationChannelMetadata;
   readonly compactionHistory?: CompactionHistoryMarkerV1;
 }

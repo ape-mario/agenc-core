@@ -69,6 +69,7 @@ type RuntimeOnlyProjectionSource = {
   readonly responseItemId?: string;
   readonly userMessageId?: string;
   readonly compactionHistory?: NonNullable<LLMMessage["runtimeOnly"]>["compactionHistory"];
+  readonly toolResultIsError?: true;
   readonly toolResultIntegrity?: NonNullable<
     NonNullable<LLMMessage["runtimeOnly"]>["toolResultIntegrity"]
   >;
@@ -316,7 +317,8 @@ export function projectRuntimeOnly(
     runtimeOnly?.agentInvocation === undefined &&
     runtimeOnly?.responseItemId === undefined &&
     runtimeOnly?.userMessageId === undefined &&
-    runtimeOnly?.compactionHistory === undefined
+    runtimeOnly?.compactionHistory === undefined &&
+    runtimeOnly?.toolResultIsError !== true
   ) {
     return {};
   }
@@ -330,6 +332,9 @@ export function projectRuntimeOnly(
         : {}),
       ...(runtimeOnly.compactionHistory !== undefined
         ? { compactionHistory: runtimeOnly.compactionHistory }
+        : {}),
+      ...(runtimeOnly.toolResultIsError === true
+        ? { toolResultIsError: true as const }
         : {}),
       ...(runtimeOnly.toolResultIntegrity !== undefined
         ? { toolResultIntegrity: runtimeOnly.toolResultIntegrity }

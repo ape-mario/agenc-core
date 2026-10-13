@@ -158,6 +158,8 @@ export interface LLMMessage {
      * preparation must remove it after local history transformations finish.
      */
     readonly toolResultIntegrity?: ToolResultIntegrity;
+    /** Host-reported tool failure, retained for restored transcript rendering. */
+    readonly toolResultIsError?: true;
     /** Durable authority/channel identity for versioned agent invocation input. */
     readonly agentInvocation?: AgentInvocationChannelMetadata;
     /** Commit-authenticated boundary/summary identity; never accepted from wire input. */
