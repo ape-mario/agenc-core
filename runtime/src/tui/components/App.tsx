@@ -3758,6 +3758,13 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
               return {
                 forwardedToModel: false,
               };
+            if (commandName === "clear" && result.kind === "text") {
+              setComposerPastedContents({});
+              retrySubmissionRef.current = null;
+              // A clear is an authoritative draft reset, even when the
+              // input was already empty and React batches the updates.
+              setDraftRestoreRevision((revision) => revision + 1);
+            }
             if (result.kind === "exit") {
               // /exit (and its `/quit` alias) returns kind:"exit" after
               // calling session.shutdown(). The TUI needs to unmount

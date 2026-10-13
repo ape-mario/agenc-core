@@ -4436,6 +4436,24 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     }
   });
 
+  test("drops pasted attachments after a successful clear before the next model turn", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const session = { ...createSession(), clearDaemonSession: vi.fn(async () => {}) };
+    const helpers = { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() };
+    await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
+      const props = providerProbe.promptProps.at(-1)!;
+      (props.setPastedContents as (value: unknown) => void)({ 1: { id: 1, type: "text", content: "private stale paste" } });
+      await vi.waitFor(() => expect(providerProbe.promptProps.at(-1)?.pastedContents).toHaveProperty("1"));
+      const before = providerProbe.promptProps.at(-1)?.draftRestoreRevision as number;
+      await providerProbe.promptSubmits.at(-1)!("/clear", helpers);
+      await vi.waitFor(() => {
+        expect(providerProbe.promptProps.at(-1)?.pastedContents).toEqual({});
+        expect(providerProbe.promptProps.at(-1)?.draftRestoreRevision).toBeGreaterThan(before);
+      });
+      expect(session.clearDaemonSession).toHaveBeenCalledOnce();
+    });
+  });
+
   test("keeps suspected-paste confirmation in front of the daemon shell bridge", async () => {
     const { AgenCTuiApp } = await import("./App.js");
     const executeShellCommand = vi.fn();

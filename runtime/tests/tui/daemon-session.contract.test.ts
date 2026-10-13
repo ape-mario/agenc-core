@@ -2127,6 +2127,16 @@ describe("AgenC TUI daemon session adapter", () => {
     });
   });
 
+  it("discards queued pasted inputs and their admission leases on clear", async () => {
+    const client = createClient();
+    const session = createDaemonTuiSession({ baseSession: createBaseSession(), client, sessionId: "session_1", clientId: "tui_1" });
+    const lease = session.enqueueIdleInputBatchOwned?.([{ role: "user", content: "private stale paste" }], { workspaceView: "agent" });
+    await session.clearDaemonSession?.();
+    expect(session.rollbackIdleInputAdmission?.(lease!.token)).toBe(false);
+    await session.submit?.("after clear");
+    expect(client.requests.at(-1)).toMatchObject({ method: "message.stream", params: { content: "after clear" } });
+  });
+
   it("clears daemon-owned session history through session.clear", async () => {
     const client = createClient();
     const session = createDaemonTuiSession({

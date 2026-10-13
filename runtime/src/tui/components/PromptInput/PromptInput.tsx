@@ -719,8 +719,8 @@ function PromptInput({
     if (pastedContents === lastPastedContentsPropRef.current) {
       return;
     }
-    lastPastedContentsPropRef.current = pastedContents;
     if (input === lastInternalInputRef.current) {
+      lastPastedContentsPropRef.current = pastedContents;
       pastedContentsRef.current = pastedContents;
     }
   }, [input, pastedContents]);
