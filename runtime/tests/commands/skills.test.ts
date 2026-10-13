@@ -29,6 +29,7 @@ function stubSession(opts: {
     readonly name: string;
     readonly description?: string;
     readonly scope?: string;
+    readonly root?: string;
     readonly loadedFrom?: string;
     readonly userInvocable?: boolean;
     readonly disableModelInvocation?: boolean;
@@ -69,6 +70,16 @@ function nonBundled(
 }
 
 describe("skillsCommand", () => {
+  it("reports the loaded user skill scope and root without plugins", async () => {
+    const snapshot = await collectSkillsSnapshot(stubSession({
+      availableSkills: [{ name: "private", description: "Private skill", scope: "user", loadedFrom: "skills", root: "/private/home/skills" }],
+    }));
+    expect(snapshot.effectiveSkillRoots).toContain("/private/home/skills");
+    const text = formatSkillsSnapshot(snapshot);
+    expect(text).toContain("$private - Private skill [user]");
+    expect(text).toContain("skill roots: /private/home/skills");
+  });
+
   it("collects sorted available skills, invoked skills, and plugin roots", async () => {
     const snapshot = await collectSkillsSnapshot(
       stubSession({
@@ -173,7 +184,7 @@ describe("skillsCommand", () => {
         "  use: $skill-name [args] (slash commands use /, file mentions use @)",
         "  available: none",
         "  invoked: none",
-        "  plugin roots: none",
+        "  skill roots: none",
       ].join("\n"),
     );
   });
@@ -246,7 +257,7 @@ describe("skillsCommand", () => {
         "    $debug - Debug a failing workflow [skills]",
         "    $mcp__Docs_Server__reviewer - Remote review skill [mcp]",
         "  invoked: $debug",
-        "  plugin roots: /skills",
+        "  skill roots: /skills",
       ].join("\n"),
     );
   });
@@ -392,7 +403,7 @@ describe("skillsCommand", () => {
     if (result.kind === "text") {
       expect(result.text).toContain("$debug");
       expect(result.text).toContain("invoked: $debug");
-      expect(result.text).toContain("plugin roots: /skills");
+      expect(result.text).toContain("skill roots: /skills");
     }
   });
 

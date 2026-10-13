@@ -523,6 +523,11 @@ export interface AgenCDaemonTuiClient {
     params?: JsonObject,
     options?: { readonly signal?: AbortSignal },
   ): Promise<SessionMcpServerMutationResult>;
+  request(
+    method: "session.mcp.removeServer",
+    params?: JsonObject,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<SessionMcpServerMutationResult>;
   request<Method extends AgenCDaemonMethod>(
     method: Method,
     params?: JsonObject,
@@ -2180,6 +2185,14 @@ function createDaemonMcpProjection(
     },
     disableServer: async (name: string) => {
       const remote = await client.request("session.mcp.disableServer", {
+        sessionId,
+        serverName: name,
+      } satisfies SessionMcpServerByNameParams);
+      await refreshAfterMutation();
+      return mutationResult(remote);
+    },
+    removeServer: async (name: string) => {
+      const remote = await client.request("session.mcp.removeServer", {
         sessionId,
         serverName: name,
       } satisfies SessionMcpServerByNameParams);

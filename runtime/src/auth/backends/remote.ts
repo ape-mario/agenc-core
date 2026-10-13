@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { withPromotionWalletAmounts } from "../promotion-allowance.js";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -155,6 +156,7 @@ export interface RemoteAuthBackendOptions {
   readonly authFilePath?: string;
   readonly keyVendor?: RemoteAuthKeyVendor;
   readonly loginFlow?: RemoteAuthLoginFlow;
+  readonly loginSignal?: AbortSignal;
   readonly modelInferer?: RemoteAuthModelInferer;
   readonly onDeviceCode?: RemoteAuthDeviceCodeHandler;
   readonly subscriptionTierResolver?: RemoteAuthSubscriptionTierResolver;
@@ -190,6 +192,7 @@ export class RemoteAuthBackend implements AuthBackend {
   readonly #accountSnapshotResolver: RemoteAuthAccountSnapshotResolver;
   readonly #keyVendor: RemoteAuthKeyVendor;
   readonly #loginFlow: RemoteAuthLoginFlow;
+  readonly #loginSignal?: AbortSignal;
   readonly #modelInferer: RemoteAuthModelInferer;
   readonly #subscriptionTierResolver: RemoteAuthSubscriptionTierResolver;
   readonly #llmUsageResolver: RemoteAuthLlmUsageResolver;
@@ -218,6 +221,7 @@ export class RemoteAuthBackend implements AuthBackend {
       createHttpRemoteAuthAccountSnapshotResolver(scopedOptions);
     this.#keyVendor = scopedOptions.keyVendor ??
       createHttpRemoteAuthKeyVendor(scopedOptions, this.#home);
+    this.#loginSignal = scopedOptions.loginSignal;
     this.#loginFlow = scopedOptions.loginFlow ??
       createHttpRemoteAuthLoginFlow(scopedOptions);
     this.#modelInferer =
@@ -244,11 +248,14 @@ export class RemoteAuthBackend implements AuthBackend {
   get managedKeysEnabled(): boolean { return this.#managedKeysEnabled; }
 
   async login(params: AuthLoginParams = {}): Promise<AuthLoginResult> {
+    this.#loginSignal?.throwIfAborted();
     const result = normalizeRemoteAuthLoginResult(
-      await this.#loginFlow(params),
+      await cancellableLogin(this.#loginFlow(params), this.#loginSignal),
     );
+    this.#loginSignal?.throwIfAborted();
     const createdAt = this.#now().toISOString();
     await withRemoteAuthStateLock(this.#authFilePath, async () => {
+      this.#loginSignal?.throwIfAborted();
       const credentialTransaction = storeRemoteBearerCredential(this.#home, {
         bearerToken: result.token,
         createdAt,
@@ -663,6 +670,18 @@ function createHttpRemoteAuthKeyVendor(
   };
 }
 
+function cancellableLogin<T>(work: T | Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (signal === undefined) return Promise.resolve(work);
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    Promise.resolve(work).then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", onAbort);
+    });
+  });
+}
+
 function createHttpRemoteAuthLoginFlow(
   options: RemoteAuthBackendOptions,
 ): RemoteAuthLoginFlow {
@@ -676,13 +695,17 @@ function createHttpRemoteAuthLoginFlow(
     trimNonEmpty(env[REMOTE_AUTH_LOGIN_POLL_URL_ENV]) ??
     DEFAULT_REMOTE_AUTH_LOGIN_POLL_URL;
   const fetchImpl = options.fetchImpl ?? globalThis.fetch?.bind(globalThis);
-  const sleep = options.sleepMs ?? sleepMs;
+  const signal = options.loginSignal;
+  const sleep = (ms: number) => options.sleepMs === undefined
+    ? delay(ms, undefined, { signal })
+    : cancellableLogin(options.sleepMs(ms), signal);
   return async (request) => {
     if (fetchImpl === undefined) {
       throw new Error("RemoteAuthBackend requires fetch for remote login");
     }
     const startResponse = await remoteAuthFetch(fetchImpl, startEndpoint, {
       method: "POST",
+      signal,
       headers: remoteAuthJsonHeaders(undefined),
       body: JSON.stringify(compactRemoteAuthLoginRequest(request)),
     }, "login start", env, options.fetchImpl === undefined);
@@ -705,17 +728,20 @@ function createHttpRemoteAuthLoginFlow(
       (started.intervalSeconds ?? 2) * 1000,
     );
     while (Date.now() <= expiresAtMs) {
+      signal?.throwIfAborted();
       let pollResponse: Response;
       try {
         pollResponse = await remoteAuthFetch(fetchImpl, pollEndpoint, {
           method: "POST",
+          signal,
           headers: remoteAuthJsonHeaders(undefined),
           body: JSON.stringify({
             deviceCode: started.deviceCode,
             sessionId: request.sessionId,
           }),
         }, "login poll", env, options.fetchImpl === undefined);
-      } catch {
+      } catch (error) {
+        if (signal?.aborted) throw error;
         await sleep(intervalMs);
         continue;
       }
@@ -1477,10 +1503,6 @@ function parseExpiresAtMs(expiresAt: string | undefined): number | undefined {
   if (expiresAt === undefined) return undefined;
   const parsed = Date.parse(expiresAt);
   return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-async function sleepMs(ms: number): Promise<void> {
-  await new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 function positiveTtlMs(value: number | undefined): number {

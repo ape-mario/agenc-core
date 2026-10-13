@@ -253,6 +253,7 @@ export const AGENC_DAEMON_INTERNAL_METHODS = [
   "session.mcp.reconnectServer",
   "session.mcp.enableServer",
   "session.mcp.disableServer",
+  "session.mcp.removeServer",
 ] as const;
 
 export type AgenCDaemonInternalMethod =
@@ -1255,6 +1256,14 @@ export const AGENC_DAEMON_INTERNAL_METHOD_SPECS = defineInternalMethodSpecs({
     result: "object",
     description:
       "TUI-internal request to disable an MCP server on the daemon-owned runtime session.",
+  },
+  "session.mcp.removeServer": {
+    method: "session.mcp.removeServer",
+    direction: "client-to-server",
+    params: "required",
+    result: "object",
+    description:
+      "TUI-internal request to remove a session-added MCP server on the daemon-owned runtime session.",
   },
 });
 
@@ -4499,6 +4508,7 @@ export interface AgenCDaemonInternalResultByMethod {
   readonly "session.mcp.reconnectServer": SessionMcpServerMutationResult;
   readonly "session.mcp.enableServer": SessionMcpServerMutationResult;
   readonly "session.mcp.disableServer": SessionMcpServerMutationResult;
+  readonly "session.mcp.removeServer": SessionMcpServerMutationResult;
 }
 
 export type AgenCDaemonKnownResultByMethod = AgenCDaemonResultByMethod &

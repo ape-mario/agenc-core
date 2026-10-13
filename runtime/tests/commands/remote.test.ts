@@ -107,6 +107,19 @@ function slashCommandContext(
 }
 
 describe("/remote slash command", () => {
+  it("rejects unknown subcommands and extra arguments before remote pairing", async () => {
+    const fixture = remoteFixture("agenc-remote-invalid-", { AGENC_REMOTE_FULL_CONTROL: "1" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected pairing"));
+    try {
+      for (const argsRaw of ["badargument", "badargument --full-control", "on --yes", "status extra", "off extra", "on status"]) {
+        expect(await runRemoteSlash(argsRaw, fixture.context)).toContain("Usage: /remote");
+        const result = await remoteCommand.execute({ ...slashCommandContext(fixture.context), argsRaw });
+        expect(result).toMatchObject({ kind: "text", text: expect.stringContaining("Usage: /remote") });
+      }
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally { fixture.cleanup(); }
+  });
+
   it("is an immediate command named remote", () => {
     expect(remoteCommand.name).toBe("remote");
     expect(remoteCommand.immediate).toBe(true);

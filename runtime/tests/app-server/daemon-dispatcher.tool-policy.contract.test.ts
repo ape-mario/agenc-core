@@ -183,6 +183,7 @@ describe("tool.approve and elicitation.respond are bound to an attached connecti
       ["session.mcp.reconnectServer", byName],
       ["session.mcp.enableServer", byName],
       ["session.mcp.disableServer", byName],
+      ["session.mcp.removeServer", byName],
     ] as const) {
       expect(await call(stranger, method, params), method).toMatchObject({ error: { code: -32000, data: { code: "SESSION_NOT_ATTACHED" } } });
     }

@@ -1551,7 +1551,7 @@ describe("AgenC TUI daemon session adapter", () => {
       if (
         method === "session.mcp.reconnectServer" ||
         method === "session.mcp.enableServer" ||
-        method === "session.mcp.disableServer"
+        method === "session.mcp.disableServer" || method === "session.mcp.removeServer"
       ) {
         return {
           sessionId: "session_1",
@@ -1607,6 +1607,7 @@ describe("AgenC TUI daemon session adapter", () => {
       reconnectServer: localReconnect,
       enableServer: localEnable,
       disableServer: localDisable,
+      removeServer: localDisable,
     };
 
     const session = await attachDaemonTuiSession({
@@ -1619,11 +1620,13 @@ describe("AgenC TUI daemon session adapter", () => {
       reconnectServer(name: string): Promise<unknown>;
       enableServer(name: string): Promise<unknown>;
       disableServer(name: string): Promise<unknown>;
+      removeServer(name: string): Promise<unknown>;
     };
 
     const reconnectResult = await manager.reconnectServer("audit-ping");
     const enableResult = await manager.enableServer("audit-ping");
     const disableResult = await manager.disableServer("audit-ping");
+    const removeResult = await manager.removeServer("audit-ping");
 
     const projected = {
       serverName: "audit-ping",
@@ -1633,6 +1636,7 @@ describe("AgenC TUI daemon session adapter", () => {
     expect(reconnectResult).toEqual(projected);
     expect(enableResult).toEqual(projected);
     expect(disableResult).toEqual(projected);
+    expect(removeResult).toEqual(projected);
 
     expect(
       client.requests.filter((request) => request.method !== "session.mcp.status"),
@@ -1653,15 +1657,19 @@ describe("AgenC TUI daemon session adapter", () => {
         method: "session.mcp.disableServer",
         params: { sessionId: "session_1", serverName: "audit-ping" },
       },
+      {
+        method: "session.mcp.removeServer",
+        params: { sessionId: "session_1", serverName: "audit-ping" },
+      },
     ]);
     expect(
       client.requests.filter((request) => request.method === "session.mcp.status"),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(localReconnect).not.toHaveBeenCalled();
     expect(localEnable).not.toHaveBeenCalled();
     expect(localDisable).not.toHaveBeenCalled();
     expect(session.mcpSurfaceSnapshot?.()).toMatchObject({
-      revision: 3,
+      revision: 4,
       servers: [
         expect.objectContaining({
           name: "audit-ping",

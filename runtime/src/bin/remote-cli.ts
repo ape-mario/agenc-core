@@ -66,7 +66,12 @@ export function parseAgenCRemoteCliArgs(argv: readonly string[]): RemoteCliComma
 export function parseRemoteSlashArgs(argsRaw: string): { readonly sub: string; readonly fullControl: boolean } {
   const tokens = (argsRaw || "").trim().split(/\s+/u).filter(Boolean);
   const fullControl = tokens.includes(REMOTE_FULL_CONTROL_FLAG);
-  const sub = tokens.find((token) => token !== REMOTE_FULL_CONTROL_FLAG) ?? "on";
+  const args = tokens.filter((token) => token !== REMOTE_FULL_CONTROL_FLAG);
+  const sub = args[0] ?? "on";
+  if (args.length > 1 || !["on", "off", "status"].includes(sub) ||
+      (fullControl && sub !== "on")) {
+    return { sub: "help", fullControl: false };
+  }
   return { sub, fullControl };
 }
 
@@ -756,6 +761,8 @@ export async function runRemoteSlash(
     stopLegacyRemote(context);
     return "This computer is not linked.";
   }
+
+  if (sub !== "on") return "Usage: /remote [on|off|status] [--full-control]";
 
   // "on" — delegate to the shared starter.
   const started = await startRemoteOn(context, { fullControl });

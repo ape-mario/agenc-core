@@ -383,6 +383,14 @@ function projectLocalSkill(
         args,
       });
       const rawContent = rendered?.content ?? "";
+      if (rendered !== null && rendered !== undefined) {
+        skillsManager.recordInvokedSkill?.({
+          skillName: rendered.skill.name,
+          skillPath: rendered.skill.path,
+          content: rendered.content,
+          invokedAt: Date.now(),
+        });
+      }
       const content = repositoryControlled
         ? frameRepositorySkillGuidance(rawContent)
         : rawContent;

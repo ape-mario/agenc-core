@@ -238,9 +238,15 @@ async function bundledSkillsFromRegistry(
   }
 }
 
+export function skillDisplaySource(skill: AvailableSkillSnapshot): string | undefined {
+  return skill.loadedFrom === "skills"
+    ? skill.scope ?? skill.loadedFrom
+    : skill.loadedFrom ?? skill.scope;
+}
+
 function formatSourceTag(skill: AvailableSkillSnapshot): string {
   if (skill.name.startsWith(".")) return " [system]";
-  const source = skill.loadedFrom ?? skill.scope;
+  const source = skillDisplaySource(skill);
   return source ? ` [${sanitizeSkillDisplayText(source)}]` : "";
 }
 
@@ -409,9 +415,10 @@ export async function collectSkillsSnapshot(
         ...mcpSkillsFromAppState(appStateBridge),
       ],
     ),
-    effectiveSkillRoots: normalizeRoots(pluginView.effectiveSkillRoots()).sort(
-      (a, b) => a.localeCompare(b),
-    ),
+    effectiveSkillRoots: [...new Set([
+      ...normalizeRoots(pluginView.effectiveSkillRoots()),
+      ...(outcome.availableSkills ?? []).flatMap((skill) => skill.root ? [skill.root] : []),
+    ])].sort((a, b) => a.localeCompare(b)),
     ...(outcome.truncatedSkillRoots !== undefined &&
       outcome.truncatedSkillRoots.length > 0
       ? { truncatedRoots: outcome.truncatedSkillRoots }
@@ -493,8 +500,8 @@ function formatInvokedLine(snapshot: SkillsSnapshot): string {
 
 function formatPluginRootsLine(snapshot: SkillsSnapshot): string {
   return snapshot.effectiveSkillRoots.length === 0
-    ? "  plugin roots: none"
-    : `  plugin roots: ${snapshot.effectiveSkillRoots.join(", ")}`;
+    ? "  skill roots: none"
+    : `  skill roots: ${snapshot.effectiveSkillRoots.join(", ")}`;
 }
 
 export function formatSkillsSnapshot(
