@@ -123,7 +123,9 @@ export async function applyModelSwitch(
     }) => Promise<void> | void;
   } = {},
 ): Promise<ProviderModelSelectionOutcome> {
-  const current = readSessionSelection(session);
+  // A previous accepted switch may still be waiting for the next turn.
+  // Compare against that selection so a switch back replaces it.
+  const current = readSessionSelection(session, { includePending: true });
   let selection;
   try {
     selection = resolveSessionProviderModelSelection(

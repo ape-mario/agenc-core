@@ -9,7 +9,7 @@ import {
   checkModelHistoryCompat,
 } from "./model.js";
 import { modelMenuFallback, readModelMenuSnapshot } from "./model-menu-snapshot.js";
-import { switchProviderModel } from "./provider.js";
+import { applyProviderSwitch, switchProviderModel } from "./provider.js";
 import type { EnvSnapshot } from "../config/env.js";
 import { resolveHomeContext, type HomeContext } from "../config/home.js";
 import type { ConfigStore } from "../config/store.js";
@@ -694,6 +694,31 @@ describe("modelCommand", () => {
     const session = stubSession({ abortTerminal });
     await applyModelSwitch(session, "grok-4-fast");
     expect(abortTerminal).not.toHaveBeenCalled();
+  });
+
+  it.each(["model", "provider"] as const)("replaces an accepted pending model when switching back via %s before another turn", async (kind) => {
+    const session = stubSession({
+      provider: "grok", model: "grok-4",
+      pendingProviderSwitch: { provider: "grok", model: "grok-4-fast" },
+    });
+    const outcome = kind === "model"
+      ? await applyModelSwitch(session, "grok-4", "grok")
+      : await applyProviderSwitch(session, "grok", "grok-4");
+    expect(outcome).toMatchObject({ applied: true, provider: "grok", model: "grok-4" });
+    expect(session.pendingProviderSwitch).toEqual({ provider: "grok", model: "grok-4" });
+  });
+
+  it.each(["model", "provider"] as const)("does not restage an already accepted pending pair via %s", async (kind) => {
+    const session = stubSession({
+      provider: "grok", model: "grok-4",
+      pendingProviderSwitch: { provider: "grok", model: "grok-4-fast" },
+    });
+    const stage = vi.fn();
+    const outcome = kind === "model"
+      ? await applyModelSwitch(session, "grok-4-fast", "grok", { stage })
+      : await applyProviderSwitch(session, "grok", "grok-4-fast", { stage });
+    expect(outcome).toMatchObject({ applied: false, provider: "grok", model: "grok-4-fast" });
+    expect(stage).not.toHaveBeenCalled();
   });
 
   it("does not stage or abort an unchanged model pair", async () => {
