@@ -1100,7 +1100,7 @@ export function Msg({
           </Box>
         ) : null}
         <ContentWidthProvider width={contentWidth}>
-          <Content color={role === 'user' ? 'text' : 'text2'}>{children}</Content>
+          <Content color={role === 'user' || role === 'agenc' ? 'text' : 'text2'}>{children}</Content>
         </ContentWidthProvider>
       </Box>
     </Box>
@@ -1134,10 +1134,10 @@ export function ResultLine({
   return (
     <Box flexDirection="row" paddingLeft={2}>
       <Box flexShrink={0}>
-        <ThemedText color="subtle">{'└ '}</ThemedText>
+        <ThemedText color="text3">{'└ '}</ThemedText>
       </Box>
       <Box flexShrink={1} minWidth={0}>
-        <ThemedText color={failed ? 'stepFail' : 'inactive'} wrap="truncate-end">
+        <ThemedText color={failed ? 'stepFail' : 'text3'} wrap="truncate-end">
           {children}
         </ThemedText>
       </Box>
@@ -1244,11 +1244,11 @@ function ToolResultLines({
   readonly state: ToolState
   readonly children: string | ReactNode
 }): React.ReactNode {
-  const color: ThemeColor = state === 'failed' ? 'stepFail' : 'inactive'
+  const color: ThemeColor = state === 'failed' ? 'stepFail' : 'text3'
   if (typeof children !== 'string') {
     return (
       <Box flexDirection="row" paddingLeft={2} gap={1}>
-        <ThemedText color="subtle">└</ThemedText>
+        <ThemedText color="text3">└</ThemedText>
         <Box flexDirection="column" flexGrow={1}>
           {children}
         </Box>
@@ -1258,7 +1258,7 @@ function ToolResultLines({
   const lines = children.split('\n')
   return (
     <Box flexDirection="row" paddingLeft={2} gap={1}>
-      <ThemedText color="subtle">└</ThemedText>
+      <ThemedText color="text3">└</ThemedText>
       <Box flexDirection="column" flexGrow={1}>
         {lines.map((line, index) => (
           <ThemedText key={index} color={color} wrap="wrap">

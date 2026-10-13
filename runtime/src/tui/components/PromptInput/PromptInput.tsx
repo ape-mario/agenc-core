@@ -996,11 +996,14 @@ function PromptInput({
   // Which pills render below the input box. Order here IS the nav order
   // (down/right = forward, up/left = back). The inline AGENT FLEET panel (the
   // `tasks` footer item + its ↓-to-manage entry) was removed, so it is no
-  // longer offered here — background agents still run; only the panel UI is gone.
+  // longer offered here. Shells keep their keyboard entry in the status line.
   const teamsFooterVisible = cachedTeams.length > 0;
+  const shellsFooterVisible = isFullscreen && Object.values(tasks).some(task =>
+    isBackgroundTask(task) && task.type === 'local_bash',
+  );
   const footerItems = useMemo(
-    () => [teamsFooterVisible && "teams"].filter(Boolean) as FooterItem[],
-    [teamsFooterVisible],
+    () => [shellsFooterVisible && "tasks", teamsFooterVisible && "teams"].filter(Boolean) as FooterItem[],
+    [shellsFooterVisible, teamsFooterVisible],
   );
 
   // Effective selection: null if the selected pill stopped rendering (bridge

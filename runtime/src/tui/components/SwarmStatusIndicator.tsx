@@ -30,9 +30,8 @@ export function swarmStatusPresentation(
 }
 
 /**
- * A quiet inline status, intentionally not a filled badge: the old white-on-
- * orange `SWARM` slab dominated the composer chrome and looked disconnected
- * from the surrounding mode/model context.
+ * Match the effort segment: plain primary ink. Activity is carried by the
+ * label's count; the footer needs no extra glyph.
  */
 export function SwarmStatusIndicator({
   runningAgents,
@@ -46,11 +45,8 @@ export function SwarmStatusIndicator({
       <ThemedText color="inactive" wrap="truncate-end">
         {" · "}
       </ThemedText>
-      <ThemedText color="agenc" wrap="truncate-end">
-        {presentation.glyph}
-      </ThemedText>
-      <ThemedText color="inactive" wrap="truncate-end">
-        {` ${presentation.label}`}
+      <ThemedText color="text" wrap="truncate-end">
+        {presentation.label}
       </ThemedText>
     </Box>
   );

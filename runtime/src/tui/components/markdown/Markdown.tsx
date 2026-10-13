@@ -7,6 +7,7 @@ import { type CliHighlight, getCliHighlightPromise } from '../../../utils/cliHig
 import { hashContent } from '../../../utils/hash.js';
 import { configureMarked, formatToken } from '../../../utils/markdown.js';
 import { stripPromptXMLTags } from '../../../utils/messages.js';
+import { color } from '../design-system/color.js';
 import { MarkdownTable } from './MarkdownTable.js';
 
 type Props = {
@@ -148,7 +149,7 @@ function MarkdownBody(t0: Props & { highlight: CliHighlight | null }): React.Rea
         // is scoped to the markdown body (non-table assistant/user text) — code
         // blocks render via <HighlightedCode>'s own <Ansi> without this prop, so
         // their significant leading whitespace is preserved.
-        elements.push(<AnsiComponent key={elements.length} dimColor={dimColor} wrap="wrap-trim">{nonTableContent.trim()}</AnsiComponent>);
+        elements.push(<AnsiComponent key={elements.length} dimColor={dimColor} wrap="wrap-trim">{color('text', theme)(nonTableContent.trim())}</AnsiComponent>);
         nonTableContent = "";
       }
     };

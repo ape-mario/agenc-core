@@ -12,6 +12,7 @@ import { selectAgenCTuiGlyphs } from "../glyphs.js";
 import ScrollBox, { type ScrollBoxHandle } from '../ink/components/ScrollBox.js';
 import instances from '../ink/instances.js';
 import { Box, Text, useTerminalFocus } from '../ink.js';
+import { isBackgroundTask } from '../../tasks/types.js';
 import type { Message } from '../../types/message';
 import { openBrowser, openPath } from '../../utils/browser.js';
 import { logError } from '../../utils/log.js';
@@ -27,10 +28,11 @@ import type { PermissionMode } from '../../permissions/types.js';
 import type { StickyPrompt } from './VirtualMessageList';
 import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
 import { PlanModeBanner } from './v2/primitives.js';
-import { useStatusEffort } from '../context/statusEffortContext.js';
+import { useStatusEffort, useStatusContextUsage } from '../context/statusEffortContext.js';
 import ThemedText from './design-system/ThemedText.js';
 import { LedgerStatus } from './LedgerStatus.js';
-import { SwarmStatusIndicator } from './SwarmStatusIndicator.js';
+import { swarmStatusPresentation } from './SwarmStatusIndicator.js';
+import { stringWidth } from '../ink/stringWidth.js';
 
 /** Rows of transcript context kept visible above the modal pane's ▔ divider. */
 const MODAL_TRANSCRIPT_PEEK = 2;
@@ -624,6 +626,7 @@ export type StatusLineSegments = {
   readonly model: string;
   readonly effort: string | null;
   readonly mode: string;
+  readonly light: string | null;
   readonly branch: string | null;
   readonly spend: string | null;
 };
@@ -647,7 +650,8 @@ export function statusLineSegments(
     folder: columns >= STATUS_FOLDER_MIN_COLUMNS ? folder : null,
     model: modelLabel,
     effort,
-    mode: `${statusModeLabel(mode)}${lightMode ? " · Light" : ""}`,
+    mode: statusModeLabel(mode),
+    light: lightMode ? "light" : null,
     branch: branch !== null && columns >= STATUS_BRANCH_MIN_COLUMNS ? branch : null,
     spend: spend === '' ? null : spend,
   };
@@ -658,13 +662,11 @@ function workspaceFolderLabel(columns: number): string {
   return truncateMiddleToWidth(`~/${name}`, Math.max(12, Math.floor(columns * 0.24)));
 }
 
-const STATUS_SEPARATOR = '  ·  ';
-
 /**
  * The one status line under the prompt. Plain text on the terminal's own
- * background, no border or wash: the folder and branch are muted, the model
- * is bold, the mode is full ink (and bold in bypass mode), spend sits on the
- * right. Swarm and Ledger indicators keep their places when active.
+ * background, no border or wash: cwd and branch share secondary ink, facts
+ * use primary ink, and risky state uses the warning tone. Context and spend
+ * sit on the right.
  */
 function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const model = useAppStateMaybeOutsideOfProvider(state => state.mainLoopModel) ?? 'agenc';
@@ -675,49 +677,73 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
     () => Object.values(tasks ?? {}).filter((task: any) => task?.type !== "local_bash" && (task?.status === "running" || task?.status === "pending")).length,
     [tasks],
   );
+  const shellCount = Object.values(tasks).filter(task =>
+    isBackgroundTask(task) && task.type === 'local_bash',
+  ).length;
   const folder = React.useMemo(() => workspaceFolderLabel(columns), [columns]);
   const spend = useSessionSpendLabel();
   const branch = useGitChromeLabel();
   const effort = useStatusEffort();
+  const contextPercent = useStatusContextUsage();
   const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) === true;
   const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, branch, spend, effort, lightMode);
   const bypass = mode === 'bypassPermissions';
-  const separator = <ThemedText color="subtle">{STATUS_SEPARATOR}</ThemedText>;
+  const rightLabels = [
+    contextPercent !== null ? `ctx ${contextPercent}%` : null,
+    segments.spend,
+  ].filter((label): label is string => label !== null);
+  const rightWidth = stringWidth(rightLabels.join(' · '));
+  const leftWidth = Math.max(1, columns - 4 - rightWidth - (rightWidth > 0 ? 1 : 0));
+  const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error'; bold?: boolean }> = [
+    ...(segments.folder !== null ? [{ key: 'folder', label: `${segments.folder}${segments.branch ? ` (${segments.branch})` : ''}`, color: 'text2' as const }] : []),
+    { key: 'model', label: segments.model, color: 'text' },
+    ...(segments.effort !== null ? [{ key: 'effort', label: segments.effort, color: 'text' as const }] : []),
+    { key: 'mode', label: segments.mode, color: bypass ? 'error' : 'text', bold: bypass },
+    ...(segments.light !== null ? [{ key: 'light', label: segments.light, color: 'text' as const }] : []),
+    ...(swarmMode ? [{ key: 'swarm', label: swarmStatusPresentation(runningAgents).label, color: 'text' as const }] : []),
+    ...(shellCount > 0 ? [{ key: 'shells', label: `${shellCount} ${shellCount === 1 ? 'shell' : 'shells'}`, color: 'text' as const }] : []),
+  ];
+  // Reserve the truthful context/cost block first. Drop cwd/branch, shorten
+  // effort/mode, then drop swarm/effort/light before truncating the model.
+  // Every segment remains in this single row even at a narrow width.
+  const width = () => items.reduce((sum, item) => sum + stringWidth(item.label), Math.max(0, items.length - 1) * 3);
+  const drop = (key: string) => {
+    const index = items.findIndex(item => item.key === key);
+    if (index >= 0) items.splice(index, 1);
+  };
+  if (width() > leftWidth) drop('folder');
+  if (width() > leftWidth) {
+    for (const item of items) {
+      if (item.key === 'effort') item.label = item.label.replace(/ effort$/, '');
+      if (item.key === 'mode') item.label = item.label.replace(/ mode$/, '');
+    }
+  }
+  for (const key of ['swarm', 'effort', 'light']) {
+    if (width() > leftWidth) drop(key);
+  }
+  const modelItem = items.find(item => item.key === 'model');
+  if (modelItem && width() > leftWidth) {
+    modelItem.label = truncateMiddleToWidth(modelItem.label, Math.max(1, stringWidth(modelItem.label) - (width() - leftWidth)));
+  }
   return (
-    <Box flexDirection="row" paddingX={2} minHeight={1} flexShrink={0}>
-      {segments.folder !== null ? (
-        <>
-          <Box flexShrink={1} minWidth={0}>
-            <ThemedText color="inactive" wrap="truncate-middle">{segments.folder}</ThemedText>
-          </Box>
-          {separator}
-        </>
-      ) : null}
-      <Box flexShrink={1} minWidth={0}>
-        <ThemedText color="text" bold wrap="truncate-end">{segments.model}</ThemedText>
+    <Box flexDirection="row" paddingX={2} height={1} overflow="hidden" flexShrink={0}>
+      <Box flexDirection="row" width={leftWidth} flexShrink={1} minWidth={0} overflow="hidden">
+        {items.map((item, index) => (
+          <React.Fragment key={item.key}>
+            {index > 0 ? <ThemedText color="text2">{' · '}</ThemedText> : null}
+            <ThemedText color={item.color} bold={item.bold} wrap="truncate-end">{item.label}</ThemedText>
+          </React.Fragment>
+        ))}
       </Box>
-      {segments.effort !== null ? (
-        <>
-          {separator}
-          <ThemedText color="text2" wrap="truncate-end">{segments.effort}</ThemedText>
-        </>
-      ) : null}
-      {separator}
-      <ThemedText color={bypass ? 'error' : 'text2'} bold={bypass} wrap="truncate-end">
-        {segments.mode}
-      </ThemedText>
-      {swarmMode ? <SwarmStatusIndicator runningAgents={runningAgents} /> : null}
-      {segments.branch !== null ? (
-        <>
-          {separator}
-          <Box flexShrink={1} minWidth={0}>
-            <ThemedText color="inactive" wrap="truncate-end">{segments.branch}</ThemedText>
-          </Box>
-        </>
-      ) : null}
       <Box flexGrow={1} />
       <LedgerStatus />
-      {segments.spend !== null ? <ThemedText color="text2" wrap="truncate-end">{` ${segments.spend}`}</ThemedText> : null}
+      {contextPercent !== null ? (
+        <ThemedText color={contextPercent >= 80 ? 'error' : 'text'} wrap="truncate-end">
+          {`ctx ${contextPercent}%`}
+        </ThemedText>
+      ) : null}
+      {contextPercent !== null && segments.spend !== null ? <ThemedText color="text">{' · '}</ThemedText> : null}
+      {segments.spend !== null ? <ThemedText color="text" wrap="truncate-end">{segments.spend}</ThemedText> : null}
     </Box>
   );
 }
