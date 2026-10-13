@@ -91,12 +91,16 @@ async function executeAuthCommand(
       };
     }
 
-    const backend = createSlashAuthBackend(ctx);
+    const controller = action === "login" ? new AbortController() : undefined;
+    const backend = createSlashAuthBackend(ctx, controller);
 
     if (action === "login") {
       let result: Awaited<ReturnType<AuthBackend["login"]>>;
       try {
         result = await backend.login({ sessionId: TUI_AUTH_SESSION_ID });
+      } catch (error) {
+        if (controller?.signal.aborted) return { kind: "text", text: "Google sign-in cancelled." };
+        throw error;
       } finally {
         clearLocalAuthNotice(ctx);
       }
@@ -188,7 +192,7 @@ function hostedSubscriptionRouteMessage(
   );
 }
 
-function createSlashAuthBackend(ctx: SlashCommandContext): AuthBackend {
+function createSlashAuthBackend(ctx: SlashCommandContext, controller?: AbortController): AuthBackend {
   const configStore = requireCommandConfigStore(ctx);
   const agencHome = configStore.homeContext.path;
   const config = configStore.current() ?? defaultConfig();
@@ -196,16 +200,19 @@ function createSlashAuthBackend(ctx: SlashCommandContext): AuthBackend {
     agencHome,
     env: providerEnvironmentFromCommandContext(ctx),
     remote: {
+      loginSignal: controller?.signal,
       onDeviceCode: async ({ verificationUri, userCode }) => {
-        if (verificationUri === undefined) return;
+        if (verificationUri === undefined || controller?.signal.aborted) return;
         const notices = typeof ctx.appState?.setToolJSX === "function"
           ? await import("./auth-menu.js")
           : undefined;
-        notices?.showBrowserLoginNotice(ctx, verificationUri, userCode);
+        if (controller?.signal.aborted) return;
+        const onCancel = controller === undefined ? undefined : () => controller.abort();
+        notices?.showBrowserLoginNotice(ctx, verificationUri, userCode, onCancel);
         try {
           await openUrlInBrowser(verificationUri);
         } catch {
-          notices?.showCopyUrlLoginNotice(ctx, verificationUri, userCode);
+          if (!controller?.signal.aborted) notices?.showCopyUrlLoginNotice(ctx, verificationUri, userCode, onCancel);
         }
       },
     },
