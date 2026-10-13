@@ -29,10 +29,9 @@ import {
   MAX_SUBCOMMANDS_FOR_SECURITY_CHECK,
   getFirstWordPrefix,
   getSimpleCommandPrefix,
-  parseShellWrapperSubcommandsForPermission,
-  shellWrapperCodeSubcommandsForPermission,
-  splitCommand,
+  parseShellCommand,
 } from "../shell-command/parser.js";
+import { shellRestrictionParts } from "./shell-restrictions.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Escape helpers (parens + backslash)
@@ -362,10 +361,18 @@ function shellContentRuleForInput(
       firstWord: getFirstWordPrefix(candidate),
     });
     if (matched !== null) return matched;
-    pending.push(
-      ...(parseShellWrapperSubcommandsForPermission(candidate) ?? splitCommand(candidate)),
-      ...shellWrapperCodeSubcommandsForPermission(candidate),
-    );
+    const parsed = shellRestrictionParts(candidate);
+    if (parsed.opaque) return rules.values().next().value ?? null;
+    // Match decoded literal words as well as their quoted shell spelling.
+    const words = parseShellCommand(candidate);
+    if (words !== null) {
+      const decoded = words.join(" ");
+      const decodedMatch = findMatchingContentRule(rules, decoded, {
+        prefix: getSimpleCommandPrefix(decoded), firstWord: getFirstWordPrefix(decoded),
+      });
+      if (decodedMatch !== null) return decodedMatch;
+    }
+    pending.push(...parsed.commands);
     if (pending.length > MAX_SUBCOMMANDS_FOR_SECURITY_CHECK * 2) {
       return rules.values().next().value ?? null;
     }

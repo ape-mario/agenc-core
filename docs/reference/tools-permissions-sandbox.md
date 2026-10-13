@@ -516,9 +516,13 @@ reporting success, without selecting a different model or effort. A matching
 deny wins over allow rules in every mode, including bypass.
 Shell deny and ask rules with command content are checked before any approval
 prompt, including exact commands, wildcard/prefix patterns, compound commands
-and recognized shell wrappers. An approval cannot override a matching deny.
-Commands exceeding the bounded rule-check limit are refused when shell deny
-rules are configured. Saved rules remain visible after restart and resume;
+and shell wrappers. Transparent launchers such as `env`, `command`, `nice`,
+`nohup`, `timeout` and `sudo` are checked against the command they launch.
+An approval cannot override a matching deny. With command-specific shell
+restrictions, opaque syntax, unknown launcher options, script files and dynamic
+`xargs` input fail closed; use a literal, inspectable command instead.
+Commands exceeding the bounded rule-check limit are also refused. This
+restriction parsing never grants a command. Saved rules remain visible after restart and resume;
 live mode changes preserve the rule projection.
 Legacy `Bash` deny and ask rules restrict the canonical shell tool family
 (`exec_command`, `system.bash`, and process continuation tools). Legacy `Bash`

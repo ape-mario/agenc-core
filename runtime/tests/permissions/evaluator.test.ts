@@ -320,6 +320,15 @@ describe("command-specific deny floor", () => {
         ["Bash", "printf DENIED", "pwd; printf DENIED"],
         ["exec_command", "printf:*", "printf DENIED"],
         ["Bash", "printf DEN*", "bash -c 'printf DENIED'"],
+        ...[
+          "env printf DENIED", "env -i -u PATH LANG=C printf DENIED",
+          "command -p printf DENIED", "nice -n 5 printf DENIED", "nohup printf DENIED",
+          "timeout --signal=TERM 2s printf DENIED", "xargs -n1 printf DENIED",
+          "sudo -n -u nobody printf DENIED", "sh -c 'printf DENIED'",
+          "env -- nice -5 timeout 2 bash -ec 'printf DENIED'", "/usr/bin/printf DENIED",
+          "env -S 'printf DENIED'", "env --unknown printf ALLOWED", "bash script.sh",
+          "printf $(printf DENIED)", "LANG=C printf DENIED", "printf 'DENIED'",
+        ].map(cmd => ["exec_command", "printf DENIED", cmd]),
       ]) {
         const { context } = buildHarness({ mode, allowRules: [{ toolName: "exec_command" }], denyRules: [{ toolName: toolName!, ruleContent }] });
         const tool = makeTool({ name: "exec_command", checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
@@ -332,7 +341,9 @@ describe("command-specific deny floor", () => {
   it("does not turn an unmatched command into a rule deny", async () => {
     const { context } = buildHarness({ denyRules: [{ toolName: "exec_command", ruleContent: "printf DENIED" }] });
     const tool = makeTool({ name: "exec_command", checkPermissions: () => ({ behavior: "allow", updatedInput: {} }) });
-    expect((await hasPermissionsToUseTool(tool, { cmd: "printf ALLOWED" }, context)).behavior).toBe("allow");
+    for (const cmd of ["printf ALLOWED", "env -i LANG=C printf ALLOWED", "nice -n5 printf ALLOWED", "timeout 2 sh -c 'printf ALLOWED'"]) {
+      expect((await hasPermissionsToUseTool(tool, { cmd }, context)).behavior).toBe("allow");
+    }
   });
   it("matches executable fields even when unused command or args fields are supplied", async () => {
     const { context } = buildHarness({
