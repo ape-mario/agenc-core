@@ -405,6 +405,7 @@ describe('useTextInput', () => {
       rendered.latest().onInput('c', key({ ctrl: true }))
       await sleep()
       expect(rendered.latest().value).toBe('')
+      expect(harness.addToHistory).toHaveBeenCalledWith('interrupt')
       expect(onExitMessage).toHaveBeenCalledWith(true, 'Ctrl-C')
       rendered.latest().onInput('c', key({ ctrl: true }))
       await sleep()
