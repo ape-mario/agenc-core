@@ -68,6 +68,7 @@ import {
 } from "./rules.js";
 import {
   resolveUnattendedPermissionDecision,
+  toolPolicyDenyDecision,
   unattendedAllowDecision,
   unattendedDenyDecision,
   unattendedPauseDecision,
@@ -936,8 +937,14 @@ async function checkUnattendedPolicy(
   // operator's denylist. Consulting it before the mode-scoped early return
   // closes that bypass. No denylist configured ⇒ resolve never returns "deny",
   // so behavior is unchanged when no operator denylist is set.
+  //
+  // A session tool policy (`agent.create` toolPolicy) rides the same floor: a
+  // tool outside its enabledTools is denied in every mode, even though the
+  // registry already refuses to build it. This is the second of the layers.
   if (unattended.behavior === "deny") {
-    return unattendedDenyDecision(unattended.toolName);
+    return unattended.reason === "tool_policy"
+      ? toolPolicyDenyDecision(unattended.toolName)
+      : unattendedDenyDecision(unattended.toolName);
   }
 
   // A run with nobody attached cannot be asked anything, so `pause` never

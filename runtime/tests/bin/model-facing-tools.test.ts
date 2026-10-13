@@ -8,6 +8,9 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { UnifiedExecProcessManager } from "../unified-exec/process-manager.js";
+import { attachExecOwnerBinding } from "../unified-exec/process-ownership.js";
+import { withExplicitDangerBoundary } from "../helpers/explicit-danger-boundary.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExecutionAdmissionKernel } from "../budget/execution-admission-kernel.js";
 import { defaultConfig } from "../config/schema.js";
@@ -670,6 +673,37 @@ describe("model-facing tools", () => {
         },
       },
     });
+  });
+
+  it("carries captured exec authority through the PowerShell adapter", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "powershell-owner-binding-"));
+    const manager = new UnifiedExecProcessManager({ cwd, sessionTempRoot: cwd });
+    const binding = manager.createOwnerLifetime("powershell-child").bind();
+    // Discovery needs a file, but the intercepted launch does not execute it.
+    await writeFile(join(cwd, "pwsh"), "");
+    const exec = vi.spyOn(manager, "execCommand").mockImplementation(async request => {
+      manager.assertOwnerAdmission(request.ownerId, request.ownerBinding);
+      return {
+        output: "scoped-powershell", stdout: "scoped-powershell", stderr: "",
+        exitCode: 0, exit_code: 0, durationMs: 0, wall_time_seconds: 0,
+        timedOut: false, truncated: false, original_token_count: 1,
+      };
+    });
+    try {
+      const tool = createModelFacingTools({ workspaceRoot: cwd, getSession: () => null,
+        env: { PATH: cwd }, unifiedExecManager: manager }).find(tool => tool.name === "PowerShell")!;
+      const args = withExplicitDangerBoundary({ command: "echo scoped-powershell", __agencSessionId: "powershell-child" });
+      attachExecOwnerBinding(args, binding);
+      const result = await tool.execute(args);
+      expect(result.content).toContain("scoped-powershell");
+      expect(exec.mock.calls[0]?.[0].ownerBinding).toBe(binding);
+      binding.release();
+      await expect(tool.execute(args)).rejects.toThrow(/binding/);
+    } finally {
+      exec.mockRestore();
+      await manager.closeAll();
+      await rm(cwd, { recursive: true, force: true });
+    }
   });
 
   it("exposes LSP in the default visible surface with per-op backing documented", () => {
@@ -2607,7 +2641,7 @@ describe("model-facing tools", () => {
     });
   });
 
-  it("WebSearch uses Grok provider-native web_search when the active model supports it", async () => {
+  it.each([0, 219_000])("WebSearch respects task budget %s before provider-native search or fallback", async (taskTokenBudget) => {
     const nativeResponse: LLMResponse = {
       content: "Use the current docs for this answer.",
       toolCalls: [],
@@ -2670,6 +2704,7 @@ describe("model-facing tools", () => {
         model: "grok-4-fast",
       }),
     );
+    Object.assign(session.config, { taskTokenBudget });
     const admission = installAdmissionClient(session);
     const fetchMock = vi.fn();
     const previousFetch = globalThis.fetch;
@@ -2680,6 +2715,16 @@ describe("model-facing tools", () => {
         getSession: () => session,
         providerFactory: providerFactory as never,
       });
+      if (taskTokenBudget > 0) {
+        // Native search reserves its full context window, beyond this allowance.
+        await expect(tools.find((tool) => tool.name === "WebSearch")!.execute({
+          query: "current docs", allowed_domains: ["agenc.tech"], max_results: 1,
+        })).rejects.toThrow("Task budget reached");
+        expect(nativeChat).not.toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(admission.markDispatched).not.toHaveBeenCalled();
+        return;
+      }
       const result = await tools
         .find((tool) => tool.name === "WebSearch")!
         .execute({

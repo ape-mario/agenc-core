@@ -1,3 +1,5 @@
+import { oneShotFastModeActive } from "../one-shot-fast-mode.js";
+import { SessionWriteBehindQueue, withSessionWriteBehind } from "./write-behind.js";
 /**
  * Session — initialized model agent context.
  *
@@ -204,7 +206,7 @@ import type { PhaseEvent } from "../phases/events.js";
 import type { RunTurnOptions, Terminal } from "./run-turn.js";
 import { runWithCurrentRuntimeSession } from "./current-session.js";
 import { runWithCanonicalSettingsAuthority } from "../utils/settings/canonicalAuthority.js";
-import type { UnifiedExecProcessManagerLike } from "../unified-exec/types.js";
+import type { UnifiedExecProcessManagerLike, UnifiedExecOwnerBinding, UnifiedExecOwnerLifetime } from "../unified-exec/types.js";
 import type { CodeModeService } from "../tools/code-mode/types.js";
 import type { ToolLatencyStore } from "../tools/tool-latency-store.js";
 import type { PolicyLimitsService } from "../services/policyLimits/index.js";
@@ -325,6 +327,7 @@ export interface SessionState {
     readonly totalTokens?: number;
     readonly cachedInputTokens?: number;
     readonly cacheCreationInputTokens?: number;
+    readonly cacheCreation1hInputTokens?: number;
     readonly reasoningOutputTokens?: number;
     readonly webSearchRequests?: number;
   };
@@ -1621,6 +1624,11 @@ export type AbortReason =
 
 export interface SessionOpts {
   readonly conversationId: ThreadId;
+  /** A child borrows the manager but owns its captured exec lifetime. */
+  readonly unifiedExecOwnership?: {
+    readonly kind: "borrowed";
+    readonly binding?: UnifiedExecOwnerBinding;
+  };
   readonly fileReadScope?: object;
   readonly initialState: SessionState;
   readonly features: ManagedFeatures;
@@ -2420,6 +2428,11 @@ function activeAgentDefinitionsFromRoles(
 export class Session {
   /** Conversation/thread id. */
   readonly conversationId: ThreadId;
+  readonly unifiedExecOwnerBinding: UnifiedExecOwnerBinding | undefined;
+  private readonly ownsUnifiedExecManager: boolean;
+  private execCloseTask: Promise<void> | undefined;
+  private borrowedShutdownTask: Promise<void> | undefined;
+  private readonly compatibilityExecLifetimes = new Map<string, UnifiedExecOwnerLifetime>();
   readonly fileReadScope: object;
   private readonly ownsFileReadScope: boolean;
 
@@ -2557,6 +2570,10 @@ export class Session {
    *  When present, every emitted event is appended; durable events
    *  (I-4) force an immediate fsync. */
   rolloutStore: RolloutStore | null = null;
+  private transientWriteBehind: SessionWriteBehindQueue | undefined;
+  get writeBehind(): SessionWriteBehindQueue {
+    return this.rolloutStore?.store?.writeBehind ?? (this.transientWriteBehind ??= new SessionWriteBehindQueue());
+  }
   private shutdownResourceRelease?: () => void | Promise<void>;
 
   private outOfBandElicitationPauseCount = 0;
@@ -2660,13 +2677,20 @@ export class Session {
    * must supply the same registry used by commands and tool evaluation.
    */
   constructor(opts: SessionOpts) {
+    if (opts.unifiedExecOwnership?.binding !== undefined &&
+        opts.unifiedExecOwnership.binding.ownerId !== String(opts.conversationId).trim()) {
+      throw new Error("exec owner binding does not match session identity");
+    }
     this.conversationId = opts.conversationId;
+    this.unifiedExecOwnerBinding = opts.unifiedExecOwnership?.binding;
+    this.ownsUnifiedExecManager = opts.unifiedExecOwnership === undefined;
     this.fileReadScope = opts.fileReadScope ?? Object.freeze({});
     this.ownsFileReadScope = opts.fileReadScope === undefined;
     this.ownsMcpManager = opts.mcpManagerOwnership === "owned";
     // Keep legacy producers that were handed `session.eventLog` on the same
     // canonical persist-before-publish path as direct `session.emit` callers.
     this.eventLog.setEmitDelegate((event) => this.emit(event));
+    this.eventLog.setVisibilityBarrier(() => this.writeBehind.drain());
     this.roleWorkspace = opts.roleWorkspace
       ? normalizeAgentRoleWorkspace(opts.roleWorkspace)
       : createAgentRoleWorkspace(opts.initialState.sessionConfiguration.cwd);
@@ -3003,6 +3027,35 @@ export class Session {
    */
   get sessionConfiguration(): SessionConfiguration {
     return this.state.unsafePeek().sessionConfiguration;
+  }
+
+  createChildExecLifetime(ownerId: string): UnifiedExecOwnerLifetime | undefined {
+    if (this.isShuttingDown) throw new Error("session is shutting down");
+    if (ownerId.trim() === String(this.conversationId).trim()) {
+      throw new Error("exec child cannot alias its parent owner");
+    }
+    return this.services.unifiedExecManager?.createOwnerLifetime?.(
+      ownerId, this.unifiedExecOwnerBinding,
+    );
+  }
+
+  /** Keep yielded work across turns, but never reuse a turn's admission token. */
+  acquireCompatibilityExecBinding(ownerId: string): UnifiedExecOwnerBinding | undefined {
+    if (this.isShuttingDown) throw new Error("session is shutting down");
+    this.services.unifiedExecManager?.assertOwnerAdmission?.(
+      String(this.conversationId), this.unifiedExecOwnerBinding,
+    );
+    const id = ownerId.trim();
+    if (id === String(this.conversationId).trim()) {
+      throw new Error("exec child cannot alias its parent owner");
+    }
+    let lifetime = this.compatibilityExecLifetimes.get(id);
+    if (lifetime === undefined || lifetime.closed) {
+      lifetime = this.createChildExecLifetime(id);
+      if (lifetime === undefined) return undefined;
+      this.compatibilityExecLifetimes.set(id, lifetime);
+    }
+    return lifetime.bind();
   }
 
   snapshotHistoryMessages(): LLMMessage[] {
@@ -3484,7 +3537,7 @@ export class Session {
     }
     const withTurnAuthority = <T>(operation: () => T): T =>
       runWithCurrentRuntimeSession(this, () =>
-        runWithCanonicalSettingsAuthority(configStore, operation),
+        withSessionWriteBehind(this.writeBehind, () => runWithCanonicalSettingsAuthority(configStore, operation)),
       );
     if (opts.ctx === undefined) {
       while (this.pendingProviderSwitch !== null) {
@@ -3768,20 +3821,29 @@ export class Session {
   }
 
   subscribeToEvents(cb: (event: PhaseEvent) => void): () => void {
+    this.writeBehind.drain();
     this.phaseEventListeners.add(cb);
     return () => {
+      this.writeBehind.drain();
       this.phaseEventListeners.delete(cb);
     };
   }
 
   emitPhaseEvent(event: PhaseEvent): void {
-    for (const listener of this.phaseEventListeners) {
-      try {
-        listener(event);
-      } catch {
-        // Keep parity with EventLog subscriber isolation.
-      }
+    if (this.writeBehind.deferring) {
+      const captured = structuredClone(event);
+      this.writeBehind.defer("phase-publication", () => this.emitPhaseEvent(captured));
+      return;
     }
+    this.writeBehind.observe(() => {
+      for (const listener of this.phaseEventListeners) {
+        try {
+          listener(event);
+        } catch {
+          // Keep parity with EventLog subscriber isolation.
+        }
+      }
+    });
   }
 
   isRolloutPersistenceSuspended(): boolean {
@@ -3789,6 +3851,7 @@ export class Session {
   }
 
   async withRolloutPersistenceSuspended<T>(fn: () => Promise<T>): Promise<T> {
+    this.writeBehind.finish();
     this.rolloutPersistenceSuspendDepth += 1;
     try {
       return await fn();
@@ -4837,6 +4900,7 @@ export class Session {
     event: Event,
     appendOpts: AppendOptions = {},
   ): { readonly event: Event; publish(): Event } {
+    if (this.writeBehind.draining) this.writeBehind.drain();
     if (this.canonicalJournalSealed) {
       throw new Error(
         `cannot append ${event.msg.type}: canonical run journal is sealed`,
@@ -4932,14 +4996,19 @@ export class Session {
 
   /** Publish an event already stamped and appended by {@link prepareEmit}. */
   publishPreparedEvent(event: Event): Event {
+    if (this.writeBehind.deferring) {
+      const captured = structuredClone(event);
+      this.writeBehind.defer("event-publication", () => this.publishPreparedEvent(captured));
+      return event;
+    }
     hitM4DurabilityFailpoint("before_event_publish");
-    this.eventLog.publish(event, (published) => {
+    this.writeBehind.observe(() => this.eventLog.publish(event, (published) => {
       // Compatibility consumers belong to the same FIFO publication queue.
       // A listener may synchronously emit another event; keeping this callback
       // inside EventLog prevents txEvent from observing N+1 before N.
       this.txEvent.send(published);
       hitM4DurabilityFailpoint("after_event_publish");
-    });
+    }));
     return event;
   }
 
@@ -4950,6 +5019,39 @@ export class Session {
    */
   emit(event: Event, appendOpts: AppendOptions = {}): Event {
     return this.prepareEmit(event, appendOpts).publish();
+  }
+
+  /**
+   * Reserve an event's position now and build its captured payload at that
+   * position in the write-behind queue. Only observation/checkpoint payloads
+   * use this path; authority transitions still validate before continuing.
+   */
+  emitDeferred(
+    envelope: Omit<Event, "msg">,
+    buildMsg: () => Extract<EventMsg, { type: "session_usage" | "turn_checkpoint" | "execution_admission" }>,
+    appendOpts: AppendOptions = {},
+  ): void {
+    const queue = this.writeBehind;
+    const bufferedOneShot = oneShotFastModeActive() && queue.oneShotBuffering && !queue.draining;
+    if ((!queue.deferring && !bufferedOneShot) || this.isRolloutPersistenceSuspended()) {
+      this.emit({ ...envelope, msg: buildMsg() }, appendOpts);
+      return;
+    }
+    queue.assertHealthy();
+    if (this.canonicalJournalSealed) {
+      throw new Error("cannot append deferred event: canonical run journal is sealed");
+    }
+    const stamped = this.eventLog.stampEnvelope(envelope);
+    const store = this.rolloutStore;
+    const capturedOptions = { ...appendOpts };
+    queue.enqueue("deferred-event", () => {
+      const event: Event = { ...stamped, msg: buildMsg() };
+      const durable = isDurableEvent(event) || capturedOptions.durable === true;
+      if (store?.append(event, { ...capturedOptions, durable }) === false && durable) {
+        throw new Error(`durable event ${event.msg.type} sequence ${event.seq ?? "unassigned"} was not fsync-committed`);
+      }
+      this.publishPreparedEvent(event);
+    });
   }
 
   /**
@@ -5562,6 +5664,7 @@ export class Session {
    * rollout_degraded) surface through the event log.
    */
   mountRolloutStore(store: RolloutStore | null): void {
+    this.writeBehind.finish();
     this.rolloutStore = store;
     if (store) {
       store.store.setDiagnosticListener((d) => {
@@ -5724,9 +5827,10 @@ export class Session {
    */
   private async abortAllTasksLocked(reason: TurnAbortReason): Promise<void> {
     const taken = await this.activeTurn.swap(null);
-    if (taken === null) return;
+    if (taken === null) { this.writeBehind.finish(); return; }
     const tasks = Array.from(taken.tasks.values());
-    await Promise.all(tasks.map((task) => this.handleTaskAbort(task, reason)));
+    try { await Promise.all(tasks.map((task) => this.handleTaskAbort(task, reason))); }
+    finally { this.writeBehind.finish(); }
     // Release any
     // dangling approvals / input pre-emptively so interrupted tasks
     // don't surface stale responses. We reach into `turnState` here
@@ -5758,7 +5862,8 @@ export class Session {
     });
     if (taken === null) return false;
     const tasks = Array.from(taken.tasks.values());
-    await Promise.all(tasks.map((task) => this.handleTaskAbort(task, reason)));
+    try { await Promise.all(tasks.map((task) => this.handleTaskAbort(task, reason))); }
+    finally { this.writeBehind.finish(); }
     await taken.turnState.with((ts) => {
       ts.pendingApprovals.clear();
       ts.pendingRequestPermissions.clear();
@@ -6086,6 +6191,7 @@ export class Session {
     if (this.abortController.signal.aborted) return;
     const activeTurnId = this.activeTurn.unsafePeek()?.turnId;
     this.abortController.abort(reason);
+    this.writeBehind.finish();
     // Emit a typed event so I-8 is satisfied.
     this.emit({
       id: this.nextInternalSubId(),
@@ -6136,6 +6242,27 @@ export class Session {
    *   - Emit final shutdown status.
    */
   async shutdown(): Promise<void> {
+    if (!this.ownsUnifiedExecManager) {
+      if (this.borrowedShutdownTask !== undefined) return this.borrowedShutdownTask;
+      if (this.unifiedExecOwnerBinding !== undefined) {
+        // Reject a released projection before hooks, children or shared
+        // admission services can be touched. Revoke active admission now;
+        // shutdownCore awaits the same strict proof before durable finalizers.
+        this.unifiedExecOwnerBinding.assertCurrent();
+        this.execCloseTask ??= this.unifiedExecOwnerBinding.prepareForDurableClose();
+        void this.execCloseTask.catch(() => {});
+      } else if (this.services.unifiedExecManager?.prepareForDurableClose !== undefined) {
+        throw new Error("borrowed exec manager has no scoped cleanup authority");
+      }
+      // An old completed Session must never run shared-service teardown again
+      // after a replacement Session has acquired the same conversation id.
+      this.borrowedShutdownTask = Promise.resolve().then(() => this.shutdownAndRelease());
+      return this.borrowedShutdownTask;
+    }
+    return this.shutdownAndRelease();
+  }
+
+  private async shutdownAndRelease(): Promise<void> {
     let shutdownError: unknown;
     try {
       await this.shutdownCore();
@@ -6271,6 +6398,7 @@ export class Session {
     }
     let durableCloseError: unknown;
     try {
+      this.writeBehind.finish();
       await shutdownEffectSettlementSupervisor(this, MAX_DRAIN_MS);
       let drainedOperationCount = 0;
       while (this.pendingDurableOperations.size > 0) {
@@ -6293,7 +6421,13 @@ export class Session {
 
       // Best-effort lifecycle closeAll may time out or retain cleanup failure.
       // Neither permits a cancellation/suspension terminal to authorize seal.
-      await this.services.unifiedExecManager?.prepareForDurableClose?.();
+      if (this.ownsUnifiedExecManager) {
+        await this.services.unifiedExecManager?.prepareForDurableClose?.();
+      } else if (this.unifiedExecOwnerBinding !== undefined) {
+        await this.execCloseTask;
+      } else if (this.services.unifiedExecManager?.prepareForDurableClose !== undefined) {
+        throw new Error("borrowed exec manager has no scoped cleanup authority");
+      }
       const finalizers = [...this.beforeDurableCloseListeners];
       this.beforeDurableCloseListeners.clear();
       for (const finalize of finalizers) {
@@ -6311,10 +6445,10 @@ export class Session {
     // Flush + close the rollout store (I-4: final durable fsync).
     if (this.rolloutStore) {
       try {
-        this.rolloutStore.flushDurable();
-        this.rolloutStore.close();
-      } catch {
-        /* best-effort */
+        try { this.rolloutStore.flushDurable(); }
+        finally { this.rolloutStore.close(); }
+      } catch (error) {
+        durableCloseError ??= error;
       }
     }
     try {
@@ -6342,7 +6476,8 @@ export class Session {
         if (mcpDisposeTimer !== undefined) clearTimeout(mcpDisposeTimer);
       }
     }
-    this.eventLog.close();
+    try { this.eventLog.close(); }
+    catch (error) { durableCloseError ??= error; }
     this.txEvent.close();
     const sessionEnvironmentHome = this.services.configStore?.homeContext?.path;
     if (sessionEnvironmentHome !== undefined) {

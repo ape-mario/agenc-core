@@ -209,6 +209,17 @@ import {
 } from "../permissions/permission-audit-log.js";
 import { DEFAULT_UNATTENDED_ALLOWLIST } from "../permissions/unattended-policy.js";
 import {
+  TOOL_POLICY_METADATA_KEY,
+  TOOL_POLICY_MODE_CEILING_METADATA_KEY,
+  frozenPermissionModeMessage,
+  isWiderPermissionMode,
+  retainedToolPolicyModeCeiling,
+  sameSessionToolPolicy,
+  sessionToolPolicyFromMetadata,
+  type SessionToolPolicy,
+} from "../permissions/session-tool-policy.js";
+import { isPermissionMode, type PermissionMode } from "../permissions/types.js";
+import {
   consumeExitPlanModeApproval,
   recordExitPlanModeApproval,
   type ExitPlanModeApproval,
@@ -994,6 +1005,17 @@ export class AgenCDaemonAgentManager {
         (canonicalRuntimeSettings === undefined
           ? metadataString(retainedMetadata, "profile")
           : (canonicalRuntimeSettings.profile ?? undefined));
+      const taskBudget: { taskTokenBudget?: number; taskMaxCalls?: number } = {};
+      for (const key of ["taskTokenBudget", "taskMaxCalls"] as const) {
+        const value = params[key] ?? retainedMetadata?.[key];
+        if (value === undefined) continue;
+        if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+          throw new AgenCDaemonAgentLifecycleError(
+            "INVALID_ARGUMENT", `agent.create ${key} must be a non-negative safe integer`,
+          );
+        }
+        taskBudget[key] = value;
+      }
       const configPath = params.configPath ?? retainedConfigPath;
       if (configPath !== undefined && !isAbsolute(configPath)) {
         throw new AgenCDaemonAgentLifecycleError(
@@ -1013,6 +1035,10 @@ export class AgenCDaemonAgentManager {
       const unattendedDeny = normalizeStringList(
         params.unattendedDeny,
         metadataStringList(retainedMetadata, "unattendedDeny") ?? [],
+      );
+      const toolPolicy = resolveCreateToolPolicy(
+        params.toolPolicy,
+        retainedMetadata,
       );
       const requestedRuntimeOptions = validateAgentRuntimeOptions(
         params.runtimeOptions,
@@ -1075,11 +1101,16 @@ export class AgenCDaemonAgentManager {
           : profile !== undefined
             ? { profile }
             : {}),
+        ...taskBudget,
         ...(configPath !== undefined ? { configPath } : {}),
         ...(addDirs !== undefined ? { addDirs: [...addDirs] } : {}),
         ...(permissionMode !== undefined ? { permissionMode } : {}),
         unattendedAllow,
         unattendedDeny,
+        // Part of the durable run identity: a restore reads it back from here.
+        ...(toolPolicy !== undefined
+          ? { [TOOL_POLICY_METADATA_KEY]: toolPolicyToMetadata(toolPolicy) }
+          : {}),
         commandEnvironment: captureRecoverableCommandEnvironment(params.envOverrides),
         // The rest of the client snapshot a restart must reproduce: endpoint
         // and setting values, plus only the names of credentials, which are
@@ -1106,6 +1137,7 @@ export class AgenCDaemonAgentManager {
               ...(model !== undefined ? { model } : {}),
               ...(provider !== undefined ? { provider } : {}),
               ...(profile !== undefined ? { profile } : {}),
+              ...taskBudget,
               ...(configPath !== undefined ? { configPath } : {}),
               ...(addDirs !== undefined ? { addDirs } : {}),
               ...(params.initialContent !== undefined
@@ -1122,6 +1154,7 @@ export class AgenCDaemonAgentManager {
               metadata,
               unattendedAllow,
               unattendedDeny,
+              ...(toolPolicy !== undefined ? { toolPolicy } : {}),
               runtimeOptions,
               ...(permissionMode !== undefined ? { permissionMode } : {}),
               ...(params.envOverrides !== undefined
@@ -1149,6 +1182,7 @@ export class AgenCDaemonAgentManager {
               ...(model !== undefined ? { model } : {}),
               ...(provider !== undefined ? { provider } : {}),
               ...(profile !== undefined ? { profile } : {}),
+              ...taskBudget,
               ...(configPath !== undefined ? { configPath } : {}),
               ...(addDirs !== undefined ? { addDirs } : {}),
               ...(permissionMode !== undefined ? { permissionMode } : {}),
@@ -1201,6 +1235,9 @@ export class AgenCDaemonAgentManager {
                 runtimeRestore: "available",
               },
             }
+          : {}),
+        ...(started.toolPolicyModeCeiling !== undefined
+          ? { [TOOL_POLICY_MODE_CEILING_METADATA_KEY]: started.toolPolicyModeCeiling }
           : {}),
         ...(started.rolloutPath !== undefined
           ? { canonicalRolloutPath: started.rolloutPath }
@@ -1483,6 +1520,8 @@ export class AgenCDaemonAgentManager {
     readonly provider?: string;
     readonly profile?: string;
     readonly configPath?: string;
+    readonly taskTokenBudget?: number;
+    readonly taskMaxCalls?: number;
     readonly addDirs?: readonly string[];
     readonly permissionMode?:
       | "default"
@@ -1538,6 +1577,12 @@ export class AgenCDaemonAgentManager {
       ...(params.model !== undefined ? { model: params.model } : {}),
       ...(params.provider !== undefined ? { provider: params.provider } : {}),
       ...(params.profile !== undefined ? { profile: params.profile } : {}),
+      ...(params.taskTokenBudget !== undefined
+        ? { taskTokenBudget: params.taskTokenBudget }
+        : {}),
+      ...(params.taskMaxCalls !== undefined
+        ? { taskMaxCalls: params.taskMaxCalls }
+        : {}),
       ...(params.configPath !== undefined
         ? { configPath: params.configPath }
         : {}),
@@ -2777,6 +2822,14 @@ export class AgenCDaemonAgentManager {
       throw new AgenCDaemonAgentLifecycleError(
         "INVALID_ARGUMENT",
         "allowAllToolsForSession requires session approval scope",
+      );
+    }
+    // "Allow all tools" is a switch to bypassPermissions; a frozen session
+    // never gets one, however the approval arrives.
+    if (allowAllToolsForSession && this.#frozenSessionMode(agentId) !== undefined) {
+      throw new AgenCDaemonAgentLifecycleError(
+        "INVALID_ARGUMENT",
+        "allowAllToolsForSession is refused: this session's permission mode is frozen by its toolPolicy",
       );
     }
     if (
@@ -4040,6 +4093,17 @@ export class AgenCDaemonAgentManager {
       params.sessionId,
       { allowSetPermissionMode: true },
     );
+    const frozenCeiling = this.#frozenSessionMode(agentId);
+    if (
+      frozenCeiling !== undefined &&
+      isPermissionMode(params.mode) &&
+      isWiderPermissionMode(params.mode, frozenCeiling)
+    ) {
+      throw new AgenCDaemonAgentLifecycleError(
+        "INVALID_ARGUMENT",
+        frozenPermissionModeMessage(params.mode, frozenCeiling),
+      );
+    }
     const result = await this.#runner.setAgentPermissionMode(agentId, {
       sessionId: params.sessionId,
       mode: params.mode,
@@ -4077,6 +4141,16 @@ export class AgenCDaemonAgentManager {
       params.sessionId,
       { allowMutatePermissionRule: true },
     );
+    if (
+      this.#frozenSessionMode(agentId) !== undefined &&
+      !permissionRuleMutationNarrows(params.operation, params.behavior)
+    ) {
+      throw new AgenCDaemonAgentLifecycleError(
+        "INVALID_ARGUMENT",
+        "session.permissions.mutateRule is refused: this session's permission mode is frozen by its toolPolicy, " +
+          "so rules may only narrow access (add deny or ask, remove allow)",
+      );
+    }
     const result = await this.#runner.mutateAgentPermissionRule(agentId, {
       sessionId: params.sessionId,
       operation: params.operation,
@@ -4640,6 +4714,55 @@ export class AgenCDaemonAgentManager {
     return agentId;
   }
 
+  /**
+   * The permission-mode ceiling of an agent whose toolPolicy freezes its mode,
+   * or undefined when its mode is not frozen. A frozen agent with no recorded
+   * ceiling is held to `plan`, the narrowest mode.
+   */
+  #frozenSessionMode(agentId: string): PermissionMode | undefined {
+    const metadata = this.#state.peek((state) => state.agents.get(agentId)?.metadata);
+    if (sessionToolPolicyFromMetadata(metadata)?.frozenPermissionMode !== true) {
+      return undefined;
+    }
+    return retainedToolPolicyModeCeiling(metadata) ?? "plan";
+  }
+
+  /**
+   * The tool policy of the session (or agent) `ownerId` names, if it has one.
+   * Read-only and best effort: an unknown id has no policy to report.
+   */
+  /**
+   * Every session id of the agent that owns `ownerId` (an agent id or one of
+   * its session ids). It only widens where an attachment is looked for; the
+   * attachment itself is the authority.
+   */
+  peekOwnerSessionIds(ownerId: string): readonly string[] {
+    return this.#state.peek((state) => {
+      const agent =
+        state.agents.get(ownerId) ??
+        [...state.agents.values()].find((candidate) => candidate.sessionIds.includes(ownerId));
+      return agent === undefined ? [] : [...agent.sessionIds];
+    });
+  }
+
+  /** The id of the agent that owns `ownerId` (an agent id or one of its session ids). */
+  peekOwnerAgentId(ownerId: string): string | undefined {
+    return this.#state.peek((state) => {
+      if (state.agents.has(ownerId)) return ownerId;
+      for (const [agentId, candidate] of state.agents) if (candidate.sessionIds.includes(ownerId)) return agentId;
+      return undefined;
+    });
+  }
+
+  getSessionToolPolicy(ownerId: string): SessionToolPolicy | undefined {
+    return this.#state.peek((state) => {
+      const agent =
+        state.agents.get(ownerId) ??
+        [...state.agents.values()].find((candidate) => candidate.sessionIds.includes(ownerId));
+      return sessionToolPolicyFromMetadata(agent?.metadata);
+    });
+  }
+
   async #resolvePermissionOwner(
     ownerId: string,
     allowListPermissions = false,
@@ -4891,6 +5014,59 @@ function metadataString(
   return typeof value === "string" && value.trim().length > 0
     ? value
     : undefined;
+}
+
+/**
+ * The policy a created or resumed session runs under. A resume keeps the
+ * policy the session was created with; naming one again must match it exactly
+ * (it cannot swap or widen), and naming one for a session that had none
+ * restricts it from now on. A malformed stored policy refuses the create.
+ */
+/** @internal Exported for hermetic regression coverage of the resume rules. */
+export function resolveCreateToolPolicy(
+  requested: SessionToolPolicy | undefined,
+  retainedMetadata: JsonObject | undefined,
+): SessionToolPolicy | undefined {
+  let retained: SessionToolPolicy | undefined;
+  try {
+    retained = sessionToolPolicyFromMetadata(retainedMetadata);
+  } catch (error) {
+    throw new AgenCDaemonAgentLifecycleError(
+      "INVALID_ARGUMENT",
+      `agent.create retained ${error instanceof Error ? error.message : "toolPolicy is invalid"}`,
+    );
+  }
+  if (requested === undefined) return retained;
+  if (retained !== undefined && !sameSessionToolPolicy(requested, retained)) {
+    throw new AgenCDaemonAgentLifecycleError(
+      "INVALID_ARGUMENT",
+      "agent.create toolPolicy differs from the policy this session was created with",
+    );
+  }
+  return retained ?? requested;
+}
+
+function toolPolicyToMetadata(policy: SessionToolPolicy): JsonObject {
+  return {
+    enabledTools: [...policy.enabledTools],
+    ...(policy.frozenPermissionMode !== undefined
+      ? { frozenPermissionMode: policy.frozenPermissionMode }
+      : {}),
+    ...(policy.deferMcpTools !== undefined
+      ? { deferMcpTools: policy.deferMcpTools }
+      : {}),
+  };
+}
+
+/**
+ * Whether a session rule mutation can only keep or narrow access. Adding an
+ * allow rule, or removing a deny or ask rule, may widen it.
+ */
+function permissionRuleMutationNarrows(
+  operation: string,
+  behavior: string,
+): boolean {
+  return operation === "add" ? behavior !== "allow" : behavior === "allow";
 }
 
 function metadataStringList(

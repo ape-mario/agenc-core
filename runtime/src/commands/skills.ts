@@ -12,6 +12,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 
+import {
+  sessionToolPolicyAllowsBundledSkill,
+  type SessionToolPolicy,
+} from "../permissions/session-tool-policy.js";
 import type { Session } from "../session/session.js";
 import { logForDebugging } from "../utils/debug.js";
 import { isRecord } from "../utils/record.js";
@@ -161,14 +165,22 @@ function mergeAvailableSkills(
  * The catch logs for the same reason the other two command-loading catches
  * do: in production a throwing registration would otherwise drop EVERY
  * bundled skill from `/skills` with nothing to explain where they went.
+ *
+ * The listing matches what the session may load: a session with a toolPolicy
+ * sees only the bundled skills it enabled, and a skill that is unlisted by
+ * default (the kit installer) shows only once the operator turned it on.
  */
-async function bundledSkillsFromRegistry(): Promise<AvailableSkillSnapshot[]> {
+async function bundledSkillsFromRegistry(
+  toolPolicy: SessionToolPolicy | undefined,
+  config: unknown,
+): Promise<AvailableSkillSnapshot[]> {
   try {
     const loaded = (await import(
       "../skills/bundledSkills.js"
     )) as unknown as Record<string, unknown>;
     const getBundledSkills = loaded.getBundledSkills;
     if (typeof getBundledSkills !== "function") return [];
+    const isListed = loaded.isBundledSkillListed;
     const bundledCommands = (getBundledSkills as () => unknown)();
     // Skills contributed by plugins shipped in the runtime package register
     // through a separate registry; fold them in so /skills lists exactly what
@@ -190,7 +202,13 @@ async function bundledSkillsFromRegistry(): Promise<AvailableSkillSnapshot[]> {
         !isRecord(command) ||
         typeof command.name !== "string" ||
         command.name.length === 0 ||
-        command.isHidden === true
+        command.isHidden === true ||
+        !sessionToolPolicyAllowsBundledSkill(toolPolicy, command.name) ||
+        (typeof isListed === "function" &&
+          !(isListed as (name: string, config: unknown) => boolean)(
+            command.name,
+            config,
+          ))
       ) {
         return [];
       }
@@ -384,7 +402,10 @@ export async function collectSkillsSnapshot(
         aliases: skill.aliases,
       })),
       [
-        ...(await bundledSkillsFromRegistry()),
+        ...(await bundledSkillsFromRegistry(
+          services.registry?.toolPolicy,
+          session.config,
+        )),
         ...mcpSkillsFromAppState(appStateBridge),
       ],
     ),

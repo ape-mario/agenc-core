@@ -39,7 +39,8 @@ Boolean-like values that go through `applyEnvOverrides` treat
 | `AGENC_STREAM_IDLE_TIMEOUT_MS` | Stream idle deadline in milliseconds. Unset keeps the `600000` config default; `0` means no idle deadline |
 | `AGENC_PROVIDER_OUTAGE_WAIT_MS` | Overrides `provider_outage_wait_ms`: how long a turn keeps waiting for a provider outage to end after the reconnect ladder is spent. Unset keeps the `1800000` default; `0` ends the turn when the ladder is exhausted |
 | `AGENC_PROVIDER_OUTAGE_RETRY_MS` | Overrides `provider_outage_retry_ms`: the first slow-retry delay during a provider outage, doubling up to ten times the value. Unset keeps the `30000` default |
-| `AGENC_MARKETPLACE_CLI` | Path to marketplace-cli (`[protocol].cli_path`) |
+| `AGENC_MARKETPLACE_CLI` | Path to marketplace-cli (`[protocol].cli_path`). Checked after `cli_path`; then `~/.agenc/bin/agenc-marketplace` if owned by you and not world-writable. `node_modules/.bin` is not searched |
+| `AGENC_RPC_URL` | Solana RPC endpoint for marketplace-cli. Core passes it through to the CLI, which uses it instead of its managed endpoint. Unset keeps the managed one |
 
 ## Provider credentials and endpoints
 
@@ -57,7 +58,7 @@ Credential values are not written into the canonical config snapshot.
 | OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `AGENC_OPENROUTER_HTTP_REFERER`, `AGENC_OPENROUTER_TITLE` |
 | Groq | `GROQ_API_KEY`, `GROQ_BASE_URL` |
 | DeepSeek | `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`; `AGENC_SHARED_PREFIX_TAIL` (shared cached prefix, below) |
-| Meta | `MODEL_API_KEY`, `META_BASE_URL` |
+| Meta | `MODEL_API_KEY`, `META_BASE_URL` (Muse Code's `META_API_KEY` is not read) |
 | QwenCloud Pay-As-You-Go | `DASHSCOPE_API_KEY`, then `QWEN_API_KEY`; `DASHSCOPE_BASE_URL`, then `QWEN_BASE_URL` |
 | QwenCloud Token Plan | `QWEN_TOKEN_PLAN_API_KEY`, then `DASHSCOPE_TOKEN_PLAN_API_KEY`; `QWEN_TOKEN_PLAN_BASE_URL`, then `DASHSCOPE_TOKEN_PLAN_BASE_URL` |
 | Cerebras | `CEREBRAS_API_KEY`, `CEREBRAS_BASE_URL` |
@@ -115,15 +116,31 @@ OAuth sign-in. Neither explicit selection silently obtains managed credentials.
 These values are captured with the session environment and do not delete saved
 credentials or change another session's selection.
 
-`AGENC_OPENAI_REASONING_REPLAY` (boolean-like, off by default) makes the
-`openai` provider keep the encrypted reasoning of its Responses calls and send
-it back. A stateless request (`store: false`, which is always the case on a
+`AGENC_OPENAI_REASONING_REPLAY` (boolean-like, on by default) controls whether
+the `openai` provider keeps encrypted reasoning from Responses reasoning calls
+and sends it back. Set it to `0`, `false`, `no` or `off` to disable retention
+and replay. The setting is captured in the session environment and applies to
+both platform API keys and ChatGPT sign-in. A stateless request (`store: false`, which is always the case on a
 ChatGPT subscription) then asks for `reasoning.encrypted_content`. Each
 reasoning item a response returns stays with the assistant message it
 preceded. Later requests to the same provider and model replay it right before
 that message's function calls, or before its text when it called none. A model
 or provider switch drops it. Requests with `store: true` and other providers
-on the Responses wire are unchanged.
+on the Responses wire are unchanged, except Meta's Muse Wonder, which always
+replays its encrypted reasoning and ignores this switch (see
+[providers.md](providers.md)). Non-reasoning models and calls with
+reasoning effort `none` do not enable replay. Models that default to no reasoning
+enable it only when a reasoning effort is selected. ChatGPT still requests
+encrypted content for its stateless backend contract when replay is disabled;
+the opt-out prevents retaining or replaying that content.
+
+With replay enabled, an unset `reasoning_summary` requests `auto`, including
+when the model's default effort already enables reasoning. An explicit summary
+setting, including `none`, takes precedence. Summary `none` suppresses summaries;
+it does not disable encrypted reasoning replay. Set the environment switch to
+`0` to disable replay as well. Replayed input and retained history can increase
+token usage and reach a task budget sooner. Provider output limits
+still depend on what the backend accepts and enforces.
 
 Gemini project identity has one ordered surface: `GEMINI_PROJECT_ID` wins over
 `GOOGLE_CLOUD_PROJECT`. Other Google project-name aliases are not consumed.

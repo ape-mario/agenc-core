@@ -150,6 +150,7 @@ import { AgenCCleanupRegistry } from "../lifecycle/cleanup-registry.js";
 import { installAgenCShutdownSignalHandlers } from "../lifecycle/signal-handlers.js";
 
 import { summarizeAgenCShutdown } from "../lifecycle/shutdown-message.js";
+import { finishAllSessionWriteBehind } from "../session/write-behind.js";
 
 import type { AgenCSignalProcess } from "../lifecycle/signal-handlers.js";
 
@@ -264,6 +265,10 @@ import { classifyUntrustedToolResult, frameUntrustedToolHistoryMessages, frameUn
 import { logForDebugging } from "../utils/debug.js";
 
 import { installAgenCDaemonErrorLogSink } from "./daemon-error-log.js";
+import {
+  TOOL_POLICY_METADATA_KEY,
+  TOOL_POLICY_MODE_CEILING_METADATA_KEY,
+} from "../permissions/session-tool-policy.js";
 
 import { startHeapWatchdog } from "../services/heapWatchdog/heapWatchdog.js";
 import { scheduleDaemonCompileCacheFlush } from "../bin/compile-cache.js";
@@ -1095,6 +1100,10 @@ async function runAgenCDaemonForegroundLocked(
         return voided;
       },
     });
+    // Cleanup runs in reverse registration order: stop producers, attempt
+    // snapshots, finish every remaining session queue, then close state.
+    // A failed individual session must not strand another session's jobs.
+    cleanup.register("daemon-session-persistence", () => finishAllSessionWriteBehind());
     cleanup.register("daemon-snapshots", async () => {
       await agentManager.flushSnapshots("daemon_shutdown");
     });
@@ -3314,6 +3323,15 @@ function recoveryMetadataForRun(
   return {
     ...(typeof run.metadata?.routineId === "string" ? { routineId: run.metadata.routineId } : {}),
     ...(typeof run.metadata?.routineRunId === "string" ? { routineRunId: run.metadata.routineRunId } : {}),
+    // The published agent's metadata is what later snapshots persist, so a
+    // session's tool policy has to survive the restart or the next snapshot
+    // would erase it.
+    ...(run.metadata?.[TOOL_POLICY_METADATA_KEY] !== undefined
+      ? { [TOOL_POLICY_METADATA_KEY]: run.metadata[TOOL_POLICY_METADATA_KEY] }
+      : {}),
+    ...(run.metadata?.[TOOL_POLICY_MODE_CEILING_METADATA_KEY] !== undefined
+      ? { [TOOL_POLICY_MODE_CEILING_METADATA_KEY]: run.metadata[TOOL_POLICY_MODE_CEILING_METADATA_KEY] }
+      : {}),
     ...(canonicalSource !== undefined
       ? {
           agentPath: canonicalSource.agentPath,
@@ -3456,6 +3474,7 @@ export async function restoreRecoveredAgentRuntime(
             ...optionalMetadataString(run.metadata, "provider"),
             ...optionalMetadataString(run.metadata, "profile"),
           }),
+      ...retainedTaskBudget(run.metadata),
       ...optionalAbsoluteMetadataPath(run.metadata, "configPath"),
       ...(initialMessages !== undefined ? { initialMessages } : {}),
       ...(replayToolCalls.length > 0 ? { replayToolCalls } : {}),
@@ -4250,4 +4269,19 @@ function isDaemonConnectionAuthenticationFailure(message: JsonObject): boolean {
 function readNonEmptyString(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed !== undefined && trimmed.length > 0 ? trimmed : undefined;
+}
+
+function retainedTaskBudget(metadata: JsonObject | undefined): {
+  taskTokenBudget?: number; taskMaxCalls?: number;
+} {
+  const result: { taskTokenBudget?: number; taskMaxCalls?: number } = {};
+  for (const key of ["taskTokenBudget", "taskMaxCalls"] as const) {
+    const value = metadata?.[key];
+    if (value === undefined) continue;
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`invalid retained ${key}`);
+    }
+    result[key] = value;
+  }
+  return result;
 }

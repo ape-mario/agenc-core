@@ -137,14 +137,17 @@ the host default runs. Out-of-enum values are not translated.
 ### Meta Muse request controls
 
 Meta Muse Spark chat models forward `reasoning_effort` only for `minimal`,
-`low`, `medium`, `high`, and `xhigh`; `none` and `max` are stripped because the
-Model API rejects them. Meta accepts only `tool_choice: "auto"`: required and
-named choices are normalized to `auto`, while `none` removes tools from the
-request. Caller-supplied stop sequences are stripped because Meta rejects the
-`stop` field. Meta requests use `max_completion_tokens`; Muse Spark supports
-image input, JSON-schema structured output, and parallel function calls. Those
-function calls can target the same backend-qualified AgenC tool catalog as
-calls from other cloud providers.
+`low`, `medium`, `high`, and `xhigh`, plus `max` on standard-tier
+`muse-spark-1.3`; `none` is stripped because the Model API rejects it. Muse
+Wonder runs on the Responses API and sends `reasoning.effort` for `minimal`
+through `max`, again without `none`. On both surfaces Meta accepts only
+`tool_choice: "auto"`: required and named choices are normalized to `auto`,
+while `none` removes tools from the request. Caller-supplied stop sequences are
+stripped because Meta rejects the `stop` field. Muse Spark requests use
+`max_completion_tokens` and Muse Wonder requests use `max_output_tokens`. Both
+support image input, JSON-schema structured output, and parallel function
+calls. Those function calls can target the same backend-qualified AgenC tool
+catalog as calls from other cloud providers.
 
 ## Gemini native JSON Schema
 

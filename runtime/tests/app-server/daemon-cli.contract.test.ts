@@ -6080,11 +6080,15 @@ snapshot_max_bytes = 64
     const signalProcess = createSignalProcess();
     const pidPath = resolveAgenCDaemonPidPath(host.env, host.userHome);
     const cookiePath = resolveAgenCDaemonCookiePath(host.env, host.userHome);
+    // A session created with a tool policy has to come back with it, and its
+    // published record must keep it or the next snapshot would erase it.
+    const storedToolPolicy = { enabledTools: ["FileRead", "mcp.desktop.read_file"], deferMcpTools: false };
     const restartRolloutPath = seedRecoverableDaemonState(agencHome, {
       cwd: process.cwd(),
       runId: "run-restart",
       sessionId: "session-restart",
       toolCallId: "tool-restart",
+      extraMetadata: { toolPolicy: storedToolPolicy },
     });
     seedTerminalDaemonRun(agencHome, {
       cwd: process.cwd(),
@@ -6264,6 +6268,8 @@ snapshot_max_bytes = 64
     expect(restoreOptions.get("run-restart")?.cwd).not.toBe(
       dirname(dirname(dirname(restartRolloutPath))),
     );
+    expect(restoreOptions.get("run-restart")?.toolRegistryOptions).toEqual({ toolPolicy: storedToolPolicy });
+    expect(restoreOptions.get("run-other")).not.toHaveProperty("toolRegistryOptions");
     expect(restoreOptions.get("run-other")).toMatchObject({
       conversationId: "run-other",
       resumeConversation: true,
@@ -6306,6 +6312,7 @@ snapshot_max_bytes = 64
       status: "idle",
       activeSessionIds: ["session-restart"],
       metadata: {
+        toolPolicy: storedToolPolicy,
         recovery: {
           runStatus: "running",
           runnable: true,
@@ -8428,6 +8435,8 @@ function seedRecoverableDaemonState(
     readonly includeRuntimeOptions?: boolean;
     readonly includeCommandEnvironment?: boolean;
     readonly lightMode?: boolean;
+    /** Extra run metadata, as agent.create persists it (for example a toolPolicy). */
+    readonly extraMetadata?: Record<string, unknown>;
   },
 ): string {
   const driver = openStateDatabases({
@@ -8467,6 +8476,7 @@ function seedRecoverableDaemonState(
             ? {}
             : { commandEnvironment: { PATH: "/usr/bin:/bin" } }),
           sessionEnvironment: { values: {}, withheldKeys: [] },
+          ...(params.extraMetadata ?? {}),
         }),
       );
     driver

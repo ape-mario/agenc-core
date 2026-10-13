@@ -7,7 +7,9 @@
  * root tool-registry is removed.
  */
 
+import type { SessionToolPolicy } from "../../permissions/session-tool-policy.js";
 import type { FunctionCallOutputContentItem } from "../../tools/context.js";
+import type { Tool as RuntimeTool } from "../../tools/types.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LLMTool = any;
@@ -46,7 +48,13 @@ export interface ToolDispatchResult {
 export interface ToolRegistry {
   readonly tools: readonly Tool[];
   toLLMTools(): LLMTool[];
-  dispatch(toolCall: LLMToolCall): Promise<ToolDispatchResult>;
+  dispatch(toolCall: LLMToolCall, options?: { readonly prepareArguments?: (args: Record<string, unknown>, tool: RuntimeTool) => Record<string, unknown>; readonly advertisedToolNames?: readonly string[]; readonly abortSignal?: AbortSignal }): Promise<ToolDispatchResult>;
   getDiscoveredToolNames?(): ReadonlySet<string>;
   discoverToolNames?(toolNames: readonly string[]): void;
+  /**
+   * The session's fixed tool policy (`agent.create` `toolPolicy`), when it has
+   * one. Session-level surfaces that are not tools (skill listings, slash
+   * commands) read it to stay inside the same boundary.
+   */
+  readonly toolPolicy?: SessionToolPolicy;
 }

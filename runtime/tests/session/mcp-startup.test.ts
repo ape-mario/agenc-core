@@ -1,3 +1,4 @@
+import { CostSidecar } from "../../src/session/cost.js";
 /**
  * T6 gap #119 seam: `attachMcpManagerToSession` must install the
  * session-bound `MCPCallObserver` on the manager BEFORE `manager.start()`
@@ -421,6 +422,33 @@ describe("mcp-startup.attachMcpManagerToSession", () => {
       reasoningOutputTokens: 1,
       reasoningIncludedInCompletion: true,
     });
+  });
+
+  it("preserves one-hour cache writes through MCP sampling and session pricing", async () => {
+    const model = "claude-haiku-5-5";
+    const sidecar = new CostSidecar({ defaultProvider: "anthropic", defaultModel: model });
+    const providerChat = vi.fn(async () => ({
+      content: "ok", toolCalls: [], model, finishReason: "stop" as const,
+      usage: { promptTokens: 60_001, completionTokens: 1000, totalTokens: 61_001,
+        cachedInputTokens: 20_000, cacheCreationInputTokens: 20_000, cacheCreation1hInputTokens: 10_000 },
+    }));
+    const emit = vi.fn((event: Parameters<CostSidecar["onEvent"]>[0]) => sidecar.onEvent(event));
+    const session = {
+      provider: { chat: providerChat },
+      services: { provider: { chat: providerChat }, admissionRequired: false },
+      emit, nextInternalSubId: vi.fn(() => "sub-ttl"),
+      sessionConfiguration: { approvalPolicy: { value: "never" } },
+    } as unknown as Session;
+    await createSessionMcpSamplingHandlers(session).createMessage({
+      serverName: "srv", requestId: 9,
+      request: { id: 9, method: "sampling/createMessage", params: {
+        messages: [{ role: "user", content: { type: "text", text: "Sample" } }], maxTokens: 1024,
+      } } as never,
+    });
+    const tokenCount = emit.mock.calls.map(call => call[0].msg).find(msg => msg.type === "token_count");
+    expect(tokenCount?.payload).toMatchObject({ cacheCreationInputTokens: 20_000, cacheCreation1hInputTokens: 10_000 });
+    // 100,001 total prompt tokens selects the long tier, with mixed write TTLs.
+    expect(sidecar.getTotalCostUsd()).toBeCloseTo(0.0497505, 10);
   });
 
   it("keeps an MCP sampling temperature off the OpenAI reasoning model's Responses request", async () => {
@@ -2841,6 +2869,24 @@ describe("session MCP mutation transactions", () => {
       await service.refreshFromAuthority?.();
       expect(manager.getServerConfig('plugin:demo:alpha')).toBeUndefined();
     } finally { await service.dispose?.(); await otherSession.dispose?.(); fixture.cleanup(); }
+  });
+
+  it("gives an attached server the session toolPolicy grant that names it, never one the client sent", async () => {
+    const fixture = await createMcpAuthorityFixture();
+    const config = { name: "agenc-marketplace-task", transport: "http" as const, endpoint: "http://127.0.0.1:43120/mcp", headers: { Authorization: `Bearer ${"e".repeat(48)}` }, localOnly: true };
+    const service = createSessionMcpService(createSessionMcpManager([]), {
+      authority: fixture.store, environment: {}, noFsWriteToolsFor: (name: string) => name === config.name ? ["echo"] : undefined,
+    });
+    const plainService = createSessionMcpService(createSessionMcpManager([]), { authority: fixture.store, environment: {} });
+    try {
+      await expect(service.addServer?.(config, { replace: true })).resolves.toMatchObject({ success: true });
+      expect(mockCreateToolBridge.mock.calls.at(-1)?.[3]?.serverConfig).toMatchObject({ virtualNoFsWriteTools: ["echo"] });
+      // A client that sends the runtime-owned field itself gets nothing from it.
+      mockCreateToolBridge.mockClear();
+      const forged = await plainService.addServer?.({ ...config, toolPolicyNoFsWriteTools: ["echo"] } as never, { replace: true });
+      if (forged?.success) expect(mockCreateToolBridge.mock.calls.at(-1)?.[3]?.serverConfig?.virtualNoFsWriteTools).toBeUndefined();
+      else expect(mockCreateToolBridge).not.toHaveBeenCalled();
+    } finally { await service.dispose?.(); await plainService.dispose?.(); fixture.cleanup(); }
   });
 
   it("attaches, idempotently replaces and rotates authenticated local HTTP state without persisting credentials", async () => {

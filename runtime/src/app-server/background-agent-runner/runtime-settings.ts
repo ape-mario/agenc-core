@@ -23,7 +23,12 @@ import {
   canonicalizeBypassPermissionsCwd,
   loadBypassPermissionsConsent,
 } from "../../permissions/bypass-consent-state.js";
-import type { ToolPermissionContext } from "../../permissions/types.js";
+import type { PermissionMode, ToolPermissionContext } from "../../permissions/types.js";
+import {
+  frozenPermissionModeMessage,
+  isWiderPermissionMode,
+  type SessionToolPolicy,
+} from "../../permissions/session-tool-policy.js";
 import {
   readSessionSelection,
   resolveProviderModelSelection,
@@ -1374,6 +1379,8 @@ function restoreBootstrapSelection(params: AgenCBackgroundAgentRestoreParams): {
   readonly model?: string;
   readonly profile?: string;
   readonly configPath?: string;
+  readonly taskTokenBudget?: number;
+  readonly taskMaxCalls?: number;
   readonly addDirs?: readonly string[];
   readonly permissionMode?:
     | "default"
@@ -1389,6 +1396,12 @@ function restoreBootstrapSelection(params: AgenCBackgroundAgentRestoreParams): {
     provider: canonical.provider,
     model: canonical.model,
     ...(canonical.profile !== null ? { profile: canonical.profile } : {}),
+    ...(params.taskTokenBudget !== undefined
+      ? { taskTokenBudget: params.taskTokenBudget }
+      : {}),
+    ...(params.taskMaxCalls !== undefined
+      ? { taskMaxCalls: params.taskMaxCalls }
+      : {}),
     ...(params.configPath !== undefined
       ? { configPath: params.configPath }
       : {}),
@@ -1458,6 +1471,8 @@ function buildBootstrapArgv(
     readonly model?: string;
     readonly profile?: string;
     readonly configPath?: string;
+    readonly taskTokenBudget?: number;
+    readonly taskMaxCalls?: number;
     readonly addDirs?: readonly string[];
     readonly permissionMode?:
       | "default"
@@ -1498,11 +1513,13 @@ async function installUnattendedPermissionPolicy(
   allow: readonly string[] | undefined,
   deny: readonly string[] | undefined,
   routine?: { readonly workspaceRoot: string },
+  toolPolicy?: SessionToolPolicy,
 ): Promise<void> {
   if (
     normalizeUnattendedToolList(allow).length === 0 &&
     normalizeUnattendedToolList(deny).length === 0 &&
-    routine === undefined
+    routine === undefined &&
+    toolPolicy === undefined
   ) {
     return;
   }
@@ -1512,6 +1529,8 @@ async function installUnattendedPermissionPolicy(
   const next = applyUnattendedPermissionPolicyToContext(current, {
     ...(allow !== undefined ? { allowlist: allow } : {}),
     ...(deny !== undefined ? { denylist: deny } : {}),
+    // A session tool policy rides the same bypass-immune floor as the denylist.
+    ...(toolPolicy !== undefined ? { enabledTools: toolPolicy.enabledTools } : {}),
     // Both default off, so every caller that is not a routine is byte-identical.
     ...(routine === undefined
       ? {}
@@ -1520,6 +1539,29 @@ async function installUnattendedPermissionPolicy(
         : { readOnly: true }),
   });
   await registry.update(next);
+}
+
+/**
+ * Freeze a session's permission mode at its ceiling when its tool policy asks
+ * for it, and return that ceiling so the caller can persist it. The ceiling is
+ * the mode the session has now, or, on restore, the one recorded when it was
+ * created: a session narrowed to `plan` before a restart may return to its
+ * original mode, never past it. A restored session already wider than its
+ * recorded ceiling is refused instead of silently capped.
+ */
+function freezeSessionPermissionMode(
+  registry: PermissionModeRegistry,
+  toolPolicy: SessionToolPolicy | undefined,
+  retainedCeiling: PermissionMode | undefined,
+): PermissionMode | undefined {
+  if (toolPolicy?.frozenPermissionMode !== true) return undefined;
+  const current = registry.current().mode;
+  const ceiling = retainedCeiling ?? current;
+  if (isWiderPermissionMode(current, ceiling)) {
+    throw new Error(frozenPermissionModeMessage(current, ceiling));
+  }
+  registry.freezeModeCeiling(ceiling);
+  return ceiling;
 }
 
 /**
@@ -1580,6 +1622,7 @@ export {
   runtimeSettingsWithRestoreOverrides,
   buildBootstrapArgv,
   installUnattendedPermissionPolicy,
+  freezeSessionPermissionMode,
   assertRoutineRunAuthority,
 };
 export type { PreparedRuntimeSettingsChange };

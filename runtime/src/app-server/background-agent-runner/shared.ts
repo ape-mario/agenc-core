@@ -84,6 +84,8 @@ import type {
   ResumeRolloutDescriptorLease,
 } from "../../session/session-store.js";
 import type { AgentRuntimeOptions } from "../../session/runtime-options.js";
+import type { SessionToolPolicy } from "../../permissions/session-tool-policy.js";
+import type { PermissionMode } from "../../permissions/types.js";
 
 export interface AgenCBackgroundAgentStartParams {
   readonly signal?: AbortSignal;
@@ -93,6 +95,8 @@ export interface AgenCBackgroundAgentStartParams {
   readonly provider?: string;
   readonly profile?: string;
   readonly configPath?: string;
+  readonly taskTokenBudget?: number;
+  readonly taskMaxCalls?: number;
   readonly addDirs?: readonly string[];
   readonly initialContent?: MessageContent;
   readonly deferInitialTurn?: boolean;
@@ -100,6 +104,8 @@ export interface AgenCBackgroundAgentStartParams {
   readonly metadata?: JsonObject;
   readonly unattendedAllow: readonly string[];
   readonly unattendedDeny: readonly string[];
+  /** Fixed tool allowlist for this session (`agent.create` `toolPolicy`). */
+  readonly toolPolicy?: SessionToolPolicy;
   readonly permissionMode?:
     | "default"
     | "plan"
@@ -129,6 +135,11 @@ export interface AgenCBackgroundAgentStartResult {
   readonly rolloutPath?: string;
   readonly rolloutDev?: string;
   readonly rolloutIno?: string;
+  /**
+   * Widest permission mode a frozen session (`toolPolicy.frozenPermissionMode`)
+   * may reach. The lifecycle persists it so a restore keeps the same ceiling.
+   */
+  readonly toolPolicyModeCeiling?: PermissionMode;
 }
 
 export interface AgenCBackgroundAgentRestoreParams {
@@ -140,6 +151,8 @@ export interface AgenCBackgroundAgentRestoreParams {
   readonly provider?: string;
   readonly profile?: string;
   readonly configPath?: string;
+  readonly taskTokenBudget?: number;
+  readonly taskMaxCalls?: number;
   readonly addDirs?: readonly string[];
   readonly permissionMode?:
     | "default"

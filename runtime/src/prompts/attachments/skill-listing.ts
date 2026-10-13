@@ -2,6 +2,11 @@ import type { LLMMessage } from "../../llm/types.js";
 import type { AttachmentProducer } from "./orchestrator.js";
 import { SKILL_LISTING_REMINDER_HEADER } from "./messages.js";
 import {
+  SKILL_TOOL_NAME,
+  sessionToolPolicyAllowsBundledSkill,
+  type SessionToolPolicy,
+} from "../../permissions/session-tool-policy.js";
+import {
   buildSkillListingWithinBudget,
   rankSkillsForRequest,
   type SkillListingEntry,
@@ -26,12 +31,24 @@ function messageCarriesText(message: LLMMessage, needle: string): boolean {
  * import with a catch, as in /skills: in tests the build-time MACRO global
  * is absent and registration throws at module load, in which case the
  * listing simply omits them.
+ *
+ * What the listing names is what the session may load: a session with a
+ * toolPolicy is told only about the bundled skills it enabled, and a skill
+ * that is unlisted by default (the kit installer) appears only once the
+ * operator has turned it on in config.
  */
-async function bundledRegistrySkills(): Promise<readonly SkillListingEntry[]> {
+async function bundledRegistrySkills(
+  toolPolicy: SessionToolPolicy | undefined,
+  config: unknown,
+): Promise<readonly SkillListingEntry[]> {
   try {
-    const { getBundledSkills } = await import("../../skills/bundledSkills.js");
+    const { getBundledSkills, isBundledSkillListed } = await import(
+      "../../skills/bundledSkills.js"
+    );
     return getBundledSkills().flatMap((command): SkillListingEntry[] =>
-      command.isEnabled?.() === false
+      command.isEnabled?.() === false ||
+      !sessionToolPolicyAllowsBundledSkill(toolPolicy, command.name) ||
+      !isBundledSkillListed(command.name, config)
         ? []
         : [{
             name: command.name,
@@ -62,6 +79,14 @@ export const skillListingProducer: AttachmentProducer = async (opts, tracking) =
   if (opts.lightMode === true &&
       !opts.loadedTools.some(tool => tool.function.name === "Skill")) return [];
   if (!opts.skillsManager) return [];
+  // A session whose policy leaves out the Skill tool cannot load anything the
+  // listing would name.
+  if (
+    opts.toolPolicy !== undefined &&
+    !opts.toolPolicy.enabledTools.includes(SKILL_TOOL_NAME)
+  ) {
+    return [];
+  }
   if (opts.signal.aborted) return [];
   const listingPresent = opts.messages.some((message) =>
     messageCarriesText(message, SKILL_LISTING_REMINDER_HEADER),
@@ -82,7 +107,7 @@ export const skillListingProducer: AttachmentProducer = async (opts, tracking) =
     (root) => root.droppedCount > 0,
   );
   const known = new Set(skills.map((skill) => skill.name));
-  const bundled = (await bundledRegistrySkills()).filter(
+  const bundled = (await bundledRegistrySkills(opts.toolPolicy, opts.config)).filter(
     (skill) => !known.has(skill.name),
   );
   if (opts.signal.aborted) return [];

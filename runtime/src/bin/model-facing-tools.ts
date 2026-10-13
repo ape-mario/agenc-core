@@ -46,6 +46,7 @@ import type {
 } from "../llm/types.js";
 import { runAdmittedModelCall } from "../budget/admitted-model-call.js";
 import { AdmissionDeniedError } from "../budget/admission-client.js";
+import { TaskBudgetReachedError } from "../session/task-budget.js";
 import type { GrokCapabilityConfig } from "../config/schema.js";
 import {
   isDirectXaiInferenceHost,
@@ -77,7 +78,7 @@ import {
   SESSION_ID_ARG,
 } from "../agents/_deps/filesystem-args.js";
 import type { UnifiedExecProcessManagerLike } from "../unified-exec/types.js";
-import { processOwnerIdFromToolArgs } from "../unified-exec/process-ownership.js";
+import { processOwnerIdFromToolArgs, execOwnerBindingFromToolArgs } from "../unified-exec/process-ownership.js";
 import { runtimeSandboxForExec } from "../tools/system/exec-command.js";
 import {
   formatUnifiedExecToolContent,
@@ -159,6 +160,11 @@ import {
   waitForInitialization,
 } from "../services/lsp/manager.js";
 import { readSandboxExecutionBroker } from "../sandbox/execution-broker.js";
+import {
+  bundledSkillRefusalMessage,
+  sessionToolPolicyAllowsBundledSkill,
+  type SessionToolPolicy,
+} from "../permissions/session-tool-policy.js";
 import { readToolRuntimeContext } from "../tools/runtimes/context.js";
 import { registerSessionCronMutation } from "../tools/runtimes/session-cron.js";
 import { openStateDatabases } from "../state/sqlite-driver.js";
@@ -219,6 +225,11 @@ export interface ModelFacingToolOptions {
   readonly sessionProvider?: string;
   /** Session inference base URL retained for embedding compatibility. */
   readonly sessionBaseURL?: string;
+  /**
+   * The session's fixed tool policy. Bundled skills are available to a session
+   * with one only when it enables them by name.
+   */
+  readonly toolPolicy?: SessionToolPolicy;
 }
 
 function requireModelFacingRequestEnvironment(
@@ -1180,7 +1191,7 @@ async function runGrokNativeWebSearch(
     });
   } catch (error) {
     abortSignalFromArgs(args)?.throwIfAborted();
-    if (error instanceof AdmissionDeniedError) throw error;
+    if (error instanceof AdmissionDeniedError || error instanceof TaskBudgetReachedError) throw error;
     return undefined;
   }
 }
@@ -2825,7 +2836,7 @@ function createSkillInvocationRuntimeTool(opts: ModelFacingToolOptions): Tool {
       additionalProperties: false,
     },
     checkPermissions: async (input, context) =>
-      checkSkillPermissions(input, context),
+      checkSkillPermissions(input, context, opts.toolPolicy),
     // Recording the invocation is the tool's only effect, so every refusal
     // below is made before it. A bare error from a side-effecting tool is
     // filed as an unknown outcome and gates the whole session (#2190).
@@ -2846,6 +2857,12 @@ function createSkillInvocationRuntimeTool(opts: ModelFacingToolOptions): Tool {
       if (!rendered) {
         // Bundled skills live in the runtime registry, not the local loader.
         const bundled = await findBundledSkillCommand(skillName);
+        if (
+          bundled !== null &&
+          !sessionToolPolicyAllowsBundledSkill(opts.toolPolicy, bundled.name)
+        ) {
+          return refusal({ error: bundledSkillRefusalMessage(bundled.name) });
+        }
         if (bundled?.getPromptForCommand !== undefined) {
           if (bundled.disableModelInvocation === true) {
             return refusal({
@@ -2870,7 +2887,12 @@ function createSkillInvocationRuntimeTool(opts: ModelFacingToolOptions): Tool {
         // Bundled skills are loadable through the branch above, so they belong
         // in the list the model is told about — otherwise it is shown a
         // narrower world than `/skills` shows the user.
-        const bundledNames = (await listBundledSkillNames()).filter(
+        const bundledNames = (
+          await listBundledSkillNames(
+            opts.toolPolicy,
+            sessionOrError.services.configStore?.current?.(),
+          )
+        ).filter(
           (name) => !(outcome.availableSkills ?? []).some((s) => s.name === name),
         );
         return refusal({
@@ -2976,14 +2998,22 @@ async function findBundledSkillCommand(name: string): Promise<
   }
 }
 
-/** Names of every model-invocable skill in the bundled registry. */
-async function listBundledSkillNames(): Promise<string[]> {
+/**
+ * Names of every model-invocable skill in the bundled registry that this
+ * session lists: not the ones its toolPolicy withholds, and not the ones that
+ * stay unlisted until the operator enables them.
+ */
+async function listBundledSkillNames(
+  toolPolicy: SessionToolPolicy | undefined,
+  config: unknown,
+): Promise<string[]> {
   try {
     const loaded = (await import(
       "../skills/bundledSkills.js"
     )) as unknown as Record<string, unknown>;
     const getBundledSkills = loaded.getBundledSkills;
     if (typeof getBundledSkills !== "function") return [];
+    const isListed = loaded.isBundledSkillListed;
     const commands = (getBundledSkills as () => unknown)();
     if (!Array.isArray(commands)) return [];
     const invocable = (list: unknown): string[] =>
@@ -2993,7 +3023,13 @@ async function listBundledSkillNames(): Promise<string[]> {
             typeof command.name === "string" &&
             command.name.length > 0 &&
             command.disableModelInvocation !== true &&
-            command.isHidden !== true
+            command.isHidden !== true &&
+            sessionToolPolicyAllowsBundledSkill(toolPolicy, command.name) &&
+            (typeof isListed !== "function" ||
+              (isListed as (name: string, config: unknown) => boolean)(
+                command.name,
+                config,
+              ))
               ? [command.name]
               : [],
           )
@@ -3079,6 +3115,7 @@ function formatLoadedSkillForModel(skillName: string, content: string): string {
 async function checkSkillPermissions(
   input: unknown,
   context: ToolEvaluatorContext,
+  toolPolicy: SessionToolPolicy | undefined,
 ) {
   const skillName = normalizeSkillName(
     stringValue((input as { skill?: unknown })?.skill) ??
@@ -3132,14 +3169,30 @@ async function checkSkillPermissions(
     };
   }
 
-  const skill =
-    (await context.session.services.skillsManager.resolveSkill?.(skillName)) ??
-    // resolveSkill is typed to exclude the bundled source, so fall back to the
-    // runtime registry before declaring a shipped skill unknown. The bundled
-    // Command carries the same capability fields the auto-allow check reads,
-    // so it goes through the identical policy below — no special case.
-    (await findBundledSkillCommand(skillName)) ??
-    null;
+  const localSkill =
+    await context.session.services.skillsManager.resolveSkill?.(skillName);
+  // resolveSkill is typed to exclude the bundled source, so fall back to the
+  // runtime registry before declaring a shipped skill unknown. The bundled
+  // Command carries the same capability fields the auto-allow check reads,
+  // so it goes through the identical policy below — no special case.
+  const bundledSkill =
+    localSkill === undefined || localSkill === null
+      ? await findBundledSkillCommand(skillName)
+      : null;
+  if (
+    bundledSkill !== null &&
+    !sessionToolPolicyAllowsBundledSkill(toolPolicy, bundledSkill.name)
+  ) {
+    return {
+      behavior: "deny" as const,
+      message: bundledSkillRefusalMessage(bundledSkill.name),
+      decisionReason: {
+        type: "other" as const,
+        reason: "bundled skill not enabled by the session tool policy",
+      },
+    };
+  }
+  const skill = localSkill ?? bundledSkill ?? null;
   if (skill === null) {
     return {
       behavior: "deny" as const,
@@ -3404,7 +3457,7 @@ async function runWebFetchExtraction(
       : undefined;
   } catch (error) {
     input.signal?.throwIfAborted();
-    if (error instanceof AdmissionDeniedError) throw error;
+    if (error instanceof AdmissionDeniedError || error instanceof TaskBudgetReachedError) throw error;
     return undefined;
   }
 }
@@ -5173,6 +5226,7 @@ function createPowerShellTool(opts: ModelFacingToolOptions): readonly Tool[] {
           ...(numberValue(args.timeout_ms) !== undefined
             ? { timeoutMs: numberValue(args.timeout_ms) }
             : {}),
+          ownerBinding: execOwnerBindingFromToolArgs(args as Record<string, unknown>),
           ...(ownerId !== undefined ? { ownerId } : {}),
           ...(runtimeSandbox !== undefined ? { runtimeSandbox } : {}),
         });

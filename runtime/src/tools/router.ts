@@ -1,3 +1,4 @@
+import { stripModelSuppliedAgenCInternalArgs } from "./internal-args.js";
 /**
  * Tool router: spec registry, tool-call construction, and dispatch.
  *
@@ -129,6 +130,11 @@ import {
   REQUEST_LEDGER_TRANSFER_TOOL_NAME,
 } from "../elicitation/request-ledger-transfer.js";
 import { runAdmittedToolCall } from "../budget/admitted-tool-call.js";
+import {
+  sessionToolPolicyAllowsTool,
+  toolPolicyRefusalMessage,
+  type SessionToolPolicy,
+} from "../permissions/session-tool-policy.js";
 import {
   createWorkspaceOperationLifetime,
   runWithWorkspaceOperationLifetime,
@@ -288,6 +294,12 @@ export interface ToolRouterOpts {
    * T9 wires from config.
    */
   readonly parallelMcpServerNames?: ReadonlySet<string>;
+  /**
+   * The session's tool allowlist. The specs it was applied to are already
+   * filtered; the router keeps it only to refuse a call to a tool outside it
+   * with an explicit message instead of "unknown tool".
+   */
+  readonly toolPolicy?: SessionToolPolicy;
 }
 
 /**
@@ -304,12 +316,14 @@ export interface ToolRouterFromConfigOpts {
   readonly discoverableTools?: ReadonlyArray<Tool>;
   readonly dynamicTools?: ReadonlyArray<Tool>;
   readonly parallelMcpServerNames?: ReadonlySet<string>;
+  readonly toolPolicy?: SessionToolPolicy;
 }
 
 export class ToolRouter {
   private readonly specs: ConfiguredToolSpec[];
   private readonly byName = new Map<string, ConfiguredToolSpec>();
   private readonly parallelMcpServerNames: ReadonlySet<string>;
+  private readonly toolPolicy: SessionToolPolicy | undefined;
 
   constructor(
     specs: ReadonlyArray<ConfiguredToolSpec>,
@@ -318,6 +332,14 @@ export class ToolRouter {
     this.specs = [...specs];
     for (const spec of this.specs) this.byName.set(spec.tool.name, spec);
     this.parallelMcpServerNames = opts.parallelMcpServerNames ?? new Set();
+    this.toolPolicy = opts.toolPolicy;
+  }
+
+  /** The error for a name no spec answers to: a policy refusal or unknown. */
+  private unknownToolError(name: string): string {
+    return sessionToolPolicyAllowsTool(this.toolPolicy, name)
+      ? `unknown tool: ${name}`
+      : toolPolicyRefusalMessage(name);
   }
 
   /**
@@ -379,9 +401,12 @@ export class ToolRouter {
       addTool(tool, { dynamic: true });
     }
 
-    const parallelOpts: ToolRouterOpts = opts.parallelMcpServerNames
-      ? { parallelMcpServerNames: opts.parallelMcpServerNames }
-      : {};
+    const parallelOpts: ToolRouterOpts = {
+      ...(opts.parallelMcpServerNames
+        ? { parallelMcpServerNames: opts.parallelMcpServerNames }
+        : {}),
+      ...(opts.toolPolicy !== undefined ? { toolPolicy: opts.toolPolicy } : {}),
+    };
     return new ToolRouter(Array.from(merged.values()), parallelOpts);
   }
 
@@ -530,11 +555,11 @@ export class ToolRouter {
     if (!spec) {
       return {
         content: JSON.stringify({
-          error: `unknown tool: ${
+          error: this.unknownToolError(
             invocation.toolName.namespace
               ? `${invocation.toolName.namespace}.${invocation.toolName.name}`
-              : invocation.toolName.name
-          }`,
+              : invocation.toolName.name,
+          ),
         }),
         isError: true,
       };
@@ -836,7 +861,7 @@ export class ToolRouter {
     const spec = this.findSpec(toolCall.name);
     if (!spec) {
       return {
-        content: JSON.stringify({ error: `unknown tool: ${toolCall.name}` }),
+        content: JSON.stringify({ error: this.unknownToolError(toolCall.name) }),
         isError: true,
       };
     }
@@ -1507,38 +1532,6 @@ function rawPayloadArguments(payload: ToolPayload): string {
   }
 }
 
-const AGENC_INTERNAL_ARG_PREFIX = "__agenc";
-
-/**
- * Drop every `__agenc*` key from model-supplied tool-call arguments.
- *
- * `__agenc*` keys (e.g. `__agencSessionAllowedRoots`, `__agencSessionId`)
- * are a TRUSTED INTERNAL channel the runtime injects post-approval to
- * scope filesystem confinement. A model that emits them directly could
- * widen its own allowed roots (audit #1/#2/#4). We strip them at the
- * dispatch boundary so the only `__agenc*` values that ever reach
- * `tool.execute` are those the runtime itself adds afterwards. Returns
- * the input untouched when there is nothing to strip.
- */
-function stripModelSuppliedAgenCInternalArgs(
-  input: Record<string, unknown>,
-): Record<string, unknown> {
-  let needsStrip = false;
-  for (const key of Object.keys(input)) {
-    if (key.startsWith(AGENC_INTERNAL_ARG_PREFIX)) {
-      needsStrip = true;
-      break;
-    }
-  }
-  if (!needsStrip) return input;
-  // Own data properties only: assigning a model's JSON `__proto__` key onto
-  // `{}` would make it the copy's prototype instead of an argument.
-  return Object.fromEntries(
-    Object.entries(input).filter(
-      ([key]) => !key.startsWith(AGENC_INTERNAL_ARG_PREFIX),
-    ),
-  );
-}
 
 function planFileContextForApproval(
   options: Pick<LiveToolDispatchOptions, "agencHome" | "session">,
@@ -1916,7 +1909,10 @@ export function routerFromRegistry(
       : {}),
     ...(unavailable?.has(tool.name) === true ? { unavailable: true } : {}),
   }));
-  return new ToolRouter(specs, opts);
+  return new ToolRouter(specs, {
+    ...(registry.toolPolicy !== undefined ? { toolPolicy: registry.toolPolicy } : {}),
+    ...opts,
+  });
 }
 
 /**

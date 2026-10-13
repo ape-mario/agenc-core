@@ -1,6 +1,6 @@
 {
   "name": "@tetsuo-ai/runtime",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "private": true,
   "description": "AgenC lean coding CLI",
   "type": "module",
@@ -26,6 +26,7 @@
   "agencNamespaceInitEntry": "dist/agenc-namespace-init-entry",
   "agencExecutableFiles": [
     "dist/agenc-process-broker",
+    "dist/agenc-session-sandbox",
     "dist/agenc-process-job-broker.exe",
     "dist/agenc-landlock-run",
     "dist/agenc-secret-service-helper",
@@ -33,6 +34,7 @@
   ],
   "scripts": {
     "postinstall": "node bin/prepare-peer-credentials.mjs",
+    "build:linux-broker:portable": "node scripts/build-portable-linux-broker.mjs",
     "build": "node scripts/check-launcher-preflight.mjs --check && node scripts/sync-shipped-plugins.mjs && node scripts/build-runtime.mjs && node scripts/write-build-version.mjs && npm run check:package-entrypoints && npm run check:sdk-generated-types && node ../scripts/canonicalize-package-modes.mjs .",
     "generate:fresh-state-schema": "node --import tsx scripts/generate-fresh-state-schema.ts",
     "daemon": "node bin/agenc daemon start --foreground",

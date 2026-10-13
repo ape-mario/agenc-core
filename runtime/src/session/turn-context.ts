@@ -357,6 +357,7 @@ export interface SessionConfiguration {
    * `sandbox.allow_gpu`). Kernel attack surface — off by default.
    */
   readonly sandboxAllowGpu?: boolean;
+  readonly sandboxPersistentSession?: boolean;
   readonly collaborationMode: CollaborationMode;
   /**
    * True once the session's reasoning effort was cleared on purpose
@@ -474,6 +475,8 @@ export type SessionSource =
 
 /** The original config blob (large). */
 export interface Config {
+  readonly bypassFastMode?: boolean;
+  readonly reasoningCapPolicy?: "off" | "streak2";
   readonly agents?: import("../config/schema.js").AgentsConfig;
   readonly model: string;
   readonly modelVerbosity?: "low" | "medium" | "high";
@@ -519,6 +522,9 @@ export interface Config {
   readonly maxTurns?: number;
   /** Canonical per-session USD cap; checked before every sampling iteration. */
   readonly maxBudgetUsd?: number;
+  readonly taskTokenBudget?: number;
+  readonly taskMaxCalls?: number;
+  readonly experimentalTaskBudgetProgress?: string;
   /** Canonical durable checkpoint/resume policy captured for this session. */
   readonly durableTurns?: DurableTurnsConfig;
   /** Completion gate policy for non-interactive verification rounds. */
@@ -625,11 +631,13 @@ export interface TurnContext {
 
   /** Reasoning summary mode. */
   readonly reasoningSummary: ReasoningSummary;
+  /** Preserve explicit summary choices when an opt-in provider experiment changes its default. */
+  readonly reasoningSummaryIsDefault?: true;
 
   /** Provider-facing output verbosity hint. */
   readonly modelVerbosity?: "low" | "medium" | "high";
 
-  /** Explicit session response-detail override; null keeps inherited requests unchanged. */
+  /** Effective response detail for prompt fallback routes, including inherited config. */
   readonly responseDetailOverride?: "low" | "medium" | "high" | null;
 
   /** Provider-facing service-tier hint. */
@@ -1299,8 +1307,12 @@ export function buildTurnContext(opts: BuildTurnContextOptions): TurnContext {
     modelProviderId: providerBinding.provider,
     reasoningEffort,
     reasoningSummary,
+    ...(sc.modelReasoningSummary === undefined ? { reasoningSummaryIsDefault: true as const } : {}),
     modelVerbosity: sc.modelVerbosity,
-    responseDetailOverride: sc.modelVerbosityOverride,
+    // Clearing the runtime override restores the configured level. Prompt
+    // assembly and the concrete wire adapter decide whether to use this
+    // fallback or the provider's native verbosity parameter, never both.
+    responseDetailOverride: sc.modelVerbosityOverride ?? sc.modelVerbosity,
     serviceTier: sc.serviceTier,
     sessionSource: sc.sessionSource,
     environment: opts.environment,

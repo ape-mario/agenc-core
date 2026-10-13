@@ -14,6 +14,7 @@ import {
 } from "../../context/personality-spec-instructions.js";
 import type { ReasoningEffort, ReasoningSummary } from "../../session/turn-context.js";
 import { normalizeProviderIdentity } from "../../provider-identity.js";
+import { oneShotFastModeActive } from "../../one-shot-fast-mode.js";
 import { MISTRAL_MODEL_CATALOG, resolveMistralChatModel } from "./mistral-models.js";
 import { BEDROCK_CONVERSE_MODELS } from "./bedrock-converse-models.js";
 import { GROQ_MODELS } from "./groq-models.js";
@@ -124,6 +125,9 @@ const META_SPARK_13_REASONING_LEVELS = Object.freeze([
   ...META_REASONING_LEVELS,
   "max",
 ] as const satisfies readonly ReasoningEffort[]);
+// Muse Wonder takes every level from minimal to max and rejects none.
+// https://dev.meta.ai/docs/reasoning
+const META_WONDER_REASONING_LEVELS = META_SPARK_13_REASONING_LEVELS;
 const QWEN_38_REASONING_LEVELS = Object.freeze([
   "low",
   "medium",
@@ -823,6 +827,14 @@ const ANTHROPIC_SONNET_5_5_ENTRY: RegisteredModelCatalogEntry = Object.freeze({
   priority: 1,
 });
 
+// Official Haiku 5.5 overview and effort docs, checked 2026-10-07.
+const ANTHROPIC_HAIKU_5_5_ENTRY: RegisteredModelCatalogEntry = Object.freeze({
+  ...ANTHROPIC_OPUS_5_5_ENTRY,
+  model: "claude-haiku-5-5",
+  displayName: "Claude Haiku 5.5",
+  priority: 3,
+});
+
 const ANTHROPIC_HAIKU_4_5_ENTRY: RegisteredModelCatalogEntry = Object.freeze({
   ...ANTHROPIC_OPUS_5_5_ENTRY,
   model: "claude-haiku-4-5-20251001",
@@ -834,7 +846,7 @@ const ANTHROPIC_HAIKU_4_5_ENTRY: RegisteredModelCatalogEntry = Object.freeze({
   // parameter. A visible model does not have to expose an effort dial.
   supportedReasoningLevels: NO_REASONING_LEVELS,
   defaultReasoningLevel: undefined,
-  priority: 3,
+  priority: 9,
 });
 
 // Already-supported Claude models previously inherited the generic 200K /
@@ -908,6 +920,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
     ...MISTRAL_MODEL_CATALOG,
     ANTHROPIC_OPUS_5_5_ENTRY,
     ANTHROPIC_SONNET_5_5_ENTRY,
+    ANTHROPIC_HAIKU_5_5_ENTRY,
     ANTHROPIC_HAIKU_4_5_ENTRY,
     ...ANTHROPIC_EXISTING_ENTRIES,
     ...ANTHROPIC_UNCURATED_ENTRIES,
@@ -1208,6 +1221,37 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_SPARK_13_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
+      priority: 1,
+      visibility: "list",
+    },
+    {
+      // Meta provider default (BUILT_IN_PROVIDER_DEFAULT_MODELS.meta), so it
+      // leads the Meta list. Model API pay-as-you-go id; Muse Wonder Full is
+      // Muse Code only.
+      // https://dev.meta.ai/docs/models (1,048,576-token context window).
+      // Meta publishes no output cap for Wonder; this keeps the 131,072
+      // output limit Meta documents for Muse Spark on the same endpoints
+      // (https://dev.meta.ai/docs/coding-agents).
+      provider: "meta",
+      model: "muse-wonder-1.0",
+      displayName: "Muse Wonder",
+      contextWindow: 1_048_576,
+      maxContextWindow: 1_048_576,
+      maxOutputTokens: 131_072,
+      inputModalities: TEXT_IMAGE_MODALITIES,
+      supportsToolUse: true,
+      supportsParallelToolCalls: true,
+      supportsStructuredOutput: true,
+      supportsSearchTool: false,
+      supportsVerbosity: false,
+      webSearchToolType: "none",
+      // Responses API reasoning summaries ("auto" is Meta's compact default).
+      supportsReasoningSummaries: true,
+      defaultReasoningSummary: "auto",
+      supportedReasoningLevels: META_WONDER_REASONING_LEVELS,
+      // Meta's coding-agent guide calls high "a strong default".
+      defaultReasoningLevel: "high",
+      additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
       priority: 0,
       visibility: "list",
     },
@@ -1230,7 +1274,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 1,
+      priority: 2,
       visibility: "list",
     },
     {
@@ -1252,7 +1296,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 2,
+      priority: 3,
       visibility: "list",
     },
     {
@@ -1274,7 +1318,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 3,
+      priority: 4,
       visibility: "list",
     },
     {
@@ -1296,7 +1340,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       supportedReasoningLevels: META_REASONING_LEVELS,
       defaultReasoningLevel: "medium",
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: 4,
+      priority: 5,
       visibility: "list",
     },
     {
@@ -1726,7 +1770,24 @@ export function listRegisteredModelCatalogEntries(
   );
 }
 
+const fastCatalogEntries = new Map<string, RegisteredModelCatalogEntry | undefined>();
+
 export function resolveRegisteredModelCatalogEntry(input: {
+  readonly provider: string | undefined;
+  readonly model: string | undefined;
+}): RegisteredModelCatalogEntry | undefined {
+  if (!oneShotFastModeActive()) return resolveRegisteredModelCatalogEntryUncached(input);
+  // This resolver reads only the bundled immutable catalog and these two
+  // route fields. Config capability overrides are applied by its callers.
+  const key = JSON.stringify([input.provider ?? null, input.model ?? null]);
+  if (fastCatalogEntries.has(key)) return fastCatalogEntries.get(key);
+  const entry = resolveRegisteredModelCatalogEntryUncached(input);
+  if (fastCatalogEntries.size >= 64) fastCatalogEntries.clear();
+  fastCatalogEntries.set(key, entry);
+  return entry;
+}
+
+function resolveRegisteredModelCatalogEntryUncached(input: {
   readonly provider: string | undefined;
   readonly model: string | undefined;
 }): RegisteredModelCatalogEntry | undefined {
@@ -1909,6 +1970,8 @@ function resolveBedrockCatalogEntry(
 ): RegisteredModelCatalogEntry | undefined {
   const id = parseClaudeModelId(model);
   if (id === undefined || id.platform !== "bedrock") return undefined;
+  // Haiku 5.5 ships on the direct API first; Bedrock routing is a separate launch.
+  if (id.canonical === "claude-haiku-5-5") return undefined;
   const row = CLAUDE_CATALOG_ROWS.get(id.canonical);
   return row === undefined ? undefined : bedrockClaudeCatalogEntry(row, model);
 }

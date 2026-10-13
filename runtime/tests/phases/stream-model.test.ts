@@ -106,6 +106,7 @@ vi.mock("./execute-tools.js", () => ({
 
 import {
   streamModel,
+  buildProviderOptions,
   type StreamModelRequestContract,
   StreamModelError,
 } from "./stream-model.js";
@@ -316,6 +317,7 @@ describe("streamModel — live assistant text sanitization", () => {
     const dispatch = vi.fn(async () => ({
       content: "ok",
       toolCalls: [],
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
       model,
       finishReason: "stop" as const,
     }));
@@ -538,6 +540,19 @@ describe("streamModel — live assistant text sanitization", () => {
       serviceTier: "priority",
       parallelToolCalls: false,
     });
+  });
+
+  test("forwards the captured distinction between default and explicitly disabled summaries", () => {
+    const ctx = mkCtx("chat");
+    const { session } = mkSession(mkProvider(async () => ({
+      content: "ok", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      model: "test-model", finishReason: "stop",
+    })));
+    const request = mkRequest([{ role: "user", content: "hello" }]);
+    const signal = new AbortController().signal;
+    expect(buildProviderOptions(request, ctx, signal, session).reasoningSummaryIsDefault).toBeUndefined();
+    (ctx as TurnContext & { reasoningSummaryIsDefault?: true }).reasoningSummaryIsDefault = true;
+    expect(buildProviderOptions(request, ctx, signal, session).reasoningSummaryIsDefault).toBe(true);
   });
 
   test("routes every provider request with the session conversation id as the prompt cache key", async () => {
@@ -1943,6 +1958,23 @@ describe("streamModel — SessionState.totalTokenUsage accumulator", () => {
     );
 
     expect(tracker.emitted).toBe(348);
+  });
+
+  test("Haiku 5.5 one-hour cache usage reaches event accounting and tiered session cost", async () => {
+    const ctx = mkCtx("chat");
+    const model = "claude-haiku-5-5";
+    const provider = mkProvider(async () => parseAnthropicMessagesResponse(model, {
+      model, content: [{ type: "text", text: "ok" }], stop_reason: "end_turn",
+      usage: { input_tokens: 60_001, output_tokens: 1000, cache_read_input_tokens: 20_000,
+        cache_creation_input_tokens: 20_000, cache_creation: { ephemeral_1h_input_tokens: 10_000 } },
+    }, { model, messages: [{ role: "user", content: "hello" }], tools: [] }));
+    const { session, events } = mkSession(provider);
+    const sidecar = new CostSidecar();
+    session.eventLog.subscribe(event => sidecar.onEvent(event));
+    await streamModel(mkState(ctx), ctx, session, mkRequest([{ role: "user", content: "hello" }]));
+    const event = events.find(event => event.msg.type === "token_count");
+    expect(event?.msg).toMatchObject({ payload: { cacheCreation1hInputTokens: 10_000 } });
+    expect(sidecar.getTotalCostUsd()).toBeCloseTo((60_001 * 0.5 + 1000 * 2.5 + 20_000 * 0.05 + 10_000 * 0.625 + 10_000) / 1e6, 10);
   });
 
   test("a fast-served Anthropic turn reaches CostSidecar at fast-mode rates", async () => {

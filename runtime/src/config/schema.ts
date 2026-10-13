@@ -1,3 +1,5 @@
+import { DEFAULT_TASK_TOKEN_BUDGET, TASK_BUDGET_LEVELS, type TaskBudgetLevel } from "./task-budget.js";
+import { DEFAULT_MODEL_VERBOSITY } from "./runtime-defaults.js";
 // T10 Group D — AgenC config schema.
 //
 // Merges AgenC config surfaces, profile selection, and runtime additions
@@ -129,6 +131,8 @@ export type SandboxIgnoreViolations = Readonly<
 >;
 
 export interface SandboxConfig {
+  /** Reuse a Linux sandbox within a session; false retains per-command launches. */
+  readonly persistent_session?: boolean;
   /** Explicit network policy; defaults to true only in danger-full-access. */
   readonly network_access?: boolean;
   /**
@@ -184,6 +188,8 @@ export interface ProfileOverride {
   readonly approval_policy?: ApprovalPolicy;
   readonly sandbox_mode?: SandboxMode;
   readonly reasoning_effort?: ReasoningEffort;
+  /** Experimental bounded native cap recovery extension. Default: off. */
+  readonly reasoning_cap_policy?: "off" | "streak2";
   readonly reasoning_summary?: ReasoningSummary;
   readonly approvals_reviewer?: ApprovalsReviewer;
   readonly model_verbosity?: ModelVerbosity;
@@ -419,8 +425,10 @@ export interface MarketplaceCliProtocolConfig {
   readonly adapter: ProtocolAdapterKind;
   /**
    * Trusted local path override for the `agenc-marketplace` binary.
-   * Resolution order: this value → `AGENC_MARKETPLACE_CLI` env →
-   * `node_modules/.bin/agenc-marketplace`. `npx` is never used.
+   * Resolution order: this value → `AGENC_MARKETPLACE_CLI` env → the
+   * installer's own `~/.agenc/bin/agenc-marketplace` (owned by the current
+   * user, not world-writable). The working directory is never searched and
+   * `npx` is never used.
    */
   readonly cli_path?: string;
 }
@@ -872,6 +880,8 @@ export interface AgenCConfig {
   readonly sandbox?: SandboxConfig;
   readonly shell_environment_policy?: ShellEnvironmentPolicy;
   readonly reasoning_effort?: ReasoningEffort;
+  /** Experimental bounded native cap recovery extension. Default: off. */
+  readonly reasoning_cap_policy?: "off" | "streak2";
   readonly reasoning_summary?: ReasoningSummary;
   readonly approvals_reviewer?: ApprovalsReviewer;
   readonly model_verbosity?: ModelVerbosity;
@@ -921,6 +931,8 @@ export interface AgenCConfig {
   readonly alwaysThinkingEnabled?: boolean;
   readonly swarmMode?: boolean;
   readonly fastMode?: boolean;
+  /** Defer bypass-session persistence until request send; false keeps synchronous boundaries. */
+  readonly bypassFastMode?: boolean;
   readonly promptSuggestionEnabled?: boolean;
   readonly pluginConfigs?: Readonly<Record<string, PluginPreferenceConfig>>;
   readonly autoUpdatesChannel?: "latest" | "stable";
@@ -974,6 +986,13 @@ export interface AgenCConfig {
   readonly capped_default_max_output_tokens?: boolean;
   readonly max_turns?: number;
   readonly max_budget_usd?: number;
+  /** Per-session task allocation including reasoning. Zero explicitly disables it. */
+  readonly task_token_budget?: number;
+  /** Named allocation; higher config layers replace lower numeric/level choices. */
+  readonly budget_level?: TaskBudgetLevel;
+  readonly task_max_calls?: number;
+  /** Experimental signed host-check registration; never raises task_token_budget. */
+  readonly experimental_task_budget_progress?: string;
   readonly autonomous_mode?: boolean;
   /**
    * Coordinator mode: the main session orchestrates work through
@@ -1025,6 +1044,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "sandbox",
   "shell_environment_policy",
   "reasoning_effort",
+  "reasoning_cap_policy",
   "reasoning_summary",
   "approvals_reviewer",
   "model_verbosity",
@@ -1071,6 +1091,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "alwaysThinkingEnabled",
   "swarmMode",
   "fastMode",
+  "bypassFastMode",
   "promptSuggestionEnabled",
   "pluginConfigs",
   "autoUpdatesChannel",
@@ -1114,6 +1135,10 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "capped_default_max_output_tokens",
   "max_turns",
   "max_budget_usd",
+  "task_token_budget",
+  "budget_level",
+  "task_max_calls",
+  "experimental_task_budget_progress",
   "autonomous_mode",
   "coordinator_mode",
   "transaction_guard",
@@ -1146,9 +1171,11 @@ export function defaultConfig(): AgenCConfig {
     configVersion: 2,
     model: DEFAULT_BUILT_IN_PROVIDER_SELECTION.model,
     model_provider: DEFAULT_BUILT_IN_PROVIDER_SELECTION.provider,
+    ...(DEFAULT_MODEL_VERBOSITY !== undefined ? { model_verbosity: DEFAULT_MODEL_VERBOSITY } : {}),
     approval_policy: "on-request" as ApprovalPolicy,
     sandbox_mode: "workspace-write" as SandboxMode,
     reasoning_effort: "medium" as ReasoningEffort,
+    reasoning_cap_policy: "off" as const,
     approvals_reviewer: "user" as ApprovalsReviewer,
     agent_max_depth: 1,
     auth: Object.freeze({
@@ -1200,6 +1227,7 @@ export function defaultConfig(): AgenCConfig {
     // `0` ends the turn as soon as the ladder is exhausted.
     provider_outage_wait_ms: DEFAULT_PROVIDER_OUTAGE_WAIT_MS,
     provider_outage_retry_ms: DEFAULT_PROVIDER_OUTAGE_RETRY_MS,
+    task_token_budget: DEFAULT_TASK_TOKEN_BUDGET,
     // No default turn cap. Interactive / long-running agents stop on the
     // model’s own stop signal (or explicit cancel / budget). Operators who
     // want a runaway-loop backstop can set `max_turns` (or its documented env
@@ -1315,6 +1343,16 @@ export function mergeConfigs(
     base as Record<string, unknown>,
     override as Record<string, unknown>,
   ) as AgenCConfig;
+  // Treat the level and numeric cap as one selection across config layers.
+  // A numeric value wins when both are supplied in the same layer (including 0).
+  if (override.task_token_budget !== undefined) {
+    const level = override.budget_level;
+    return deepFreeze({ ...merged, budget_level:
+      level !== undefined && TASK_BUDGET_LEVELS[level] === override.task_token_budget ? level : undefined });
+  }
+  if (override.budget_level !== undefined) {
+    return deepFreeze({ ...merged, task_token_budget: TASK_BUDGET_LEVELS[override.budget_level] });
+  }
   return deepFreeze(merged);
 }
 
@@ -3098,6 +3136,7 @@ export function validateSandboxConfig(
   const booleanKeys = [
     "network_access",
     "allow_gpu",
+    "persistent_session",
     "autoAllowBashIfSandboxed",
     "allowUnsandboxedCommands",
     "enableWeakerNestedSandbox",
@@ -3157,6 +3196,7 @@ const OPERATOR_BOOLEAN_FIELDS = Object.freeze([
   "alwaysThinkingEnabled",
   "swarmMode",
   "fastMode",
+  "bypassFastMode",
   "promptSuggestionEnabled",
   "prefersReducedMotion",
   "autoMemoryEnabled",
@@ -3494,6 +3534,7 @@ export const PROFILE_OVERRIDE_KEYS = Object.freeze([
   "approval_policy",
   "sandbox_mode",
   "reasoning_effort",
+  "reasoning_cap_policy",
   "reasoning_summary",
   "approvals_reviewer",
   "model_verbosity",
@@ -3573,6 +3614,12 @@ export function validateProfilesConfig(
       profile.reasoning_effort,
       `${name}.reasoning_effort`,
       ["minimal", "low", "medium", "high", "xhigh", "max", "none"],
+      makeError,
+    );
+    validateEnumValue(
+      profile.reasoning_cap_policy,
+      `${name}.reasoning_cap_policy`,
+      ["off", "streak2"],
       makeError,
     );
     validateEnumValue(

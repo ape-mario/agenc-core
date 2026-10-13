@@ -1,3 +1,6 @@
+import { suggestToolForUnknownName } from "./tools/tool-name-suggestion.js";
+import { unknownToolResult } from "./tools/results.js";
+import { oneShotFastModeActive } from "./one-shot-fast-mode.js";
 /**
  * Tool registry — the lean coding-profile surface.
  *
@@ -104,6 +107,11 @@ import {
 } from "./tools/router.js";
 import { resolvePerToolConfig, toolConfigAllowsTool } from "./tools/config.js";
 import {
+  sessionToolPolicyAllowsTool,
+  toolPolicyRefusalMessage,
+  type SessionToolPolicy,
+} from "./permissions/session-tool-policy.js";
+import {
   attachSandboxExecutionBroker,
   type SandboxExecutionBrokerLike,
 } from "./sandbox/execution-broker.js";
@@ -143,6 +151,9 @@ export interface CodeModeNestedToolDispatch {
 }
 
 export interface ToolRegistryDispatchOptions {
+  /** Trusted runtime projection, applied after parsing and before tool execution. */
+  readonly prepareArguments?: (args: Record<string, unknown>, tool: Tool) => Record<string, unknown>;
+  readonly abortSignal?: AbortSignal;
   /** Request-scoped discovery metadata; does not grant execution permission. */
   readonly advertisedToolNames?: readonly string[];
 }
@@ -162,6 +173,12 @@ export interface ToolRegistry {
   ): Promise<ToolDispatchResult>;
   getDiscoveredToolNames?(): ReadonlySet<string>;
   discoverToolNames?(toolNames: readonly string[]): void;
+  /**
+   * The session's fixed tool allowlist, when it has one. Tools outside it were
+   * never built, so they are in neither `tools` nor dispatch; routers use this
+   * to answer a call to one with an explicit refusal.
+   */
+  readonly toolPolicy?: SessionToolPolicy;
 }
 
 /**
@@ -631,6 +648,14 @@ export interface BuildToolRegistryOptions {
    */
   readonly toolsConfig?: ToolsConfig;
   /**
+   * Session tool policy (`agent.create` `toolPolicy`). Tools outside
+   * `enabledTools` are never built, so they are absent from the model-visible
+   * catalog and from dispatch by name, whatever `toolsConfig` says. It composes
+   * with `toolsConfig` by intersection: a tool must pass both. Its
+   * `deferMcpTools` takes precedence over the option of the same name.
+   */
+  readonly toolPolicy?: SessionToolPolicy;
+  /**
    * `[providers.grok]` capability profile. Passed through to model-facing
    * LIVE tools (XSearch) so Pattern A one-shots can gate on config.
    */
@@ -1019,6 +1044,7 @@ export function buildToolRegistry(
     },
   ]);
   function applyConfiguredTool(tool: Tool): Tool | null {
+    if (!sessionToolPolicyAllowsTool(options.toolPolicy, tool.name)) return null;
     if (!toolConfigAllowsTool(options.toolsConfig, tool.name)) return null;
     const config = resolvePerToolConfig(options.toolsConfig, tool.name);
     if (config.defaultPermissionMode === undefined) return tool;
@@ -1067,21 +1093,25 @@ export function buildToolRegistry(
   );
   const staticTools: Tool[] = [...defaultBuiltinTools, ...extraTools];
 
+  const deferMcpTools = options.toolPolicy?.deferMcpTools ?? options.deferMcpTools ?? true;
+
   // T7: tag each registered tool with its ConcurrencyClass + flags.
   // Tools without explicit metadata get sensible defaults:
   //   - readFile/listDir/stat/glob/grep → SharedRead + isReadOnly
   //   - writeFile/editFile/delete/move    → Exclusive (never parallel)
   //   - web_fetch/WebSearch               → SharedRead (network reads)
   //   - bash                              → BackgroundTerminal (subprocess)
-  function currentMcpTools(): readonly Tool[] {
+  function currentMcpTools(
+    raw: readonly Tool[] = options.mcpToolsProvider?.getTools() ?? [],
+  ): readonly Tool[] {
     return configuredTools(
-      (options.mcpToolsProvider?.getTools() ?? []).map((tool) => {
+      raw.map((tool) => {
         const serverId = inferMcpServerId(tool.name);
         return tagTool(
           withMetadata(tool, {
             source: "mcp",
             family: "mcp",
-            deferred: options.deferMcpTools ?? true,
+            deferred: deferMcpTools,
           }),
           serverId ? { serverId } : {},
         );
@@ -1089,9 +1119,11 @@ export function buildToolRegistry(
     );
   }
 
-  function currentDynamicTools(): readonly Tool[] {
+  function currentDynamicTools(
+    raw: readonly Tool[] = readToolList(options.dynamicTools),
+  ): readonly Tool[] {
     return configuredTools(
-      readToolList(options.dynamicTools).map((tool) =>
+      raw.map((tool) =>
         tagTool(
           withMetadata(tool, { source: tool.metadata?.source ?? "plugin" }),
         ),
@@ -1099,9 +1131,11 @@ export function buildToolRegistry(
     );
   }
 
-  function currentDeferredTools(): readonly Tool[] {
+  function currentDeferredTools(
+    raw: readonly Tool[] = readToolList(options.deferredTools),
+  ): readonly Tool[] {
     return configuredTools(
-      readToolList(options.deferredTools).map((tool) =>
+      raw.map((tool) =>
         tagTool(
           withMetadata(tool, {
             source: tool.metadata?.source ?? "plugin",
@@ -1112,9 +1146,11 @@ export function buildToolRegistry(
     );
   }
 
-  function currentDiscoverableTools(): readonly Tool[] {
+  function currentDiscoverableTools(
+    raw: readonly Tool[] = readToolList(options.discoverableTools),
+  ): readonly Tool[] {
     return configuredTools(
-      readToolList(options.discoverableTools).map((tool) =>
+      raw.map((tool) =>
         tagTool(
           withMetadata(tool, { source: tool.metadata?.source ?? "plugin" }),
         ),
@@ -1122,8 +1158,67 @@ export function buildToolRegistry(
     );
   }
 
+  /**
+   * The router is a pure function of the raw tool lists and option arrays
+   * below: every derived tool and spec is built from them, and neither tools,
+   * specs nor the router are mutated after construction. Providers may return
+   * a fresh array each time; the router is reused while every list holds the
+   * same elements in the same order, and rebuilt on any difference.
+   */
+  let routerMemo:
+    | { readonly inputs: readonly (readonly unknown[])[]; readonly router: ToolRouter }
+    | undefined;
+
+  function routerInputs(): readonly (readonly unknown[])[] {
+    const parallel = options.parallelMcpServerNames;
+    return [
+      options.mcpToolsProvider?.getTools() ?? [],
+      readToolList(options.discoverableTools),
+      readToolList(options.dynamicTools),
+      readToolList(options.deferredTools),
+      options.unavailableCalledTools ?? [],
+      parallel === undefined ? [] : [parallel, ...parallel],
+      // The supplied TOML policy is live, including nested per-tool defaults.
+      // Snapshot its value rather than its object identity or array references.
+      [JSON.stringify(options.toolsConfig)],
+    ];
+  }
+
+  function sameRouterInputs(
+    left: readonly (readonly unknown[])[],
+    right: readonly (readonly unknown[])[],
+  ): boolean {
+    return left.length === right.length && left.every((list, index) => {
+      const other = right[index]!;
+      return list.length === other.length &&
+        list.every((value, item) => Object.is(value, other[item]));
+    });
+  }
+
   function buildRouter(): ToolRouter {
-    const mcpTools = preserveTrustedRuntimeOwnedTools(currentMcpTools());
+    const inputs = routerInputs();
+    if (routerMemo !== undefined && sameRouterInputs(routerMemo.inputs, inputs)) {
+      return routerMemo.router;
+    }
+    // Snapshot the lists: a caller may mutate an array it handed in.
+    const snapshot = inputs.map((list) => [...list]);
+    const router = buildRouterFrom(
+      snapshot[0] as readonly Tool[],
+      snapshot[1] as readonly Tool[],
+      snapshot[2] as readonly Tool[],
+      snapshot[3] as readonly Tool[],
+    );
+    routerMemo = { inputs: snapshot, router };
+    return router;
+  }
+
+  function buildRouterFrom(
+    mcpRaw: readonly Tool[],
+    discoverableRaw: readonly Tool[],
+    dynamicRaw: readonly Tool[],
+    deferredRaw: readonly Tool[],
+  ): ToolRouter {
+    const mcpTools = preserveTrustedRuntimeOwnedTools(currentMcpTools(mcpRaw));
     // A live manager owns its qualified MCP names. ToolRouter intentionally
     // allows later dynamic/discoverable entries to override ordinary names,
     // but allowing that for MCP would let a plugin borrow a real server's
@@ -1146,16 +1241,17 @@ export function buildToolRegistry(
       mcpTools: toolMap(directMcpTools),
       deferredMcpTools: toolMap(deferredMcpTools),
       discoverableTools: withoutManagedMcpCollisions(
-        currentDiscoverableTools(),
+        currentDiscoverableTools(discoverableRaw),
       ),
       dynamicTools: withoutManagedMcpCollisions([
-        ...currentDynamicTools(),
-        ...currentDeferredTools(),
+        ...currentDynamicTools(dynamicRaw),
+        ...currentDeferredTools(deferredRaw),
       ]),
       unavailableCalledTools: options.unavailableCalledTools ?? [],
       ...(options.parallelMcpServerNames !== undefined
         ? { parallelMcpServerNames: options.parallelMcpServerNames }
         : {}),
+      ...(options.toolPolicy !== undefined ? { toolPolicy: options.toolPolicy } : {}),
     });
   }
 
@@ -1169,8 +1265,8 @@ export function buildToolRegistry(
       (deferRareTools && isRareDeferredTool(spec.tool.name));
   }
 
-  function visibleSpecs(): readonly ConfiguredToolSpec[] {
-    const specs = allSpecs().filter((spec) => spec.unavailable !== true);
+  function visibleSpecs(router?: ToolRouter): readonly ConfiguredToolSpec[] {
+    const specs = (router?.getSpecs() ?? allSpecs()).filter((spec) => spec.unavailable !== true);
     // A restrictive policy may remove discovery itself. Keep its remaining
     // capabilities callable instead of stranding them behind an absent tool.
     if (options.lightMode === true && !specs.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME)) {
@@ -1181,7 +1277,11 @@ export function buildToolRegistry(
         (options.lightMode === true
           ? (lightEditsWithApplyPatch(options.getSession?.()?.services?.provider?.name)
             ? LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES : LIGHT_INITIAL_TOOL_NAMES).has(spec.tool.name) ||
-            (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined)
+            (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined) ||
+            // A policy that opts out of MCP deferral wants its allowlisted MCP
+            // tools in front of the model with no search step; Light mode is
+            // the small-model profile that most needs that.
+            (deferMcpTools === false && spec.tool.metadata?.source === "mcp" && !isDeferredSpec(spec))
           : !isDeferredSpec(spec)) || discoveredToolNames.has(spec.tool.name),
     );
   }
@@ -1262,15 +1362,10 @@ export function buildToolRegistry(
     });
   }
 
-  return {
-    get tools(): readonly Tool[] {
-      return allSpecs().map((spec) => spec.tool);
-    },
-    toLLMTools(): LLMTool[] {
-      const visible = visibleSpecs();
-      // The lean exec_command points at system.searchTools for its advanced fields, so it is lean
-      // only while that discovery tool is presented; otherwise the full schema is shown, as other
-      // capabilities fall back when discovery is unavailable.
+  let presentationMemo: { router: ToolRouter; discovered: readonly string[];
+    provider: string | undefined; tools: LLMTool[] } | undefined;
+  function buildPresentedTools(router: ToolRouter): LLMTool[] {
+      const visible = visibleSpecs(router);
       const leanExec = visible.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME) &&
         !discoveredToolNames.has("exec_command");
       const tools = visible.map((spec) => {
@@ -1279,15 +1374,31 @@ export function buildToolRegistry(
           ? lightPresentation(tool, { leanExec }) : tool;
       });
       if (!deferRareTools) return tools;
-      const pointer = rareToolPointer(new Set(
-        allSpecs()
-          .filter((spec) => spec.unavailable !== true && isRareDeferredTool(spec.tool.name))
-          .map((spec) => spec.tool.name),
-      ));
-      if (pointer === undefined) return tools;
-      return tools.map((tool) => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME
+      const pointer = rareToolPointer(new Set(router.getSpecs()
+        .filter(spec => spec.unavailable !== true && isRareDeferredTool(spec.tool.name))
+        .map(spec => spec.tool.name)));
+      return pointer === undefined ? tools : tools.map(tool => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME
         ? { ...tool, function: { ...tool.function, description: `${tool.function.description ?? ""}\n\n${pointer}`.trim() } }
         : tool);
+  }
+
+  return {
+    ...(options.toolPolicy !== undefined ? { toolPolicy: options.toolPolicy } : {}),
+    get tools(): readonly Tool[] {
+      return allSpecs().map((spec) => spec.tool);
+    },
+    toLLMTools(): LLMTool[] {
+      const router = buildRouter();
+      if (!oneShotFastModeActive()) return buildPresentedTools(router);
+      const provider = options.getSession?.()?.services?.provider?.name;
+      const discovered = [...discoveredToolNames];
+      const memo = presentationMemo;
+      if (memo?.router === router && memo.provider === provider &&
+          memo.discovered.length === discovered.length &&
+          memo.discovered.every((name, i) => name === discovered[i])) return memo.tools;
+      const tools = buildPresentedTools(router);
+      presentationMemo = { router, provider, discovered, tools };
+      return tools;
     },
     getDiscoveredToolNames(): ReadonlySet<string> {
       return discoveredToolNames;
@@ -1306,12 +1417,18 @@ export function buildToolRegistry(
       const router = buildRouter();
       const spec = router.findSpec(toolCall.name);
       if (!spec) {
-        return {
-          content: safeStringify({
-            error: `unknown tool: ${toolCall.name}`,
-          }),
-          isError: true,
-        };
+        if (!sessionToolPolicyAllowsTool(options.toolPolicy, toolCall.name)) {
+          return { content: safeStringify({ error: toolPolicyRefusalMessage(toolCall.name) }), isError: true };
+        }
+        if (dispatchOptions?.advertisedToolNames === undefined) {
+          return { content: safeStringify({ error: `unknown tool: ${toolCall.name}` }), isError: true };
+        }
+        const offered = new Set(dispatchOptions.advertisedToolNames);
+        const suggestion = suggestToolForUnknownName(toolCall.name, router.getSpecs().map(spec => ({
+          name: spec.tool.name, offered: offered.has(spec.tool.name), deferred: isDeferredSpec(spec),
+          hidden: spec.tool.metadata?.hiddenByDefault === true, unavailable: spec.unavailable === true,
+        })), SYSTEM_SEARCH_TOOLS_NAME);
+        return unknownToolResult(toolCall.name, toolCall.id, suggestion);
       }
       if (spec.unavailable === true) return unavailableToolResult(spec.tool.name);
       try {
@@ -1333,7 +1450,7 @@ export function buildToolRegistry(
             isError: true,
           };
         }
-        return await executeConfiguredTool(spec, toolCall.id, parseResult.args, dispatchOptions);
+        return await executeConfiguredTool(spec, toolCall.id, dispatchOptions?.prepareArguments?.(parseResult.args, spec.tool) ?? parseResult.args, dispatchOptions);
       } catch (error) {
         return {
           content: safeStringify({
@@ -1359,7 +1476,9 @@ export function buildToolRegistry(
       if (!spec) {
         return {
           content: safeStringify({
-            error: `unknown tool: ${toolCall.name}`,
+            error: sessionToolPolicyAllowsTool(options.toolPolicy, toolCall.name)
+              ? `unknown tool: ${toolCall.name}`
+              : toolPolicyRefusalMessage(toolCall.name),
           }),
           isError: true,
         };

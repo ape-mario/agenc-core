@@ -70,6 +70,34 @@ describe("ResilientMCPBridge", () => {
     },
   );
 
+  it("grants a session-attached server only the tools its session toolPolicy names", () => {
+    expect(toToolCatalogPolicyConfig({
+      name: "task",
+      command: "node",
+      origin: { scope: "session" },
+      toolPolicyNoFsWriteTools: ["view_task"],
+    })).toMatchObject({ virtualNoFsWriteTools: ["view_task"] });
+    // The server's own config never grants it, for a session server either.
+    expect(toToolCatalogPolicyConfig({
+      name: "task",
+      command: "node",
+      origin: { scope: "session" },
+      virtual_no_fs_write_tools: ["view_task"],
+    })?.virtualNoFsWriteTools).toBeUndefined();
+  });
+
+  it.each(["project", "local", "plugin", "environment"] as const)(
+    "ignores the toolPolicy grant on a %s server",
+    (scope) => {
+      expect(toToolCatalogPolicyConfig({
+        name: "task",
+        command: "node",
+        origin: { scope },
+        toolPolicyNoFsWriteTools: ["view_task"],
+      })?.virtualNoFsWriteTools).toBeUndefined();
+    },
+  );
+
   it.each([
     "project",
     "local",

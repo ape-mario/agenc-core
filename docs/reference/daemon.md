@@ -1,6 +1,6 @@
 # Daemon reference
 
-The local **app-server** control plane for AgenC **0.18.0**. One daemon per
+The local **app-server** control plane for AgenC **0.19.0**. One daemon per
 `AGENC_HOME`. Clients (TUI, print CLI, gateway, remote, SDK, background
 agents) attach over a local socket and speak JSON-RPC.
 
@@ -446,6 +446,102 @@ verification, independent review or finalization runs after that checkpoint.
 Required checks are unchanged and a verifier's PASS label cannot override a
 failing required command. Correcting the requirements requires an explicit
 new Goal; the frozen specification is not modified.
+
+#### Session tool policy (protocol 1.32)
+
+`agent.create` accepts an optional `toolPolicy` that fixes the tools a session
+may use. A client that opens a restricted session, for example a marketplace
+task that may only call a few tools from one MCP server, sends:
+
+```json
+{
+  "toolPolicy": {
+    "enabledTools": ["FileRead", "mcp.desktop.read_file", "mcp.desktop.submit_work"],
+    "frozenPermissionMode": true,
+    "deferMcpTools": false
+  }
+}
+```
+
+- `enabledTools` is required: non-empty, at most 256 exact dispatch names,
+  each matching `[A-Za-z0-9][A-Za-z0-9._:-]*` (at most 128 characters), no
+  duplicates. Built-ins use their dispatch name (`FileRead`); MCP tools use
+  `mcp.<server>.<tool>`. Anything else is a `-32602` invalid-params error. An older daemon
+  rejects the unknown `toolPolicy` param, so a client that needs the
+  restriction fails closed instead of running unrestricted.
+- A tool outside `enabledTools` is never built. It is absent from the
+  model-visible catalog and from `system.searchTools`, and a call to it by name
+  is refused with `tool "<name>" is not enabled for this session`. Role
+  allowlists and `spawn_agent` children start from this filtered set, so they
+  cannot reach a removed tool. MCP servers that connect later are filtered the
+  same way. The permission evaluator also denies every tool outside the list in
+  all modes, including `bypassPermissions`. `toolPolicy` composes with
+  `tools_config` by intersection.
+- Removing `system.searchTools` removes discovery, and with the default
+  deferred MCP catalog the allowlisted MCP tools would then be unreachable. So
+  a policy that defers MCP tools must list `system.searchTools`: `agent.create`
+  answers `-32602` when `deferMcpTools` is `true`, or omitted while `enabledTools`
+  names an `mcp.` tool, and `system.searchTools` is missing. Set
+  `deferMcpTools: false` to advertise the allowlisted MCP tools directly with no
+  search step, which also suits small models and Light mode. A policy that names
+  no MCP tool and leaves `deferMcpTools` omitted needs no search tool.
+- `noFsWriteTools` is optional: MCP tools from `enabledTools`, written
+  `mcp.<server>.<tool>`, that the client vouches write nothing through Core.
+  The sandbox then does not try to infer their filesystem targets, which it
+  otherwise must for an MCP tool before it runs. It applies only to servers
+  attached to this session with `session.mcp.addServer`, never to configured,
+  project or plugin servers, and a server's own config cannot claim it. A name
+  that is not an enabled `mcp.` tool is a `-32602` error. The list is part of
+  the persisted policy, so a restored session keeps exactly the same grant.
+- Bundled skills are skills that ship inside the daemon, such as
+  `browser-automation`. A session with a `toolPolicy` is offered none of them
+  unless `enabledTools` lists the `Skill` tool and names each skill as
+  `Skill:<name>`:
+
+  ```json
+  { "enabledTools": ["FileRead", "Skill", "Skill:browser-automation"] }
+  ```
+
+  A `Skill:<name>` entry without `Skill` is refused at `agent.create`. A skill
+  that is not named is absent from the per-session skill listing and from
+  `/skills`, and `Skill(<name>)` answers `skill "<name>" is not enabled for this
+  session`; the permission check denies it as well. `agenc-marketplace-kit-installer`
+  can never be enabled: it tells the model to download and run an installer, so
+  `Skill:agenc-marketplace-kit-installer` is refused at `agent.create` and the
+  skill is withheld even from a hand-built policy. A policy without the `Skill`
+  tool gets no skill listing at all. Skills that live in the workspace, the
+  user's home or a plugin are not bundled and follow the `Skill` tool as before.
+- The protocol slash commands `/claim`, `/delegate`, `/proof`, `/settle` and
+  `/stake` are unavailable in a session with a `toolPolicy`. They answer
+  `AgenC protocol · <verb>: AgenC protocol commands are not available in a
+  session with a toolPolicy. No command was executed.` before reading config or
+  starting any process, whatever the operator's `[protocol]` block says, so the
+  marketplace CLI adapter behind them never runs in such a session.
+- `frozenPermissionMode: true` pins the session's permission mode at its mode
+  when created: it can narrow (for example to `plan`) and return, never widen.
+  `tool.approve` with `allowAllToolsForSession`, a wider `session.setPermissionMode`
+  (including `bypassPermissions`), and `session.permissions.mutateRule` calls
+  that could widen access (adding `allow`, removing `deny` or `ask`) answer
+  `INVALID_ARGUMENT`. The permission registry also refuses every other path to
+  a wider mode (ExitPlanMode, a restore override), so none can bypass those
+  checks.
+- The policy is stored in the agent's metadata, survives a daemon restart and a
+  resume, and cannot be changed afterwards. A resume that names a different
+  policy is refused; naming one for a session that had none restricts it from
+  then on. Stored policy that cannot be read fails the restore instead of
+  bringing the session back unrestricted.
+- For a session with a `toolPolicy`, `tool.approve` and `elicitation.respond`
+  must arrive on a connection that holds a client attached to that session,
+  the same rule `session.resolveToolCall` has. Another connection gets
+  `SESSION_NOT_ATTACHED`. `agent.create` does not attach: attach with
+  `agent.attach` or `session.attach` on the connection that will answer
+  prompts. Sessions without a policy, and remote connections (which carry their
+  own grant), are unchanged.
+- `session.shell.execute` runs the session's shell tool, so it answers
+  "not available" unless the policy lists it (`system.bash`, or `PowerShell` on
+  Windows).
+- `metadata.toolPolicy` and `metadata.toolPolicyModeCeiling` are reserved and
+  rejected in `agent.create`.
 
 #### Remote and Telegram methods
 

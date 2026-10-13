@@ -44,7 +44,7 @@ const PROFILES: Readonly<Record<string, Readonly<Record<string, ChildModelProfil
     "gpt-5.3-codex": STRONG,
   }),
   anthropic: Object.freeze({
-    "claude-haiku-4-5": COMPACT, "claude-sonnet-4-6": BALANCED,
+    "claude-haiku-5-5": COMPACT, "claude-haiku-4-5": COMPACT, "claude-sonnet-4-6": BALANCED,
     "claude-opus-4-6": STRONG, "claude-opus-4-7": STRONG,
     "claude-opus-4-8": STRONG,
     "claude-sonnet-5": BALANCED, "claude-opus-5": STRONG, "claude-opus-5-5": STRONG,
@@ -66,7 +66,8 @@ const PROFILES: Readonly<Record<string, Readonly<Record<string, ChildModelProfil
   mistral: Object.freeze({ "mistral-medium-latest": BALANCED }),
   groq: Object.freeze({ "llama-3.3-70b-versatile": BALANCED, "llama-3.1-8b-instant": COMPACT }),
   cerebras: Object.freeze({ "gpt-oss-120b": BALANCED, "qwen-3.8-27b": BALANCED, "gemma-4-31b": BALANCED }),
-  meta: Object.freeze({ "muse-spark-1.3": STRONG, "muse-spark-1.3-contributor": BALANCED,
+  meta: Object.freeze({ "muse-wonder-1.0": STRONG,
+    "muse-spark-1.3": STRONG, "muse-spark-1.3-contributor": BALANCED,
     "muse-spark-1.2": BALANCED, "muse-spark-1.2-contributor": BALANCED }),
 });
 
