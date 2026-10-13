@@ -75,6 +75,7 @@ async function createDeferredInputSession(
     readonly baseSession?: unknown;
     readonly configStore?: ConfigStore;
     readonly deps?: unknown;
+    readonly permissionMode?: "default" | "bypassPermissions";
     readonly preparePrompt?: (
       params: Readonly<{ message: string }>,
     ) => Promise<string | null>;
@@ -87,6 +88,9 @@ async function createDeferredInputSession(
     env: {},
     cwd: process.cwd(),
     clientId: "deferred-input-test",
+    ...(options.permissionMode !== undefined
+      ? { permissionMode: options.permissionMode }
+      : {}),
     ...(options.preparePrompt !== undefined
       ? { preparePrompt: options.preparePrompt }
       : {}),
@@ -355,6 +359,66 @@ function daemonHarness(
 }
 
 describe("deferred daemon input ownership", () => {
+  it.each(["default", "plan", "acceptEdits"])(
+    "uses a pre-first-task %s choice instead of startup bypass",
+    async (mode) => {
+      const harness = daemonHarness();
+      const session = await createDeferredInputSession({
+        baseSession: harness.baseSession,
+        deps: harness.deps,
+        permissionMode: "bypassPermissions",
+        preparePrompt: async ({ message }) => message,
+      });
+      const controls = session as typeof session & Pick<
+        import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession,
+        "setDaemonPermissionMode"
+      >;
+      await controls.setDaemonPermissionMode!(mode);
+      expect(harness.startPromptAgent).not.toHaveBeenCalled();
+      await session.submit("first task after choosing a mode");
+      expect(harness.startPromptAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ permissionMode: mode }),
+      );
+    },
+  );
+
+  it("keeps startup bypass when the user has not changed the mode", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({
+      baseSession: harness.baseSession,
+      deps: harness.deps,
+      permissionMode: "bypassPermissions",
+      preparePrompt: async ({ message }) => message,
+    });
+    await session.submit("first task with the startup mode");
+    expect(harness.startPromptAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ permissionMode: "bypassPermissions" }),
+    );
+  });
+
+  it("does not stage a cold mode whose registry publication was rejected", async () => {
+    const harness = daemonHarness();
+    const registry = new PermissionModeRegistry(createEmptyToolPermissionContext());
+    const session = await createDeferredInputSession({
+      baseSession: { ...harness.baseSession, services: { permissionModeRegistry: registry } },
+      deps: harness.deps,
+      permissionMode: "default",
+      preparePrompt: async ({ message }) => message,
+    });
+    vi.spyOn(registry, "update").mockRejectedValueOnce(new Error("mode publication rejected"));
+    const controls = session as typeof session & Pick<
+      import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession,
+      "setDaemonPermissionMode"
+    >;
+    await expect(controls.setDaemonPermissionMode!("acceptEdits"))
+      .rejects.toThrow("mode publication rejected");
+    expect(registry.current().mode).toBe("default");
+    await session.submit("first task after a rejected mode change");
+    expect(harness.startPromptAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ permissionMode: "default" }),
+    );
+  });
+
   it("commits cold and live rule edits through daemon authority before submitting", async () => {
     const harness = daemonHarness();
     const session = await createDeferredInputSession({
