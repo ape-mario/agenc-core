@@ -296,7 +296,7 @@ export interface TurnCheckpointV3Event extends TurnCheckpointBase<TurnCheckpoint
 export interface TurnCheckpointV4Event extends TurnCheckpointBase<TurnCheckpointSliceLine> {
   readonly checkpointVersion: 4;
   readonly toolResultIntegrityVersion: 1;
-  readonly prefixHashVersion: 3;
+  readonly prefixHashVersion: 3 | 4;
 }
 
 export type TurnCheckpointEvent =

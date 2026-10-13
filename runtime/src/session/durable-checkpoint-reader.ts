@@ -52,6 +52,7 @@ export const MAX_CHECKPOINT_PREFIX_MESSAGES = 2_000_000;
 
 const CHECKPOINT_PREFIX_V2_DIGEST_DOMAIN = "agenc.checkpoint-prefix.v2";
 const CHECKPOINT_PREFIX_V3_DIGEST_DOMAIN = "agenc.checkpoint-prefix.v3";
+const CHECKPOINT_PREFIX_V4_DIGEST_DOMAIN = "agenc.checkpoint-prefix.v4";
 const MAX_CHECKPOINT_TURN_ID_BYTES = 4_096;
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
 const CHECKPOINT_BASE_KEYS = Object.freeze([
@@ -76,6 +77,7 @@ const RESPONSE_ITEM_KEYS = Object.freeze([
   "toolCalls",
   "toolName",
   "toolResultIntegrity",
+  "toolResultIsError",
 ]);
 const TOOL_CALL_KEYS = Object.freeze(["arguments", "id", "name"]);
 const PROVIDER_REASONING_V1_KEYS = Object.freeze(["content", "version"]);
@@ -267,9 +269,9 @@ function readIntegrityTurnCheckpoint(
     );
   }
   if (version === DURABLE_CHECKPOINT_READ_VERSION) {
-    if (payload.prefixHashVersion !== 3) {
+    if (payload.prefixHashVersion !== 3 && payload.prefixHashVersion !== 4) {
       throw malformed(
-        `checkpoint v${version} requires prefixHashVersion 3`,
+        `checkpoint v${version} requires prefixHashVersion 3 or 4`,
       );
     }
     return {
@@ -279,7 +281,7 @@ function readIntegrityTurnCheckpoint(
         ...parseCheckpointBase(payload, "current"),
         checkpointVersion: version,
         toolResultIntegrityVersion: 1,
-        prefixHashVersion: 3,
+        prefixHashVersion: payload.prefixHashVersion,
       },
     };
   }
@@ -338,11 +340,20 @@ export function computeCheckpointPrefixHashV3(
   );
 }
 
+/** Current writer: authenticate failure metadata in its own digest version. */
+export function computeCheckpointPrefixHashV4(
+  messages: ReadonlyArray<ToolResultIntegrityResponseItem>,
+  count: number,
+): string {
+  return computeCheckpointPrefixHash(messages, count, CHECKPOINT_PREFIX_V4_DIGEST_DOMAIN, true, true);
+}
+
 function computeCheckpointPrefixHash(
   messages: ReadonlyArray<ToolResultIntegrityResponseItem>,
   count: number,
   digestDomain: string,
   authenticateCompactionHistory: boolean,
+  authenticateToolResultStatus = false,
 ): string {
   if (!Number.isSafeInteger(count) || count < 0 || count > messages.length) {
     throw new Error("checkpoint prefix count is outside the available history");
@@ -379,6 +390,11 @@ function computeCheckpointPrefixHash(
     writeOptionalString(writer, "tool-result-call-id", message.toolCallId);
     writeOptionalString(writer, "tool-result-name", message.toolName);
     writeOptionalString(writer, "response-id", message.id);
+    // Failure status was absent from historical digest versions. Only the
+    // explicit new algorithm authenticates it; there is no fallback.
+    if (authenticateToolResultStatus && message.toolResultIsError === true) {
+      writer.writeString("tool-result-is-error", "true");
+    }
     writeOptionalString(writer, "phase", message.phase);
     writer.writeString(
       "end-turn-present",
@@ -539,6 +555,9 @@ export function validateCheckpointPrefixV2(
 export function validateCheckpointPrefixV3(
   params: CheckpointPrefixValidationParams<TurnCheckpointV4Event>,
 ): DurableCheckpointPrefixValidation {
+  if (params.checkpoint.prefixHashVersion !== 3) {
+    return invalidPrefixHashVersion();
+  }
   return validateCheckpointPrefixWithHasher(
     params,
     computeCheckpointPrefixHashV3,
@@ -546,11 +565,25 @@ export function validateCheckpointPrefixV3(
   );
 }
 
+export function validateCheckpointPrefixV4(
+  params: CheckpointPrefixValidationParams<TurnCheckpointV4Event>,
+): DurableCheckpointPrefixValidation {
+  if (params.checkpoint.prefixHashVersion !== 4) return invalidPrefixHashVersion();
+  return validateCheckpointPrefixWithHasher(params, computeCheckpointPrefixHashV4, true);
+}
+
+function invalidPrefixHashVersion(): DurableCheckpointPrefixValidation {
+  return { status: "invalid", failure: { kind: "integrity_failure", code: "checkpoint_response_shape_invalid", index: null, reason: "checkpoint prefix hash version does not match its selected algorithm" } };
+}
+
 /** Strictly bind each checkpoint version to its one prefix-hash algorithm. */
 export function validateCheckpointPrefix(
   params: CheckpointPrefixValidationParams<IntegrityTurnCheckpoint>,
 ): DurableCheckpointPrefixValidation {
   if (params.checkpoint.checkpointVersion === DURABLE_CHECKPOINT_READ_VERSION) {
+    if (params.checkpoint.prefixHashVersion === 4) {
+      return validateCheckpointPrefixV4({ ...params, checkpoint: params.checkpoint });
+    }
     return validateCheckpointPrefixV3({
       ...params,
       checkpoint: params.checkpoint,
@@ -831,6 +864,13 @@ function assertResponseItemShape(
         );
       }
     }
+  }
+  if (item.toolResultIsError !== undefined &&
+      (!authenticateCompactionHistory || item.role !== "tool" ||
+       item.toolResultIsError !== true)) {
+    throw malformed(
+      `checkpoint response item ${index} has invalid toolResultIsError (requires checkpoint v4 and a failed tool result)`,
+    );
   }
   if (item.toolCalls !== undefined) {
     if (!Array.isArray(item.toolCalls) || item.role !== "assistant") {
