@@ -58,6 +58,7 @@ export { getConfigFilePath } from "./config-context.js";
  */
 interface DaemonApplyConfigResult {
   readonly sessionId?: string;
+  readonly model?: string;
   readonly applied: boolean;
   readonly summary: string;
 }
@@ -344,6 +345,7 @@ export function createConfigCommand(deps: ConfigCommandDeps = {}): SlashCommand 
                 const result = await applyDaemonConfig({ reload: true });
                 daemonSuffix = `\nDaemon: ${result.summary}`;
                 mcpRefreshDeferred = result.sessionId === "pending";
+                if (result.model !== undefined) ctx.appState?.setModel?.(result.model);
               } catch (error) {
                 return {
                   kind: "error",
