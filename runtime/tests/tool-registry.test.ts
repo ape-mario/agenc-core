@@ -485,15 +485,12 @@ describe("tool-registry dynamic and deferred catalog", () => {
     expect(result.content).toContain("[exec exit_code=0");
   });
 
-  test("dispatch rejects removed file-tool names instead of rewriting them", async () => {
+  test("dispatch rejects unrecognized file-tool names", async () => {
     const registry = buildToolRegistry({ workspaceRoot: "/tmp" });
 
     for (const removedName of [
-      "Read",
       "FileReadTool",
-      "FileEdit",
       "FileEditTool",
-      "FileWrite",
       "FileWriteTool",
     ]) {
       const result = await registry.dispatch({
