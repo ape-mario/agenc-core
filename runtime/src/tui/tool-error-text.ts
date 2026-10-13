@@ -87,5 +87,5 @@ export function unwrapToolError(raw: string): string {
 
 /** Whether text still carries raw tool-error wrappers. */
 export function looksLikeRawToolError(text: string): boolean {
-  return text.includes("<tool_use_error>") || /\[exec exit_code=-?\d+/.test(text);
+  return text.includes("<tool_use_error>") || /\[exec exit_code=-?\d+/.test(text) || unwrapToolError(text) !== text;
 }
