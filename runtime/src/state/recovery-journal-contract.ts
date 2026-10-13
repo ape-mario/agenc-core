@@ -693,6 +693,10 @@ export class StrictCanonicalJournalValidator {
         );
       }
       if (item.type === "compaction_committed") {
+        const accounting = payload.accounting as Readonly<Record<string, unknown>>;
+        if (accounting.savings_policy === "manual_proportional" && current.intent.automatic !== false) {
+          this.#fail("identity_conflict", "manual proportional savings conflict with the compaction intent", facts);
+        }
         if (
           [...(current.payloadChunks?.values() ?? [])].some(
             (chunkState) => !chunkState.complete,

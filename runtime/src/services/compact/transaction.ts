@@ -73,6 +73,7 @@ import {
   MAX_COMPACTION_WALL_MS,
   MIN_COMPACTION_ABSOLUTE_TOKEN_SAVINGS,
   MIN_COMPACTION_RELATIVE_TOKEN_SAVINGS,
+  minimumCompactionTokenSavings,
   type CompactionAccountingObservationV1,
   type CompactionFailureReason,
   type CompactionIntentV1,
@@ -520,6 +521,7 @@ async function compactConversationTransactionBody(
       providerName,
       model,
       accountingRef,
+      automatic: options.automatic,
       imageBudgetBytes: shrinkAccountingImageBudgetBytes(session),
     }));
     deadline.assertActive();
@@ -1491,6 +1493,7 @@ async function validateShrink(params: {
   readonly providerName: string;
   readonly model: string;
   readonly accountingRef: string;
+  readonly automatic: boolean;
   /** See {@link shrinkAccountingImageBudgetBytes}. */
   readonly imageBudgetBytes: number;
 }): Promise<{
@@ -1546,19 +1549,25 @@ async function validateShrink(params: {
   assertTokenAccountingWithinContext(candidate, contextWindow);
   const savings = source.inputTokens - candidate.inputTokens;
   const relativeSavings = source.inputTokens === 0 ? 0 : savings / source.inputTokens;
+  // An explicit manual request can use a substantial proportional saving
+  // even when its entire short history cannot spare 1,024 tokens. Automatic
+  // compaction keeps the original absolute floor to amortize its own cost.
+  const minimumAbsoluteSavings = minimumCompactionTokenSavings(source.inputTokens, params.automatic);
   if (
-    savings < MIN_COMPACTION_ABSOLUTE_TOKEN_SAVINGS ||
+    savings < minimumAbsoluteSavings ||
     relativeSavings < MIN_COMPACTION_RELATIVE_TOKEN_SAVINGS
   ) {
     throw new CompactionCannotReduceError(
       "no_shrink",
-      `compaction candidate saves ${savings} tokens (${relativeSavings.toFixed(3)}); required ${MIN_COMPACTION_ABSOLUTE_TOKEN_SAVINGS} and ${MIN_COMPACTION_RELATIVE_TOKEN_SAVINGS}`,
+      `compaction candidate saves ${savings} tokens (${relativeSavings.toFixed(3)}); required ${minimumAbsoluteSavings} and ${MIN_COMPACTION_RELATIVE_TOKEN_SAVINGS}`,
     );
   }
   return {
     source,
     candidate,
     observation: {
+      ...(!params.automatic && savings < MIN_COMPACTION_ABSOLUTE_TOKEN_SAVINGS
+        ? { savings_policy: "manual_proportional" as const } : {}),
       accounting_ref: params.accountingRef,
       source_tokens: source.inputTokens,
       candidate_tokens: candidate.inputTokens,

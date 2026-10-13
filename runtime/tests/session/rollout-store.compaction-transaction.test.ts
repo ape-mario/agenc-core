@@ -1604,7 +1604,7 @@ describe("RolloutStore transactional compaction", () => {
       expect(() =>
         readCompactionRolloutPayload("compaction_intent", {
           ...transaction.intent,
-          minimum_reader_runtime: "0.15.0",
+          minimum_reader_runtime: "0.19.1",
         }),
       ).toThrow(/reader floor/i);
       expect(() =>
