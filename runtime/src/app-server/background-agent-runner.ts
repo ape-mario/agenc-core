@@ -4316,14 +4316,14 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       throw new Error(`AgenC daemon agent not running: ${agentId}`);
     }
     const session = active.bootstrap.session;
-    if (params.taskBudgetLevel !== undefined) {
-      if (!isTaskBudgetLevel(params.taskBudgetLevel) || params.reasoningEffort !== undefined || params.modelVerbosity !== undefined || params.profile !== undefined) throw new Error("A task budget update cannot change other session settings");
+    if (params.taskBudgetLevel !== undefined || params.taskTokenBudget !== undefined) {
+      if ((params.taskBudgetLevel !== undefined && (!isTaskBudgetLevel(params.taskBudgetLevel) || params.taskTokenBudget !== undefined)) || (params.taskTokenBudget !== undefined && (!Number.isSafeInteger(params.taskTokenBudget) || params.taskTokenBudget < 0)) || params.reasoningEffort !== undefined || params.modelVerbosity !== undefined || params.profile !== undefined) throw new Error("A task budget update cannot change other session settings");
       const store = session.services.configStore;
       if (store === undefined) throw new Error("No live config authority is available");
       return withRuntimeSettingsMutation(active, async () => {
         const staged = await store.prepareReload();
         try {
-          const requested = TASK_BUDGET_LEVELS[params.taskBudgetLevel!];
+          const requested = params.taskTokenBudget ?? TASK_BUDGET_LEVELS[params.taskBudgetLevel!];
           const configured = staged.config.task_token_budget ?? requested;
           const effective = setSessionTaskTokenBudget(session, configured);
           return { applied: true, taskTokenBudget: effective,

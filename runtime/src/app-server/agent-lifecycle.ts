@@ -4287,6 +4287,7 @@ export class AgenCDaemonAgentManager {
     const result = await this.#runner.applyAgentConfig(agentId, {
       sessionId: params.sessionId,
       ...(params.taskBudgetLevel !== undefined ? { taskBudgetLevel: params.taskBudgetLevel } : {}),
+      ...(params.taskTokenBudget !== undefined ? { taskTokenBudget: params.taskTokenBudget } : {}),
       ...(params.reasoningEffort !== undefined ? { reasoningEffort: params.reasoningEffort } : {}),
       ...(params.modelVerbosity !== undefined ? { modelVerbosity: params.modelVerbosity } : {}),
       ...(params.profile !== undefined ? { profile: params.profile } : {}),

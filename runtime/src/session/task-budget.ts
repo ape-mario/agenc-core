@@ -132,6 +132,12 @@ export function taskBudgetOf(session: Session): TaskBudget | undefined {
   return budget;
 }
 
+/** Replace the root snapshot. Per-turn and config-store snapshots remain immutable. */
+export function replaceSessionTaskTokenBudgetSnapshot(session: Pick<Session, "config">, tokens: number): void {
+  if (!Number.isSafeInteger(tokens) || tokens < 0) throw new TypeError("Invalid task token allowance");
+  (session as { config: Session["config"] }).config = Object.freeze({ ...session.config, taskTokenBudget: tokens });
+}
+
 /** Host/operator-only update; never resets usage or independent call/cost limits. */
 export function setSessionTaskTokenBudget(session: Session, tokens: number, checkpoint = false): number {
   if (!Number.isSafeInteger(tokens) || tokens < 0) throw new TypeError("Invalid task token allowance");
@@ -140,7 +146,7 @@ export function setSessionTaskTokenBudget(session: Session, tokens: number, chec
     throw new Error("This admission authority cannot update a task allowance");
   }
   const effective = admission?.setTaskTokenBudget?.(tokens) ?? tokens;
-  (session.config as { taskTokenBudget?: number }).taskTokenBudget = effective;
+  replaceSessionTaskTokenBudgetSnapshot(session, effective);
   budgets.get(session)?.setTokenLimit(effective, checkpoint);
   return effective;
 }

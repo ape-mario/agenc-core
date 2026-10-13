@@ -2891,24 +2891,27 @@ describe("AgenC TUI daemon session adapter", () => {
     expect(client.requests.at(-1)?.method).toBe("message.stream");
   });
 
-  it("reloads the running daemon and applies a task budget without changing model settings", async () => {
+  it.each([{ taskBudgetLevel: "eco", tokens: 1_000_000 }, { taskBudgetLevel: "balanced", tokens: 2_400_000 }, { taskBudgetLevel: "max", tokens: 0 }, { taskTokenBudget: 3_000_000, tokens: 3_000_000 }])("applies $tokens tokens without mutating the frozen daemon TUI config", async ({ tokens, ...update }) => {
     const client = createClient();
     const request = client.request.bind(client);
     client.request = async (method, params, options) => {
-      if (method === "session.applyConfig" && params?.taskBudgetLevel === "max") {
+      if (method === "session.applyConfig") {
         client.requests.push({ method, params });
-        return { sessionId: "session_1", applied: true, taskTokenBudget: 0, summary: "Budget updated" } as never;
+        return { sessionId: "session_1", applied: true, taskTokenBudget: tokens, summary: "Budget updated" } as never;
       }
       return request(method, params, options) as never;
     };
-    const config = { taskTokenBudget: 2_400_000 };
+    const config = Object.freeze({ taskTokenBudget: 219_000 });
     const session = createDaemonTuiSession({ baseSession: { ...createBaseSession(), config } as never, client, sessionId: "session_1", clientId: "tui_1" });
-    expect(await session.applyDaemonConfig?.({ taskBudgetLevel: "max" })).toMatchObject({ taskTokenBudget: 0 });
-    expect(config.taskTokenBudget).toBe(0);
+    expect(await session.applyDaemonConfig?.(update as never)).toMatchObject({ taskTokenBudget: tokens });
+    expect((session as unknown as { config: typeof config }).config.taskTokenBudget).toBe(tokens);
+    expect(config.taskTokenBudget).toBe(219_000);
     expect(client.requests).toEqual([
       { method: "daemon.reload", params: {} },
-      { method: "session.applyConfig", params: { sessionId: "session_1", taskBudgetLevel: "max" } },
+      { method: "session.applyConfig", params: { sessionId: "session_1", ...update } },
     ]);
+    // A successful budget update cannot poison subsequent daemon requests.
+    await expect(session.submit("still allowed")).resolves.toBeUndefined();
   });
 
   it("reloads daemon-global config before applying it to the live session", async () => {

@@ -5,6 +5,7 @@
  * input and streamed session events through the daemon protocol.
  */
 
+import { replaceSessionTaskTokenBudgetSnapshot } from "../session/task-budget.js";
 import { randomUUID } from "node:crypto";
 import { isAbsolute } from "node:path";
 import { AgenCDaemonResponseError, MAX_BUFFERED_SESSION_EVENTS_PER_SESSION } from "../app-server/agent-cli.js";
@@ -330,6 +331,7 @@ export interface AgenCTuiBridgeSession extends AgenCCompactProgressControls {
   ): Promise<SessionHooksSetDisabledResult>;
   applyDaemonConfig?(params: {
     readonly taskBudgetLevel?: "eco" | "balanced" | "max";
+    readonly taskTokenBudget?: number;
     profile?: string;
     reload?: boolean;
     /** Apply only this effort to the idle session; null clears it. */
@@ -1195,7 +1197,7 @@ export function createDaemonTuiSession<
   if (runtimeSettingsReconciler !== undefined) {
     ensureDaemonEventsSubscribed();
   }
-  return {
+  const daemonSession = {
     ...daemonSessionBase,
     conversationId,
     workflowApprovalControls: createWorkflowApprovalControls(client),
@@ -1749,7 +1751,7 @@ export function createDaemonTuiSession<
       runRuntimeSettingsAuthorityMutation(async () => {
         await awaitRuntimeSettingsAuthority();
         try {
-          if (p.reload === true || p.taskBudgetLevel !== undefined) {
+          if (p.reload === true || p.taskBudgetLevel !== undefined || p.taskTokenBudget !== undefined) {
             // session.applyConfig refreshes only this agent's live config
             // store; reload the daemon-global snapshot first.
             await client.request("daemon.reload", {});
@@ -1757,18 +1759,18 @@ export function createDaemonTuiSession<
           const result = await client.request("session.applyConfig", {
             sessionId,
             ...(p.taskBudgetLevel !== undefined ? { taskBudgetLevel: p.taskBudgetLevel } : {}),
+            ...(p.taskTokenBudget !== undefined ? { taskTokenBudget: p.taskTokenBudget } : {}),
             ...(p.profile !== undefined ? { profile: p.profile } : {}),
             ...(p.reload !== undefined ? { reload: p.reload } : {}),
             ...(p.reasoningEffort !== undefined
               ? { reasoningEffort: p.reasoningEffort }
               : {}),
           } satisfies SessionApplyConfigParams);
-          if (p.taskBudgetLevel !== undefined) {
+          if (p.taskBudgetLevel !== undefined || p.taskTokenBudget !== undefined) {
             if (!Number.isSafeInteger(result.taskTokenBudget) || result.taskTokenBudget! < 0) {
               throw new Error("daemon omitted the accepted task budget");
             }
-            const localConfig = (baseSession as unknown as { config?: { taskTokenBudget?: number } }).config;
-            if (localConfig !== undefined) localConfig.taskTokenBudget = result.taskTokenBudget;
+            replaceSessionTaskTokenBudgetSnapshot(daemonSession as unknown as Pick<import("../session/session.js").Session, "config">, result.taskTokenBudget!);
             return result;
           }
           if (!result.applied) return result;
@@ -1824,6 +1826,7 @@ export function createDaemonTuiSession<
       ...connectionNoticeEvents(client.getConnectionState?.() ?? null),
     ],
   } as AgenCDaemonBackedTuiSession<Session>;
+  return daemonSession;
 }
 
 interface MutableBridgeServices {
