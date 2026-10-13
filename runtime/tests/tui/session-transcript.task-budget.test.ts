@@ -29,3 +29,13 @@ it("shows the recorded usage and budget remedy while awaiting the final partial 
   expect(output).toContain("/budget");
   expect(output).not.toContain("/compact");
 });
+
+it("shows the quiet task budget warning while retaining the internal-warning filter", () => {
+  const message = "Task budget: 210 of 250 tokens used. A checkpoint will ask before more work crosses the allowance.";
+  const transcript = adaptTranscriptEvents([
+    event("near", "warning", { cause: "task_budget_near_limit", message }),
+    event("telemetry", "warning", { cause: "llm_request_metadata", message: "internal telemetry" }),
+  ]);
+  expect(transcript.messages.filter(item => item.content === message)).toHaveLength(1);
+  expect(JSON.stringify(transcript.messages)).not.toContain("internal telemetry");
+});

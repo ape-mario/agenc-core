@@ -3120,6 +3120,9 @@ function PromptInput({
       removeNotification("effort-level");
       return;
     }
+    // Same-key notifications are deduplicated. Remove the previous label so
+    // a canonical reload cannot leave its old effort displayed for 12s.
+    removeNotification("effort-level");
     addNotification({
       key: "effort-level",
       text: effortNotificationText,

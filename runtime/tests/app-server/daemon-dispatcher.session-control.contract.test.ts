@@ -759,6 +759,21 @@ describe("daemon session-control internal method dispatch", () => {
       } } });
   });
 
+  it("accepts custom task token counts and rejects invalid or mixed budget mutations", async () => {
+    const applyConfigToSession = vi.fn(async (params: SessionApplyConfigParams) => ({ sessionId: params.sessionId, applied: true, taskTokenBudget: params.taskTokenBudget, summary: "budget applied" }));
+    const dispatcher = new AgenCDaemonJsonRpcDispatcher({ agentManager: { applyConfigToSession } as never });
+    const connection = dispatcher.createConnection(); await initialize(connection);
+    for (const tokens of [0, 3_000_000]) {
+      await expect(connection.dispatch({ jsonrpc: JSON_RPC_VERSION, id: "budget", method: "session.applyConfig", params: { sessionId: "session_1", taskTokenBudget: tokens } }))
+        .resolves.toMatchObject({ result: { taskTokenBudget: tokens } });
+    }
+    for (const invalid of [{ taskTokenBudget: -1 }, { taskTokenBudget: 1.5 }, { taskTokenBudget: "3m" }, { taskTokenBudget: Number.MAX_SAFE_INTEGER + 1 }, { taskTokenBudget: 10, taskBudgetLevel: "max" }, { taskTokenBudget: 10, reasoningEffort: "high" }, { taskTokenBudget: 10, profile: "fast" }, { taskTokenBudget: 10, modelVerbosity: "low" }]) {
+      await expect(connection.dispatch({ jsonrpc: JSON_RPC_VERSION, id: "invalid", method: "session.applyConfig", params: { sessionId: "session_1", ...invalid } }))
+        .resolves.toMatchObject({ error: { code: -32602 } });
+    }
+    expect(applyConfigToSession).toHaveBeenCalledTimes(2);
+  });
+
   it("routes session.applyConfig with reload flag", async () => {
     const applyConfigToSession = vi.fn(
       async (params: SessionApplyConfigParams) => ({

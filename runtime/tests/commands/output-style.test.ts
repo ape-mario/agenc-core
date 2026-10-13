@@ -92,6 +92,21 @@ describe("output-style commands", () => {
     return runWithAgentRuntimeOptions(runtimeOptions, operation);
   }
 
+  it("applies a saved style to the live daemon before reporting success", async () => {
+    const cwd = tempProject();
+    const store = new ConfigStore({ home: join(cwd, "agenc-home"), env: {}, cwd, projectRoot: cwd, projectTrusted: false });
+    await store.reload();
+    const ctx = stubCtx(cwd, "Learning", undefined, store);
+    Object.assign(ctx.session.services, { runtimeOptions: resolveAgentRuntimeOptions({}, { pluginStorageRoot: join(cwd, "agenc-home", "plugins") }) });
+    const applyDaemonConfig = vi.fn(async () => {
+      expect(store.current().outputStyle).toBe("Learning");
+      return { sessionId: "live", applied: true, summary: "config updated" };
+    });
+    Object.assign(ctx.session, { applyDaemonConfig });
+    expect(await outputStyleCommand.execute(ctx)).toMatchObject({ kind: "text", text: 'Output style switched to "Learning".' });
+    expect(applyDaemonConfig).toHaveBeenCalledWith({ reload: true });
+  });
+
   it("loads cold TUI styles from its captured plugin authority without an active runtime", async () => {
     const cwd = tempProject();
     const store = new ConfigStore({ home: join(cwd, "agenc-home"), env: {}, cwd, projectRoot: cwd, projectTrusted: false });

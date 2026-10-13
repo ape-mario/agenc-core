@@ -307,18 +307,21 @@ function makeRunnerHarness(opts: {
 }
 
 describe("daemon config/model state refresh + atomicity", () => {
-  it("applies a saved task budget to the current root without changing model state", async () => {
+  it.each([{ taskBudgetLevel: "eco", tokens: 1_000_000 }, { taskBudgetLevel: "balanced", tokens: 2_400_000 }, { taskBudgetLevel: "max", tokens: 0 }, { taskTokenBudget: 3_000_000, tokens: 3_000_000 }])("applies saved $tokens tokens with an immutable root config and no model change", async ({ tokens, ...update }) => {
     const { runner, session, stateObject } = makeRunnerHarness({ configStore: {
-      current: () => ({ task_token_budget: 2_400_000 }), reload: async () => ({ task_token_budget: 0 }),
+      current: () => ({ task_token_budget: 2_400_000 }), reload: async () => ({ task_token_budget: tokens }),
     } });
     await runner.startAgent({ objective: "work", cwd: "/workspace" });
-    Object.assign(session, { config: { taskTokenBudget: 2_400_000 } });
+    const original = Object.freeze({ taskTokenBudget: 219_000 });
+    Object.assign(session, { config: original });
     const before = stateObject.sessionConfiguration;
-    const result = await runner.applyAgentConfig("parent-session", { sessionId: "session_1", taskBudgetLevel: "max" });
-    expect(result).toMatchObject({ applied: true, taskTokenBudget: 0 });
-    expect(session.config.taskTokenBudget).toBe(0);
+    const result = await runner.applyAgentConfig("parent-session", { sessionId: "session_1", ...update } as never);
+    expect(result).toMatchObject({ applied: true, taskTokenBudget: tokens });
+    expect(session.config.taskTokenBudget).toBe(tokens);
+    expect(original.taskTokenBudget).toBe(219_000);
     expect(stateObject.sessionConfiguration).toBe(before);
   });
+
   it("keeps an explicit task budget override when the saved user choice changes", async () => {
     const { runner, session } = makeRunnerHarness({ configStore: {
       current: () => ({ task_token_budget: 500 }), reload: async () => ({ task_token_budget: 500 }),

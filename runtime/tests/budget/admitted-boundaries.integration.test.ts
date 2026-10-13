@@ -179,11 +179,13 @@ describe("admitted execution boundaries with the durable kernel", () => {
         return modelResponse();
       },
     });
-    await flushAdmissionScheduler();
-
-    expect(kernel.activeCount).toBe(1);
-    expect(kernel.queuedCount).toBe(1);
-    expect(replacementInvoked).toBe(false);
+    // Budget preparation can yield before acquisition. Wait for observable
+    // admission, while the first provider remains deliberately unsettled.
+    await vi.waitFor(() => {
+      expect(kernel.activeCount).toBe(1);
+      expect(kernel.queuedCount).toBe(1);
+      expect(replacementInvoked).toBe(false);
+    });
     expect(
       kernel
         .listJournal({ cwd, runId: client.scope.runId })

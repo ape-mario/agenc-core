@@ -949,7 +949,12 @@ export async function awaitDaemonOneShotRun(params: {
         if (
           finalStatus.code !== 0 &&
           finalStatus.message !== undefined &&
-          finalStatus.message.length > 0
+          finalStatus.message.length > 0 &&
+          // The budget summary is durable assistant output. Its terminal
+          // failure repeats it (possibly truncated), rather than adding an
+          // error. Keep the failure exit code without printing it twice.
+          !(outputFormat === "text" && finalStatus.failureCode === "task_budget" &&
+            printedAssistantOutput && assistantOutput.includes(finalStatus.message))
         ) {
           io.stderr.write(`${finalStatus.message}\n`);
         }

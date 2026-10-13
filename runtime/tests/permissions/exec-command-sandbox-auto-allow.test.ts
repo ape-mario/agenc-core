@@ -199,8 +199,9 @@ describe("exec_command sandbox auto-allow", () => {
     expect("message" in decision ? decision.message : "").toContain("nobody attached");
   });
 
-  it("does not make write_stdin approval-free", async () => {
+  it("allows empty observation polls and retains approval for stdin writes", async () => {
     const writeStdin = createWriteStdinTool({ cwd: workspace, allowedPaths: [workspace] }) as unknown as ToolLike;
-    expect((await decide({ session_id: 1, chars: "" }, {}, writeStdin)).behavior).toBe("ask");
+    expect((await decide({ session_id: 1, chars: "" }, {}, writeStdin)).behavior).toBe("allow");
+    expect((await decide({ session_id: 1, chars: " \n" }, {}, writeStdin)).behavior).toBe("ask");
   });
 });

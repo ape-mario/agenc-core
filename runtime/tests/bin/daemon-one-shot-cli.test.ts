@@ -191,3 +191,19 @@ it("leaves task budgets absent by default on daemon creation", async () => {
   expect(create).not.toHaveProperty("taskTokenBudget");
   expect(create).not.toHaveProperty("taskMaxCalls");
 });
+
+it.each([false, true])("prints the budget explanation once when terminal text is truncated=%s", async truncated => {
+  const summary = "Partial result: stopped at the task budget.\n\nThe task used 0 of 1 tokens (0 model calls).\n\n" + "Verified findings. ".repeat(truncated ? 180 : 1);
+  const client = await mocks.connect();
+  client.subscribeToSessionEvents = (_: string, callback: (event: unknown) => void) => {
+    queueMicrotask(() => {
+      callback({ method: "event.message_chunk", params: { sessionId: "session", delta: summary } });
+      callback({ method: "event.agent_status", params: { sessionId: "session", status: "idle", turnEvent: { type: "turn_failed", payload: { turnId: "budget-turn", code: "task_budget", message: truncated ? summary.slice(0, 2000) : summary } } } });
+    });
+    return () => {};
+  };
+  expect(await oneShotCLI("check", [], { lightMode: true })).toBe(1);
+  expect(writes.join("")).toContain(summary);
+  const stderr = vi.mocked(process.stderr.write).mock.calls.map(([chunk]) => String(chunk)).join("");
+  expect(stderr).not.toContain("Partial result: stopped at the task budget.");
+});

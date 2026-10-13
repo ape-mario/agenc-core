@@ -4574,7 +4574,7 @@ function validateSessionApplyConfigParams(
   const validated = validateObjectShape(params, {
     methodName: "session.applyConfig",
     stringFields: ["sessionId", "profile"],
-    valueFields: ["reload", "modelVerbosity", "reasoningEffort", "taskBudgetLevel"],
+    valueFields: ["reload", "modelVerbosity", "reasoningEffort", "taskBudgetLevel", "taskTokenBudget"],
   });
   validateRequiredString(validated, "session.applyConfig", "sessionId");
   // Null clears the session's effort so it follows the model default.
@@ -4599,9 +4599,14 @@ function validateSessionApplyConfigParams(
     throw invalidParams("session.applyConfig param 'reload' must be a boolean");
   }
   if (validated.taskBudgetLevel !== undefined &&
-      (typeof validated.taskBudgetLevel !== 'string' || !['eco', 'balanced', 'max'].includes(validated.taskBudgetLevel) ||
+      (typeof validated.taskBudgetLevel !== 'string' || !['eco', 'balanced', 'max'].includes(validated.taskBudgetLevel) || validated.taskTokenBudget !== undefined ||
        validated.reasoningEffort !== undefined || validated.modelVerbosity !== undefined || validated.profile !== undefined)) {
     throw invalidParams("session.applyConfig taskBudgetLevel must be eco, balanced, or max and cannot change other session settings");
+  }
+  if (validated.taskTokenBudget !== undefined &&
+      (typeof validated.taskTokenBudget !== "number" || !Number.isSafeInteger(validated.taskTokenBudget) || validated.taskTokenBudget < 0 ||
+       validated.reasoningEffort !== undefined || validated.modelVerbosity !== undefined || validated.profile !== undefined)) {
+    throw invalidParams("session.applyConfig taskTokenBudget must be a nonnegative whole token count and cannot change other session settings");
   }
   return validated as SessionApplyConfigParams;
 }

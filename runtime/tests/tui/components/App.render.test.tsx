@@ -103,6 +103,7 @@ const providerProbe = {
     ((next: SetStateAction<Record<string, unknown>>) => void) | null,
   globalKeybindingProps: [] as Array<Record<string, unknown>>,
   cancelRequestProps: [] as Array<Record<string, unknown>>,
+  askUserQuestionProps: [] as Array<Record<string, unknown>>,
   exitFlowProps: [] as Array<Record<string, unknown>>,
   costThresholdDialogProps: [] as Array<Record<string, unknown>>,
   messageProps: [] as Array<Record<string, unknown>>,
@@ -225,6 +226,17 @@ vi.mock("../context/stats.js", async () => {
 vi.mock("../state/onChangeAppState.js", () => ({
   onChangeAppState: providerProbe.onChangeAppState,
 }));
+
+vi.mock("./AskUserQuestionOverlay.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./AskUserQuestionOverlay.js")>();
+  return {
+    ...original,
+    AskUserQuestionOverlay: (props: React.ComponentProps<typeof original.AskUserQuestionOverlay>) => {
+      providerProbe.askUserQuestionProps.push(props as unknown as Record<string, unknown>);
+      return React.createElement(original.AskUserQuestionOverlay, props);
+    },
+  };
+});
 
 vi.mock("../ink.js", async () => {
   const React = await import("react");
@@ -816,6 +828,7 @@ function resetShellSurfaceProbe(): void {
   apiKeyVerificationProbe.contexts.length = 0;
   providerProbe.costSummaryGetters.length = 0;
   providerProbe.cancelRequestProps.length = 0;
+  providerProbe.askUserQuestionProps.length = 0;
   providerProbe.exitFlowProps.length = 0;
   providerProbe.costThresholdDialogProps.length = 0;
   providerProbe.messageSelectorProps.length = 0;
@@ -4470,6 +4483,29 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
         ]);
       },
     );
+  });
+
+  test.each(["turn cancel", "card Escape"])("the first %s answers Stop here and dismisses the budget checkpoint", async (path) => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const cancelActiveTurn = vi.fn(async () => undefined);
+    const session = { ...createSession(), activeTurn: { unsafePeek: () => ({ turnId: "budget-turn" }) }, cancelActiveTurn };
+    await withRenderedApp(<AgenCTuiApp session={session as never} isInteractive={false} />, async () => {
+      let answer: unknown;
+      const response = session.services.requestUserInputResolver!.request({
+        turnId: "budget-turn", requestId: "budget-request", callId: "task-budget-checkpoint-test",
+        questions: [{ id: "task_budget", header: "Task budget", question: "Continue?", isOther: false, isSecret: false,
+          options: [{ label: "Continue", description: "More room" }, { label: "Remove the limit for this task", description: "No cap" }, { label: "Stop here", description: "Keep findings" }] }],
+      });
+      void response.then(value => { answer = value; });
+      await new Promise(resolve => setTimeout(resolve, 40));
+      const handler = path === "turn cancel"
+        ? providerProbe.cancelRequestProps.at(-1)?.onCancel
+        : providerProbe.askUserQuestionProps.at(-1)?.onSkip;
+      (handler as () => void)();
+      await vi.waitFor(() => expect(answer).toEqual({ answers: { task_budget: { answers: ["Stop here"] } } }));
+      expect(cancelActiveTurn).not.toHaveBeenCalled();
+      await response;
+    });
   });
 
   test("aborts an active bridged shell command on Escape without cancelling a model turn", async () => {

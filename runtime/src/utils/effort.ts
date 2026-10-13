@@ -686,9 +686,10 @@ export function getModelDefaultReasoningEffortForContext(
  */
 export function getSessionEffortLabelForContext(
   model: string,
-  effortValue: EffortValue | undefined,
+  effortValue: EffortValue | 'none' | undefined,
   context: ProviderAuthReadContext,
 ): string | null {
+  if (effortValue === 'none') return 'effort off'
   if (effortValue !== undefined) {
     return `${getDisplayedEffortLevelForContext(model, effortValue, context)} effort`
   }

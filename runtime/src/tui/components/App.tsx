@@ -15,6 +15,7 @@ import React, {
 import { FpsMetricsProvider, useFpsMetrics } from "../context/fpsMetrics.js";
 import { StatsProvider, type StatsStore } from "../context/stats.js";
 import { onChangeAppState } from "../state/onChangeAppState.js";
+import { syncRuntimeEffortEventToAppState } from "../state/runtimeEffortSync.js";
 import { syncCollabAgentEventToAppState } from "../state/collabAgentTaskSync.js";
 import { selectAgenCTuiGlyphs } from "../glyphs.js";
 import {
@@ -1306,7 +1307,7 @@ function ElicitationPickerOverlay({
           submit(raw);
         }
       }}
-      onSkip={() => submit("skip")}
+      onSkip={() => submit(pending.request.callId.startsWith("task-budget-checkpoint-") ? "Stop here" : "skip")}
     />
   );
 }
@@ -2524,6 +2525,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         addNotification(recovered.notification);
       }
       syncCollabAgentEventToAppState(event, setAppState);
+      syncRuntimeEffortEventToAppState(event, setAppState);
     });
     return () => {
       unsubscribe();
@@ -4129,6 +4131,14 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     }
   }, [isLoading]);
   const handleTurnCancel = useCallback(() => {
+    // The checkpoint is waiting before admission, so Escape is its Stop
+    // choice. Resolve and dismiss the card locally instead of interrupting
+    // the daemon and leaving its pending question mounted.
+    if (elicitation.pending?.kind === "user" &&
+        elicitation.pending.request.callId.startsWith("task-budget-checkpoint-")) {
+      elicitation.submit("Stop here");
+      return;
+    }
     // Fire the local signal first so cooperative command contexts see the
     // interruption, then ask the daemon to interrupt the active turn. Errors
     // from the RPC are swallowed inside cancelActiveTurn — pressing ESC must
@@ -4169,7 +4179,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     setPendingSubmission(false);
     activeModelSubmissionTokensRef.current.clear();
     setActiveModelSubmissionCount(0);
-  }, [isLoading, turnAbortController, props.session]);
+  }, [isLoading, turnAbortController, props.session, elicitation.pending, elicitation.submit]);
   const handleAgentsKilled = useCallback(
     (agents: readonly KilledAgentSummary[]) => {
       const text = formatAgentsKilledNotification(agents);

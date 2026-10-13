@@ -957,8 +957,10 @@ named budget levels or a production progress policy.
 Choose a named token allocation with `budget_level = "eco"` (1,000,000 tokens),
 `budget_level = "balanced"` (2,400,000), or `budget_level = "max"` (no token cap).
 The CLI equivalent is `--budget eco|balanced|max`. `/budget` opens a picker
-for the current session; `/budget balanced` applies that choice immediately and
-saves it for new sessions. Existing usage and reservations are retained. Explicit
+for the current session with eco, balanced, max, and Custom choices. `/budget balanced`
+applies that choice immediately and saves it for new sessions. Custom accepts a whole
+token number such as `3000000`, `3m`, `3M`, or `500k`. `/budget 3m` also applies
+and saves a custom cap. `0` and `max` both remove the task token cap. Existing usage and reservations are retained. Explicit
 CLI and project settings still override the saved user choice, and the confirmation
 states the effective allowance. Independent call and cost limits still apply to `max`.
 

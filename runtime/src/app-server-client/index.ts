@@ -64,7 +64,8 @@ import {
 import {
   validateAndDedupeAdditionalWorkingDirectoryInputs,
 } from "../contracts/additional-working-directories.js";
-import { canonicalizeBypassPermissionsCwd } from "../permissions/bypass-consent-state.js";
+import { authorizeBypassPermissionsConsent, canonicalizeBypassPermissionsCwd, loadBypassPermissionsConsent } from "../permissions/bypass-consent-state.js";
+import { applyPermissionRulesSnapshot, readPermissionRulesSnapshot } from "../permissions/settings.js";
 import type { SessionConfiguration } from "../session/turn-context.js";
 
 export {
@@ -793,11 +794,26 @@ async function createBoundAgenCDaemonOnlyTuiContext(
   try {
     await skillsServices.skillsWatcher.start();
     watcherStarted = true;
-    const permissionContext = daemonTuiPermissionContext(
+    let permissionContext = daemonTuiPermissionContext(
       options.cwd,
       runtimeSettings,
       options.permissionMode,
     );
+    if (runtimeSettings === undefined) {
+      // A cold shim has no daemon snapshot yet. Restore only exact workspace
+      // consent, through the same identity validator and source-aware policy
+      // used by runtime initialization. Live attach snapshots stay authoritative.
+      permissionContext = applyPermissionRulesSnapshot(permissionContext, readPermissionRulesSnapshot(configStore));
+      if (permissionContext.bypassPermissionsModeDisabledByPolicy !== true) {
+        try {
+          for (const accepted of loadBypassPermissionsConsent(configStore.stateRepository, options.cwd, { reload: true })) {
+            permissionContext = authorizeBypassPermissionsConsent(permissionContext, accepted);
+          }
+        } catch {
+          // Missing or stale directory identity cannot add bypass authority.
+        }
+      }
+    }
     const selectedProvider = runtimeSettings?.provider ?? startup.provider;
     const selectedModel = runtimeSettings?.model ?? startup.model;
     const configuredSessionConfiguration: DaemonTuiSessionConfiguration = {
