@@ -493,6 +493,44 @@ describe("app-server-client daemon helpers", () => {
     }
   });
 
+  it.each(["matching", "disabled", "stale"])("restores cold exact-workspace consent only when valid and permitted (%s)", async scenario => {
+    // RuntimeStateRepository defaults to isolated memory storage in tests.
+    // This regression needs two independently created stores to share disk.
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "development";
+    const agencHome = mkdtempSync(join(tmpdir(), "agenc-cold-consent-"));
+    const workspace = mkdtempSync(join(tmpdir(), "agenc-cold-consent-workspace-"));
+    const { ConfigStore } = await import("../config/store.js");
+    const { recordBypassPermissionsConsent } = await import("../permissions/bypass-consent-state.js");
+    let context: Awaited<ReturnType<typeof createAgenCDaemonOnlyTuiContext>> | null = null;
+    try {
+      if (scenario === "disabled") writeFileSync(join(agencHome, "config.toml"), 'config_version = 2\n[permissions]\nbypassPermissionsMode = "disable"\n');
+      const store = new ConfigStore({ home: agencHome, env: { AGENC_HOME: agencHome, HOME: agencHome }, cwd: workspace }); await store.reload();
+      recordBypassPermissionsConsent(store.stateRepository, workspace);
+      if (scenario === "stale") store.stateRepository.updateNamespace("permissions", value => {
+        const accepted = value.bypassPermissionsAcceptedByCwd as Record<string, Record<string, unknown>>;
+        return { ...value, bypassPermissionsAcceptedByCwd: { ...accepted, [workspace]: { ...accepted[workspace], ino: "1" } } } as never;
+      });
+      context = await createAgenCDaemonOnlyTuiContext({ env: { ...process.env, AGENC_HOME: agencHome, HOME: agencHome }, cwd: workspace,
+        conversationId: "cold-consent", runtimeOptions: resolveAgentRuntimeOptions({}, { simpleMode: true }) });
+      const permission = context.baseSession.services.permissionModeRegistry.current();
+      if (scenario === "matching") {
+        const { loadBypassPermissionsConsent } = await import("../permissions/bypass-consent-state.js");
+        expect(context.baseSession.services.configStore.agencHome).toBe(agencHome);
+        expect(loadBypassPermissionsConsent(context.baseSession.services.configStore.stateRepository, workspace, { reload: true })).toEqual([workspace]);
+        expect(permission.bypassPermissionsModeDisabledByPolicy).not.toBe(true);
+      }
+      expect(permission.mode).toBe("default");
+      expect(permission.isBypassPermissionsModeAvailable).toBe(scenario === "matching");
+      expect(permission.bypassPermissionsAcceptedIn ?? []).toEqual(scenario === "matching" ? [workspace] : []);
+      if (scenario === "disabled") expect(permission.bypassPermissionsModeDisabledByPolicy).toBe(true);
+      expect(context.baseSession.services.sandboxExecutionBroker?.mode).toBe("workspace_write");
+    } finally {
+      await context?.close(); rmSync(agencHome, { recursive: true, force: true }); rmSync(workspace, { recursive: true, force: true });
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   it("seeds ordinary bypass without widening the configured sandbox", async () => {
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-bypass-tui-context-"));
     const workspace = mkdtempSync(join(tmpdir(), "agenc-bypass-tui-workspace-"));
