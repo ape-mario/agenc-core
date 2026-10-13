@@ -1,3 +1,5 @@
+import { interruptedExecReport } from "./interrupted-exec-report.js";
+import { readPendingPhysicalSettlement } from "./physical-settlement.js";
 import { stripModelSuppliedAgenCInternalArgs } from "./internal-args.js";
 import { modelToolAliasTarget, resolveModelToolAlias } from "./model-tool-aliases.js";
 /**
@@ -800,7 +802,7 @@ export class ToolRouter {
         },
       });
     } catch (err) {
-      return toolDispatchErrorResult(err, invocation.session);
+      return toolDispatchErrorResult(err, invocation.session, spec.tool.name);
     } finally {
       clearApprovalResponseKey(invocation.session, invocation.callId);
     }
@@ -1356,7 +1358,7 @@ export class ToolRouter {
       ) {
         opts.abortController.abort(err.message);
       }
-      return toolDispatchErrorResult(err, opts.session);
+      return toolDispatchErrorResult(err, opts.session, spec.tool.name);
     } finally {
       opts.signal?.removeEventListener("abort", forwardAbort);
       clearApprovalResponseKey(opts.session, toolCall.id);
@@ -1834,7 +1836,20 @@ function workflowPolicyDenial(session: Session, source: string): Partial<ToolDis
   } : {};
 }
 
-function toolDispatchErrorResult(err: unknown, session?: Session): ToolDispatchResult {
+async function toolDispatchErrorResult(err: unknown, session?: Session, toolName?: string): Promise<ToolDispatchResult> {
+  const pending = toolName === "exec_command" ? readPendingPhysicalSettlement<ToolDispatchResult>(err) : undefined;
+  if (pending?.callerStop === "abort") {
+    // The admission boundary has already installed its unknown-effect poison
+    // and physical observer. Waiting here cannot defer that safety gate.
+    let reportTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const receipt = await Promise.race([
+        pending.settlement.then(result => result, () => null),
+        new Promise<null>(resolve => { reportTimer = setTimeout(() => resolve(null), 1100); }),
+      ]);
+      err = interruptedExecReport(err, receipt) ?? err;
+    } finally { if (reportTimer !== undefined) clearTimeout(reportTimer); }
+  }
   if (err instanceof LiveEffectMutationBlockedError) {
     // The gate refused a side-effecting call because an earlier effect has an
     // unknown outcome. Unattended runs stop on the first refusal and every
