@@ -4301,6 +4301,21 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     }
   });
 
+  test("lets a local task modal own Escape instead of the turn cancel handler", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const dispatcher = await import("../../commands/dispatcher.js");
+    const spy = vi.spyOn(dispatcher, "dispatchSlashCommand").mockImplementationOnce(async (_parsed, ctx) => {
+      ctx.appState?.setToolJSX?.({ isLocalJSXCommand: true, shouldHidePromptInput: true, jsx: React.createElement("ink-text", null, "task detail") });
+      return { result: { kind: "skip" }, command: { name: "tasks" } } as never;
+    });
+    try {
+      await withRenderedApp(<AgenCTuiApp session={createSession()} isInteractive={false} />, async () => {
+        await providerProbe.promptSubmits.at(-1)!("/tasks", { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() });
+        await vi.waitFor(() => expect(providerProbe.cancelRequestProps.at(-1)?.isLocalJSXCommand).toBe(true));
+      });
+    } finally { spy.mockRestore(); }
+  });
+
   test("hides the main composer while the /agents wizard owns input", async () => {
     const { AgenCTuiApp } = await import("./App.js");
     const dispatcher = await import("../../commands/dispatcher.js");
@@ -4447,6 +4462,24 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     } finally {
       resetCommandQueueForTesting();
     }
+  });
+
+  test("drops pasted attachments after a successful clear before the next model turn", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const session = { ...createSession(), clearDaemonSession: vi.fn(async () => {}) };
+    const helpers = { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() };
+    await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
+      const props = providerProbe.promptProps.at(-1)!;
+      (props.setPastedContents as (value: unknown) => void)({ 1: { id: 1, type: "text", content: "private stale paste" } });
+      await vi.waitFor(() => expect(providerProbe.promptProps.at(-1)?.pastedContents).toHaveProperty("1"));
+      const before = providerProbe.promptProps.at(-1)?.draftRestoreRevision as number;
+      await providerProbe.promptSubmits.at(-1)!("/clear", helpers);
+      await vi.waitFor(() => {
+        expect(providerProbe.promptProps.at(-1)?.pastedContents).toEqual({});
+        expect(providerProbe.promptProps.at(-1)?.draftRestoreRevision).toBeGreaterThan(before);
+      });
+      expect(session.clearDaemonSession).toHaveBeenCalledOnce();
+    });
   });
 
   test("keeps suspected-paste confirmation in front of the daemon shell bridge", async () => {

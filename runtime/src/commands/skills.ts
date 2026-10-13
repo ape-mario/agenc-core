@@ -18,6 +18,7 @@ import {
 } from "../permissions/session-tool-policy.js";
 import type { Session } from "../session/session.js";
 import { logForDebugging } from "../utils/debug.js";
+import { pluginScopedIdentifier } from "../plugins/identifier-normalization.js";
 import { isRecord } from "../utils/record.js";
 import {
   safeExecute,
@@ -399,7 +400,9 @@ export async function collectSkillsSnapshot(
     ),
     availableSkills: mergeAvailableSkills(
       [...(outcome.availableSkills ?? [])].map((skill) => ({
-        name: skill.name,
+        name: skill.loadedFrom === "plugin" && skill.pluginId !== undefined
+          ? pluginScopedIdentifier(skill.pluginId, skill.name.split(":"), "command")
+          : skill.name,
         description: skill.description,
         scope: skill.scope,
         loadedFrom: skill.loadedFrom,

@@ -1443,6 +1443,10 @@ export function createDaemonTuiSession<
       } satisfies ElicitationRespondParams),
     clearDaemonSession: async () => {
       await client.request("session.clear", { sessionId });
+      queuedInputs.length = 0;
+      queuedInputCount = 0;
+      queuedInputBytes = 0;
+      idleInputAdmissions.clear();
     },
     resolveDaemonToolCall: async (params: ResolveDaemonToolCallParams) =>
       client.request("session.resolveToolCall", {
