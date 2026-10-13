@@ -58,6 +58,12 @@ afterEach(() => {
 });
 
 describe("SpinnerAnimationRow liveness + token grammar", () => {
+  test("shows thinking without duplicating the effort status", async () => {
+    const output = await renderRow({ thinkingStatus: "thinking", effortSuffix: " with high effort" });
+    expect(output).toContain("thinking");
+    expect(output).not.toContain("effort");
+  });
+
   // #3a: the counter must read "1 token", never "1 tokens".
   test("uses the singular noun for exactly one token", async () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);

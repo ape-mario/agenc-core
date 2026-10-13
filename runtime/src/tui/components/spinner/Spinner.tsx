@@ -28,9 +28,7 @@ import { useSettings } from '../../hooks/useSettings.js';
 import { isInProcessTeammateTask } from '../../../tasks/InProcessTeammateTask/types.js';
 import { isBackgroundTask } from '../../../tasks/types.js';
 import { getAllInProcessTeammateTasks } from '../../../tasks/InProcessTeammateTask/InProcessTeammateTask.js';
-import { getEffortSuffixForContext } from '../../../utils/effort.js';
 import type { ProviderAuthReadContext } from '../../../utils/auth.js';
-import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
 import { getViewedTeammateTask } from '../../state/selectors.js';
 import { TEARDROP_ASTERISK } from '../../../constants/figures.js';
 import figures from 'figures';
@@ -98,7 +96,6 @@ function SpinnerWithVerbInner({
   hasActiveTools = false,
   showLeaderTokenStats = true,
   leaderIsIdle = false,
-  providerAuthContext,
 }: Props): React.ReactNode {
   const settings = useSettings();
   const reducedMotion = settings?.prefersReducedMotion ?? false;
@@ -199,13 +196,7 @@ function SpinnerWithVerbInner({
       activityManager.endCLIActivity(operationId);
     };
   }, [mode]);
-  const effortValue = useAppState((s_4: any) => s_4.effortValue);
-  const mainLoopModel = useMainLoopModel();
-  const effortSuffix = getEffortSuffixForContext(
-    mainLoopModel,
-    effortValue,
-    providerAuthContext,
-  );
+
 
   // Check if any running in-process teammates exist (needed for both modes)
   const runningTeammates = getAllInProcessTeammateTasks(tasks ?? {}).filter(t => t.status === 'running');
@@ -293,7 +284,7 @@ function SpinnerWithVerbInner({
     }
   }
   return <Box flexDirection="column" width="100%" alignItems="flex-start">
-      <SpinnerAnimationRow mode={mode} reducedMotion={reducedMotion} hasActiveTools={hasActiveTools} responseLengthRef={responseLengthRef} message={message} messageColor={messageColor} shimmerColor={shimmerColor} overrideColor={overrideColor} loadingStartTimeRef={loadingStartTimeRef} totalPausedMsRef={totalPausedMsRef} pauseStartTimeRef={pauseStartTimeRef} spinnerSuffix={spinnerSuffix} verbose={verbose} columns={columns} hasRunningTeammates={hasRunningTeammates} teammateTokens={teammateTokens} foregroundedTeammate={foregroundedTeammate} leaderIsIdle={leaderIsIdle} thinkingStatus={thinkingStatus} effortSuffix={effortSuffix} showLeaderTokenStats={showLeaderTokenStats} />
+      <SpinnerAnimationRow mode={mode} reducedMotion={reducedMotion} hasActiveTools={hasActiveTools} responseLengthRef={responseLengthRef} message={message} messageColor={messageColor} shimmerColor={shimmerColor} overrideColor={overrideColor} loadingStartTimeRef={loadingStartTimeRef} totalPausedMsRef={totalPausedMsRef} pauseStartTimeRef={pauseStartTimeRef} spinnerSuffix={spinnerSuffix} verbose={verbose} columns={columns} hasRunningTeammates={hasRunningTeammates} teammateTokens={teammateTokens} foregroundedTeammate={foregroundedTeammate} leaderIsIdle={leaderIsIdle} thinkingStatus={thinkingStatus} effortSuffix="" showLeaderTokenStats={showLeaderTokenStats} />
       {hasRunningLocalAgents && <RunningLocalAgentsLine agents={runningLocalAgents} />}
       {showSpinnerTree && hasRunningTeammates ? <TeammateSpinnerTree selectedIndex={selectedIPAgentIndex} isInSelectionMode={viewSelectionMode === 'selecting-agent'} allIdle={allIdle} leaderVerb={leaderIsIdle ? undefined : leaderVerb} leaderIdleText={leaderIsIdle ? 'Idle' : undefined} leaderTokenCount={leaderTokenCount} spinnerVerbs={spinnerVerbs} /> : (showExpandedTodos || hasOpenTodoTasks) && tasksV2 && tasksV2.length > 0 ? <Box width="100%" flexDirection="column">
           <MessageResponse>

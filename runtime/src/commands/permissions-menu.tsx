@@ -182,59 +182,6 @@ function bypassAccepted(ctx: ToolPermissionContext, workspacePath: string): bool
   }
 }
 
-function ConfirmBypassView({
-  buffer,
-  message,
-}: {
-  readonly buffer: string;
-  readonly message: string | null;
-}): React.ReactNode {
-  return (
-    <MenuModal
-      title="permissions"
-      count="bypass"
-      summary="explicit confirmation required"
-      headerRight="danger"
-      columns={[18, 60]}
-      headers={["field", "value"]}
-      items={[
-        { field: "target", value: "bypassPermissions" },
-        { field: "required", value: "type bypass" },
-        { field: "typed", value: buffer.length > 0 ? buffer : "(empty)" },
-      ]}
-      activeIndex={1}
-      renderRow={(row) => [
-        <ThemedText key="field" color="inactive" wrap="truncate-end">
-          {row.field}
-        </ThemedText>,
-        <ThemedText key="value" color={row.field === "target" ? "error" : "text2"} wrap="truncate-end">
-          {row.value}
-        </ThemedText>,
-      ]}
-      preview={
-        <Box flexDirection="column" gap={1}>
-          <ThemedText color="error">Bypass Permissions</ThemedText>
-          <ThemedText color="text2" wrap="wrap">
-            This mode bypasses approval prompts for this workspace. It must be
-            confirmed before the mode switch is applied.
-          </ThemedText>
-          {message ? (
-            <ThemedText color="warning" wrap="wrap">
-              {message}
-            </ThemedText>
-          ) : null}
-        </Box>
-      }
-      footer={[
-        { keyName: "type", label: "bypass" },
-        { keyName: "enter", label: "confirm" },
-        { keyName: "esc", label: "cancel" },
-      ]}
-      hint="risky mode confirmation"
-    />
-  );
-}
-
 function PermissionsMenuView({
   permissionContext,
   workspacePath,
@@ -261,8 +208,6 @@ function PermissionsMenuView({
   const [mode, setMode] = React.useState<PermissionMode>(permissionContext.mode);
   const [message, setMessage] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
-  const [confirmBypass, setConfirmBypass] = React.useState(false);
-  const [confirmBuffer, setConfirmBuffer] = React.useState("");
 
   const applyMode = React.useCallback((target: PermissionMode) => {
     if (!controller) {
@@ -284,14 +229,13 @@ function PermissionsMenuView({
     );
   }, [controller]);
 
-  const confirmAndApplyBypass = React.useCallback(() => {
+  const acceptAndApplyRiskyMode = React.useCallback((target: PermissionMode) => {
     if (!controller) {
       setMessage("Bypass confirmation requires a live permission controller.");
-      setConfirmBypass(false);
       return;
     }
     setBusy(true);
-    setMessage("Recording bypass confirmation...");
+    setMessage("Recording workspace consent...");
     void controller.acceptBypass().then(
       accept => {
         if (!accept.ok) {
@@ -299,11 +243,9 @@ function PermissionsMenuView({
           setMessage(accept.message);
           return;
         }
-        void controller.setMode("bypassPermissions").then(
+        void controller.setMode(target).then(
           result => {
             setBusy(false);
-            setConfirmBypass(false);
-            setConfirmBuffer("");
             setMessage(`${accept.message}\n${result.message}`);
             if (result.ok && result.nextMode !== undefined) setMode(result.nextMode);
           },
@@ -322,30 +264,6 @@ function PermissionsMenuView({
 
   useInput((input, key) => {
     if (busy) return;
-    if (confirmBypass) {
-      if (key.escape) {
-        setConfirmBypass(false);
-        setConfirmBuffer("");
-        return;
-      }
-      if (key.backspace || key.delete) {
-        setConfirmBuffer(value => value.slice(0, -1));
-        return;
-      }
-      if (key.return) {
-        if (confirmBuffer === "bypass") {
-          confirmAndApplyBypass();
-        } else {
-          setMessage('Type "bypass" exactly to confirm bypassPermissions.');
-        }
-        return;
-      }
-      if (input.length > 0) {
-        setConfirmBuffer(value => `${value}${input}`.slice(0, 16));
-      }
-      return;
-    }
-
     if (key.escape || input === "q") {
       onDone();
       return;
@@ -358,31 +276,19 @@ function PermissionsMenuView({
       setActiveIndex(index => nextMenuIndex(index, displayRows.length));
       return;
     }
-    if (input === "b") {
-      setConfirmBypass(true);
-      setConfirmBuffer("");
-      setMessage("Type bypass to confirm bypassPermissions.");
-      return;
-    }
     if (key.return) {
       const selectedRow = displayRows[activeIndex];
       if (selectedRow?.kind !== "mode") return;
       if (
-        selectedRow.mode === "bypassPermissions" &&
+        (selectedRow.mode === "bypassPermissions" || selectedRow.mode === "dontAsk") &&
         !bypassAccepted(permissionContext, workspacePath)
       ) {
-        setConfirmBypass(true);
-        setConfirmBuffer("");
-        setMessage("Type bypass to confirm bypassPermissions.");
+        acceptAndApplyRiskyMode(selectedRow.mode);
         return;
       }
       applyMode(selectedRow.mode);
     }
   });
-
-  if (confirmBypass) {
-    return <ConfirmBypassView buffer={confirmBuffer} message={message} />;
-  }
 
   const selected = displayRows[activeIndex] ?? displayRows[0];
   const totalRules = rows
@@ -422,7 +328,7 @@ function PermissionsMenuView({
         <Box flexDirection="column" gap={1}>
           <ThemedText color="agenc">Permission Rules</ThemedText>
           <ThemedText color="text2" wrap="wrap">
-            Mode changes, rules, workspace trust, and bypass confirmation stay
+            Mode changes, rules, workspace trust, and workspace consent stay
             on this v2 surface. Rule edits use /permissions add or remove.
           </ThemedText>
           <ThemedText color="subtle" wrap="wrap">
@@ -434,9 +340,13 @@ function PermissionsMenuView({
           <ThemedText color="subtle" wrap="wrap">
             Extra directories: {permissionContext.additionalWorkingDirectories.size}
           </ThemedText>
-          {mode === "bypassPermissions" ? (
+          {mode === "bypassPermissions" || (selected?.kind === "mode" && selected.mode === "bypassPermissions") ? (
             <ThemedText color="error" wrap="wrap">
-              bypassPermissions is active. Risky actions are no longer prompted.
+              bypassPermissions bypasses approvals. Risky actions are no longer prompted.
+            </ThemedText>
+          ) : mode === "dontAsk" || (selected?.kind === "mode" && selected.mode === "dontAsk") ? (
+            <ThemedText color="error" wrap="wrap">
+              dontAsk suppresses approval prompts.
             </ThemedText>
           ) : null}
           {message ? (
@@ -449,7 +359,6 @@ function PermissionsMenuView({
       footer={[
         { keyName: "up/down", label: "navigate" },
         { keyName: "enter", label: "set mode" },
-        { keyName: "b", label: "confirm bypass" },
         { keyName: "q", label: "close" },
       ]}
       hint="/permissions add|remove|mode"

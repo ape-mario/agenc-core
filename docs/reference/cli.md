@@ -53,6 +53,8 @@ From `formatCliHelpText()`:
 | `--input-format <format>` | Print mode input: `stream-json` |
 | `--deadline <+seconds\|ISO-8601>` | Print mode: the instant the run must end by, as `+<seconds>` from now or an ISO 8601 time with a zone. See the print-mode notes. |
 | `--deadline-reserve <seconds>` | Print mode, with `--deadline`: how long before the deadline the model is told to wrap up. Default 10 % of the budget, clamped to 5-30 minutes and never more than half the budget. |
+| `--budget <level>` | Set the task token allowance. Interactive TUI sessions ask at checkpoints; headless runs keep a hard cap. `max` removes the task token cap. |
+| `--task-token-budget <tokens>` | Set a numeric task allowance; `0` disables it. Explicit CLI and project values override saved `/budget` choices. |
 | `--no-tui` | Force one-shot CLI mode (no interactive TUI) |
 | `--bare` | Use reduced startup mode; immutably suppress every session hook extension point and skip LSP, plugin sync, and skill discovery while keeping authentication active |
 | `-c`, `--continue` | Continue the latest project session. In the TUI this reopens it; with `-p`, piped stdin or `--no-tui` the prompt runs as one more turn of that session and the process exits with the turn's outcome (`agenc -c -p "next step"`). |

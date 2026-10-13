@@ -1,3 +1,5 @@
+import { setSessionTaskTokenBudget } from "../session/task-budget.js";
+import { TASK_BUDGET_LEVELS, isTaskBudgetLevel, taskBudgetLabel } from "../config/task-budget.js";
 import { promoteOneShotRun, selectRelaxedOneShot } from "../durability/one-shot-durability.js";
 /**
  * Starts daemon-owned background agents through the existing delegate runtime.
@@ -68,6 +70,7 @@ import {
   canCycleToAuto,
   createDisabledAutoModeContext,
   transitionPermissionMode,
+  PermissionModeTransitionPrecommitError,
 } from "../permissions/permission-mode.js";
 import {
   applyPermissionRulesSnapshot,
@@ -534,10 +537,11 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     // A routine run is marked in its immutable runtime options, so the shell
     // sandbox, the dispatch path and MCP questions can tell it apart without
     // reading permission state that changes or is fenced mid-run.
-    const runtimeOptions = routineRun || params.runtimeOptions?.relaxedOneShot !== undefined
+    const runtimeOptions = routineRun || params.runtimeOptions?.relaxedOneShot !== undefined || params.metadata?.mode === "tui" || params.runtimeOptions?.interactiveTaskBudget !== undefined
       ? Object.freeze({
           ...params.runtimeOptions,
           ...(routineRun ? { routineRun: true } : {}),
+          interactiveTaskBudget: params.metadata?.mode === "tui" && params.runtimeOptions?.nonInteractive !== true && !routineRun && params.metadata?.goalRun !== true,
           ...(params.runtimeOptions?.relaxedOneShot !== undefined ? {
             relaxedOneShot: selectRelaxedOneShot({ requested: params.runtimeOptions.relaxedOneShot,
               nonInteractive: params.runtimeOptions.nonInteractive, source: params.metadata?.source,
@@ -1087,11 +1091,12 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         // closed instead of bringing the session back unrestricted.
         const toolPolicy = sessionToolPolicyFromMetadata(params.metadata);
         // A restored routine run stays marked as one (see startAgent).
-        const restoreRuntimeOptions = isRoutineRun(params.metadata) || params.runtimeOptions?.relaxedOneShot !== undefined
+        const restoreRuntimeOptions = isRoutineRun(params.metadata) || params.runtimeOptions?.relaxedOneShot !== undefined || params.metadata?.mode === "tui" || params.runtimeOptions?.interactiveTaskBudget !== undefined
           ? Object.freeze({
               ...params.runtimeOptions,
               ...(params.runtimeOptions?.relaxedOneShot !== undefined ? { relaxedOneShot: false } : {}),
               ...(isRoutineRun(params.metadata) ? { routineRun: true } : {}),
+              interactiveTaskBudget: params.metadata?.mode === "tui" && params.runtimeOptions?.nonInteractive !== true && !isRoutineRun(params.metadata) && params.metadata?.goalRun !== true,
             })
           : params.runtimeOptions;
         // Same ambient-authority scope as first start: restores also run
@@ -3978,29 +3983,38 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         if (sameModeAutoAuthorityRevoked) {
           nextCtx = createDisabledAutoModeContext(liveCurrent);
         } else {
-          const transitioned = runWithCurrentRuntimeSession(
-            active.bootstrap.session,
-            () => {
-              if (target !== "bypassPermissions") {
+          let transitioned: ReturnType<typeof transitionPermissionMode>;
+          try {
+            transitioned = runWithCurrentRuntimeSession(
+              active.bootstrap.session,
+              () => {
+                if (target !== "bypassPermissions") {
+                  return transitionPermissionMode(
+                    transitionContext.mode,
+                    target,
+                    transitionContext,
+                  );
+                }
+                if (workspacePath === undefined) {
+                  throw new Error(
+                    "Switching to bypassPermissions requires a canonical workspace",
+                  );
+                }
                 return transitionPermissionMode(
                   transitionContext.mode,
                   target,
                   transitionContext,
+                  { workspacePath },
                 );
-              }
-              if (workspacePath === undefined) {
-                throw new Error(
-                  "Switching to bypassPermissions requires a canonical workspace",
-                );
-              }
-              return transitionPermissionMode(
-                transitionContext.mode,
-                target,
-                transitionContext,
-                { workspacePath },
-              );
-            },
-          );
+              },
+            );
+          } catch (error) {
+            // This callback computes the next context and has not returned a
+            // registry update, prepared effect, or durable settings event.
+            throw new PermissionModeTransitionPrecommitError(
+              error instanceof Error ? error.message : String(error), { cause: error },
+            );
+          }
           if ("error" in transitioned) {
             throw new Error(
               "Switching to bypassPermissions requires explicit consent for this exact cwd",
@@ -4280,6 +4294,21 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       throw new Error(`AgenC daemon agent not running: ${agentId}`);
     }
     const session = active.bootstrap.session;
+    if (params.taskBudgetLevel !== undefined) {
+      if (!isTaskBudgetLevel(params.taskBudgetLevel) || params.reasoningEffort !== undefined || params.modelVerbosity !== undefined || params.profile !== undefined) throw new Error("A task budget update cannot change other session settings");
+      const store = session.services.configStore;
+      if (store === undefined) throw new Error("No live config authority is available");
+      return withRuntimeSettingsMutation(active, async () => {
+        const staged = await store.prepareReload();
+        try {
+          const requested = TASK_BUDGET_LEVELS[params.taskBudgetLevel!];
+          const configured = staged.config.task_token_budget ?? requested;
+          const effective = setSessionTaskTokenBudget(session, configured);
+          return { applied: true, taskTokenBudget: effective,
+            summary: `Current session budget: ${taskBudgetLabel(effective)}.${configured !== requested ? " Explicit CLI or project settings override the saved choice." : ""}` };
+        } finally { staged.rollback(); staged.settle(); }
+      });
+    }
     if (params.reasoningEffort !== undefined || params.modelVerbosity !== undefined) {
       if (params.reload !== undefined || params.profile !== undefined) {
         throw new Error("An effort or response detail update cannot reload other configuration");

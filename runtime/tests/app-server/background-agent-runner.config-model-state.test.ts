@@ -303,10 +303,49 @@ function makeRunnerHarness(opts: {
     argv: ["node", "agenc"],
     now: () => "2026-05-09T00:00:00.000Z",
   });
-  return { runner, session, stateObject };
+  return { runner, session, stateObject, bootstrap };
 }
 
 describe("daemon config/model state refresh + atomicity", () => {
+  it("applies a saved task budget to the current root without changing model state", async () => {
+    const { runner, session, stateObject } = makeRunnerHarness({ configStore: {
+      current: () => ({ task_token_budget: 2_400_000 }), reload: async () => ({ task_token_budget: 0 }),
+    } });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    Object.assign(session, { config: { taskTokenBudget: 2_400_000 } });
+    const before = stateObject.sessionConfiguration;
+    const result = await runner.applyAgentConfig("parent-session", { sessionId: "session_1", taskBudgetLevel: "max" });
+    expect(result).toMatchObject({ applied: true, taskTokenBudget: 0 });
+    expect(session.config.taskTokenBudget).toBe(0);
+    expect(stateObject.sessionConfiguration).toBe(before);
+  });
+  it("keeps an explicit task budget override when the saved user choice changes", async () => {
+    const { runner, session } = makeRunnerHarness({ configStore: {
+      current: () => ({ task_token_budget: 500 }), reload: async () => ({ task_token_budget: 500 }),
+    } });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    Object.assign(session, { config: { taskTokenBudget: 500 } });
+    const result = await runner.applyAgentConfig("parent-session", { sessionId: "session_1", taskBudgetLevel: "max" });
+    expect(result).toMatchObject({ taskTokenBudget: 500, summary: expect.stringContaining("override") });
+    expect(session.config.taskTokenBudget).toBe(500);
+  });
+
+  it.each([undefined, { nonInteractive: false }])("marks root TUI sessions for checkpoints even though daemon admission is autonomous (%j)", async runtimeOptions => {
+    const { runner, bootstrap } = makeRunnerHarness({ configStore: { current: () => ({}) } });
+    await runner.startAgent({ objective: "work", cwd: "/workspace", metadata: { mode: "tui" }, runtimeOptions: runtimeOptions as never });
+    expect(bootstrap.mock.calls[0]?.[0]).toMatchObject({ executionAdmissionAutonomous: true, runtimeOptions: { interactiveTaskBudget: true } });
+  });
+
+  it("marks a rejected auto transition as precommit and permits a subsequent default transition", async () => {
+    const { runner, session } = makeRunnerHarness({ configStore: { current: () => ({ disable_auto_mode: true }) } });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    await runner.setAgentPermissionMode("parent-session", { sessionId: "session_1", mode: "plan" });
+    await expect(runner.setAgentPermissionMode("parent-session", { sessionId: "session_1", mode: "auto" })).rejects.toMatchObject({ name: "PermissionModeTransitionPrecommitError" });
+    expect(session.permissionModeRegistry.current().mode).toBe("plan");
+    await runner.setAgentPermissionMode("parent-session", { sessionId: "session_1", mode: "default" });
+    expect(session.permissionModeRegistry.current().mode).toBe("default");
+  });
+
   // GAP #12: an unknown profile must be a true no-op — the shared config store
   // must NOT have been reloaded (mutated + subscribers fired) before the
   // unknown-profile error surfaces.

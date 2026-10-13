@@ -1,3 +1,4 @@
+import { PermissionModeTransitionPrecommitError } from "../permissions/permission-mode.js";
 import { PrintInvocation, validatePrintInvokeParams } from "./print-invocation.js";
 import { promoteOneShotRun } from "../durability/one-shot-durability.js";
 import { ROUTINE_SESSION_PREPARE_CAPABILITY, type RoutineSessionPreparation } from "../routines/session-preparation.js";
@@ -4560,7 +4561,7 @@ function validateSessionApplyConfigParams(
   const validated = validateObjectShape(params, {
     methodName: "session.applyConfig",
     stringFields: ["sessionId", "profile"],
-    valueFields: ["reload", "modelVerbosity", "reasoningEffort"],
+    valueFields: ["reload", "modelVerbosity", "reasoningEffort", "taskBudgetLevel"],
   });
   validateRequiredString(validated, "session.applyConfig", "sessionId");
   // Null clears the session's effort so it follows the model default.
@@ -4583,6 +4584,11 @@ function validateSessionApplyConfigParams(
   }
   if (validated.reload !== undefined && typeof validated.reload !== "boolean") {
     throw invalidParams("session.applyConfig param 'reload' must be a boolean");
+  }
+  if (validated.taskBudgetLevel !== undefined &&
+      (typeof validated.taskBudgetLevel !== 'string' || !['eco', 'balanced', 'max'].includes(validated.taskBudgetLevel) ||
+       validated.reasoningEffort !== undefined || validated.modelVerbosity !== undefined || validated.profile !== undefined)) {
+    throw invalidParams("session.applyConfig taskBudgetLevel must be eco, balanced, or max and cannot change other session settings");
   }
   return validated as SessionApplyConfigParams;
 }
@@ -5359,6 +5365,11 @@ function mapDispatchError(
   if (error instanceof DaemonOperationTimeoutError) {
     return errorResponse(id, -32000, error.message, {
       code: error.code, operation: error.operation, timeoutMs: error.timeoutMs,
+    });
+  }
+  if (error instanceof PermissionModeTransitionPrecommitError) {
+    return errorResponse(id, -32602, error.message, {
+      code: "PERMISSION_MODE_TRANSITION_REJECTED", authorityPhase: "precommit",
     });
   }
   if (error instanceof PermissionRuleMutationPrecommitError) {

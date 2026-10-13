@@ -2220,6 +2220,7 @@ export interface SessionHookRunDiagnosticShape extends JsonObject {
 }
 
 export interface SessionApplyConfigParams extends JsonObject {
+  readonly taskBudgetLevel?: "eco" | "balanced" | "max";
   readonly sessionId: string;
   /**
    * Apply only this effort to the idle session, without reloading other
@@ -4095,6 +4096,7 @@ export interface SessionHooksSetDisabledResult extends JsonObject {
 }
 
 export interface SessionApplyConfigResult extends JsonObject {
+  readonly taskTokenBudget?: number;
   readonly sessionId: string;
   /** `true` when any config change was applied to the live session. */
   readonly applied: boolean;

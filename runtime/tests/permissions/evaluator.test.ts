@@ -32,6 +32,7 @@ import {
 } from "./types.js";
 import { createUnattendedPermissionPolicy } from "./unattended-policy.js";
 import type { Session } from "../session/session.js";
+import { createWriteStdinTool } from "../tools/system/write-stdin.js";
 import { createBashTool } from "../tools/system/bash.js";
 
 // ---------------------------------------------------------------------------
@@ -1129,5 +1130,22 @@ describe("hasPermissionsToUseTool — plan mode denies tools that change somethi
     const { context } = buildHarness({ mode: "default" });
     const result = await hasPermissionsToUseTool(makeTool({ name: "Write" }), {}, context);
     expect(result.behavior).not.toBe("deny");
+  });
+});
+
+
+describe("write_stdin poll approval", () => {
+  it.each([{}, { chars: "" }])("allows a pure poll in default mode: %j", async (args) => {
+    const { context } = buildHarness();
+    const decision = await hasPermissionsToUseToolInner(createWriteStdinTool(), { session_id: 4, ...args }, context);
+    expect(decision.behavior).toBe("allow");
+  });
+  it.each(["y", "\n", " "])("retains approval for every nonempty input: %j", async chars => {
+    const { context } = buildHarness();
+    expect((await hasPermissionsToUseToolInner(createWriteStdinTool(), { session_id: 4, chars }, context)).behavior).toBe("ask");
+  });
+  it.each(["deny", "ask"] as const)("honors explicit %s rules even for polling", async behavior => {
+    const { context } = buildHarness(behavior === "deny" ? { denyRules: [{ toolName: "write_stdin" }] } : { askRules: [{ toolName: "write_stdin" }] });
+    expect((await hasPermissionsToUseToolInner(createWriteStdinTool(), { session_id: 4, chars: "" }, context)).behavior).toBe(behavior);
   });
 });

@@ -1298,6 +1298,7 @@ function ElicitationPickerOverlay({
     <AskUserQuestionOverlay
       key={`${pending.request.requestId}:${pending.index}`}
       input={input}
+      allowOther={!pending.request.callId.startsWith("task-budget-checkpoint-")}
       onSubmit={(updatedInput) => {
         const record = updatedInput as { answers?: Record<string, unknown> };
         const raw = record.answers?.[question.question];
@@ -1553,6 +1554,7 @@ function initialState(props: AgenCTuiProps, roleWorkspaceCwd: string): any {
   );
   return {
     ...defaults,
+    lightMode: props.session.services.runtimeOptions?.lightMode === true,
     mainLoopModel: startupModel(props),
     mainLoopModelForSession: startupModel(props),
     toolPermissionContext: initialPermissionContext(props),

@@ -1,3 +1,4 @@
+import { PermissionModeTransitionPrecommitError } from "../permissions/permission-mode.js";
 import { describe, expect, it, vi } from "vitest";
 
 import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
@@ -541,6 +542,15 @@ describe("daemon session-control internal method dispatch", () => {
       sessionId: "session_1",
       mode: "plan",
     });
+  });
+
+  it("marks a pure mode rejection as precommit so the client may make another choice", async () => {
+    const setSessionPermissionMode = vi.fn(async () => { throw new PermissionModeTransitionPrecommitError("Auto mode is unavailable"); });
+    const dispatcher = new AgenCDaemonJsonRpcDispatcher({ agentManager: { setSessionPermissionMode } as never });
+    const connection = dispatcher.createConnection(); await initialize(connection);
+    await expect(connection.dispatch({ jsonrpc: JSON_RPC_VERSION, id: "auto", method: "session.setPermissionMode", params: { sessionId: "session_1", mode: "auto" } })).resolves.toMatchObject({ error: {
+      code: -32602, data: { authorityPhase: "precommit", code: "PERMISSION_MODE_TRANSITION_REJECTED" },
+    } });
   });
 
   it("rejects session.setPermissionMode without a mode", async () => {

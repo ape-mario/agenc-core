@@ -797,6 +797,12 @@ function pushToolUse(
   out.push(makeToolUseMessage(callId, toolName, input, nextUuid()));
 }
 
+function isInterruptedAdmissionResult(value: unknown): boolean {
+  const parsed = typeof value === "string" ? safeJson(value) : value;
+  const message = typeof parsed === "string" ? parsed : payloadRecord(parsed).error;
+  return typeof message === "string" && /^(?:AdmissionDeniedError: )?execution admission cancelled: interrupted$/u.test(message);
+}
+
 function pushToolResult(
   out: any[],
   openTools: Set<string>,
@@ -806,6 +812,7 @@ function pushToolResult(
   nextUuid: () => string,
   isError = false,
   rawResult: unknown = result,
+  metadata?: Record<string, unknown>,
 ): void {
   if (!openTools.has(callId)) {
     settledToolCallIds.add(callId);
@@ -846,7 +853,9 @@ function pushToolResult(
   }
   openTools.delete(callId);
   settledToolCallIds.add(callId);
-  out.push(makeToolResultMessage(callId, result, isError, nextUuid()));
+  const message = makeToolResultMessage(callId, result, isError, nextUuid());
+  if (!isError && metadata?.ui !== undefined) message.fileMutation = metadata.ui;
+  out.push(message);
 }
 
 function streamedToolInput(entry: StreamingToolUse): unknown {
@@ -1831,7 +1840,9 @@ function collapseRepeatedSystemLines(messages: any[]): any[] {
     if (
       isNotice &&
       repeatedContent === message.content &&
-      previous?.level === message.level
+      previous?.level === message.level &&
+      message.content !== "Turn interrupted." &&
+      message.content !== "Tool execution cancelled: interrupted."
     ) {
       count += 1;
       collapsed[collapsed.length - 1] = {
@@ -1886,6 +1897,16 @@ export function adaptTranscriptEvents(
   let lastAssistantText = "";
   let lastAssistantTextForActiveTurn = "";
   let isStreaming = false;
+  const interruptionNotices = new Set<string>();
+  let admissionCancellationNoticeUuid: string | null = null;
+  let pendingTaskBudgetNotice: { message: string; uuid: string } | null = null;
+
+  const flushPendingTaskBudgetNotice = (): void => {
+    if (pendingTaskBudgetNotice !== null) {
+      out.push(makeSystemMessage(pendingTaskBudgetNotice.message, "warning", pendingTaskBudgetNotice.uuid));
+      pendingTaskBudgetNotice = null;
+    }
+  };
 
   const persistAssistantText = (
     content: string,
@@ -1945,6 +1966,7 @@ export function adaptTranscriptEvents(
         sessionUsage = latestSessionUsage(sessionUsage, event);
         break;
       case "history_cleared":
+        pendingTaskBudgetNotice = null;
         out.length = 0;
         seen.clear();
         seen.add(event.key);
@@ -1970,6 +1992,7 @@ export function adaptTranscriptEvents(
         isStreaming = false;
         break;
       case "history_replaced": {
+        pendingTaskBudgetNotice = null;
         out.length = 0;
         seen.clear();
         seen.add(event.key);
@@ -2024,8 +2047,11 @@ export function adaptTranscriptEvents(
       case "turn_start":
       case "turn_started":
         if (typeof payload.turnId !== "string" || payload.turnId !== currentTurnId) {
+          flushPendingTaskBudgetNotice();
           lastAssistantText = "";
           lastAssistantTextForActiveTurn = "";
+          interruptionNotices.clear();
+          admissionCancellationNoticeUuid = null;
         }
         isStreaming = true;
         streamingText = "";
@@ -2164,11 +2190,30 @@ export function adaptTranscriptEvents(
         suppressedStreamingToolCallIds.clear();
         suppressedStreamingToolInputIndexes.clear();
         pendingToolInputDeltas.clear();
-        out.push(event.type === "turn_failed"
-          ? makeSystemMessage(stringResult(payload.message), "error", nextUuid())
-          : makeSystemMessage(`Turn aborted: ${stringResult(payload.reason)}`, "warning", nextUuid()));
+        if (event.type === "turn_failed" && payload.code === "task_budget" && lastAssistantText.startsWith("Partial result: stopped at the task budget.")) {
+          pendingTaskBudgetNotice = null;
+        } else if (event.type === "turn_aborted" && payload.reason === "interrupted") {
+          if (!interruptionNotices.has("turn")) {
+            interruptionNotices.add("turn");
+            out.push(makeSystemMessage("Turn interrupted.", "warning", nextUuid()));
+          }
+        } else {
+          out.push(event.type === "turn_failed"
+            ? makeSystemMessage(stringResult(payload.message), "error", nextUuid())
+            : makeSystemMessage(`Turn aborted: ${stringResult(payload.reason)}`, "warning", nextUuid()));
+        }
         break;
       case "execution_admission":
+        if (payload.event === "denied" && payload.kind === "model_turn" && payload.reason === "budget_exceeded") {
+          const details = payloadRecord(payload.details);
+          const used = typeof details.usedTokens === "number" ? details.usedTokens + (typeof details.heldTokens === "number" ? details.heldTokens : 0) : null;
+          const max = typeof details.maxTokens === "number" ? details.maxTokens : null;
+          pendingTaskBudgetNotice = { uuid: nextUuid(), message:
+            used !== null && max !== null
+              ? `The task used ${used} of ${max} tokens. Type /budget to raise or remove the cap for this session, then continue.`
+              : "A budget limit stopped this task. Type /budget to review the task allowance, then continue. Independent spending limits still apply." };
+          break;
+        }
         if (payload.event === "dispatched" && payload.kind === "model_turn") {
           currentTurnModelCalls += 1;
         }
@@ -2195,6 +2240,9 @@ export function adaptTranscriptEvents(
         }
         break;
       case "user_message":
+        flushPendingTaskBudgetNotice();
+        interruptionNotices.clear();
+        admissionCancellationNoticeUuid = null;
         // A submitted user message is a hard visible turn boundary. Some
         // daemon streams can miss or de-dupe lifecycle events between prompts,
         // so close any live assistant text here before accumulating the next
@@ -2334,6 +2382,7 @@ export function adaptTranscriptEvents(
         realtimeStreamingText = "";
         break;
       case "agent_message":
+        if (typeof payload.message === "string" && payload.message.startsWith("Partial result: stopped at the task budget.")) pendingTaskBudgetNotice = null;
         if (typeof payload.message === "string" && payload.message !== lastAssistantText) {
           const subagent = parseSubagentNotification(payload.message);
           if (subagent !== null) {
@@ -2352,6 +2401,7 @@ export function adaptTranscriptEvents(
         streamingText = "";
         break;
       case "tool_call":
+        flushStreamingText(nextUuid);
         if (
           "toolCall" in raw &&
           raw.toolCall &&
@@ -2394,6 +2444,7 @@ export function adaptTranscriptEvents(
       case "tool_call_started":
       case "mcp_tool_call_begin":
       case "exec_command_begin": {
+        flushStreamingText(nextUuid);
         const callId =
           typeof payload.callId === "string" ? payload.callId : null;
         if (callId === null) break;
@@ -2438,6 +2489,7 @@ export function adaptTranscriptEvents(
         break;
       }
       case "tool_input_block_start": {
+        flushStreamingText(nextUuid);
         // Provider-emitted (R6) when a tool_use content
         // block begins streaming. Matches the content_block_start case in
         // messages.ts:3024-3037 that appends a new element to the
@@ -2609,7 +2661,22 @@ export function adaptTranscriptEvents(
             : event.type === "mcp_tool_call_end"
               ? "MCP"
               : "tool");
-        const result = formatStructuredToolResult(toolName, event.type, payload);
+        if (settledToolCallIds.has(callId)) break;
+        const interruptedAdmission = isError && isInterruptedAdmissionResult(payload.result);
+        if (interruptedAdmission) {
+          interruptionNotices.add("admission");
+          // The failed tool row owns this notice. Remove a standalone error
+          // that arrived earlier, so either delivery order produces one row.
+          if (admissionCancellationNoticeUuid !== null) {
+            const index = out.findIndex(message => message.uuid === admissionCancellationNoticeUuid);
+            if (index !== -1) {
+              out.splice(index, 1);
+              currentTurnAssistantMessageIndexes = currentTurnAssistantMessageIndexes.map(value => value > index ? value - 1 : value);
+            }
+            admissionCancellationNoticeUuid = null;
+          }
+        }
+        const result = interruptedAdmission ? "Tool execution cancelled: interrupted." : formatStructuredToolResult(toolName, event.type, payload);
         // The EnterPlanMode tool result carries the full plan-mode
         // instructions for the MODEL ("In plan mode, you should: … DO NOT
         // write or edit any files except the plan file"). Rendering that
@@ -2627,7 +2694,8 @@ export function adaptTranscriptEvents(
           displayResult,
           nextUuid,
           isError,
-          payload.result,
+          interruptedAdmission ? result : payload.result,
+          metadataRecord(payload),
         );
         runningToolNames.delete(callId);
         // Remove the matching streaming-tool-use element so the
@@ -2697,9 +2765,19 @@ export function adaptTranscriptEvents(
         out.push(makeSystemMessage(formatBackgroundAgentStatus(payload), "info", nextUuid()));
         break;
       case "error":
-      case "stream_error":
-        out.push(makeSystemMessage(stringResult(payload.message), "error", nextUuid()));
+      case "stream_error": {
+        const message = stringResult(payload.message);
+        if (/^(?:AdmissionDeniedError: )?execution admission cancelled: interrupted$/u.test(message)) {
+          if (!interruptionNotices.has("admission")) {
+            interruptionNotices.add("admission");
+            admissionCancellationNoticeUuid = nextUuid();
+            out.push(makeSystemMessage("Tool execution cancelled: interrupted.", "error", admissionCancellationNoticeUuid));
+          }
+        } else {
+          out.push(makeSystemMessage(message, "error", nextUuid()));
+        }
         break;
+      }
       case "slash_result": {
         // Format SlashCommandResult based on its kind instead of
         // JSON.stringifying the raw object — otherwise the user sees
@@ -2995,6 +3073,7 @@ export function adaptTranscriptEvents(
     }
   }
 
+  flushPendingTaskBudgetNotice();
   return {
     messages: collapseRepeatedSystemLines(out),
     streamingText:

@@ -641,12 +641,13 @@ export function statusLineSegments(
   branch: string | null,
   spend: string,
   effort: string | null = null,
+  lightMode = false,
 ): StatusLineSegments {
   return {
     folder: columns >= STATUS_FOLDER_MIN_COLUMNS ? folder : null,
     model: modelLabel,
     effort,
-    mode: statusModeLabel(mode),
+    mode: `${statusModeLabel(mode)}${lightMode ? " · Light" : ""}`,
     branch: branch !== null && columns >= STATUS_BRANCH_MIN_COLUMNS ? branch : null,
     spend: spend === '' ? null : spend,
   };
@@ -678,7 +679,8 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const spend = useSessionSpendLabel();
   const branch = useGitChromeLabel();
   const effort = useStatusEffort();
-  const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, branch, spend, effort);
+  const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) === true;
+  const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, branch, spend, effort, lightMode);
   const bypass = mode === 'bypassPermissions';
   const separator = <ThemedText color="subtle">{STATUS_SEPARATOR}</ThemedText>;
   return (

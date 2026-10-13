@@ -17,7 +17,6 @@ import {
 import { computeSpinnerMessageMaxWidth, truncateSpinnerText } from './utils.js';
 
 const SEP_WIDTH = stringWidth(' · ');
-const THINKING_BARE_WIDTH = stringWidth('thinking');
 // Show the elapsed timer + token counter almost immediately (Claude Code
 // parity): 30s felt like the indicator was frozen/slow on every normal turn.
 // The tok/s rate keeps its own ≥20-token/≥5s floor, so early reads show the
@@ -243,7 +242,6 @@ export function SpinnerAnimationRow({
   teammateTokens,
   foregroundedTeammate,
   thinkingStatus,
-  effortSuffix,
   showLeaderTokenStats = true,
 }: SpinnerAnimationRowProps): React.ReactNode {
   // Whole-second wall clock with a live tick, so the elapsed timer and the
@@ -317,7 +315,7 @@ export function SpinnerAnimationRow({
 
   let thinkingText =
     thinkingStatus === 'thinking'
-      ? `thinking${effortSuffix}`
+      ? 'thinking'
       : typeof thinkingStatus === 'number'
         ? `thought for ${Math.max(1, Math.round(thinkingStatus / 1000))}s`
         : null;
@@ -334,13 +332,7 @@ export function SpinnerAnimationRow({
     (showLeaderTokenStats && (elapsedTimeMs > SHOW_TOKENS_AFTER_MS || showStallNote));
   const availableSpace = columns - messageWidth - 5;
   let showThinking = wantsThinking && availableSpace > thinkingWidthValue;
-  if (!showThinking && wantsThinking && thinkingStatus === 'thinking' && effortSuffix) {
-    if (availableSpace > THINKING_BARE_WIDTH) {
-      thinkingText = 'thinking';
-      thinkingWidthValue = THINKING_BARE_WIDTH;
-      showThinking = true;
-    }
-  }
+
 
   const usedAfterThinking = showThinking ? thinkingWidthValue + SEP_WIDTH : 0;
   const showTimer = wantsTimerAndTokens && availableSpace > usedAfterThinking + timerWidth;

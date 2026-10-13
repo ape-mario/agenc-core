@@ -956,10 +956,11 @@ named budget levels or a production progress policy.
 
 Choose a named token allocation with `budget_level = "eco"` (1,000,000 tokens),
 `budget_level = "balanced"` (2,400,000), or `budget_level = "max"` (no token cap).
-The CLI equivalent is `--budget eco|balanced|max`. `/budget` shows the active
-session's allocation; `/budget balanced` saves the choice for new sessions.
-An existing session retains its allocation and usage. Independent call and cost
-limits still apply to `max`.
+The CLI equivalent is `--budget eco|balanced|max`. `/budget` opens a picker
+for the current session; `/budget balanced` applies that choice immediately and
+saves it for new sessions. Existing usage and reservations are retained. Explicit
+CLI and project settings still override the saved user choice, and the confirmation
+states the effective allowance. Independent call and cost limits still apply to `max`.
 
 A higher configuration layer replaces a lower layer's named or numeric choice.
 An explicit `task_token_budget` wins over `budget_level` in the same layer,
@@ -980,15 +981,28 @@ The allocation belongs to the session/run, including retries, auxiliary model
 calls, and delegated agents. Model-call reservations share the root allocation
 atomically; undispatched reservations are refunded, while dispatched attempts
 with unknown usage remain charged across restart. Restoring a session cannot
-raise its persisted call ceiling. Use a fresh session for each independent task. At 80% of either allocation,
-or earlier when the remaining tokens fit at most two recent-size requests,
-the model receives one reminder to finish its most likely fix, run the decisive
-check, and report. Requests that cannot fit their input and maximum output in the
-remaining allocation are refused before dispatch, so a run can end below its cap.
+raise its persisted call ceiling. Use a fresh session for each independent task.
+
+Interactive TUI sessions treat the token allowance as a checkpoint. One quiet
+warning appears at 80% of each allowance. Before a model request would cross the
+remaining allowance, the turn pauses with its history and admitted tool results
+intact. The card shows recorded token usage and approximate recorded cost, then
+lets you choose Continue (one more allowance), Remove the limit for this task,
+or Stop here. Enter selects Continue by default; Esc stops with a partial result.
+Continue asks again at the next checkpoint. Removing the limit lasts for this
+task and does not save a new default. Level `max` has no token checkpoints.
+Independent call, cost, provider-overrun, child and calendar limits still apply.
+
+Headless print runs, goals, routines, autonomous runs and delegated/background
+sessions keep the hard cap and partial-result behavior. At 80% of either
+allocation, or earlier when remaining tokens fit at most two recent-size
+requests, the model receives one reminder to finish the decisive check and
+report. Requests that cannot fit their input and maximum output are refused
+before dispatch, so these runs can end below the cap.
 Input counts are estimates. Reported model usage replaces the reservation; a
 token-estimate miss does not abort an otherwise admitted response. If actual
-usage reaches the task cap, admitted tools finish before the partial summary,
-and no further model call is admitted. A response can therefore put actual usage
+usage reaches a hard task cap, admitted tools finish before the partial summary,
+and no further model call is admitted without an operator budget update. A response can therefore put actual usage
 above the cap. Independent monetary limits remain enforced.
 In-flight tools finish before a local partial-result summary is emitted. No extra
 model call is spent generating that summary. Unknown usage retains its reserved

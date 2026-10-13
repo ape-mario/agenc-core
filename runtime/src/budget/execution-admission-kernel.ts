@@ -114,6 +114,7 @@ interface ClientBudgetState {
   readonly runAllocationKey: string;
   readonly taskAllocationKey?: string;
   /** Durable root-agent identity for cumulative calendar-window caps. */
+  readonly operatorTokenCeiling?: number;
   readonly periodIdentity: string;
   readonly periodPolicy?: Pick<
     ExecutionAdmissionBudgetPolicy,
@@ -475,6 +476,27 @@ export class ExecutionAdmissionKernel {
     if (binding.clientRefs === 0) return;
     binding.clientRefs -= 1;
     this.#evictIdleBinding(binding);
+  }
+
+  setTaskTokenBudget(binding: ClientBinding, tokens: number): number {
+    if (!Number.isSafeInteger(tokens) || tokens < 0) throw new TypeError("Invalid task token allowance");
+    if (binding.scope.parentRunId !== undefined || binding.scope.taskId !== undefined) {
+      throw new Error("Only a root session can change its task token allowance");
+    }
+    this.#flushCaptured(binding.workspace);
+    const effective = minimumDefined(tokens === 0 ? undefined : tokens, binding.budget.operatorTokenCeiling);
+    binding.workspace.repository.setRootTaskTokenBudget(binding.scope.runId, binding.budget.runAllocationKey, effective);
+    // Child bindings share these ancestor objects; their own caps stay intact.
+    const rootScope = binding.budget.scopes.find(scope => scope.key === binding.budget.runAllocationKey)!;
+    const mutable = rootScope as { maxTokens?: number };
+    if (effective === undefined) delete mutable.maxTokens;
+    else mutable.maxTokens = effective;
+    const scope = binding.scope as { maxTokens?: number; hasHardTokenCap?: boolean };
+    scope.hasHardTokenCap = effective !== undefined || binding.budget.periodPolicy?.dailyTokens !== undefined || binding.budget.periodPolicy?.monthlyTokens !== undefined;
+    if (effective === undefined) delete scope.maxTokens;
+    else scope.maxTokens = effective;
+    this.#scheduleDrain();
+    return effective ?? 0;
   }
 
   updateLimits(limits: AdmissionConcurrencyLimits): void {
@@ -1841,6 +1863,10 @@ class KernelAdmissionClient implements ExecutionAdmissionClient {
     this.releaseClient?.();
   }
 
+  setTaskTokenBudget(tokens: number): number {
+    return this.kernel.setTaskTokenBudget(this.binding, tokens);
+  }
+
   get scope(): AdmissionClientScope {
     return this.binding.scope;
   }
@@ -2036,6 +2062,7 @@ function rootBudgetState(
   return {
     scopes,
     runAllocationKey,
+    ...(policy?.runMaxTokens !== undefined ? { operatorTokenCeiling: policy.runMaxTokens } : {}),
     periodIdentity: scope.budgetIdentity,
     ...(periodPolicy !== undefined ? { periodPolicy } : {}),
   };

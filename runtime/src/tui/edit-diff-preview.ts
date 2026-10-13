@@ -117,10 +117,26 @@ export function editPairsFromInput(
 export function buildEditDiffPreview(
   toolName: string,
   input: unknown,
+  fileMutation?: unknown,
 ): EditDiffPreview | null {
   const extracted = editPairsFromInput(toolName, input);
   if (extracted === null) return null;
   const { file, pairs } = extracted;
+  // Completed Write receipts know the previous file contents. Input alone
+  // cannot distinguish an overwrite from a new file, so use the real counts
+  // and avoid displaying unchanged lines as additions for an overwrite.
+  if (toolName === "Write" && isRecord(fileMutation) &&
+      fileMutation.kind === "file_mutation" &&
+      (fileMutation.operation === "write" || fileMutation.operation === "create") &&
+      Number.isSafeInteger(fileMutation.additions) && Number.isSafeInteger(fileMutation.removals) &&
+      (fileMutation.additions as number) >= 0 && (fileMutation.removals as number) >= 0) {
+    const additions = fileMutation.additions as number;
+    const removals = fileMutation.removals as number;
+    if (fileMutation.operation === "write") {
+      return { file, additions, removals, stats: `+${additions} -${removals}`, lines: [], remaining: 0 };
+    }
+  }
+
 
   const lines: DiffPreviewLine[] = [];
   let additions = 0;
