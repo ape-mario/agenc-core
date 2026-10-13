@@ -99,9 +99,22 @@ export interface AdmissionUsageTotals {
   readonly heldCostUsd: number;
 }
 
+/** Bounded diagnostic identities; observation only, never spending authority. */
+export type UnpricedUsageCall = {
+  readonly reservationId: string;
+  readonly runId: string;
+  readonly stepId: string;
+  readonly kind: string;
+  readonly model?: string;
+  readonly provider?: string;
+  readonly reason: string;
+};
+
 export interface AdmissionUsageSummary extends AdmissionUsageTotals {
   readonly runId: string;
   readonly sequence: number;
+  readonly unpricedCalls?: readonly UnpricedUsageCall[];
+  readonly unpricedCallCount?: number;
   readonly models: readonly (AdmissionUsageTotals & {
     readonly model: string;
     readonly provider?: string;

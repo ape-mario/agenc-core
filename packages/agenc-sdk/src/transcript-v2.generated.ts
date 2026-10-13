@@ -71,6 +71,16 @@ export interface SessionTranscriptV2Event extends TranscriptV2JsonObject {
     readonly modelCalls?: number;
     readonly hasUnknownCost?: boolean;
     readonly costEstimated?: boolean;
+    readonly unpricedCallCount?: number;
+    readonly unpricedCalls?: readonly {
+      readonly reservationId: string;
+      readonly runId: string;
+      readonly stepId: string;
+      readonly kind: string;
+      readonly model?: string;
+      readonly provider?: string;
+      readonly reason: string;
+    }[];
     readonly models?: readonly {
       readonly model: string;
       readonly provider?: string;

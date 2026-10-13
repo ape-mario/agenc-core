@@ -28,6 +28,24 @@ function capture(projection: AdmissionUsageProjection, runId = "parent", sequenc
 }
 
 describe("AdmissionUsageProjection", () => {
+  it("names unresolved calls, snapshots their reasons, and removes resolved diagnostics", () => {
+    const projection = new AdmissionUsageProjection();
+    const unresolved = row({ reservation_id: "missing", step_id: "turn-2", status: "held_unknown", actual_cost_nanos: null,
+      model: "deepseek-flash", provider: "deepseek", resolution_reason: "cancelled_after_dispatch:interrupted" });
+    projection.update("missing", unresolved);
+    const before = projection.capture("parent", 1);
+    expect(before.read().unpricedCalls).toEqual([{
+      reservationId: "missing", runId: "parent", stepId: "turn-2", kind: "model_turn", model: "deepseek-flash", provider: "deepseek",
+      reason: "cancelled_after_dispatch:interrupted",
+    }]);
+    projection.update("missing", { ...unresolved, resolution_reason: "missing_provider_usage" });
+    expect(projection.capture("parent", 2).signature).not.toBe(before.signature);
+    expect(before.read().unpricedCalls?.[0]?.reason).toBe("cancelled_after_dispatch:interrupted");
+    projection.update("missing", { ...unresolved, status: "reconciled", actual_cost_nanos: 25 });
+    expect(capture(projection).unpricedCalls).toBeUndefined();
+    expect(capture(projection).hasUnknownCost).toBe(false);
+  });
+
   it.each([
     [
       "reserved",
