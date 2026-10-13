@@ -797,6 +797,12 @@ function pushToolUse(
   out.push(makeToolUseMessage(callId, toolName, input, nextUuid()));
 }
 
+function isInterruptedAdmissionResult(value: unknown): boolean {
+  const parsed = typeof value === "string" ? safeJson(value) : value;
+  const message = typeof parsed === "string" ? parsed : payloadRecord(parsed).error;
+  return typeof message === "string" && /^(?:AdmissionDeniedError: )?execution admission cancelled: interrupted$/u.test(message);
+}
+
 function pushToolResult(
   out: any[],
   openTools: Set<string>,
@@ -1834,7 +1840,9 @@ function collapseRepeatedSystemLines(messages: any[]): any[] {
     if (
       isNotice &&
       repeatedContent === message.content &&
-      previous?.level === message.level
+      previous?.level === message.level &&
+      message.content !== "Turn interrupted." &&
+      message.content !== "Tool execution cancelled: interrupted."
     ) {
       count += 1;
       collapsed[collapsed.length - 1] = {
@@ -1889,6 +1897,8 @@ export function adaptTranscriptEvents(
   let lastAssistantText = "";
   let lastAssistantTextForActiveTurn = "";
   let isStreaming = false;
+  const interruptionNotices = new Set<string>();
+  let admissionCancellationNoticeUuid: string | null = null;
 
   const persistAssistantText = (
     content: string,
@@ -2029,6 +2039,8 @@ export function adaptTranscriptEvents(
         if (typeof payload.turnId !== "string" || payload.turnId !== currentTurnId) {
           lastAssistantText = "";
           lastAssistantTextForActiveTurn = "";
+          interruptionNotices.clear();
+          admissionCancellationNoticeUuid = null;
         }
         isStreaming = true;
         streamingText = "";
@@ -2167,9 +2179,16 @@ export function adaptTranscriptEvents(
         suppressedStreamingToolCallIds.clear();
         suppressedStreamingToolInputIndexes.clear();
         pendingToolInputDeltas.clear();
-        out.push(event.type === "turn_failed"
-          ? makeSystemMessage(stringResult(payload.message), "error", nextUuid())
-          : makeSystemMessage(`Turn aborted: ${stringResult(payload.reason)}`, "warning", nextUuid()));
+        if (event.type === "turn_aborted" && payload.reason === "interrupted") {
+          if (!interruptionNotices.has("turn")) {
+            interruptionNotices.add("turn");
+            out.push(makeSystemMessage("Turn interrupted.", "warning", nextUuid()));
+          }
+        } else {
+          out.push(event.type === "turn_failed"
+            ? makeSystemMessage(stringResult(payload.message), "error", nextUuid())
+            : makeSystemMessage(`Turn aborted: ${stringResult(payload.reason)}`, "warning", nextUuid()));
+        }
         break;
       case "execution_admission":
         if (payload.event === "dispatched" && payload.kind === "model_turn") {
@@ -2198,6 +2217,8 @@ export function adaptTranscriptEvents(
         }
         break;
       case "user_message":
+        interruptionNotices.clear();
+        admissionCancellationNoticeUuid = null;
         // A submitted user message is a hard visible turn boundary. Some
         // daemon streams can miss or de-dupe lifecycle events between prompts,
         // so close any live assistant text here before accumulating the next
@@ -2615,7 +2636,22 @@ export function adaptTranscriptEvents(
             : event.type === "mcp_tool_call_end"
               ? "MCP"
               : "tool");
-        const result = formatStructuredToolResult(toolName, event.type, payload);
+        if (settledToolCallIds.has(callId)) break;
+        const interruptedAdmission = isError && isInterruptedAdmissionResult(payload.result);
+        if (interruptedAdmission) {
+          interruptionNotices.add("admission");
+          // The failed tool row owns this notice. Remove a standalone error
+          // that arrived earlier, so either delivery order produces one row.
+          if (admissionCancellationNoticeUuid !== null) {
+            const index = out.findIndex(message => message.uuid === admissionCancellationNoticeUuid);
+            if (index !== -1) {
+              out.splice(index, 1);
+              currentTurnAssistantMessageIndexes = currentTurnAssistantMessageIndexes.map(value => value > index ? value - 1 : value);
+            }
+            admissionCancellationNoticeUuid = null;
+          }
+        }
+        const result = interruptedAdmission ? "Tool execution cancelled: interrupted." : formatStructuredToolResult(toolName, event.type, payload);
         // The EnterPlanMode tool result carries the full plan-mode
         // instructions for the MODEL ("In plan mode, you should: … DO NOT
         // write or edit any files except the plan file"). Rendering that
@@ -2633,7 +2669,7 @@ export function adaptTranscriptEvents(
           displayResult,
           nextUuid,
           isError,
-          payload.result,
+          interruptedAdmission ? result : payload.result,
           metadataRecord(payload),
         );
         runningToolNames.delete(callId);
@@ -2704,9 +2740,19 @@ export function adaptTranscriptEvents(
         out.push(makeSystemMessage(formatBackgroundAgentStatus(payload), "info", nextUuid()));
         break;
       case "error":
-      case "stream_error":
-        out.push(makeSystemMessage(stringResult(payload.message), "error", nextUuid()));
+      case "stream_error": {
+        const message = stringResult(payload.message);
+        if (/^(?:AdmissionDeniedError: )?execution admission cancelled: interrupted$/u.test(message)) {
+          if (!interruptionNotices.has("admission")) {
+            interruptionNotices.add("admission");
+            admissionCancellationNoticeUuid = nextUuid();
+            out.push(makeSystemMessage("Tool execution cancelled: interrupted.", "error", admissionCancellationNoticeUuid));
+          }
+        } else {
+          out.push(makeSystemMessage(message, "error", nextUuid()));
+        }
         break;
+      }
       case "slash_result": {
         // Format SlashCommandResult based on its kind instead of
         // JSON.stringifying the raw object — otherwise the user sees
