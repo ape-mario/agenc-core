@@ -110,8 +110,15 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
       deferred: false,
     },
     // TOOL-02: non-empty stdin is a second shell channel; require approval
-    // under on_request (empty poll still hits approval once — safer than opt-out).
+    // under on_request. Empty polls only observe the already-admitted process.
     requiresApproval: true,
+    checkPermissions(input) {
+      const args = input as Record<string, unknown>;
+      if (args.chars === undefined || args.chars === "") {
+        return { behavior: "allow", updatedInput: args, decisionReason: { type: "other", reason: "polling output of an existing execution session" } };
+      }
+      return { behavior: "passthrough", message: "Writing input to an execution session requires approval." };
+    },
     concurrencyClass: { kind: "background_terminal" },
     isReadOnly: false,
     // Unified exec owns the bounded polling yield. The generic executor
