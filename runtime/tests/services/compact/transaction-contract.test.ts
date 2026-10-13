@@ -1096,7 +1096,7 @@ describe("transactional compaction production path", () => {
           { type: "compaction_intent" },
           { type: "compaction_failed", payload: { reason: "aborted" } },
         ]);
-      const nextLease = store.acquireCompactionLease("after-quiescence");
+      const nextLease = await store.acquireCompactionLease("after-quiescence");
       await nextLease.release();
     });
   });
