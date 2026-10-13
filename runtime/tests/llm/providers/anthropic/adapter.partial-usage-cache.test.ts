@@ -64,10 +64,10 @@ describe("AnthropicProvider streaming usage (cache tokens + stale merge)", () =>
       expect(response.partial).toBe(true);
       expect(response.finishReason).toBe("error");
       expect(response.content).toBe("partial");
-      // Core counts preserved.
+      // Core counts preserved. Total includes cache reads and writes (#2772).
       expect(response.usage.promptTokens).toBe(11);
       expect(response.usage.completionTokens).toBe(3);
-      expect(response.usage.totalTokens).toBe(14);
+      expect(response.usage.totalTokens).toBe(26);
       expect(response.usage.cacheInputExcludedFromPrompt).toBe(true);
       expect(taskUsageTokens(response.usage)).toBe(26);
       expect(response.usage.availability).toBe("unknown");
