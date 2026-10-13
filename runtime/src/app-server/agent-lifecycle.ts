@@ -5574,11 +5574,14 @@ function assertAuthoritativeResumeSource(params: {
     }
     const explicitlyTopLevel =
       meta.originator === "agenc-cli" && meta.source === "interactive-root";
+    const reviewedRollbackTopLevel =
+      meta.source === "interactive-root-reviewed-rollback" &&
+      /^c2-reviewed-rollback:[a-f0-9]{64}$/u.test(meta.originator);
     const retainedLegacyTopLevel =
       meta.originator === "agenc-cli" &&
       meta.source === undefined &&
       params.allowLegacyRetainedRoot;
-    if (!explicitlyTopLevel && !retainedLegacyTopLevel) {
+    if (!explicitlyTopLevel && !retainedLegacyTopLevel && !reviewedRollbackTopLevel) {
       fail(
         "agent.create resume rollout is not a top-level interactive session",
       );

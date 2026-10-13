@@ -1357,6 +1357,18 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           dispatchChain: Promise.resolve(),
         };
         authorityOwner = active;
+        if (active.runtimeSettings === undefined) {
+          const branchMeta = bootstrap.rolloutStore.readAll().find((item) => item.type === "session_meta");
+          if (branchMeta?.type === "session_meta" &&
+              branchMeta.payload.source === "interactive-root-reviewed-rollback" &&
+              /^c2-reviewed-rollback:[a-f0-9]{64}$/u.test(branchMeta.payload.originator)) {
+            // A reviewed branch copies conversation history into a new run,
+            // not the source run's settings authority. Establish the normal
+            // durable baseline from this run's validated live configuration.
+            requireCanonicalRuntimeSettingsSupport(active, params.agentId);
+            ensureInitialRuntimeSettings(active, params.agentId);
+          }
+        }
         if (
           canonicalRuntimeState.runtimeSettings !== undefined &&
           restoredRuntimeSettings !== undefined &&

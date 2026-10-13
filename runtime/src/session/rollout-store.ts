@@ -104,7 +104,7 @@ import {
   type ToolPairProjection,
   type ToolPairValidationOutcome,
 } from "./tool-pair-validator.js";
-import { formatIdentityForLog } from "./tool-result-integrity.js";
+import { deterministicToolResultId, formatIdentityForLog, verifyToolResultIntegrity } from "./tool-result-integrity.js";
 import {
   CompactionPinQuotaError,
   CompactionRetentionRepository,
@@ -731,6 +731,35 @@ function reviewedRollbackTargetOriginator(
       commit_sha256: rollback.commit_sha256,
     },
   )}`;
+}
+
+function reviewedRollbackTargetHistory(
+  rollback: CompactionRollbackCommittedV1,
+): CompactionProjectionMessageV1[] {
+  return rollback.source_history.map((source) => {
+    const message = cloneProjectionMessage(source);
+    const integrity = message.toolResultIntegrity;
+    if (integrity === undefined) return message;
+    if (message.role !== "tool" || message.toolCallId === undefined) {
+      throw new CompactionTransactionError("commit_failed", "rollback source has misplaced tool-result integrity");
+    }
+    const verified = verifyToolResultIntegrity({
+      integrity,
+      expectedRunId: rollback.source_session_id,
+      toolCallId: message.toolCallId,
+      content: message.content,
+    });
+    if (verified.status !== "valid") {
+      throw new CompactionTransactionError("commit_failed", "rollback source tool-result integrity could not be verified");
+    }
+    // The durable rollback authorizes this copy into a distinct run. Preserve
+    // both body digests and representation; only its run-scoped identity changes.
+    return { ...message, toolResultIntegrity: {
+      ...verified.integrity,
+      runId: rollback.target_session_id,
+      resultId: deterministicToolResultId(rollback.target_session_id, message.toolCallId),
+    } };
+  });
 }
 
 function assertCompactionItemFitsCanonicalLine(item: RolloutItem): void {
@@ -1986,11 +2015,18 @@ export class RolloutStore {
     const target = reservation.target;
     const lineageOriginator = reviewedRollbackTargetOriginator(rollback);
     if (!reservation.opened) {
+      const sourceMeta = this.store.readAll().find((item) => item.type === "session_meta");
+      const interactiveSource = sourceMeta?.type === "session_meta" &&
+        ((sourceMeta.payload.originator === "agenc-cli" &&
+          sourceMeta.payload.source === "interactive-root") ||
+         (/^c2-reviewed-rollback:[a-f0-9]{64}$/u.test(sourceMeta.payload.originator) &&
+          sourceMeta.payload.source === "interactive-root-reviewed-rollback"));
       target.open({
         sessionId: rollback.target_session_id,
         timestamp: new Date(rollback.recorded_at_ms).toISOString(),
         cwd: this.store.cwd,
         originator: lineageOriginator,
+        ...(interactiveSource ? { source: "interactive-root-reviewed-rollback" } : {}),
         agencVersion: this.store.agencVersion,
       });
       reservation.opened = true;
@@ -2023,12 +2059,13 @@ export class RolloutStore {
     const projected = existing.flatMap((item) =>
       item.type === "response_item" ? [item.payload] : [],
     );
+    const targetHistory = reviewedRollbackTargetHistory(rollback);
     if (
-      projected.length > rollback.source_history.length ||
+      projected.length > targetHistory.length ||
       projected.some(
         (message, index) =>
           canonicalizeSourceJson(message) !==
-          canonicalizeSourceJson(rollback.source_history[index]),
+          canonicalizeSourceJson(targetHistory[index]),
       )
     ) {
       throw new CompactionTransactionError(
@@ -2044,18 +2081,19 @@ export class RolloutStore {
   ): void {
     this.openAndValidateReviewedRollbackTarget(rollback, reservation);
     const target = reservation.target;
+    const targetHistory = reviewedRollbackTargetHistory(rollback);
     const projected = target
       .readAll()
       .flatMap((item) => (item.type === "response_item" ? [item.payload] : []));
     for (
       let index = projected.length;
-      index < rollback.source_history.length;
+      index < targetHistory.length;
       index += 1
     ) {
       target.appendRollout(
         {
           type: "response_item",
-          payload: cloneProjectionMessage(rollback.source_history[index]!),
+          payload: targetHistory[index]!,
         },
         { durable: true },
       );
@@ -2065,7 +2103,7 @@ export class RolloutStore {
       .flatMap((item) => (item.type === "response_item" ? [item.payload] : []));
     if (
       canonicalizeSourceJson(materialized) !==
-      canonicalizeSourceJson(rollback.source_history)
+      canonicalizeSourceJson(targetHistory)
     ) {
       throw new CompactionTransactionError(
         "commit_failed",
