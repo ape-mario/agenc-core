@@ -806,6 +806,7 @@ function pushToolResult(
   nextUuid: () => string,
   isError = false,
   rawResult: unknown = result,
+  metadata?: Record<string, unknown>,
 ): void {
   if (!openTools.has(callId)) {
     settledToolCallIds.add(callId);
@@ -846,7 +847,9 @@ function pushToolResult(
   }
   openTools.delete(callId);
   settledToolCallIds.add(callId);
-  out.push(makeToolResultMessage(callId, result, isError, nextUuid()));
+  const message = makeToolResultMessage(callId, result, isError, nextUuid());
+  if (!isError && metadata?.ui !== undefined) message.fileMutation = metadata.ui;
+  out.push(message);
 }
 
 function streamedToolInput(entry: StreamingToolUse): unknown {
@@ -2631,6 +2634,7 @@ export function adaptTranscriptEvents(
           nextUuid,
           isError,
           payload.result,
+          metadataRecord(payload),
         );
         runningToolNames.delete(callId);
         // Remove the matching streaming-tool-use element so the

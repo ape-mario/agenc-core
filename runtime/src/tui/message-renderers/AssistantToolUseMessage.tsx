@@ -288,19 +288,20 @@ export function AssistantToolUseMessage({
   // result body is suppressed in tool-result-routing.ts so the diff appears
   // exactly once. A FAILED row renders no diff (the inline failure reason wins);
   // a still-running/queued row also waits until it resolves.
+  const fileMutation = lookups.toolResultByToolUseID?.get(param.id)?.fileMutation;
   const editDiffDetail =
     (param.name === "Edit" ||
       param.name === "MultiEdit" ||
       param.name === "Write") &&
     isResolved &&
     toolState !== "failed"
-      ? renderEditDiffPreview(param.name, input.data)
+      ? renderEditDiffPreview(param.name, input.data, fileMutation)
       : null;
   // A finished edit says what it changed on the step's result line
   // ("└ +4 -0"); the colored rows follow underneath.
   const editStats =
     editDiffDetail !== null && rowResult === undefined
-      ? editDiffStats(param.name, input.data)
+      ? editDiffStats(param.name, input.data, fileMutation)
       : undefined;
   const detail = extraDetail || editDiffDetail || toolUseTag || progressDetail || queuedDetail
     ? (
@@ -340,10 +341,11 @@ const EDIT_STEP_MAX_CHANGED_LINES = 8;
 export function renderEditDiffPreview(
   toolName: string,
   input: unknown,
+  fileMutation?: unknown,
 ): React.ReactNode {
   let preview: ReturnType<typeof buildEditDiffPreview>;
   try {
-    preview = buildEditDiffPreview(toolName, input);
+    preview = buildEditDiffPreview(toolName, input, fileMutation);
   } catch (error) {
     logError(
       new Error(`Error building edit diff preview for ${toolName}: ${error}`),
@@ -376,7 +378,7 @@ export function renderEditDiffPreview(
   // Distinguish a first write from an edit in the header so the two no longer
   // look identical. A Write produces a brand-new file (all additions, old
   // content empty) → CREATE; Edit/MultiEdit change an existing file → EDIT.
-  const op = toolName === "Write" ? "CREATE" : "EDIT";
+  const op = toolName === "Write" && (fileMutation as { operation?: string } | undefined)?.operation !== "write" ? "CREATE" : "EDIT";
   return (
     <DiffInline
       file={preview.file.length > 0 ? preview.file : "file"}
@@ -388,9 +390,9 @@ export function renderEditDiffPreview(
   );
 }
 
-function editDiffStats(toolName: string, input: unknown): string | undefined {
+function editDiffStats(toolName: string, input: unknown, fileMutation?: unknown): string | undefined {
   try {
-    return buildEditDiffPreview(toolName, input)?.stats;
+    return buildEditDiffPreview(toolName, input, fileMutation)?.stats;
   } catch {
     return undefined;
   }
