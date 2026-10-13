@@ -427,13 +427,13 @@ describe("classifyShellWorkspaceWritePolicy under the full bypass", () => {
     });
   }
 
-  it("lets a command with an unresolvable target run and still reports it indeterminate", () => {
+  it("allows a read-only substitution beside a literal redirect", () => {
     // The Terminal-Bench git-multibranch run lost 51 of 459 shell calls to
     // this refusal, most of them an `echo "$(...)"` next to a harmless write.
     const decision = classifyBypassed(
       'for f in refs/heads/*; do echo "$f: $(cat $f)"; done > /tmp/agenc-bypass/refs.txt',
     );
-    expect(decision.indeterminate).toBe(true);
+    expect(decision.indeterminate).toBe(false);
     expect(decision.blocked).toBe(false);
     expect(decision.message).toBeUndefined();
   });
@@ -530,10 +530,10 @@ describe("classifyShellWorkspaceWritePolicy under the full bypass", () => {
     expect(decision).toEqual(classifyBypassed('"$CMD"'));
   });
 
-  it("changes nothing while a prompt or a sandbox still gates the command", () => {
+  it("allows a read-only substitution with a known outside redirect", () => {
     const decision = classify('echo "$(id)" > /tmp/agenc-bypass/out.txt', true);
-    expect(decision.blocked).toBe(true);
-    expect(decision.message).toContain("Unable to confirm workspace write targets");
+    expect(decision.blocked).toBe(false);
+    expect(decision.indeterminate).toBe(false);
   });
 });
 
@@ -2392,7 +2392,7 @@ describe("classifyShellWorkspaceWritePolicy after a directory change", () => {
     const decision = classifyBypassed("cd tmp && echo `cd ../src` > a.js");
     expect(decision.observedTargets).toEqual(["/repo/tmp/a.js"]);
     expect(decision.blocked).toBe(false);
-    expect(classify("cd tmp && echo `cd ../src` > a.js").blocked).toBe(true);
+    expect(classify("cd tmp && echo `cd ../src` > a.js").blocked).toBe(false);
   });
 
   it("follows a cd that time runs, after the options time reads", () => {
