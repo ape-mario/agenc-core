@@ -336,6 +336,18 @@ function daemonHarness(
 }
 
 describe("deferred daemon input ownership", () => {
+  it("forwards compaction rollback once without replaying a failed mutation", async () => {
+    const harness = daemonHarness();
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });
+    await session.submit("attach");
+    const controls = session as typeof session & Pick<import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession, "rollbackCompaction">;
+    expect(controls.rollbackCompaction).toBeTypeOf("function");
+    harness.client.request.mockImplementationOnce(async () => { throw new Error("ambiguous rollback"); });
+    await expect(controls.rollbackCompaction!({ attemptId: "attempt-1", reviewedBranchTargetSessionId: "reviewed-branch" })).rejects.toThrow("ambiguous rollback");
+    expect(harness.client.request).toHaveBeenLastCalledWith("session.rollbackCompaction", { sessionId: "session-1", attemptId: "attempt-1", reviewedBranchTargetSessionId: "reviewed-branch" });
+    expect(harness.startPromptAgent).toHaveBeenCalledOnce();
+  });
+
   it("forwards compaction retention to the attached canonical session", async () => {
     const harness = daemonHarness();
     const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt: async ({ message }) => message });

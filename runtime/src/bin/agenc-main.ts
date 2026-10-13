@@ -1048,6 +1048,10 @@ type TuiSessionShape = Pick<
     readonly feedback?: string;
     readonly signal?: AbortSignal;
   }) => Promise<unknown>;
+  rollbackCompaction?: (params: {
+    readonly attemptId: string;
+    readonly reviewedBranchTargetSessionId?: string;
+  }) => Promise<unknown>;
   extendCompactionRollbackRetention?: (params: {
     readonly attemptId: string;
     readonly extendedUntilMs: number;
@@ -2188,6 +2192,16 @@ async function createDeferredDaemonPromptTuiSession(params: {
         );
       }
       return live.partialCompactFromMessage(compactParams);
+    },
+    rollbackCompaction: async (rollbackParams) => {
+      const live = liveSession;
+      if (live === null) {
+        throw new Error("No conversation has started. There is no compaction to roll back.");
+      }
+      if (typeof live.rollbackCompaction !== "function") {
+        throw new Error("Compaction rollback is not supported by this daemon session.");
+      }
+      return live.rollbackCompaction(rollbackParams);
     },
     extendCompactionRollbackRetention: async (retentionParams) => {
       const live = liveSession;
