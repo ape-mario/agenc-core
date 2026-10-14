@@ -22,7 +22,9 @@ export function readableToolError(raw: unknown, depth = 0): string {
   }
   if (typeof raw !== "string") return "Tool execution failed";
   const trimmed = raw.trim();
-  if (/^[\[{]/.test(trimmed) && !trimmed.startsWith("[exec ")) {
+  // Sandbox diagnostics begin with a bracketed reason, not a JSON array.
+  const hasDiagnosticTag = /^\[[A-Za-z][A-Za-z0-9_-]*\](?:\s|$)/.test(trimmed);
+  if (/^[\[{]/.test(trimmed) && !trimmed.startsWith("[exec ") && !hasDiagnosticTag) {
     try { return readableToolError(JSON.parse(trimmed), depth + 1); }
     catch { return "Tool execution failed"; }
   }
