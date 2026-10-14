@@ -41,7 +41,7 @@ import {
 } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
-import { collectShellWorkspaceDeletionTargets } from "../llm/shell-write-policy.js";
+import { collectShellWorkspaceMutationTargets } from "../llm/shell-write-policy.js";
 import { monotonicMs } from "./_deps/utils.js";
 import { DegradedStore } from "./degraded-store.js";
 import type { Event } from "./event-log.js";
@@ -756,7 +756,7 @@ export class FileHistorySidecar implements Sidecar {
     const command = args[keys.command];
     if (typeof command !== "string" || command.trim().length === 0) return [];
     const cwd = args[keys.cwd];
-    return collectShellWorkspaceDeletionTargets({
+    return collectShellWorkspaceMutationTargets({
       toolName,
       args: {
         command,
@@ -777,13 +777,13 @@ export class FileHistorySidecar implements Sidecar {
     messageId: string,
   ): Promise<void> {
     for (const filePath of paths) {
-      let isFile = false;
+      let isDirectory = false;
       try {
-        isFile = (await stat(filePath)).isFile();
+        isDirectory = (await stat(filePath)).isDirectory();
       } catch {
-        isFile = false;
+        // Missing paths must be tracked so rewind removes new shell files.
       }
-      if (isFile) await this.history.trackEdit(filePath, messageId);
+      if (!isDirectory) await this.history.trackEdit(filePath, messageId);
     }
   }
 

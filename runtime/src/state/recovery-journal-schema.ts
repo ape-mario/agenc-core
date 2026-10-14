@@ -1123,7 +1123,7 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
   ),
   error: objectShape(
     { cause: isString, message: isString },
-    { turnId: isString, stack: isString },
+    { turnId: isString, stack: isString, callId: isString },
   ),
   stream_error: objectShape(
     { cause: isString, message: isString },

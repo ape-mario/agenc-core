@@ -16,6 +16,8 @@ import {
   lexShellCommand,
   type ShellToken,
 } from "../utils/shell/command-line.js";
+import { readShellSubstitutions } from "../utils/shell/substitutions.js";
+import { literalGitCommands } from "../utils/shell/git-commands.js";
 import { analyzeSedWrites } from "../utils/shell/sed-writes.js";
 import {
   parseWriteCommandOperands,
@@ -154,6 +156,8 @@ export interface ShellWorkspaceWritePolicyInput {
    * approval path.
    */
   readonly allowWorkspaceDeletions?: boolean;
+  /** Workspace content writes are permitted by the mode or this call's approval. */
+  readonly allowWorkspaceWrites?: boolean;
   /** Extra roots (the AgenC home) that a shell command may never remove. */
   readonly protectedRoots?: readonly string[];
   /** Resolve current protected roots only when the command has mutation targets. */
@@ -731,6 +735,7 @@ function collectMoveTargets(
 
 /** Where the command runs, as far as the targets depend on it. */
 interface ShellWriteEnvironment {
+  readonly substitutionDepth?: number;
   /** `sed` may be BSD sed on this host (macOS and the BSDs). */
   readonly bsdSed: boolean;
   readonly workspaceRoot: string;
@@ -1503,7 +1508,12 @@ function readFindCommandLine(
       FIND_FILE_PRIMARIES.get(name) ??
       FIND_PRIMARY_ARGUMENTS.get(name) ??
       (name === "-files0-from" || FIND_NEWER_RE.test(name) ? 1 : undefined);
-    if (arity === undefined || index + arity > args.length) {
+    if (arity === undefined) {
+      // An unknown literal primary makes find fail. It cannot introduce a
+      // write; continue reading so explicit actions still get checked.
+      continue;
+    }
+    if (index + arity > args.length) {
       unread = true;
       continue;
     }
@@ -1666,6 +1676,16 @@ function collectDirectCommandWriteTargets(
   params: CommandArguments & { readonly command: string },
 ): ShellWriteTargetCollection {
   const command = basename(params.command);
+  if (command === "git") {
+    const git = literalGitCommands([params.command, ...params.args].map(word =>
+      `'${word.replace(/'/g, "'\\''")}'`,
+    ).join(" "));
+    const collection = params.args[0] === "mv"
+      ? collectMoveTargets(params.args.slice(1), params.cwd, params.environment.bsdSed)
+      : emptyTargetCollection();
+    collection.indeterminate ||= git?.mutates === true;
+    return collection;
+  }
   if (command === "env") {
     return collectEnvCommandWriteTargets(params);
   }
@@ -2377,6 +2397,32 @@ function walkList(
   return current;
 }
 
+// These programs only read or print, or have a dedicated mutation analyzer
+// above. An unknown program inside a substitution stays indeterminate even
+// when it names no targets: an interpreter may hide arbitrary file writes.
+const KNOWN_SUBSTITUTION_COMMANDS = new Set([
+  ":", "pwd", "whoami", "id", "echo", "printf", "ls", "cat", "head", "tail",
+  "wc", "basename", "dirname", "readlink", "realpath", "cd",
+  "touch", "truncate", "tee", "cp", "mv", "install", "ln", "rm", "rmdir", "unlink", "dd",
+]);
+function substitutionCommandsAreKnown(command: string): boolean {
+  const parsed = lexShellCommand(command);
+  if (parsed.malformed || parsed.hasComment) return false;
+  let segment: ShellToken[] = [];
+  const known = (): boolean => {
+    const words = stripRedirections(segment);
+    segment = [];
+    if (words.length === 0) return true;
+    const word = words[writeCommandWordIndex(words)];
+    return word !== undefined && !word.requiresExpansion && KNOWN_SUBSTITUTION_COMMANDS.has(basename(word.value));
+  };
+  for (const token of parsed.tokens) {
+    if (isShellCommandSeparator(token)) { if (!known()) return false; }
+    else segment.push(token);
+  }
+  return known();
+}
+
 /**
  * The targets of a command line that changes directory, each command read
  * in every directory it may run in: `cd x && cmd` runs cmd in x, `cd x; cmd`
@@ -2441,13 +2487,29 @@ function collectShellCommandWriteTargets(
   cwd: string,
   environment: ShellWriteEnvironment,
 ): ShellWriteTargetCollection {
-  const parsed = lexShellCommand(commandLine);
+  let parsed = lexShellCommand(commandLine);
+  const substitutions = emptyTargetCollection();
+  if (parsed.hasCommandSubstitution) {
+    const read = readShellSubstitutions(commandLine);
+    const depth = environment.substitutionDepth ?? 0;
+    substitutions.indeterminate = !read.complete || read.commands.length === 0 || depth >= 16;
+    if (depth < 16) {
+      for (const command of read.commands) {
+        const child = collectShellCommandWriteTargets(command, cwd, { ...environment, substitutionDepth: depth + 1 });
+        mergeTargetCollections(substitutions, child);
+        substitutions.indeterminate ||= !substitutionCommandsAreKnown(command);
+      }
+    }
+    if (lineChangesDirectory(parsed.tokens) && writesAnything(substitutions)) substitutions.indeterminate = true;
+    parsed = { ...parsed, hasCommandSubstitution: substitutions.indeterminate };
+  }
   const homeMayChange = environment.homeMayChange === true || lineMayChangeHome(parsed.tokens);
   const collection = collectLineWriteTargets(
     parsed,
     cwd,
     homeMayChange ? { ...environment, homeMayChange } : environment,
   );
+  mergeTargetCollections(collection, substitutions);
   if (
     homeMayChange &&
     parsed.tokens.some((token) => LEADING_HOME_RE.test(token.value)) &&
@@ -2990,6 +3052,9 @@ export function classifyShellWorkspaceWritePolicy(
   }
   const routedTargets = writes.filter(
     (target) =>
+      params.allowWorkspaceWrites !== true &&
+      params.bypassesApprovalsAndSandbox !== true &&
+      params.validationPhase !== "preflight" &&
       !protectedTargets.includes(target) &&
       workspaceRelation(workspaceRoot, target) === "inside" &&
       !isWorkspaceGeneratedOutputPath(workspaceRoot, target),
@@ -3067,7 +3132,8 @@ export function classifyShellWorkspaceWritePolicy(
   // has a prompt or a kernel boundary to be routed to; refusing it only made
   // the model rewrite `echo "$(id)"` and `for f in *; do ... done` until they
   // parsed. The decision still reports `indeterminate` for callers.
-  if (collected.indeterminate && !bypassesApprovalsAndSandbox) {
+  if (collected.indeterminate && !bypassesApprovalsAndSandbox &&
+    params.validationPhase !== "preflight" && params.allowWorkspaceWrites !== true) {
     messages.push(buildIndeterminatePolicyMessage(observedTargets, fileWriteTools()));
   }
 
@@ -3097,6 +3163,25 @@ export function collectShellWorkspaceDeletionTargets(params: {
   const decision = classifyShellWorkspaceWritePolicy({
     ...params,
     allowWorkspaceDeletions: true,
+    allowWorkspaceWrites: true,
   });
   return decision.blocked ? [] : decision.deletionTargets;
+}
+
+/** Literal workspace mutations for the file-history sidecar, including new files. */
+export function collectShellWorkspaceMutationTargets(params: {
+  readonly toolName: string;
+  readonly args: Record<string, unknown>;
+  readonly workspaceRoot: string;
+}): readonly string[] {
+  const decision = classifyShellWorkspaceWritePolicy({
+    ...params,
+    allowWorkspaceDeletions: true,
+    allowWorkspaceWrites: true,
+  });
+  return decision.observedTargets.filter((target) =>
+    !decision.blockedTargets.includes(target) &&
+    !decision.blockedDeletions.includes(target) &&
+    workspaceRelation(params.workspaceRoot, target) === "inside",
+  );
 }

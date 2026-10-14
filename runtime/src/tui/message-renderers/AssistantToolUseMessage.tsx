@@ -25,6 +25,7 @@ import { buildEditDiffPreview } from '../edit-diff-preview.js';
 import { isFixedRerunSuccess } from './fixedRerunLink.js';
 import { AURA_LIFECYCLE_GLYPHS } from '../../utils/theme.js';
 import { useFullscreenMode } from '../context/fullscreenModeContext.js';
+import { summarizeToolError } from '../tool-error-text.js';
 type Props = {
   param: AgenCToolUseBlockParam;
   addMargin: boolean;
@@ -454,10 +455,16 @@ function rawToolResultContent(
   for (const block of content) {
     if (
       block?.type === 'tool_result' &&
-      block.tool_use_id === toolUseId &&
-      typeof block.content === 'string'
+      block.tool_use_id === toolUseId
     ) {
-      return block.content;
+      if (typeof block.content === 'string') return block.content;
+      if (Array.isArray(block.content)) {
+        return block.content
+          .filter((part): part is { type: 'text'; text: string } =>
+            part?.type === 'text' && typeof part.text === 'string')
+          .map(part => part.text)
+          .join('\n');
+      }
     }
   }
   return null;
@@ -478,13 +485,7 @@ function failedToolRowReason(
   if (kind === 'edit') {
     return summarizeFileEditError(rawResult) ?? undefined;
   }
-  const errorText = extractTag(rawResult, 'tool_use_error') ?? rawResult;
-  const cleaned = errorText.replace(/<\/?error>/g, '').trim();
-  const firstLine = cleaned
-    .split('\n')
-    .map(line => line.trim())
-    .find(line => line.length > 0);
-  return firstLine ? firstLineOf(firstLine) : undefined;
+  return firstLineOf(summarizeToolError(rawResult));
 }
 
 function selectPermissionMode(state: {

@@ -60,7 +60,7 @@ export function UserToolResultMessage({
 
   const textContent = getTextToolResultContent(param.content);
   // Compact mode already names this cancellation on the failed call row.
-  if (param.is_error && !verbose && textContent === "Tool execution cancelled: interrupted.") return null;
+  if (param.is_error && !verbose) return null;
   if (textContent?.startsWith(CANCEL_MESSAGE)) {
     return <UserToolCanceledMessage />;
   }

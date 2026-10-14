@@ -14,6 +14,7 @@ import {
   shellWorkspaceMutationPermission,
 } from "./shell-mutation-permission.js";
 import { preflightShellWorkspaceWritePolicy } from "./shell-preflight.js";
+import { shellGitMutationPermission } from "./shell-git-permission.js";
 import { recordSessionRead, resolveSessionId, safePathAllowingSessionPlanFile } from "./filesystem.js";
 import type { BashToolConfig } from "./types.js";
 import { UnifiedExecError } from "../../unified-exec/types.js";
@@ -985,6 +986,16 @@ function sandboxAutoAllow(
   const appState = context.getAppState();
   const permissions = context.toolPermissionContext?.(appState) ??
     appState.toolPermissionContext;
+  // The sandbox's auto-allow must not skip the user's approval of a
+  // workspace edit in default mode. Preflight reserves hard refusals for
+  // protected targets; an ordinary content write goes through this card.
+  if (permissions.mode === "default" && classifyShellWorkspaceWritePolicy({
+    toolName: "exec_command",
+    args: { command: args.cmd, cwd: args.workdir },
+    workspaceRoot: config?.cwd ?? config?.allowedPaths?.[0],
+  }).blocked) {
+    return { behavior: "ask", message: "Allow this shell command to change workspace files?" };
+  }
   // The auto-mode classifier re-runs tool checks with the mode set to
   // acceptEdits (evaluator.ts, tryAcceptEditsSimulation). autoModeActive
   // outside auto mode means plan with auto, which keeps its classifier.
@@ -1240,10 +1251,26 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
       }
 
       try {
-        const runtimeSandbox = inspection?.runtimeSandbox ?? runtimeSandboxForExec(
+        let runtimeSandbox = inspection?.runtimeSandbox ?? runtimeSandboxForExec(
           args,
           config?.cwd ?? process.cwd(),
         );
+        const gitMutation = inspection === undefined && !detach && tty !== true &&
+          asBoolean(args.login) !== true ? shellGitMutationPermission(
+            cmd, effectiveWorkdir ?? config?.cwd ?? process.cwd(),
+            config?.cwd ?? config?.allowedPaths?.[0] ?? process.cwd(),
+            shellWorkspaceMutationPermission(args).allowWorkspaceWrites,
+          ) : undefined;
+        if (gitMutation !== undefined && runtimeSandbox !== undefined) {
+          const previous = runtimeSandbox.additionalPermissions;
+          runtimeSandbox = {
+            ...runtimeSandbox,
+            additionalPermissions: { ...previous, fileSystem: { entries: [
+              ...(previous?.fileSystem?.entries ?? []),
+              ...gitMutation.permissions.fileSystem!.entries,
+            ] } },
+          };
+        }
         if (detach) {
           const refusal = detachRefusal(runtimeSandbox, manager);
           if (refusal !== null) return refusal;
@@ -1260,7 +1287,7 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
         const commonRequest = {
           ...(ownerId !== undefined ? { ownerId } : {}),
           ...(ownerBinding !== undefined ? { ownerBinding } : {}),
-          cmd,
+          cmd: gitMutation?.command ?? cmd,
           callId: asString(args.__callId),
           ...(asNumber(args.yield_time_ms) !== undefined
             ? { yield_time_ms: asNumber(args.yield_time_ms) }

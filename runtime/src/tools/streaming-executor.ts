@@ -3,8 +3,8 @@ import { unknownToolResult } from "./results.js";
  * StreamingToolExecutor — full AgenC port.
  *
  * Dispatches tools as they stream in from the model, with four-class
- * concurrency control (via the T7 `classify` analyzer) + sibling-
- * abort cascade on Bash errors + order-preserving yield of completed
+ * concurrency control (via the T7 `classify` analyzer) + independent
+ * settlement of batch calls + order-preserving yield of completed
  * results + AgenC-compatible progress interleaving, unknown-tool
  * short-circuit, head-of-line break, per-tool `interruptBehavior`
  * gating, and child → parent abort bubble-up.
@@ -415,7 +415,6 @@ export interface StreamingToolExecutorOptions {
 
 export class StreamingToolExecutor {
   private readonly registry: ToolRegistry;
-  private readonly onSiblingAbort?: (reason: string) => void;
   private readonly onProgress?: (event: ProgressEvent) => void;
   private readonly maxConcurrency: number;
   private readonly maxToolDrainMs: number;
@@ -425,7 +424,6 @@ export class StreamingToolExecutor {
   private readonly adaptiveDrainSafeMinMs: number;
   private readonly adaptiveDrainRaiseCap: number;
   private readonly siblingAbortController: AbortController;
-  private readonly bashToolName: string;
   private readonly runtime?: ToolCallRuntime | ToolRuntimeScheduler;
   private readonly onLeakedTool?: StreamingToolExecutorOptions["onLeakedTool"];
   private readonly cleanupGraceMs: number;
@@ -461,7 +459,6 @@ export class StreamingToolExecutor {
    */
   private discarded = false;
   private discardReason: string | null = null;
-  private hasBashErrored = false;
   /** Wake-up signal for getRemainingResults. */
   private wakeResolve: (() => void) | null = null;
   private lastDispatchedIndex = -1;
@@ -469,7 +466,6 @@ export class StreamingToolExecutor {
 
   constructor(opts: StreamingToolExecutorOptions) {
     this.registry = opts.registry;
-    this.onSiblingAbort = opts.onSiblingAbort;
     this.onProgress = opts.onProgress;
     this.maxConcurrency = normalizeMaxConcurrency(opts.maxConcurrency);
     this.maxToolDrainMs = normalizeMaxToolDrainMs(opts.maxToolDrainMs);
@@ -491,7 +487,6 @@ export class StreamingToolExecutor {
       process.env.AGENC_DRAIN_RAISE_CAP,
       DEFAULT_ADAPTIVE_DRAIN_RAISE_CAP,
     );
-    this.bashToolName = opts.bashToolName ?? "system.bash";
     this.runtime = opts.runtime;
     this.onLeakedTool = opts.onLeakedTool;
     this.cleanupGraceMs =
@@ -1549,46 +1544,21 @@ export class StreamingToolExecutor {
 
       // Late settle of an already force-finalized tool: didFinalize === false ⇒
       // no result overwrite, no status flip-back, no sibling cascade.
-      const didFinalize = this.finalizeOnce(tool, result);
+      this.finalizeOnce(tool, result);
 
-      // Sibling-abort cascade for shell-style tools. Only meaningful when
-      // another tool in the batch is still pending; a lone failing shell
-      // call has nothing to cancel and the warning would be noise.
-      if (
-        didFinalize &&
-        result.isError === true &&
-        this.isSiblingAbortShellTool(tool.toolCall.name) &&
-        !this.discarded &&
-        !this.hasBashErrored &&
-        this.hasOtherPendingTools(tool)
-      ) {
-        this.hasBashErrored = true;
-        this.onSiblingAbort?.(`bash_error:${tool.toolCall.name}`);
-        this.siblingAbortController.abort("sibling_error");
-      }
+      // Calls in a model batch have no declared dependency on one another.
+      // A failed command settles its own result; other calls continue.
     } catch (err) {
       // The self-induced rejection from our own drainCancel.abort(...) lands
       // here, produces a synthetic result, and is swallowed by the finalized
       // no-op (force-finalize already latched the terminal write).
       const error = err instanceof Error ? err : new Error(String(err));
       const syntheticReason = this.resolveSyntheticErrorReason(error);
-      const didFinalize = this.finalizeOnce(
+      this.finalizeOnce(
         tool,
         this.createSyntheticError(tool.toolCall, syntheticReason),
         error,
       );
-      // Thrown shell-tool errors also trigger sibling abort.
-      if (
-        didFinalize &&
-        this.isSiblingAbortShellTool(tool.toolCall.name) &&
-        !this.discarded &&
-        !this.hasBashErrored &&
-        this.hasOtherPendingTools(tool)
-      ) {
-        this.hasBashErrored = true;
-        this.onSiblingAbort?.(`bash_threw:${tool.toolCall.name}`);
-        this.siblingAbortController.abort("sibling_error");
-      }
     } finally {
       // Idempotent — force-finalize may have already detached on a wedged tool.
       tool.detachAbortListeners?.();
@@ -1619,26 +1589,6 @@ export class StreamingToolExecutor {
         this.liveToolDispatch?.options.session?.services.toolLatencyStore;
       store?.record(this.resolveModelToolName(tool.toolCall.name), durationMs);
     }
-  }
-
-  private isSiblingAbortShellTool(toolName: string): boolean {
-    const canonicalName = this.resolveModelToolName(toolName);
-    return canonicalName === this.bashToolName || canonicalName === "exec_command";
-  }
-
-  /**
-   * True when another tracked tool is still `queued` or `executing`. The
-   * shell sibling-abort cascade exists to cancel later calls in the same
-   * batch that may depend on the failed command; with nothing else in
-   * flight there is nothing to cancel, so neither the cascade nor its
-   * `sibling_tool_abort` warning should fire.
-   */
-  private hasOtherPendingTools(tool: TrackedTool): boolean {
-    return this.tools.some(
-      (other) =>
-        other !== tool &&
-        (other.status === "queued" || other.status === "executing"),
-    );
   }
 
   private buildRuntimeCallContext(
@@ -1686,7 +1636,7 @@ export class StreamingToolExecutor {
       return null;
     }
     const rawReason = this.siblingAbortController.signal.reason;
-    if (rawReason === "sibling_error" || this.hasBashErrored) {
+    if (rawReason === "sibling_error") {
       return "sibling_error";
     }
     // For the AgenC 'interrupt' case, check per-tool behavior
@@ -1760,7 +1710,7 @@ export class StreamingToolExecutor {
     }
 
     const signalReason = this.siblingAbortController.signal.reason;
-    if (this.hasBashErrored || signalReason === "sibling_error") {
+    if (signalReason === "sibling_error") {
       return "sibling_error";
     }
 

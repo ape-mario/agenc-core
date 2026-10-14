@@ -16,7 +16,7 @@ import type {
   RuntimeTranscriptMessage,
 } from "../session/transcript-replacement.js";
 import type { AgenCBridgeSession } from "./session-types.js";
-import { clampMarkerLine, looksLikeRawToolError, summarizeToolError } from "./tool-error-text.js";
+import { clampMarkerLine, looksLikeRawToolError, summarizeToolError, unwrapToolError } from "./tool-error-text.js";
 import { nonEmptyString } from "../utils/stringUtils.js";
 import { modelToolAliasTarget } from "../tools/model-tool-aliases.js";
 import { formatRealtimeItemSummary } from "./realtime/state.js";
@@ -1439,6 +1439,9 @@ export function formatStructuredToolResult(
   payload: Record<string, unknown>,
 ): readonly { readonly type: "text"; readonly text: string }[] {
   toolName = modelToolAliasTarget(toolName) ?? toolName;
+  if (payload.isError === true && eventType === "tool_call_completed") {
+    return [{ type: "text", text: unwrapToolError(stringResult(payload.result)) }];
+  }
   // Skill loads return the ENTIRE skill prompt as the tool result — 12k+
   // characters of instructions for the model, not conversation. Rendering it
   // verbatim buries the chat under the full skill text on every invocation
@@ -2773,6 +2776,9 @@ export function adaptTranscriptEvents(
         break;
       case "error":
       case "stream_error": {
+        // A correlated tool failure is already displayed on its call row.
+        if (typeof payload.callId === "string" &&
+          (openTools.has(payload.callId) || settledToolCallIds.has(payload.callId))) break;
         const message = stringResult(payload.message);
         if (/^(?:AdmissionDeniedError: )?execution admission cancelled: interrupted$/u.test(message)) {
           if (!interruptionNotices.has("admission")) {

@@ -533,6 +533,7 @@ export interface ThreadRolledBackEvent {
 export interface ErrorEvent {
   readonly cause: string;
   readonly message: string;
+  readonly callId?: string;
   readonly turnId?: string;
   readonly stack?: string;
 }
@@ -1873,6 +1874,7 @@ export class EventLog {
 export interface EmitErrorOptions {
   readonly cause: string;
   readonly message: string;
+  readonly callId?: string;
   readonly turnId?: string;
   readonly stack?: string;
   /** Use `stream_error` instead of `error` (for transient provider failures). */
@@ -1921,6 +1923,7 @@ export function emitError(
             cause: options.cause,
             message: options.message,
             ...(options.turnId !== undefined ? { turnId: options.turnId } : {}),
+            ...(options.callId !== undefined ? { callId: options.callId } : {}),
             ...(options.stack !== undefined ? { stack: options.stack } : {}),
           },
         },
