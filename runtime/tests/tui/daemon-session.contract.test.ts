@@ -2326,9 +2326,45 @@ describe("AgenC TUI daemon session adapter", () => {
           direction: "up_to",
           feedback: "keep decisions",
         },
-        signal: abortController.signal,
+        signal: expect.any(AbortSignal),
       },
     ]);
+    const composed = client.requests[0]!.signal!;
+    expect(composed).not.toBe(abortController.signal);
+    expect(composed.aborted).toBe(false);
+    abortController.abort("caller cancelled");
+    expect(composed.aborted).toBe(true);
+    expect(composed.reason).toBe("caller cancelled");
+  });
+
+  it.each(["caller", "local"])("forwards %s cancellation to the outstanding manual compaction RPC", async (origin) => {
+    const client = createClient();
+    const original = client.request.bind(client);
+    const rpc = Promise.withResolvers<SessionPartialCompactFromMessageResult>();
+    let signal: AbortSignal | undefined;
+    client.request = (async (method, params, options) => {
+      if (method !== "session.partialCompactFromMessage") return original(method, params, options);
+      signal = options?.signal;
+      client.requests.push({ method, params, signal });
+      return rpc.promise;
+    }) as typeof client.request;
+    const caller = new AbortController();
+    const session = createDaemonTuiSession({
+      baseSession: createBaseSession(), client, sessionId: "session_1", clientId: "tui_1",
+    });
+    const pending = session.partialCompactFromMessage!({
+      messageOrdinal: 2, direction: "up_to", signal: caller.signal,
+    });
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal!.aborted).toBe(false);
+    if (origin === "caller") caller.abort("cancel fixture");
+    else await session.cancelActiveTurn!("cancel fixture");
+    expect(signal!.aborted).toBe(true);
+    expect(signal!.reason).toBe("cancel fixture");
+    expect(caller.signal.aborted).toBe(origin === "caller");
+    expect(client.requests.map(request => request.method)).toEqual(["session.partialCompactFromMessage"]);
+    rpc.resolve({ sessionId: "session_1", ok: true, eventAlreadyEmitted: true });
+    await pending;
   });
 
   it("routes compaction operator requests through the daemon session", async () => {

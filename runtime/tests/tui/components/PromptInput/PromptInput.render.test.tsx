@@ -48,6 +48,10 @@ const harness = vi.hoisted(() => {
     baseProps: undefined as undefined | Record<string, unknown>,
     clearBuffer: vi.fn(),
     keybindings: {} as Record<string, () => unknown>,
+    inputCaptures: new Set<{
+      handler: (input: string, key: Record<string, boolean>) => boolean
+      options?: { context?: string; isActive?: boolean }
+    }>(),
     inputHandlers: [] as Array<{
       handler: (
         input: string,
@@ -161,6 +165,7 @@ const harness = vi.hoisted(() => {
       harness.baseProps = undefined;
       harness.keybindings = {};
       harness.inputHandlers = [];
+      harness.inputCaptures.clear();
       appState.coordinatorTaskIndex = -1;
       appState.effortValue = undefined;
       appState.footerSelection = null;
@@ -318,7 +323,8 @@ vi.mock("../../hooks/useArrowKeyHistory.js", () => ({
   },
 }));
 
-vi.mock("../../hooks/useDoublePress.js", () => ({
+vi.mock("../../hooks/useDoublePress.js", async (importOriginal) => ({
+  ...await importOriginal<Record<string, unknown>>(),
   useDoublePress: (_single: () => void, doublePress: () => void) => doublePress,
 }));
 
@@ -402,7 +408,17 @@ vi.mock("../../keybindings/shortcutFormat.js", () => ({
   getShortcutDisplay: () => "ctrl+v",
 }));
 
-vi.mock("../../keybindings/useKeybinding.js", () => ({
+vi.mock("../../keybindings/useKeybinding.js", async () => {
+  const { useLayoutEffect } = await import("react")
+  return ({
+  useInputCapture: (handler: (input: string, key: Record<string, boolean>) => boolean, options?: { context?: string; isActive?: boolean }) => {
+    useLayoutEffect(() => {
+      if (options?.isActive === false) return
+      const registration = { handler, options }
+      harness.inputCaptures.add(registration)
+      return () => { harness.inputCaptures.delete(registration) }
+    }, [handler, options?.context, options?.isActive])
+  },
   useKeybinding: (
     action: string,
     handler: () => unknown,
@@ -426,7 +442,8 @@ vi.mock("../../keybindings/useKeybinding.js", () => ({
     }
     Object.assign(harness.keybindings, handlers);
   },
-}));
+})
+});
 
 vi.mock("../../glyphs.js", () => ({
   selectAgenCTuiGlyphs: () => ({ horizontal: "-" }),
@@ -2941,3 +2958,23 @@ describe("PromptInput render surface", () => {
     }
   });
 });
+
+ test("captures mode-toast Ctrl+C once before composer editing and disposes the capture", async () => {
+   harness.reset();
+   harness.nextPermissionMode = "acceptEdits";
+   const onChange = vi.fn();
+   const rendered = await renderPromptInput({ input: "KEEP_DRAFT_é😀", onChange });
+   try {
+     await waitForPromptInputProps();
+     const capture = [...harness.inputCaptures].at(-1)!;
+     expect(capture.options?.context).toBe("Chat");
+     expect(capture.handler("c", { ctrl: true })).toBe(false);
+     harness.keybindings["chat:cycleMode"]?.();
+     // Same stdin batch, before another render: the live toast ref owns this.
+     expect(capture.handler("hello", {})).toBe(false);
+     expect(capture.handler("c", { ctrl: true })).toBe(true);
+     expect(capture.handler("c", { ctrl: true })).toBe(false);
+     expect(onChange).not.toHaveBeenCalled();
+   } finally { await rendered.dispose(); }
+   expect(harness.inputCaptures.size).toBe(0);
+ });
