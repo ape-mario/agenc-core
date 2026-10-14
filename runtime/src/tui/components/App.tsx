@@ -3395,6 +3395,9 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         };
         await executeBash();
       } catch (err_1) {
+        // The daemon owns the cancelled call's canonical error row. The
+        // transport's aborted-request exception is not another shell result.
+        if (usesDaemonShellBridge && bashAbortController.signal.aborted) return;
         const message_1 =
           err_1 instanceof Error ? err_1.message : String(err_1);
         emitTranscriptText(

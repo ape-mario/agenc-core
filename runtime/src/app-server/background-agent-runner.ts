@@ -37,6 +37,7 @@ import { ensureAgentControl } from "../bin/delegate-tool.js";
 import { AgentControl } from "../agents/control.js";
 import { clearSession } from "../commands/clear.js";
 import { runTurn } from "../session/run-turn.js";
+import { llmMessageToResponseItem } from "../session/message-history-conversion.js";
 import { isToolCallPhysicallyExecuting } from "../session/executing-tool-calls.js";
 import { classifyTurnTerminal } from "../contracts/turn-terminal.js";
 import {
@@ -2798,6 +2799,21 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     const transcriptOutput =
       `<bash-stdout>${escapeXml(result.stdout)}</bash-stdout>` +
       `<bash-stderr>${escapeXml(result.stderr)}</bash-stderr>`;
+    // UI events do not append model history. Persist this operator context
+    // before releasing the serialized command so the next turn and a cold
+    // resume see the command's actual outcome without inventing tool pairs.
+    const shellHistory = {
+      role: "user" as const,
+      content: `<user_shell_command><command>${escapeXml(params.command)}</command>` +
+        `<exit_code>${result.exitCode ?? "unknown"}</exit_code>` +
+        `${transcriptOutput}</user_shell_command>`,
+      runtimeOnly: { responseItemId: `shell-context:${eventKey}` },
+    };
+    active.bootstrap.rolloutStore.appendRollout(
+      { type: "response_item", payload: llmMessageToResponseItem(shellHistory) },
+      { durable: true },
+    );
+    await session.state.with((state) => { state.history.push(shellHistory); });
     session.emit(
       {
         eventId: `shell-output:${eventKey}`,
