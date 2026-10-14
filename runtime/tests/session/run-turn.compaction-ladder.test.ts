@@ -1,3 +1,4 @@
+import { installPreparedCompactionPressure } from "../helpers/prepared-compaction-pressure.js";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { LLMMessage, LLMResponse } from "../../src/llm/types.js";
 import type { ToolRegistry } from "../../src/tool-registry.js";
@@ -213,6 +214,7 @@ describe("degraded compaction ladder", () => {
     let streamCount = 0;
     const seen: LLMMessage[][] = [];
     const provider = mkProvider({});
+    installPreparedCompactionPressure(provider, request => Math.max(request.messages.some(m => m.role === "tool" || (m.toolCalls?.length ?? 0) > 0) ? 18_130 : 100, Math.ceil(Buffer.byteLength(JSON.stringify(request.messages)) / 4)));
     provider.chatStream = async (messages): Promise<LLMResponse> => {
       seen.push([...messages]);
       streamCount += 1;

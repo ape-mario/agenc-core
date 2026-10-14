@@ -32,7 +32,7 @@ for (const accounting of ["native", "calibrated fallback", "calibrated fallback 
           adapterRevision: "1", configurationRevision: String(fits),
           countTokens: async (request: TokenAccountingRequest) => ({
             inputTokens: JSON.stringify(request.messages).includes(replacement)
-              ? (fits ? 97_000 : 99_000) : 1_000,
+              ? (fits ? 97_000 : 99_000) : request.messages.some(message => message.role === "tool") ? 90_000 : 1_000,
             complete: true, confidence: "exact",
             countedComponents: ["system", "messages", "tools", "provider_framing"],
           }),
@@ -95,7 +95,7 @@ for (const accounting of ["native", "calibrated fallback", "calibrated fallback 
         } };
       });
       await drain(runTurn(session, ctx, "Read once and finish."));
-      expect(attempts).toBe(accounting === "calibration raised by advisory refusal" ? 2 : 1);
+      expect(attempts, JSON.stringify(events.map(event => event.msg))).toBe(accounting === "calibration raised by advisory refusal" ? 2 : 1);
       expect(requests).toHaveLength(fits ? 2 : 1);
       const terminals = events.map(event => classifyTurnTerminal(event.msg));
       if (fits) {

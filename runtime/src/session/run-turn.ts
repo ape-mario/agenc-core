@@ -2,6 +2,7 @@ import { assistantMessageFromResponse, parseToolUseBlocks, admittedModelStepId }
 import { cumulativeUsage } from "./cumulative-usage.js";
 import { runMinimalTurn } from "./minimal-turn.js";
 import { oneShotFastModeActive, bypassFastModeEnabled, withOneShotFastMode } from "../one-shot-fast-mode.js";
+import { CompactionTransactionError, CompactionReconstructionRequiredError } from "../services/compact/transaction-types.js";
 import { recordPreparedContextPressure } from "./prepared-context-pressure.js";
 import { getEffectiveContextWindowSize } from "../services/compact/thresholds.js";
 import { resolveMainLoopReasoningEffort } from "./session-reasoning-effort.js";
@@ -1421,6 +1422,12 @@ async function runSamplingRequest(
 
 class DeferredCompactionError extends Error {}
 
+class PreparedCompactionFailure extends DeferredCompactionError {
+  constructor(readonly original: Error) {
+    super(original.message, { cause: original });
+  }
+}
+
 interface PreparedRequestContextPressure {
   readonly fits: boolean;
   readonly inputTokens: number;
@@ -2283,6 +2290,11 @@ async function* runTurnKernelInner(
       responseItemId: seedUserMessageId,
     };
   }
+  const liveSeedRequestId = seedUserMessageId ?? (opts.resume === undefined
+    ? `user-request-${crypto.randomUUID()}` : undefined);
+  if (liveSeedRequestId !== undefined) {
+    user.runtimeOnly = { ...user.runtimeOnly, responseItemId: liveSeedRequestId };
+  }
   let state: TurnState = buildInitialTurnState(ctx, user, {
     priorMessages: priorFull,
     modelInstructions,
@@ -2290,6 +2302,11 @@ async function* runTurnKernelInner(
       ? { initialSkipCacheWrite: opts.skipCacheWrite }
       : {}),
   });
+  state.liveUserMessageId = opts.resume !== undefined
+    ? priorFull.findLast((message) => message.role === "user" &&
+        message.runtimeOnly?.compactionHistory === undefined &&
+        message.runtimeOnly?.responseItemId !== undefined)?.runtimeOnly?.responseItemId
+    : liveSeedRequestId;
   // Phase 4c: restate an active goal at the top of every root human turn. The
   // goal is session state, not conversation, so a compacted history or a
   // fresh user prompt still starts from the objective verbatim (goal drift
@@ -3250,6 +3267,22 @@ async function* runTurnKernelInner(
         async (request) => {
           const requestedModel = state.pendingAdmissionFallback?.toModel ??
             session.config?.model ?? ctx.config.model ?? ctx.modelInfo.slug;
+          const compactPreparedRequest = async (mandatory: boolean): Promise<boolean> => {
+            try {
+              return await runAutoCompact(
+                session, ctx, "before_last_user_message", "context_limit", "in_turn", state,
+                {
+                  querySource: turnQuerySource,
+                  durableMessageCount: compactionDurableCount(),
+                  onDurableHistoryReplaced: onCompactionReplacedHistory,
+                  ...(mandatory ? {} : { onAdvisoryRefusal: deferCompactionRefusal }),
+                  propagateErrors: true,
+                },
+              );
+            } catch (error) {
+              throw new PreparedCompactionFailure(compactFailureError(error));
+            }
+          };
           let pressure: Promise<PreparedRequestContextPressure> | undefined;
           const requestPressure = () => pressure ??= preparedRequestContextPressure(
             request, session, ctx, signal, requestedModel,
@@ -3286,15 +3319,7 @@ async function* runTurnKernelInner(
           if (!deferredCompaction && preparedOverThreshold) {
             proactiveDispatchCompactionAttempted = true;
             persistNewResponseItems();
-            const compacted = await runAutoCompact(
-              session, ctx, "before_last_user_message", "context_limit", "in_turn", state,
-              {
-                querySource: turnQuerySource,
-                durableMessageCount: compactionDurableCount(),
-                onDurableHistoryReplaced: onCompactionReplacedHistory,
-                onAdvisoryRefusal: deferCompactionRefusal,
-              },
-            );
+            const compacted = await compactPreparedRequest(false);
             // A rejected summary can still have reported provider usage and
             // raised this conversation's calibration. Recount before deciding
             // whether the unchanged request fits after a refusal.
@@ -3313,7 +3338,9 @@ async function* runTurnKernelInner(
              * the turn as compact_failed.
              */
             if (!deferredCompaction) {
-              if (await requestFits()) return true;
+              // Only proven unchanged-history advisory refusals may defer.
+              // A provider, persistence or projection failure is terminal even
+              // when the unchanged request happens to fit this window.
               const tiers = state.compactionLadder?.tiersAttempted ?? [];
               throw new DeferredCompactionError(
                 "Compaction could not shrink the context enough for the next request and reserved output." +
@@ -3338,14 +3365,7 @@ async function* runTurnKernelInner(
           }
           requiredCompactionAttempted = true;
           persistNewResponseItems();
-          const compacted = await runAutoCompact(
-            session, ctx, "before_last_user_message", "context_limit", "in_turn", state,
-            {
-              querySource: turnQuerySource,
-              durableMessageCount: compactionDurableCount(),
-              onDurableHistoryReplaced: onCompactionReplacedHistory,
-            },
-          );
+          const compacted = await compactPreparedRequest(true);
           if (!compacted) {
             const tiers = state.compactionLadder?.tiersAttempted ?? [];
             throw new DeferredCompactionError(
@@ -3454,10 +3474,17 @@ async function* runTurnKernelInner(
         return { reason: "task_budget" };
       }
       if (underlying instanceof DeferredCompactionError) {
+        const compactionError = underlying instanceof PreparedCompactionFailure
+          ? underlying.original : underlying;
+        emitTurnWarning(session, MID_TURN_COMPACT_FAILED_CAUSE,
+          `mid_turn_compact_skipped: ${compactionError.message}`);
         await syncSessionState();
-        emitTurnComplete(lastContent, "compact_failed", underlying);
-        yield compactFailedTurnComplete(lastContent, usage, underlying);
-        return { reason: "completed", error: underlying };
+        emitTurnComplete(lastContent, "compact_failed", compactionError);
+        yield compactFailedTurnComplete(lastContent, usage, compactionError);
+        if (underlying instanceof PreparedCompactionFailure &&
+          (compactionError instanceof CompactionTransactionError ||
+            compactionError instanceof CompactionReconstructionRequiredError)) throw compactionError;
+        return { reason: "completed", error: compactionError };
       }
       await syncSessionState();
       emitTurnFailed(

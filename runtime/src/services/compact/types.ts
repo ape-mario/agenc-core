@@ -47,6 +47,8 @@ export type RuntimeMessage = {
   readonly timestamp?: string;
   readonly isMeta?: boolean;
   readonly runtimeOnly?: {
+    readonly responseItemId?: string;
+    readonly userMessageId?: string;
     readonly toolResultIsError?: true;
     readonly toolResultIntegrity?: ToolResultIntegrity;
     readonly agentInvocation?: AgentInvocationChannelMetadata;
@@ -56,6 +58,8 @@ export type RuntimeMessage = {
 };
 
 export type CompactContext = {
+  /** Trusted turn-local identity; recovery prompts cannot replace this request. */
+  readonly liveUserMessageId?: string;
   readonly abortController?: AbortController;
   /** Canonical workspace for lifecycle hook metadata. */
   readonly cwd?: string;

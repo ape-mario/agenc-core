@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { automaticCompactionSplit, compactConversation } from "../../../src/services/compact/compact.js";
+import { automaticCompactionLiveUserIndex, automaticCompactionSplit, compactConversation } from "../../../src/services/compact/compact.js";
 import type { RuntimeMessage } from "../../../src/services/compact/types.js";
 
 describe("automatic continuation retention", () => {
@@ -23,6 +23,41 @@ describe("automatic continuation retention", () => {
   test("does not drop an oversized newest result", () => {
     const huge = [...history.slice(0, -1), { ...history.at(-1)!, content: "x".repeat(200_000) }];
     expect(automaticCompactionSplit(huge, 32_768)).toBe(3);
+  });
+  test("keeps the completed tool exchange when output-recovery prompts follow it", () => {
+    const recovering = [...history.map((message, index) => index === 2
+      ? { ...message, runtimeOnly: { responseItemId: "live-request" } }
+      : message),
+      { role: "user" as const, content: "retry the truncated arguments" }];
+    expect(automaticCompactionSplit(recovering, 32_768, true, "live-request")).toBe(3);
+  });
+  test("can summarize a completed earlier turn when a new request follows its tools", () => {
+    const nextTurn = [...history,
+      { role: "user" as const, content: "new incident review", runtimeOnly: { responseItemId: "next-request" } }];
+    expect(automaticCompactionSplit(nextTurn, 32_768, true, "next-request")).toBe(6);
+  });
+  test("a degraded state check retains the preceding result needed for the next edit", () => {
+    const checked: RuntimeMessage[] = [...history,
+      { role: "assistant", content: "check ledger before append", toolCalls: [{ id: "ledger", name: "FileRead", arguments: '{}' }] },
+      { role: "tool", toolCallId: "ledger", content: "batches 01-02 appended" }];
+    expect(automaticCompactionSplit(checked, 32_768, true)).toBe(3);
+    expect(checked.slice(automaticCompactionSplit(checked, 32_768, true)))
+      .toContainEqual(history.at(-1));
+  });
+  test("protects the actual caller request rather than an internal recovery prompt", () => {
+    const recovering = history.map((message, index) => index === 2
+      ? { ...message, runtimeOnly: { responseItemId: "live-request" } }
+      : message);
+    recovering.push({ role: "user", content: "retry the truncated arguments" });
+    expect(automaticCompactionLiveUserIndex(recovering, "live-request")).toBe(2);
+    expect(() => automaticCompactionLiveUserIndex(recovering, "missing-request"))
+      .toThrow(/live user request is missing.*history was not changed/);
+  });
+  test("counts prior provider reasoning against the optional tail budget", () => {
+    const reasoning = history.map((message, index) => index === 1
+      ? { ...message, providerReasoningContent: "x".repeat(100_000) }
+      : message);
+    expect(automaticCompactionSplit(reasoning, 32_768)).toBe(2);
   });
   test("declines when only the current exchange remains", async () => {
     const current = history.slice(2);

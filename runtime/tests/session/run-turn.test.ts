@@ -6924,7 +6924,7 @@ describe("runTurn — runAutoCompact dispatcher", () => {
     );
     expect(firstTracking).toBeUndefined();
     expect(firstSnipTokensFreed).toBe(0);
-    expect(firstInitialContextInjection).toBe("do_not_inject");
+    expect(firstInitialContextInjection).toBe("before_last_user_message");
   });
 
   test("pre-sampling compact preserves the caller querySource", async () => {
@@ -7033,7 +7033,7 @@ describe("runTurn — runAutoCompact dispatcher", () => {
         querySource: "repl_main_thread",
       }),
     );
-    expect(calls[0]?.[4]).toBe("do_not_inject");
+    expect(calls[0]?.[4]).toBe("before_last_user_message");
   });
 
   test("autoCompactIfNeeded is NOT called when total usage is below the threshold", async () => {
@@ -7277,13 +7277,14 @@ describe("runTurn — runAutoCompact dispatcher", () => {
         fn({ history, totalTokenUsage: 0 }),
     };
 
-    setAutoCompactImplForTests(async () => ({
+    setAutoCompactImplForTests(async (messages) => ({
       wasCompacted: true,
       compactionResult: {
         message: "POST-COMPACT SUMMARY",
         replacementHistory: [
           { role: "system", content: "POST-COMPACT SUMMARY" },
           { role: "assistant", content: "KEPT TAIL" },
+          ...messages.filter(message => message.role === "user" && Array.isArray(message.content)),
         ],
         preCompactTokens: 999,
         postCompactTokens: 100,
@@ -7343,7 +7344,7 @@ describe("runTurn — runAutoCompact dispatcher", () => {
     const errors = events.filter(
       (e) =>
         e.msg.type === "warning" &&
-        e.msg.payload.cause === "pre_sampling_compact_failed",
+        e.msg.payload.cause === "mid_turn_compact_failed",
     );
     expect(errors.length).toBeGreaterThanOrEqual(1);
     expect(events).toContainEqual(

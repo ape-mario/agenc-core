@@ -5,8 +5,8 @@
  * call, so the durable compaction transaction runs unchanged.
  *
  * The output is deliberately plain: a header that says what happened, the
- * original request, and the latest assistant text and tool calls. Older
- * content is dropped, not paraphrased; a model-free tier must not invent.
+ * earlier context, latest assistant state and bounded tool-result excerpts.
+ * Evidence is quoted, not paraphrased; a model-free tier must not invent.
  */
 
 import type { LLMMessage } from "../../llm/types.js";
@@ -31,6 +31,8 @@ const MAX_LATEST_TEXT_BYTES = 1024;
 const MAX_TOOL_CALLS_BYTES = 1024;
 const MAX_TOOL_ARGUMENT_BYTES = 200;
 const MAX_LATEST_TOOL_CALLS = 8;
+const MAX_EVIDENCE_RECORDS = 12;
+const MAX_EVIDENCE_BYTES = 768;
 
 const HEADER_PREFIX = "Runtime emergency compaction:";
 const REQUEST_HEADING = "Original request:";
@@ -43,12 +45,14 @@ interface EmergencyDigest {
   originalRequest: string | undefined;
   latestAssistantText: string | undefined;
   latestToolCalls: string[];
+  evidence: { text: string; sourceRef: string }[];
 }
 
 interface StructuredMessage {
   readonly role?: unknown;
   readonly content?: unknown;
   readonly tool_calls?: ReadonlyArray<{ readonly name?: unknown; readonly arguments?: unknown }>;
+  readonly tool_name?: unknown;
 }
 
 function textOf(content: unknown): string {
@@ -82,6 +86,21 @@ export function truncateUtf8(value: string, maximumBytes: number): string {
   return `${value.slice(0, end)}${marker}`;
 }
 
+function tailUtf8(value: string, maximumBytes: number): string {
+  // At most maximumBytes UTF-16 units can contribute to this byte suffix;
+  // avoid copying the full (potentially very large) tool result.
+  const bytes = Buffer.from(value.slice(-maximumBytes), "utf8");
+  let start = Math.max(0, bytes.length - maximumBytes);
+  while (start < bytes.length && (bytes[start]! & 0xc0) === 0x80) start += 1;
+  return bytes.subarray(start).toString("utf8");
+}
+
+function evidenceExcerpt(value: string, maximumBytes: number): string {
+  if (Buffer.byteLength(value, "utf8") <= maximumBytes) return value;
+  const headBytes = Math.min(128, Math.floor(maximumBytes / 4));
+  return `${truncateUtf8(value, headBytes)}\n[…]\n${tailUtf8(value, maximumBytes - headBytes - 16)}`;
+}
+
 function parseInput(message: LLMMessage | undefined): unknown {
   const raw = message === undefined ? "" : textOf(message.content);
   try {
@@ -91,13 +110,14 @@ function parseInput(message: LLMMessage | undefined): unknown {
   }
 }
 
-function digestTranscript(payload: unknown): EmergencyDigest {
+function digestTranscript(payload: unknown, sourceRef: string | undefined): EmergencyDigest {
   const digest: EmergencyDigest = {
     droppedMessages: 0,
     toolCalls: new Map(),
     originalRequest: undefined,
     latestAssistantText: undefined,
     latestToolCalls: [],
+    evidence: [],
   };
   const units = (payload as { units?: unknown } | undefined)?.units;
   if (!Array.isArray(units)) return digest;
@@ -110,6 +130,25 @@ function digestTranscript(payload: unknown): EmergencyDigest {
       const text = textOf(entry.content).trim();
       if (role === "user" && digest.originalRequest === undefined && text.length > 0) {
         digest.originalRequest = text;
+      }
+      if (sourceRef !== undefined && role === "user") {
+        try {
+          const prior: unknown = JSON.parse(text);
+          if (isRecord(prior) && prior.kind === "agenc_compaction_context_v2" && Array.isArray(prior.facts)) {
+            for (const fact of prior.facts) {
+              if (typeof fact === "string") digest.evidence.push({ text: evidenceExcerpt(fact, MAX_EVIDENCE_BYTES), sourceRef });
+            }
+            digest.evidence = digest.evidence.slice(-MAX_EVIDENCE_RECORDS);
+          }
+        } catch { /* Ordinary user prose is not a prior summary. */ }
+      }
+      if (sourceRef !== undefined && role === "tool" && text.length > 0) {
+        const name = typeof entry.tool_name === "string" ? entry.tool_name : "tool";
+        // Command results commonly put computed values and exit status at
+        // the end. Keep both the beginning and the end of oversized output.
+        const excerpt = evidenceExcerpt(text, MAX_EVIDENCE_BYTES);
+        digest.evidence.push({ text: `Recorded ${name} output (excerpt):\n${excerpt}`, sourceRef });
+        digest.evidence = digest.evidence.slice(-MAX_EVIDENCE_RECORDS);
       }
       if (role === "assistant") {
         if (text.length > 0) digest.latestAssistantText = text;
@@ -176,6 +215,7 @@ function digestSummaries(payload: unknown): EmergencyDigest {
     originalRequest: undefined,
     latestAssistantText: undefined,
     latestToolCalls: [],
+    evidence: [],
   };
   const summaries = (payload as { summaries?: unknown } | undefined)?.summaries;
   if (!Array.isArray(summaries)) return digest;
@@ -193,6 +233,14 @@ function digestSummaries(payload: unknown): EmergencyDigest {
     if (latest !== undefined) digest.latestAssistantText = latest;
     const tools = section(narrative, LATEST_TOOLS_HEADING);
     if (tools !== undefined) digest.latestToolCalls = tools.split("\n").filter(Boolean);
+    if (isRecord(child) && typeof child.ref_id === "string" && Array.isArray(child.facts)) {
+      for (const fact of child.facts) {
+        if (isRecord(fact) && typeof fact.text === "string") {
+          digest.evidence.push({ text: evidenceExcerpt(fact.text, MAX_EVIDENCE_BYTES + 128), sourceRef: child.ref_id });
+        }
+      }
+      digest.evidence = digest.evidence.slice(-MAX_EVIDENCE_RECORDS);
+    }
   }
   return digest;
 }
@@ -206,7 +254,7 @@ function renderNarrative(digest: EmergencyDigest, scale: number): string {
   const parts = [
     `${HEADER_PREFIX} the model summarizer could not reduce this context; ` +
       `${digest.droppedMessages} messages and ${callTotal} tool calls (${callList}) were dropped. ` +
-      "Re-read files before relying on earlier contents.",
+      "Use retained recent exchanges and recorded evidence to continue; excerpts are incomplete. Do not repeat completed work from older pending actions.",
   ];
   if (digest.originalRequest !== undefined) {
     parts.push(`${REQUEST_HEADING}\n${truncateUtf8(digest.originalRequest, Math.floor(MAX_REQUEST_BYTES * scale))}`);
@@ -230,11 +278,16 @@ export function createRuntimeEmergencySummarizer(): CompactionLocalSummarizer {
     // A single-call plan labels its only call `final` yet still sends the
     // transcript, so the payload kind, not the stage, decides the parser.
     const kind = (payload as { kind?: unknown } | undefined)?.kind;
-    const digest = kind === "untrusted_compaction_summaries" ? digestSummaries(payload) : digestTranscript(payload);
+    const digest = kind === "untrusted_compaction_summaries" ? digestSummaries(payload) : digestTranscript(payload, input.allowedSourceRefIds[0]);
     let narrative = "";
     for (const scale of [1, 0.5, 0.25, 0.1, 0]) {
       narrative = renderNarrative(digest, scale);
-      const body = JSON.stringify({ narrative, facts: [], open_actions: [] });
+      const facts = scale === 0 ? [] : digest.evidence.map((record, index) => ({
+        id: `e${index + 1}`,
+        text: evidenceExcerpt(record.text, Math.max(64, Math.floor((MAX_EVIDENCE_BYTES + 128) * scale))),
+        source_ref_ids: [record.sourceRef],
+      }));
+      const body = JSON.stringify({ narrative, facts, open_actions: [] });
       if (conservativeOutputTokenEstimate(body) <= input.maxOutputTokens) return body;
     }
     // Even the bare header did not fit the reserve; shrink the first line
