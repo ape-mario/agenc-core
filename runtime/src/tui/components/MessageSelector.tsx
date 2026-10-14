@@ -470,7 +470,9 @@ function getRestoreOptionConversationText(option: RestoreOption): string {
       return 'Preceding messages will be summarized. This and subsequent messages will remain unchanged. You will stay at the end of the conversation.';
     case 'both':
     case 'conversation':
-      return 'The conversation will be forked.';
+      // Rewind moves this conversation back in place; it does not keep a
+      // second copy, so do not promise a fork.
+      return 'The conversation goes back to this point. Later messages are removed.';
     case 'code':
     case 'nevermind':
       return 'The conversation will be unchanged.';

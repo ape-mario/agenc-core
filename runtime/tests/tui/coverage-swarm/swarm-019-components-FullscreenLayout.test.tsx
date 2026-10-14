@@ -277,7 +277,7 @@ describe('FullscreenLayout coverage swarm 019', () => {
     expect(output).not.toContain('running-task')
     expect(output).not.toContain('queued-task')
     expect(output).not.toContain('completed-task')
-    expect(output).toContain('auto mode')
+    expect(output).toContain('auto approve')
     expect(output).toContain('$0.00')
     expect(output).not.toContain('12.4K')
   })

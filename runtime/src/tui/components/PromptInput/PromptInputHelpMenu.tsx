@@ -9,10 +9,6 @@ import type { GlobalRuntimeState } from '../../../config/runtime-state-repositor
 
 /** Below this width the two groups stack into one column. */
 const NARROW_LAYOUT_BREAKPOINT = 100;
-/** Width of the key column, so every action starts at the same place. */
-const KEY_COLUMN_WIDTH = 24;
-/** Width of the prefix group ("/  commands"). */
-const PREFIX_GROUP_WIDTH = 30;
 
 /**
  * Show a binding the way this keyboard labels it: "ctrl+o", "option+p" on
@@ -57,9 +53,11 @@ function KeyRows({
   readonly keyWidth: number;
 }): React.ReactNode {
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" flexShrink={0}>
       {rows.map(row => (
-        <Box key={`${row.key}:${row.action}`} flexDirection="row">
+        // Rows never shrink: when the pane is short the transcript gives way,
+        // instead of two shortcut rows collapsing onto one line.
+        <Box key={`${row.key}:${row.action}`} flexDirection="row" flexShrink={0}>
           <Box width={keyWidth} flexShrink={0}>
             <Text dimColor={dimColor}>{row.key}</Text>
           </Box>
@@ -91,24 +89,25 @@ export function PromptInputHelpMenu(props: Props): React.ReactNode {
     ? `shift+tab or ${optionName}+m`
     : formatHelpKey(cycleMode, platform);
 
+  // Only "!" changes how a message is read; "/" and "@" open pickers.
   const prefixRows: Row[] = [
     { key: '/', action: 'commands' },
     { key: '!', action: 'run a shell command' },
     { key: '@', action: 'attach a file' },
-    { key: '&', action: 'run in the background' },
   ];
-
-  const keyRows: Row[] = [
+  const editingRows: Row[] = [
     { key: cycleModeKey, action: 'change mode' },
     { key: newlineKey(getNewlineInstructions(runtimeState)), action: 'new line' },
     { key: 'esc esc', action: 'clear the prompt' },
     { key: formatHelpKey(stash, platform), action: 'set the prompt aside' },
     { key: formatHelpKey(externalEditor, platform), action: 'edit in your editor' },
-    { key: formatHelpKey(imagePaste, platform), action: 'paste an image' },
-    { key: formatHelpKey(modelPicker, platform), action: 'switch model' },
-    { key: formatHelpKey(transcript, platform), action: 'show details' },
-    { key: formatHelpKey(todos, platform), action: 'show tasks' },
     { key: formatHelpKey(undo, platform), action: 'undo' },
+  ];
+  const viewRows: Row[] = [
+    { key: formatHelpKey(modelPicker, platform), action: 'switch model' },
+    { key: formatHelpKey(imagePaste, platform), action: 'paste an image' },
+    { key: formatHelpKey(transcript, platform), action: 'show details' },
+    { key: formatHelpKey(todos, platform), action: 'show the to-do list' },
     ...(platform !== 'windows' ? [{ key: 'ctrl+z', action: 'suspend' }] : []),
   ];
 
@@ -116,33 +115,38 @@ export function PromptInputHelpMenu(props: Props): React.ReactNode {
     <Text dimColor>/keybindings to change these keys</Text>
   ) : null;
 
-  const prefixGroup = (
-    <Box flexDirection="column" width={isNarrowLayout ? undefined : PREFIX_GROUP_WIDTH} flexShrink={0}>
-      <Text dimColor>start a message with</Text>
-      <KeyRows rows={prefixRows} dimColor={dimColor} keyWidth={4} />
-    </Box>
-  );
-  const keyGroup = (
-    <Box flexDirection="column">
-      <Text dimColor>keys</Text>
-      <KeyRows rows={keyRows} dimColor={dimColor} keyWidth={KEY_COLUMN_WIDTH} />
-    </Box>
-  );
+  const editingKeyWidth = Math.max(...editingRows.map(row => row.key.length)) + 2;
+  const viewKeyWidth = Math.max(...viewRows.map(row => row.key.length)) + 2;
 
   if (isNarrowLayout) {
+    // Two short columns and a one-line prefix row keep the whole panel about
+    // ten lines tall, so it fits under the prompt on an 80x24 terminal.
     return (
-      <Box paddingX={paddingX} flexDirection="column" gap={1}>
-        {prefixGroup}
-        {keyGroup}
+      <Box paddingX={paddingX} flexDirection="column" flexShrink={0}>
+        <Text dimColor={dimColor}>/ commands   ! shell command   @ attach a file</Text>
+        <Box flexDirection="row" gap={2} flexShrink={0}>
+          <KeyRows rows={editingRows} dimColor={dimColor} keyWidth={editingKeyWidth} />
+          <KeyRows rows={viewRows} dimColor={dimColor} keyWidth={viewKeyWidth} />
+        </Box>
         {footer}
       </Box>
     );
   }
   return (
-    <Box paddingX={paddingX} flexDirection="column" gap={1}>
-      <Box flexDirection="row" gap={gap ?? 4}>
-        {prefixGroup}
-        {keyGroup}
+    <Box paddingX={paddingX} flexDirection="column" flexShrink={0}>
+      <Box flexDirection="row" gap={gap ?? 4} flexShrink={0}>
+        <Box flexDirection="column" flexShrink={0}>
+          <Text dimColor>start with</Text>
+          <KeyRows rows={prefixRows} dimColor={dimColor} keyWidth={3} />
+        </Box>
+        <Box flexDirection="column" flexShrink={0}>
+          <Text dimColor>keys</Text>
+          <KeyRows rows={editingRows} dimColor={dimColor} keyWidth={editingKeyWidth} />
+        </Box>
+        <Box flexDirection="column" flexShrink={0}>
+          <Text dimColor> </Text>
+          <KeyRows rows={viewRows} dimColor={dimColor} keyWidth={viewKeyWidth} />
+        </Box>
       </Box>
       {footer}
     </Box>
