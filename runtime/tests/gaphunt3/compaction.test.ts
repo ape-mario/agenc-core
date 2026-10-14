@@ -143,8 +143,8 @@ describe("gaphunt3 #41 — auto-compaction does not count aborts as failures", (
     const abortController = new AbortController();
     abortController.abort("user pressed esc");
 
-    // Provider whose summary call throws once aborted. The abort discriminator
-    // must surface the cancel rather than swallowing it into a failure count.
+    // Canonical ownership rejects a pre-aborted acquisition before dispatch.
+    // Preserve the original cancel cause and never count it as a failure.
     const messages = [makeMessage("x".repeat(60_000)), makeMessage("recent request")];
     const harness = createCompactionTransactionHarness(messages, {
       compactionMode: "automatic",
@@ -152,6 +152,7 @@ describe("gaphunt3 #41 — auto-compaction does not count aborts as failures", (
         throw new Error("Partial compaction aborted");
       },
     });
+    const tracking = { consecutiveFailures: 0 };
 
     await expect(
       autoCompactIfNeeded(
@@ -162,11 +163,17 @@ describe("gaphunt3 #41 — auto-compaction does not count aborts as failures", (
         },
         undefined,
         undefined,
-        { consecutiveFailures: 0 },
+        tracking,
         0,
         { force: true },
       ),
-    ).rejects.toBe("user pressed esc");
+    ).rejects.toMatchObject({
+      name: "CompactionTransactionError", reason: "intent_failed", cause: "user pressed esc",
+    });
+    expect(tracking.consecutiveFailures).toBe(0);
+    expect(harness.provider.chat).not.toHaveBeenCalled();
+    expect(harness.store.readAll().some((item) => item.type === "compaction_failed" || item.type === "compaction_committed"))
+      .toBe(false);
     harness.close();
   });
 
