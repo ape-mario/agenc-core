@@ -391,6 +391,7 @@ async function compactConversationTransactionBody(
       max_output_tokens: context.options?.maxOutputTokens ?? null,
       summary_reasoning_effort: reasoningEffort ?? null,
       summary_max_output_tokens: summaryOutputReserve ?? null,
+      ...(options.automatic ? { automatic_retention_policy: "bounded_emergency_v2" } : {}),
       direction,
       requested_focus: requestedFocus,
     },

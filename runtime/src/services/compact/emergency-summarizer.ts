@@ -33,6 +33,8 @@ const MAX_TOOL_ARGUMENT_BYTES = 200;
 const MAX_LATEST_TOOL_CALLS = 8;
 const MAX_EVIDENCE_RECORDS = 12;
 const MAX_EVIDENCE_BYTES = 768;
+const MAX_PRIOR_FACTS = 8;
+const PRIOR_FACT_PREFIX = "Earlier recorded fact:\n";
 
 const HEADER_PREFIX = "Runtime emergency compaction:";
 const REQUEST_HEADING = "Original request:";
@@ -46,6 +48,7 @@ interface EmergencyDigest {
   latestAssistantText: string | undefined;
   latestToolCalls: string[];
   evidence: { text: string; sourceRef: string }[];
+  priorFacts: { text: string; sourceRef: string }[];
 }
 
 interface StructuredMessage {
@@ -118,6 +121,7 @@ function digestTranscript(payload: unknown, sourceRef: string | undefined): Emer
     latestAssistantText: undefined,
     latestToolCalls: [],
     evidence: [],
+    priorFacts: [],
   };
   const units = (payload as { units?: unknown } | undefined)?.units;
   if (!Array.isArray(units)) return digest;
@@ -136,9 +140,12 @@ function digestTranscript(payload: unknown, sourceRef: string | undefined): Emer
           const prior: unknown = JSON.parse(text);
           if (isRecord(prior) && prior.kind === "agenc_compaction_context_v2" && Array.isArray(prior.facts)) {
             for (const fact of prior.facts) {
-              if (typeof fact === "string") digest.evidence.push({ text: evidenceExcerpt(fact, MAX_EVIDENCE_BYTES), sourceRef });
+              if (typeof fact === "string") digest.priorFacts.push({
+                text: evidenceExcerpt(fact.startsWith(PRIOR_FACT_PREFIX) ? fact : PRIOR_FACT_PREFIX + fact, MAX_EVIDENCE_BYTES),
+                sourceRef,
+              });
             }
-            digest.evidence = digest.evidence.slice(-MAX_EVIDENCE_RECORDS);
+            digest.priorFacts = digest.priorFacts.slice(0, MAX_PRIOR_FACTS);
           }
         } catch { /* Ordinary user prose is not a prior summary. */ }
       }
@@ -216,6 +223,7 @@ function digestSummaries(payload: unknown): EmergencyDigest {
     latestAssistantText: undefined,
     latestToolCalls: [],
     evidence: [],
+    priorFacts: [],
   };
   const summaries = (payload as { summaries?: unknown } | undefined)?.summaries;
   if (!Array.isArray(summaries)) return digest;
@@ -236,10 +244,13 @@ function digestSummaries(payload: unknown): EmergencyDigest {
     if (isRecord(child) && typeof child.ref_id === "string" && Array.isArray(child.facts)) {
       for (const fact of child.facts) {
         if (isRecord(fact) && typeof fact.text === "string") {
-          digest.evidence.push({ text: evidenceExcerpt(fact.text, MAX_EVIDENCE_BYTES + 128), sourceRef: child.ref_id });
+          const record = { text: evidenceExcerpt(fact.text, MAX_EVIDENCE_BYTES + 128), sourceRef: child.ref_id };
+          if (fact.text.startsWith(PRIOR_FACT_PREFIX)) digest.priorFacts.push(record);
+          else digest.evidence.push(record);
         }
       }
       digest.evidence = digest.evidence.slice(-MAX_EVIDENCE_RECORDS);
+      digest.priorFacts = digest.priorFacts.slice(0, MAX_PRIOR_FACTS);
     }
   }
   return digest;
@@ -272,23 +283,31 @@ function renderNarrative(digest: EmergencyDigest, scale: number): string {
 }
 
 /** Build a summarizer that never calls a model and always fits its output reserve. */
-export function createRuntimeEmergencySummarizer(): CompactionLocalSummarizer {
+export function createRuntimeEmergencySummarizer(maximumOutputTokens = 8_192): CompactionLocalSummarizer {
   return (input) => {
+    const outputLimit = Math.min(input.maxOutputTokens, maximumOutputTokens);
     const payload = parseInput(input.messages[0]);
     // A single-call plan labels its only call `final` yet still sends the
     // transcript, so the payload kind, not the stage, decides the parser.
     const kind = (payload as { kind?: unknown } | undefined)?.kind;
     const digest = kind === "untrusted_compaction_summaries" ? digestSummaries(payload) : digestTranscript(payload, input.allowedSourceRefIds[0]);
     let narrative = "";
-    for (const scale of [1, 0.5, 0.25, 0.1, 0]) {
+    for (const scale of maximumOutputTokens < 8_192 ? [0.25, 0.1, 0] : [1, 0.5, 0.25, 0.1, 0]) {
       narrative = renderNarrative(digest, scale);
-      const facts = scale === 0 ? [] : digest.evidence.map((record, index) => ({
+      // Reduce the number of older excerpts before shortening each one: the
+      // computed tail of an oversized result must survive, along with facts
+      // already learned in earlier summaries.
+      const records = scale === 0 ? [] : [...digest.priorFacts.map((record) => ({
+        ...record, text: evidenceExcerpt(record.text, Math.max(128, Math.floor(MAX_EVIDENCE_BYTES * scale))),
+      })),
+        ...digest.evidence.slice(-Math.max(1, Math.ceil(digest.evidence.length * scale)))];
+      const facts = records.map((record, index) => ({
         id: `e${index + 1}`,
-        text: evidenceExcerpt(record.text, Math.max(64, Math.floor((MAX_EVIDENCE_BYTES + 128) * scale))),
+        text: record.text,
         source_ref_ids: [record.sourceRef],
       }));
       const body = JSON.stringify({ narrative, facts, open_actions: [] });
-      if (conservativeOutputTokenEstimate(body) <= input.maxOutputTokens) return body;
+      if (conservativeOutputTokenEstimate(body) <= outputLimit) return body;
     }
     // Even the bare header did not fit the reserve; shrink the first line
     // until it does. The body is never empty: a compaction with no
@@ -296,7 +315,7 @@ export function createRuntimeEmergencySummarizer(): CompactionLocalSummarizer {
     const header = narrative.split("\n")[0] ?? HEADER_PREFIX;
     for (let bytes = 256; bytes >= 16; bytes = Math.floor(bytes / 2)) {
       const body = JSON.stringify({ narrative: truncateUtf8(header, bytes), facts: [], open_actions: [] });
-      if (conservativeOutputTokenEstimate(body) <= input.maxOutputTokens) return body;
+      if (conservativeOutputTokenEstimate(body) <= outputLimit) return body;
     }
     return JSON.stringify({ narrative: truncateUtf8(header, 16), facts: [], open_actions: [] });
   };

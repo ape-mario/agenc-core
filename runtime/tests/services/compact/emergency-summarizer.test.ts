@@ -71,6 +71,21 @@ describe("runtime emergency summarizer", () => {
     expect(reduced.facts[0].text).toContain('"latency":70075');
     expect(reduced.facts[0].source_ref_ids).toEqual(["s1"]);
   });
+  test("bounded emergency output keeps earlier facts and complete computed tails", () => {
+    const summarize = createRuntimeEmergencySummarizer(2_048);
+    const messages = [
+      { role: "user", content: JSON.stringify({ kind: "agenc_compaction_context_v2", facts: ["Tracker seed EIS-204 / Europa Ice Survey"] }) },
+      ...Array.from({ length: 12 }, (_, index) => ({ role: "tool", tool_name: "exec_command",
+        content: "α".repeat(8_000) + `\n{"batch":"${index + 1}","latency":70075}` })),
+    ];
+    const text = summarize({ stage: "final", allowedSourceRefIds: ["s1"], maxOutputTokens: 8_192,
+      messages: [{ role: "user", content: JSON.stringify({ kind: "untrusted_compaction_transcript", units: [{ messages }] }) }] });
+    const body = JSON.parse(text);
+    expect(conservativeOutputTokenEstimate(text)).toBeLessThanOrEqual(2_048);
+    expect(body.facts.some((fact: { text: string }) => fact.text.includes("EIS-204 / Europa Ice Survey"))).toBe(true);
+    expect(body.facts.some((fact: { text: string }) => fact.text.includes('"batch":"12","latency":70075'))).toBe(true);
+    expect(body.facts.every((fact: { source_ref_ids: string[] }) => fact.source_ref_ids.join() === "s1")).toBe(true);
+  });
 
   test("reduce stage merges children: earliest request, latest state, summed counts", () => {
     const summarize = createRuntimeEmergencySummarizer();

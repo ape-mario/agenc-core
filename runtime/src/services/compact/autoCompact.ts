@@ -150,7 +150,7 @@ export async function autoCompactIfNeeded(
           : {
               keepCount: 0,
               ...(tier === "emergency_local"
-                ? { summarizer: (await import("./emergency-summarizer.js")).createRuntimeEmergencySummarizer() }
+                ? { summarizer: (await import("./emergency-summarizer.js")).createRuntimeEmergencySummarizer(2_048) }
                 : {}),
             },
       );
