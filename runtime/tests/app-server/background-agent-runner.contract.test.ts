@@ -632,6 +632,9 @@ function makeTopLevelRunner(opts: {
   const rolloutStore = {
     rolloutPath: `/tmp/${opts.conversationId}.jsonl`,
     readAll: () => [...rolloutItems],
+    appendRollout: vi.fn((item: RolloutItem, _options?: { readonly durable?: boolean }) => {
+      rolloutItems.push(item);
+    }),
     listThreadSpawnChildrenWithStatus: vi.fn(() => []),
     listThreadSpawnChildren: vi.fn(() => []),
     rootHasOnlyTerminalDescendants: vi.fn(() => true),
@@ -1134,6 +1137,48 @@ function makeTopLevelRunner(opts: {
       permissionContext = next;
     },
   };
+}
+
+function expectPersistedShellContexts(
+  harness: ReturnType<typeof makeTopLevelRunner>,
+  expected: ReadonlyArray<{
+    readonly command: string;
+    readonly stdout: string;
+    readonly stderr: string;
+    readonly exitCode: number | null;
+  }>,
+) {
+  const appends = harness.rolloutStore.appendRollout.mock.calls;
+  expect(appends).toHaveLength(expected.length);
+  const persisted = appends.map(([item, options], index) => {
+    expect(options).toEqual({ durable: true });
+    expect(item.type).toBe("response_item");
+    if (item.type !== "response_item") throw new Error("Expected operator response item");
+    const context = expected[index]!;
+    expect(item.payload).toMatchObject({ role: "user", id: expect.stringMatching(/^shell-context:/u) });
+    expect(item.payload.content).toContain(`<command>${context.command}</command>`);
+    expect(item.payload.content).toContain(`<exit_code>${context.exitCode ?? "unknown"}</exit_code>`);
+    expect(item.payload.content).toContain(`<bash-stdout>${context.stdout}</bash-stdout>`);
+    expect(item.payload.content).toContain(context.stderr.length === 0
+      ? "<bash-stderr></bash-stderr>" : context.stderr);
+    expect(harness.rolloutStore.readAll()).toContainEqual(item);
+    return item.payload;
+  });
+  expect(new Set(persisted.map(item => item.id)).size).toBe(expected.length);
+  const live = harness.sessionState.history as Array<{
+    readonly role: string;
+    readonly content: string;
+    readonly runtimeOnly?: { readonly responseItemId?: string };
+  }>;
+  const operatorHistory = live.filter(item => item.content.startsWith("<user_shell_command>"));
+  expect(operatorHistory).toHaveLength(expected.length);
+  persisted.forEach((item, index) => {
+    expect(operatorHistory[index]).toMatchObject({
+      role: "user", content: item.content, runtimeOnly: { responseItemId: item.id },
+    });
+  });
+  const reopened = reconstructFromRollout(harness.rolloutStore.readAll() as RolloutItem[]);
+  persisted.forEach(item => expect(reopened.history).toContainEqual(item));
 }
 
 function configureSessionShellHarness(
@@ -1850,6 +1895,18 @@ describe("AgenC delegate background-agent runner", () => {
     ]);
     expect(harness.stub.thread.submit).not.toHaveBeenCalled();
     expect(harness.control.sendInput).not.toHaveBeenCalled();
+    const expectedContext = [{ command: "printf shell-route", stdout: "shell stdout",
+      stderr: "shell stderr", exitCode: 0 }];
+    expectPersistedShellContexts(harness, expectedContext);
+    harness.control.sendInput.mockImplementationOnce(async () => {
+      expectPersistedShellContexts(harness, expectedContext);
+    });
+    await expect(harness.runner.submitAgentMessage("session-direct-shell-authorities", {
+      sessionId: "session-direct-shell-authorities", content: "Inspect the shell outcome",
+      originalContent: "Inspect the shell outcome", messageId: "shell-authorities-next",
+      streamId: "shell-authorities-next", acceptedAt: "2026-08-27T00:00:00.000Z",
+    })).resolves.toMatchObject({ disposition: "started" });
+    expect(harness.control.sendInput).toHaveBeenCalledOnce();
   });
 
   it("[managed-thread] durably closes direct shell state when dispatch rejects after start", async () => {
@@ -2049,6 +2106,12 @@ describe("AgenC delegate background-agent runner", () => {
     ]);
     expect(duplicateResult).toEqual(firstResult);
     expect(shell.bashExecute).toHaveBeenCalledOnce();
+    expectPersistedShellContexts(harness, [{ command: "printf once", stdout: "once",
+      stderr: "", exitCode: 0 }]);
+    await expect(harness.runner.executeAgentShell("session-direct-shell-deduplication", params))
+      .resolves.toEqual(firstResult);
+    expectPersistedShellContexts(harness, [{ command: "printf once", stdout: "once",
+      stderr: "", exitCode: 0 }]);
   });
 
   it.each(["reject", "queue"] as const)(
@@ -2078,6 +2141,10 @@ describe("AgenC delegate background-agent runner", () => {
         } });
       Object.assign(harness.rolloutStore, {
         assertModelExecutionAllowed: () => store.assertModelExecutionAllowed(),
+      });
+      harness.control.sendInput.mockImplementationOnce(async () => {
+        expectPersistedShellContexts(harness, [{ command: "printf done", stdout: "done",
+          stderr: "", exitCode: 0 }]);
       });
       let execution: Promise<unknown> | undefined;
       try {
@@ -2127,6 +2194,8 @@ describe("AgenC delegate background-agent runner", () => {
         store.recordEffectEvent(result);
         releaseShell.resolve();
         await expect(execution).resolves.toMatchObject({ isError: false });
+        expectPersistedShellContexts(harness, [{ command: "printf done", stdout: "done",
+          stderr: "", exitCode: 0 }]);
         if (queued !== undefined) {
           await expect(queued).resolves.toMatchObject({ disposition: "started" });
           await expect(duplicate).resolves.toMatchObject({ disposition: "duplicate" });
@@ -2210,6 +2279,8 @@ describe("AgenC delegate background-agent runner", () => {
     expect(shell.acquire).toHaveBeenCalledOnce();
     expect(shell.bashExecute).toHaveBeenCalledOnce();
     expect(harness.control.sendInput).not.toHaveBeenCalled();
+    expectPersistedShellContexts(harness, [{ command: "printf admitted", stdout: "shell stdout",
+      stderr: "", exitCode: 0 }]);
   });
 
   it("[managed-thread] checks effect review after cancelled submission cleanup before the next queued prompt", async () => {
@@ -2359,6 +2430,8 @@ describe("AgenC delegate background-agent runner", () => {
       stdout: "shell stdout",
     });
     expect(shell.bashExecute).toHaveBeenCalledOnce();
+    expectPersistedShellContexts(harness, [{ command: "printf after-cancel", stdout: "shell stdout",
+      stderr: "", exitCode: 0 }]);
   });
 
   it("[managed-thread] forwards direct-shell aborts into the admitted tool dispatch", async () => {
@@ -2429,6 +2502,8 @@ describe("AgenC delegate background-agent runner", () => {
     expect(shell.markDispatched).toHaveBeenCalledOnce();
     expect(harness.stub.thread.submit).not.toHaveBeenCalled();
     expect(harness.control.sendInput).not.toHaveBeenCalled();
+    expectPersistedShellContexts(harness, [{ command: "printf abort", stdout: "",
+      stderr: "operator aborted direct shell", exitCode: null }]);
   });
 
   it("[managed-thread] keeps direct-shell errors session-scoped and accepts an immediate follow-up command", async () => {
@@ -2549,6 +2624,10 @@ describe("AgenC delegate background-agent runner", () => {
       stdout: "second command succeeded",
     });
     expect(shell.bashExecute).toHaveBeenCalledTimes(2);
+    expectPersistedShellContexts(harness, [
+      { command: "sleep 10", stdout: "", stderr: "operator cancelled direct shell", exitCode: null },
+      { command: "printf second-command", stdout: "second command succeeded", stderr: "", exitCode: 0 },
+    ]);
     await expect(
       harness.runner.getAgentSnapshot(agentId),
     ).resolves.toMatchObject({ status: "idle" });
@@ -11152,6 +11231,8 @@ describe("AgenC delegate background-agent runner", () => {
       stdout: "shell stdout",
     });
     expect(shell.bashExecute).toHaveBeenCalledOnce();
+    expectPersistedShellContexts(harness, [{ command: "printf serialized", stdout: "shell stdout",
+      stderr: "", exitCode: 0 }]);
   });
 
   it("[managed-thread] reports a persisted crash-tail retry as incomplete", async () => {
