@@ -27,63 +27,6 @@ import {
   WelcomeColdPanel,
 } from './primitives.js'
 
-const BRAILLE_ALPHA_THRESHOLD = 0.22
-const BRAILLE_DOT_BITS = [
-  [0x01, 0x08],
-  [0x02, 0x10],
-  [0x04, 0x20],
-  [0x40, 0x80],
-] as const
-
-function renderLogoBraille(
-  raster: Buffer,
-  columns: number,
-  rows: number,
-): readonly string[] {
-  const sampleColumns = columns * 2
-  const sampleRows = rows * 4
-
-  function sampleAlpha(sampleColumn: number, sampleRow: number): boolean {
-    const xStart = Math.floor(
-      (sampleColumn * AGENC_LOGO_RASTER_SIZE) / sampleColumns,
-    )
-    const xEnd = Math.floor(
-      ((sampleColumn + 1) * AGENC_LOGO_RASTER_SIZE) / sampleColumns,
-    )
-    const yStart = Math.floor(
-      (sampleRow * AGENC_LOGO_RASTER_SIZE) / sampleRows,
-    )
-    const yEnd = Math.floor(
-      ((sampleRow + 1) * AGENC_LOGO_RASTER_SIZE) / sampleRows,
-    )
-    let alpha = 0
-    let pixels = 0
-
-    for (let y = yStart; y < yEnd; y += 1) {
-      for (let x = xStart; x < xEnd; x += 1) {
-        alpha += raster[(y * AGENC_LOGO_RASTER_SIZE + x) * 4 + 3] ?? 0
-        pixels += 1
-      }
-    }
-
-    return alpha / (pixels * 255) >= BRAILLE_ALPHA_THRESHOLD
-  }
-
-  return Array.from({ length: rows }, (_, row) =>
-    Array.from({ length: columns }, (_, column) => {
-      let dots = 0
-      for (let dotRow = 0; dotRow < 4; dotRow += 1) {
-        for (let dotColumn = 0; dotColumn < 2; dotColumn += 1) {
-          if (sampleAlpha(column * 2 + dotColumn, row * 4 + dotRow)) {
-            dots |= BRAILLE_DOT_BITS[dotRow]![dotColumn]!
-          }
-        }
-      }
-      return String.fromCodePoint(0x2800 + dots)
-    }).join(''),
-  )
-}
-
 describe('v2 primitives', () => {
   it('renders the runtime-bound mode switcher state with the current mode selected', async () => {
     const output = await renderToString(
@@ -189,21 +132,33 @@ describe('v2 primitives', () => {
     expect(raster.includes(Buffer.from([255, 255, 255, 255]))).toBe(true)
   })
 
-  it('derives both portable logo sizes from the official raster', () => {
-    const raster = inflateSync(
-      Buffer.from(AGENC_LOGO_RGBA_ZLIB_BASE64, 'base64'),
-    )
-
-    expect(AGENC_LOGO_MARK_LINES).toEqual(renderLogoBraille(raster, 16, 8))
-    expect(AGENC_LOGO_MARK_COMPACT_LINES).toEqual(
-      renderLogoBraille(raster, 14, 6),
-    )
-    expect(AGENC_LOGO_MARK_LINES.every(line => stringWidth(line) === 16)).toBe(
-      true,
-    )
-    expect(
-      AGENC_LOGO_MARK_COMPACT_LINES.every(line => stringWidth(line) === 14),
-    ).toBe(true)
+  it('preserves the selected Braille geometry and both portable logo sizes', () => {
+    // The clearer mark replaces the old 0.22 alpha-average preview. Pin all
+    // dots of the selected geometry; the exact RGBA raster is checked above.
+    expect(AGENC_LOGO_MARK_LINES).toEqual([
+      '⢀⣴⡷⠰⣿⠆⢾⣦⡀⠀⠀⢀⣴⡷⠰⣿⠆⢾⣦⡀',
+      '⢙⡋⠀⠀⠀⠀⠀⠙⢿⣦⣴⡿⠋⠀⠀⠀⠀⠀⢙⡋',
+      '⠻⠟⠀⠀⠀⠀⠀⢀⣼⣿⣿⣧⡀⠀⠀⠀⠀⠀⠻⠟',
+      '⠺⣷⣄⠀⠀⢀⣴⣿⠟⠁⠈⠻⣿⣦⡀⠀⠀⣠⣾⠗',
+      '⠀⠈⠻⣷⣶⣿⠟⠁⠀⠀⠀⠀⠈⠻⣿⣶⣾⠟⠁⠀',
+      '⠀⢀⣴⡿⠿⣿⣦⡀⠀⠀⠀⠀⢀⣴⣿⠿⢿⣦⡀⠀',
+      '⢴⡿⠋⠀⠀⠈⠻⣿⣦⡀⢀⣴⣿⠟⠁⠀⠀⠙⢿⡦',
+      '⣴⣦⠀⠀⠀⠀⠀⠈⢻⣿⣿⡟⠁⠀⠀⠀⠀⠀⣴⣦',
+      '⣨⣅⠀⠀⠀⠀⠀⣠⣾⠟⠻⣷⣄⠀⠀⠀⠀⠀⣨⣅',
+      '⠈⠻⡷⠰⣿⠆⢾⠟⠁⠀⠀⠈⠻⡷⠰⣿⠆⢾⠟⠁',
+    ])
+    expect(AGENC_LOGO_MARK_COMPACT_LINES).toEqual([
+      '⠴⠃⠚⠘⢷⣄⣠⡾⠃⠓⠘⠦',
+      '⣚⠀⠀⠀⣠⡿⢿⣄⠀⠀⠀⣓',
+      '⠙⢷⣤⡾⠋⠀⠀⠙⢷⣤⡾⠋',
+      '⣠⡾⠛⢷⣄⠀⠀⣠⡾⠛⢷⣄',
+      '⢭⠀⠀⠀⠙⣷⣾⠋⠀⠀⠀⡭',
+      '⠲⡄⢤⢠⡾⠋⠙⢷⡄⡤⢠⠖',
+    ])
+    expect(AGENC_LOGO_MARK_LINES).toHaveLength(10)
+    expect(AGENC_LOGO_MARK_COMPACT_LINES).toHaveLength(6)
+    expect(AGENC_LOGO_MARK_LINES.every(line => stringWidth(line) === 20)).toBe(true)
+    expect(AGENC_LOGO_MARK_COMPACT_LINES.every(line => stringWidth(line) === 12)).toBe(true)
   })
 
   it('detects Kitty directly but keeps multiplexers and other terminals on the fallback', () => {
@@ -234,12 +189,29 @@ describe('v2 primitives', () => {
       `s=160,v=160,c=${columns},r=${rows},i=16777215;`,
     )
     expect(upload).toMatch(/\x1b\\$/)
-    expect(columns).toBe(16)
+    expect(columns).toBe(20)
+    expect(rows).toBe(10)
     expect(placeholders).toHaveLength(rows)
     expect(placeholders.every(row => stringWidth(row) === columns)).toBe(true)
     expect(compactPlaceholders).toHaveLength(
       AGENC_LOGO_MARK_COMPACT_LINES.length,
     )
+    expect(compactPlaceholders.every(row => stringWidth(row) === 12)).toBe(true)
+    const maximumGrid = kittyLogoPlaceholderRows(20, 20)
+    expect(maximumGrid).toHaveLength(20)
+    expect(maximumGrid.every(row => stringWidth(row) === 20)).toBe(true)
+    expect(new Set(maximumGrid)).toHaveProperty('size', 20)
+    expect(() => kittyLogoPlaceholderRows(21, 20)).toThrow(RangeError)
+    expect(() => kittyLogoPlaceholderRows(20, 21)).toThrow(RangeError)
+    expect(() => kittyLogoPlaceholderRows(0, 10)).toThrow(RangeError)
+  })
+
+  it.each([23, 24])('chooses the correct logo size at terminal height %i', async rows => {
+    const output = await renderToString(<WelcomeColdPanel />, { columns: 120, rows })
+    const expected = rows < 24 ? AGENC_LOGO_MARK_COMPACT_LINES : AGENC_LOGO_MARK_LINES
+    const other = rows < 24 ? AGENC_LOGO_MARK_LINES : AGENC_LOGO_MARK_COMPACT_LINES
+    expect(output).toContain(expected[0])
+    expect(output).not.toContain(other[0])
   })
 
   it('fabricates no session data and repeats no status fact', async () => {
