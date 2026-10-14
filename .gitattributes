@@ -20,3 +20,18 @@ runtime/tests/helpers/red-probe-markdown-loader.mjs text eol=lf
 runtime/tests/helpers/red-probe.ts text eol=lf
 runtime/tests/fnd/red-probes/*.red-probe.ts text eol=lf
 runtime/tests/fnd/red-probes/**/*.red-probe.ts text eol=lf
+
+# The runtime build compares this generated launcher module byte for byte with a
+# fresh esbuild render, which always uses LF.
+packages/agenc/generated/startup-preflight.mjs text eol=lf
+
+# The release build hashes the fresh state schema, its generator and every
+# migration source byte for byte (runtime/src/state/fresh-state-schema.sources.json).
+runtime/scripts/fresh-state-schema-artifact.mjs text eol=lf
+runtime/scripts/generate-fresh-state-schema.ts text eol=lf
+runtime/src/agents/jobs/csv-reader.ts text eol=lf
+runtime/src/agents/jobs/csv-schema.ts text eol=lf
+runtime/src/contracts/csv-job-contract.ts text eol=lf
+runtime/src/state/fresh-state-schema.generated.ts text eol=lf
+runtime/src/state/migrations/** text eol=lf
+runtime/src/utils/loadAjv.ts text eol=lf
