@@ -16,6 +16,7 @@ import { FpsMetricsProvider, useFpsMetrics } from "../context/fpsMetrics.js";
 import { StatsProvider, type StatsStore } from "../context/stats.js";
 import { onChangeAppState } from "../state/onChangeAppState.js";
 import { syncRuntimeEffortEventToAppState } from "../state/runtimeEffortSync.js";
+import { syncRuntimeModelEventToAppState } from "../state/runtimeModelSync.js";
 import { syncTaskBudgetEventToTuiSession } from "../state/taskBudgetSync.js";
 import { syncCollabAgentEventToAppState } from "../state/collabAgentTaskSync.js";
 import { selectAgenCTuiGlyphs } from "../glyphs.js";
@@ -2531,6 +2532,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       }
       syncCollabAgentEventToAppState(event, setAppState);
       syncRuntimeEffortEventToAppState(event, setAppState);
+      syncRuntimeModelEventToAppState(event, setAppState);
       syncTaskBudgetEventToTuiSession(event, props.session);
     });
     return () => {
