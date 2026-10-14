@@ -1,3 +1,4 @@
+import { useStartupUpdate } from "../hooks/useStartupUpdate.js";
 import { logForDebugging } from "src/utils/debug.js";
 import { isRecord } from "../../utils/record.js";
 import { createHash, randomUUID } from "node:crypto";
@@ -4311,6 +4312,13 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     elicitation.prompt === null &&
     toolJSX === null &&
     !onboarding.active;
+  useStartupUpdate({
+    configStore: getTuiConfigStore(props.session),
+    safe: !effectiveInputBusy && input.length === 0 && Object.keys(pastedContents).length === 0 &&
+      toolJSX === null && permissionRequests.length === 0 && elicitation.prompt === null &&
+      !onboarding.active && !showCostDialog && !isMessageSelectorVisible,
+    setToolJSX,
+  });
   const isLocalJSXCommandActive = toolJSX?.isLocalJSXCommand === true;
   const localCommandPopupRef = useRef(toolJSX);
   localCommandPopupRef.current = toolJSX;
