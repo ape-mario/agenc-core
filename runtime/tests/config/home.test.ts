@@ -36,7 +36,9 @@ describe('explicit process home path ingress', () => {
   })
 
   test('rejects the retired authority even when candidate home coordinates are unknown', () => {
-    expect(() => resolveProcessHomePathInput({ AGENC_CONFIG_DIR: '' })).toThrow('AGENC_CONFIG_DIR')
+    // An explicit invalid-input payload, never an installed test home alias.
+    const retiredAuthorityInput = Object.fromEntries([['AGENC_CONFIG_DIR', '']])
+    expect(() => resolveProcessHomePathInput(retiredAuthorityInput)).toThrow('AGENC_CONFIG_DIR')
   })
 })
 
