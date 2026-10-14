@@ -2264,6 +2264,16 @@ describe("agenc update CLI", () => {
     expect(existsSync(join(agencHome, "runtime", NEW_VERSION))).toBe(false);
   });
 
+  test("shared check retains the CLI fallback for an unparsable current version", async () => {
+    const artifact = makeSyntheticArtifact(work);
+    const manifestUrl = `file://${writeManifest(work, artifact)}`;
+    const checked = await checkAgenCUpdate({ kind: "update", check: true, json: false, manifestUrl }, { ...deps, currentVersion: "local-build" });
+    expect(checked.updateAvailable).toBe(true);
+    const code = await runAgenCUpdateCli({ kind: "update", check: true, json: true, manifestUrl }, { ...deps, currentVersion: "local-build" });
+    expect(code).toBe(0);
+    expect(JSON.parse(out.join(""))).toMatchObject({ currentVersion: "local-build", latestVersion: NEW_VERSION, updateAvailable: true });
+  });
+
   test("TUI check shares the CLI result and rejects a changed release before installation", async () => {
     const artifact = makeSyntheticArtifact(work);
     const manifestUrl = `file://${writeManifest(work, artifact)}`;

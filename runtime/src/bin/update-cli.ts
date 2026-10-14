@@ -3536,7 +3536,13 @@ export async function checkAgenCUpdate(
     deps.runtimeCompatibility ?? currentUpdateRuntimeCompatibility(deps.platform, deps.arch, deps.nodeModuleAbi ?? process.versions.modules));
   const latestVersion = manifest.runtimeVersion;
   const pinned = command.pinVersion !== undefined;
-  const updateAvailable = pinned ? latestVersion !== currentVersion : semverGt(latestVersion, currentVersion);
+  // Unpinned updates only when remote is semver-greater; --pin installs that exact release even if lower.
+  let updateAvailable: boolean;
+  try {
+    updateAvailable = pinned ? latestVersion !== currentVersion : semverGt(latestVersion, currentVersion);
+  } catch {
+    updateAvailable = latestVersion !== currentVersion;
+  }
   return { currentVersion, latestVersion, updateAvailable, manifestRequest, manifest, artifact };
 }
 
