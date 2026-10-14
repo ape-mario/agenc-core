@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +9,7 @@ import {
   ROLLOUT_SCHEMA_VERSION,
 } from "../../src/session/event-log.js";
 import { backfillPinnedRolloutContent } from "./backfill.js";
-import { CanonicalJournalIntegrityError } from "./recovery-contract.js";
+import { CanonicalJournalIntegrityError, MAX_RECOVERY_CANONICAL_LINE_BYTES } from "./recovery-contract.js";
 import {
   StrictCanonicalJournalValidator,
   validateCanonicalJournalBytes,
@@ -33,6 +34,78 @@ afterEach(() => {
 });
 
 describe("strict canonical journal contract", () => {
+  it("requires a genuine full-validation proof before reusing JSON shape validation", () => {
+    const raw = validEvent(1, "agent_message", { message: "valid" });
+    const proof = validateCanonicalJournalText(raw);
+    expect(validateCanonicalJournalText(raw, {
+      trustedSourceSha256: proof.sourceSha256, validatedJsonSource: proof,
+      identityPolicy: "trusted_replay",
+    }).sourceSha256).toBe(proof.sourceSha256);
+    const invalid = validEvent(1, "agent_message", { message: 7 });
+    const forgedDigest = createHash("sha256").update(invalid).digest("hex");
+    expect(() => validateCanonicalJournalText(invalid, {
+      trustedSourceSha256: forgedDigest,
+      validatedJsonSource: { ...proof, sourceSha256: forgedDigest },
+      identityPolicy: "trusted_replay",
+    })).toThrow(expect.objectContaining({ reasonCode: "schema_invalid" }));
+    expect(() => { (proof as { sourceSha256: string }).sourceSha256 = forgedDigest; }).toThrow();
+    expect(() => validateCanonicalJournalText(invalid, {
+      trustedSourceSha256: forgedDigest, validatedJsonSource: proof,
+      identityPolicy: "trusted_replay",
+    })).toThrow(expect.objectContaining({ reasonCode: "schema_invalid" }));
+  });
+
+  it("replays oversized historical session bootstrap copies under the bounded compatibility lane", () => {
+    const message = "a".repeat(MAX_RECOVERY_CANONICAL_LINE_BYTES + 1024);
+    const payload = {
+      sessionId: "strict-test", model: "m", modelProviderId: "p", cwd: "/repo",
+      historyLogId: 0, historyEntryCount: 1,
+      initialMessages: [{ type: "agent_message", payload: { message } }],
+    };
+    const raw = JSON.stringify({ type: "event_msg", payload: {
+      id: "configured", msg: { type: "session_configured", payload },
+      eventId: "event:1", seq: 1,
+    } }) + "\n";
+    const streaming = new StrictCanonicalJournalValidator();
+    const bytes = Buffer.from(raw);
+    for (let offset = 0; offset < bytes.length; offset += 65_536) {
+      streaming.push(bytes.subarray(offset, offset + 65_536));
+    }
+    expect(streaming.finish().records[0]?.item).toMatchObject({
+      payload: { msg: { payload: { initialMessages: payload.initialMessages } } },
+    });
+    expect(() => validateCanonicalJournalText(raw, { maxLineBytes: 1024 }))
+      .toThrow(expect.objectContaining({ reasonCode: "line_byte_limit" }));
+    const duplicate = raw.replace('"message":', '"message":"first","message":');
+    expect(() => validateCanonicalJournalText(duplicate))
+      .toThrow(expect.objectContaining({ reasonCode: "schema_invalid" }));
+    const badSchema = raw.replace('"historyEntryCount":1', '"historyEntryCount":-1');
+    expect(() => validateCanonicalJournalText(badSchema))
+      .toThrow(expect.objectContaining({ reasonCode: "schema_invalid" }));
+    const badMetadata = raw.replace('"cwd":"/repo"', '"cwd":' + JSON.stringify(message));
+    expect(() => validateCanonicalJournalText(badMetadata))
+      .toThrow(expect.objectContaining({ reasonCode: "line_byte_limit" }));
+    const escapedMetadata = raw.replace('"cwd":"/repo"', '"cwd":"' +
+      '\\u0061'.repeat(Math.ceil(MAX_RECOVERY_CANONICAL_LINE_BYTES / 6)) + '"');
+    expect(() => validateCanonicalJournalText(escapedMetadata))
+      .toThrow(expect.objectContaining({ reasonCode: "line_byte_limit" }));
+    const paddedMetadata = raw.replace('"historyEntryCount":1',
+      '"historyEntryCount":' + ' '.repeat(MAX_RECOVERY_CANONICAL_LINE_BYTES) + '1');
+    expect(() => validateCanonicalJournalText(paddedMetadata))
+      .toThrow(expect.objectContaining({ reasonCode: "line_byte_limit" }));
+    const ordinary = validEvent(1, "agent_message", { message });
+    expect(() => validateCanonicalJournalText(ordinary))
+      .toThrow(expect.objectContaining({ reasonCode: "line_byte_limit" }));
+  });
+
+  it("retains escaped-key duplicate and nesting checks while skipping string values quickly", () => {
+    const escaped = validEvent(1, "agent_message", { message: 'a\\\"b \\ c \" d'.repeat(1000) });
+    expect(validateCanonicalJournalText(escaped).eventCount).toBe(1);
+    const duplicate = escaped.replace('"message":', '"mess\\u0061ge":"first","message":');
+    expect(() => validateCanonicalJournalText(duplicate))
+      .toThrow(expect.objectContaining({ reasonCode: "schema_invalid" }));
+  });
+
   it.each(RUN_RUNTIME_REASONING_EFFORTS)("replays %s in durable settings and both turn-context carriers", (reasoningEffort) => {
     const context = {
       cwd: "/synthetic", approvalPolicy: "never", sandboxPolicy: "danger-full-access",

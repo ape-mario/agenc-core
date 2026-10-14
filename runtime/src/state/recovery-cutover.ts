@@ -23,6 +23,7 @@ import type { StateSqliteDriver } from "./sqlite-driver.js";
 const RECOVERY_RETRY_DELAY_MILLISECONDS = 60_000;
 
 export interface RecoveryCutoverOptions {
+  readonly canonicalProjectionEpoch?: string;
   readonly limits?: RecoveryFileLimitOverrides;
   readonly descriptorBudget?: RecoveryDescriptorBudget;
   readonly nowMilliseconds?: () => number;

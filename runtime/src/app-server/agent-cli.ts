@@ -201,6 +201,10 @@ const MAX_DAEMON_CLIENT_BUFFER_BYTES = 16 * 1024 * 1024;
 // tools, approvals, or collaboration workers make progress. Explicit aborts,
 // request.cancel, socket closure, and daemon shutdown still terminate them.
 const UNBOUNDED_DAEMON_METHODS: ReadonlySet<AgenCDaemonKnownMethod> = new Set([
+  // Large cold resumes include source validation and runtime restoration.
+  // The daemon's bounded scans, cancellation and socket lifetime own this
+  // operation; a 30s client timer must not abandon a legitimate load.
+  "agent.create",
   // Both message methods await the full daemon turn before responding.
   "message.send",
   "message.stream",

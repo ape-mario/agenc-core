@@ -799,9 +799,28 @@ function maxEventSeqInRollout(path: string): EventSeq {
   }
 }
 
-function maxEventSeqInRolloutFd(fd: number): EventSeq {
+function maxEventSeqInRolloutFd(fd: number, strict = false): EventSeq {
   let maxSeq: EventSeq = 0;
   const chunk = Buffer.allocUnsafe(64 * 1024);
+  if (strict) {
+    const validator = new StrictCanonicalJournalValidator({
+      retainRecords: false,
+      onRecord: record => {
+        if (record.item.type !== "event_msg") return;
+        const seq = validEventSeq(record.item.payload.seq);
+        if (seq !== undefined) maxSeq = Math.max(maxSeq, seq);
+      },
+    });
+    let offset = 0;
+    for (;;) {
+      const count = readSync(fd, chunk, 0, chunk.byteLength, offset);
+      if (count === 0) break;
+      validator.push(chunk.subarray(0, count));
+      offset += count;
+    }
+    validator.finish();
+    return maxSeq;
+  }
   let pending = Buffer.alloc(0);
   let position = 0;
   const inspect = (lineBytes: Buffer): void => {
@@ -2124,7 +2143,12 @@ export class SessionStore {
         const rolloutSeq =
           resumeHandle === undefined
             ? maxEventSeqInRollout(this.rolloutPath)
-            : maxEventSeqInRolloutFd(resumeHandle.fd);
+            : maxEventSeqInRolloutFd(
+                resumeHandle.fd,
+                // Older schema headers still need the existing migration
+                // before they can pass the current canonical validator.
+                existingMeta.rolloutSchemaVersion === ROLLOUT_SCHEMA_VERSION,
+              );
         if (rolloutSeq > this.lastSeqWritten) {
           this.lastSeqWritten = rolloutSeq;
         }

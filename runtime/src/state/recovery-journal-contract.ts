@@ -6,6 +6,7 @@ import { createHash, type Hash } from "node:crypto";
 import { isLegacyConfiguredCacheWithinCeiling, recoveryPendingLineCeiling } from "./session-configured-cache.js";
 import {
   parseRolloutLine,
+  parseRolloutValue,
   ROLLOUT_ITEM_VERSION,
   type RolloutItem,
 } from "../session/rollout-item.js";
@@ -18,6 +19,7 @@ import {
   MAX_RECOVERY_CANONICAL_EVENTS,
   MAX_RECOVERY_CANONICAL_LINE_BYTES,
   MAX_RECOVERY_CANONICAL_SOURCE_BYTES,
+  MAX_RECOVERY_LEGACY_SESSION_CONFIGURED_BYTES,
   assertRecoverySha256,
   type RecoveryIntegrityFacts,
   type RecoveryIntegrityReasonCode,
@@ -92,6 +94,8 @@ export interface StrictCanonicalJournal {
 }
 
 export interface StrictCanonicalJournalOptions {
+  /** In-process full-validation proof for an identical digest-anchored replay. */
+  readonly validatedJsonSource?: StrictCanonicalJournal;
   readonly expectedRunId?: string;
   readonly expectedEpoch?: number;
   readonly terminalPolicy?: "allow_missing" | "require_terminal";
@@ -159,7 +163,12 @@ const LEGACY_EVENT_TYPE_ALIASES = new Set<string>([
  * descriptors and imposes no aggregate resource policy; E1a supplies those
  * mechanisms around this byte-fed contract.
  */
+// External callers cannot manufacture this proof by supplying a digest alone.
+// Store the digest independently of the returned object's mutable properties.
+const validatedJsonSourceDigests = new WeakMap<StrictCanonicalJournal, string>();
+
 export class StrictCanonicalJournalValidator {
+  readonly #reuseJsonValidation: boolean;
   readonly #options: StrictCanonicalJournalOptions;
   readonly #sourceHash: Hash = createHash("sha256");
   readonly #rollingHash: Hash = createHash("sha256");
@@ -223,6 +232,9 @@ export class StrictCanonicalJournalValidator {
 
   constructor(options: StrictCanonicalJournalOptions = {}) {
     this.#options = Object.freeze({ ...options });
+    this.#reuseJsonValidation = options.trustedSourceSha256 !== undefined &&
+      options.validatedJsonSource !== undefined &&
+      validatedJsonSourceDigests.get(options.validatedJsonSource) === options.trustedSourceSha256;
     if (options.trustedSourceSha256 !== undefined) {
       assertRecoverySha256(options.trustedSourceSha256, "trustedSourceSha256");
     }
@@ -311,7 +323,9 @@ export class StrictCanonicalJournalValidator {
     if (this.#finished)
       throw new Error("canonical journal validator is closed");
     this.#finished = true;
-    return this.#seal(this.#sourceHash.digest("hex"));
+    const journal = this.#seal(this.#sourceHash.digest("hex"));
+    validatedJsonSourceDigests.set(journal, journal.sourceSha256);
+    return journal;
   }
 
   /**
@@ -441,8 +455,9 @@ export class StrictCanonicalJournalValidator {
     if (content.at(-1) === CARRIAGE_RETURN_BYTE) {
       content = content.subarray(0, -1);
     }
-    if (content.byteLength > this.#maxLineBytes &&
-      !isLegacyConfiguredCacheWithinCeiling(content, this.#maxLineBytes)) {
+    const largeLegacyConfigured = content.byteLength > this.#maxLineBytes &&
+      this.#allowsLegacySessionConfigured(content.subarray(0, 4096), content.byteLength);
+    if (content.byteLength > this.#maxLineBytes && !largeLegacyConfigured) {
       this.#fail(
         "line_byte_limit",
         "canonical journal record exceeds its line byte ceiling",
@@ -476,8 +491,11 @@ export class StrictCanonicalJournalValidator {
         },
       );
     }
+    let legacyHistoryBytes: number | undefined;
     try {
-      assertNoDuplicateJsonObjectKeys(line);
+      if (!this.#reuseJsonValidation) {
+        legacyHistoryBytes = assertNoDuplicateJsonObjectKeys(line, largeLegacyConfigured);
+      }
     } catch (error) {
       this.#fail(
         "schema_invalid",
@@ -488,6 +506,23 @@ export class StrictCanonicalJournalValidator {
       );
     }
     const item = this.#validateRolloutItem(parsed, lineNumber, byteOffset);
+    if (largeLegacyConfigured) {
+      // The compatibility allowance belongs only to the duplicated history.
+      // Every field, nested message, duplicate key, identity and digest still
+      // passes the ordinary validator; the rest of the envelope stays <=4 MiB.
+      if (item.type !== "event_msg" || item.payload.msg.type !== "session_configured") {
+        this.#fail("line_byte_limit", "oversized record is not a legacy session bootstrap", { lineNumber, byteOffset });
+      }
+      // Count original encoded bytes outside the one history array. Decoding
+      // and reserializing could otherwise shrink escaped metadata or padding
+      // below the ordinary limit. A genuine same-source replay proof already
+      // carries this check from its complete first pass.
+      if (!this.#reuseJsonValidation && (legacyHistoryBytes === undefined ||
+          !isLegacyConfiguredCacheWithinCeiling(content, this.#maxLineBytes) ||
+          content.byteLength - legacyHistoryBytes + 2 > this.#maxLineBytes)) {
+        this.#fail("line_byte_limit", "legacy session bootstrap metadata exceeds its byte ceiling", { lineNumber, byteOffset });
+      }
+    }
     const record = Object.freeze({
       item,
       lineNumber,
@@ -499,6 +534,11 @@ export class StrictCanonicalJournalValidator {
     this.#recordCount += 1;
     if (this.#options.retainRecords !== false) this.#records.push(record);
     this.#options.onRecord?.(record);
+  }
+
+  #allowsLegacySessionConfigured(prefix: Buffer, bytes: number): boolean {
+    return this.#maxLineBytes === MAX_RECOVERY_CANONICAL_LINE_BYTES &&
+      isLegacyLargeSessionConfiguredPrefix(prefix, bytes);
   }
 
   #validateRolloutItem(
@@ -555,7 +595,7 @@ export class StrictCanonicalJournalValidator {
         facts,
       );
     }
-    if (!isCanonicalRolloutPayload(type, value.payload)) {
+    if (!this.#reuseJsonValidation && !isCanonicalRolloutPayload(type, value.payload)) {
       this.#fail(
         "schema_invalid",
         `canonical ${type} payload does not match the runtime schema`,
@@ -572,7 +612,7 @@ export class StrictCanonicalJournalValidator {
     if (type === "session_meta")
       this.#validateSessionMeta(value.payload, facts);
     if (type === "event_msg") this.#validateEvent(value.payload, facts);
-    const item = normalizeCanonicalRolloutValue(value);
+    const item = parseRolloutValue(value);
     if (item === null || item.type === "unknown") {
       this.#fail(
         "schema_invalid",
@@ -1909,6 +1949,13 @@ export function validateCanonicalJournalText(
  * caller that reuses an earlier validation of the same bytes derives its
  * items through this same normalization.
  */
+/** Bounded old serializer prefix; acceptance still requires full strict validation. */
+export function isLegacyLargeSessionConfiguredPrefix(prefix: Buffer, bytes: number): boolean {
+  return bytes <= MAX_RECOVERY_LEGACY_SESSION_CONFIGURED_BYTES &&
+    recoveryPendingLineCeiling(prefix, MAX_RECOVERY_CANONICAL_LINE_BYTES) >
+      MAX_RECOVERY_CANONICAL_LINE_BYTES;
+}
+
 export function normalizeCanonicalRolloutValue(
   value: unknown,
 ): RolloutItem | null {
@@ -1975,22 +2022,25 @@ function boundedCeiling(
 }
 
 /** JSON is parsed first; this bounded walk exists solely to reject duplicate keys. */
-function assertNoDuplicateJsonObjectKeys(input: string): void {
-  const parser = new DuplicateKeyScanner(input);
-  parser.scan();
+function assertNoDuplicateJsonObjectKeys(input: string, captureLegacyHistory = false): number | undefined {
+  const parser = new DuplicateKeyScanner(input, captureLegacyHistory);
+  return parser.scan();
 }
 
 class DuplicateKeyScanner {
   #offset = 0;
+  readonly #path: string[] = [];
+  #historyBytes: number | undefined;
 
-  constructor(private readonly input: string) {}
+  constructor(private readonly input: string, private readonly captureLegacyHistory = false) {}
 
-  scan(): void {
+  scan(): number | undefined {
     this.#skipWhitespace();
     this.#value(0);
     this.#skipWhitespace();
     if (this.#offset !== this.input.length)
       throw new Error("canonical JSON has trailing content");
+    return this.#historyBytes;
   }
 
   #value(depth: number): void {
@@ -2000,12 +2050,12 @@ class DuplicateKeyScanner {
     if (token === "{") return this.#object(depth + 1);
     if (token === "[") return this.#array(depth + 1);
     if (token === '"') {
-      this.#string();
+      this.#string(false);
       return;
     }
     while (
       this.#offset < this.input.length &&
-      !/[\s,}\]]/u.test(this.input[this.#offset]!)
+      !this.#isValueTerminator(this.input.charCodeAt(this.#offset))
     ) {
       this.#offset += 1;
     }
@@ -2029,7 +2079,16 @@ class DuplicateKeyScanner {
       this.#skipWhitespace();
       this.#expect(":");
       this.#skipWhitespace();
+      const historyValue = this.captureLegacyHistory && key === "initialMessages" &&
+        this.#path.length === 3 && this.#path[0] === "payload" &&
+        this.#path[1] === "msg" && this.#path[2] === "payload";
+      const valueStart = this.#offset;
+      if (this.captureLegacyHistory) this.#path.push(key);
       this.#value(depth);
+      if (this.captureLegacyHistory) this.#path.pop();
+      if (historyValue) {
+        this.#historyBytes = Buffer.byteLength(this.input.slice(valueStart, this.#offset));
+      }
       this.#skipWhitespace();
       if (this.input[this.#offset] === "}") {
         this.#offset += 1;
@@ -2059,19 +2118,27 @@ class DuplicateKeyScanner {
     }
   }
 
-  #string(): string {
+  #string(decode = true): string {
     const start = this.#offset;
     this.#expect('"');
-    while (this.#offset < this.input.length) {
-      const token = this.input[this.#offset++]!;
-      if (token === "\\") {
-        this.#offset += 1;
-        continue;
+    for (;;) {
+      const quote = this.input.indexOf('"', this.#offset);
+      if (quote < 0) break;
+      let slash = quote - 1;
+      while (slash > start && this.input.charCodeAt(slash) === 92) slash -= 1;
+      this.#offset = quote + 1;
+      if ((quote - 1 - slash) % 2 === 0) {
+        // JSON.parse already checked every value string. Decode only keys:
+        // escaped keys still participate in the exact duplicate-key check.
+        return decode ? JSON.parse(this.input.slice(start, this.#offset)) as string : "";
       }
-      if (token === '"')
-        return JSON.parse(this.input.slice(start, this.#offset)) as string;
     }
     throw new Error("canonical JSON contains an unterminated string");
+  }
+
+  #isValueTerminator(code: number): boolean {
+    return code === 32 || code === 9 || code === 10 || code === 13 ||
+      code === 44 || code === 125 || code === 93;
   }
 
   #expect(token: string): void {
@@ -2081,6 +2148,10 @@ class DuplicateKeyScanner {
   }
 
   #skipWhitespace(): void {
-    while (/\s/u.test(this.input[this.#offset] ?? "")) this.#offset += 1;
+    while (this.#offset < this.input.length) {
+      const code = this.input.charCodeAt(this.#offset);
+      if (code !== 32 && code !== 9 && code !== 10 && code !== 13) break;
+      this.#offset += 1;
+    }
   }
 }
