@@ -560,6 +560,7 @@ export const TUI_THEME_SETTINGS = Object.freeze([
   "dark-daltonized",
   "light-ansi",
   "dark-ansi",
+  "olive",
 ] as const);
 
 export type TuiThemeSetting = (typeof TUI_THEME_SETTINGS)[number];

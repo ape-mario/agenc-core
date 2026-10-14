@@ -5,7 +5,7 @@ import { useStdin } from '../../ink/components/StdinContext.js';
 import { logError } from '../../../utils/log.js';
 import { getExecutionAuthoritySettings, updateSettingsForSource } from '../../../utils/settings/settings.js';
 import { getCanonicalSettingsAuthority } from '../../../utils/settings/canonicalAuthority.js';
-import { getTerminalBackground, type TerminalBackground } from '../../../utils/terminalBackground.js'; // upstream-import: keep target is owned by another Z-PURGE item
+import { autoThemeForBackground, getTerminalBackground, type TerminalBackground } from '../../../utils/terminalBackground.js'; // upstream-import: keep target is owned by another Z-PURGE item
 import type { ThemeName, ThemeSetting } from '../../../utils/theme.js'; // upstream-import: keep target is owned by another Z-PURGE item
 type ThemeContextValue = {
   /** The saved user preference. May be 'auto'. */
@@ -90,7 +90,7 @@ export function ThemeProvider({
       cleanup?.();
     };
   }, [activeSetting, internal_querier]);
-  const currentTheme: ThemeName = activeSetting === 'auto' ? terminalBackground : activeSetting;
+  const currentTheme: ThemeName = activeSetting === 'auto' ? autoThemeForBackground(terminalBackground) : activeSetting;
   const value = useMemo<ThemeContextValue>(() => ({
     themeSetting,
     setThemeSetting: (newSetting: ThemeSetting) => {

@@ -2604,13 +2604,14 @@ interface OnboardingCardView {
 }
 
 const THEME_NOTES: Readonly<Record<ThemeSetting, string>> = {
-  auto: "matches your terminal background",
-  dark: "for dark terminals",
+  auto: "olive on dark terminals, light on light ones",
+  dark: "black and purple, for dark terminals",
   light: "for light terminals",
   "light-daltonized": "color-blind friendly, light",
   "dark-daltonized": "color-blind friendly, dark",
   "light-ansi": "your terminal's 16 colors, light",
   "dark-ansi": "your terminal's 16 colors, dark",
+  olive: "olive, cream and wine, for dark terminals",
 };
 
 /** Providers visible at once; the rest collapse into "n more" rows. */

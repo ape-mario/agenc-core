@@ -319,6 +319,38 @@ const darkTheme = monochromeTheme('rgb(0,0,0)', 'rgb(255,255,255)', {
   diffRemovedWord: 'rgb(255,79,122)',
 })
 
+// Olive: the dark layout on an olive-black surface with cream ink and a wine
+// accent, from the owner's olive / burgundy / cream palette. It is what
+// "auto" shows on a dark terminal. Burgundy itself (#5e181b) is too dark to
+// read on this surface, so the accent is a lighter wine that keeps AA
+// contrast. Success is a light olive green and failure an orange red, so
+// neither can be mistaken for the accent.
+const oliveTheme = monochromeTheme('rgb(25,27,17)', 'rgb(235,227,208)', {
+  text2: 'rgb(201,193,172)',
+  text3: 'rgb(158,154,128)',
+  codeText: 'rgb(222,214,195)',
+  inactive: 'rgb(143,141,114)',
+  inactiveShimmer: 'rgb(170,166,138)',
+  subtle: 'rgb(102,101,80)',
+  muted3: 'rgb(84,83,64)',
+  line: 'rgb(42,45,28)',
+  lineSoft: 'rgb(35,38,26)',
+  promptBackground: 'rgb(35,38,26)',
+  accent: 'rgb(208,106,112)',
+  accentSoft: 'rgb(190,140,132)',
+  stepOk: 'rgb(168,180,98)',
+  stepFail: 'rgb(242,128,82)',
+  userBand: 'rgb(44,30,31)',
+  success: 'rgb(168,180,98)',
+  error: 'rgb(242,128,82)',
+  diffAdded: 'rgb(38,48,22)',
+  diffRemoved: 'rgb(60,26,26)',
+  diffAddedDimmed: 'rgb(30,36,18)',
+  diffRemovedDimmed: 'rgb(44,22,22)',
+  diffAddedWord: 'rgb(168,180,98)',
+  diffRemovedWord: 'rgb(242,128,82)',
+})
+
 // The light grays keep the dark theme's contrast against the surface, so
 // muted text reads the same weight on a white terminal.
 const lightTheme = monochromeTheme('rgb(255,255,255)', 'rgb(0,0,0)', {
@@ -443,6 +475,8 @@ function getBaseTheme(themeName: ThemeName): Theme {
       return lightAnsiTheme
     case 'dark-ansi':
       return darkAnsiTheme
+    case 'olive':
+      return oliveTheme
     default:
       return darkTheme
   }
