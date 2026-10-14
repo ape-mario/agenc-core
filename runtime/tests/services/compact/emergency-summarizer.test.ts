@@ -87,6 +87,37 @@ describe("runtime emergency summarizer", () => {
     expect(body.facts.every((fact: { source_ref_ids: string[] }) => fact.source_ref_ids.join() === "s1")).toBe(true);
   });
 
+  test("a requested recall fact beyond eight prior details survives bounded emergency recovery", () => {
+    const summarize = createRuntimeEmergencySummarizer(2_048);
+    const recall = "Recall fact: initial launch token CONFIG-593 and deadline 23.";
+    const facts = [...Array.from({ length: 12 }, (_, index) => `Code detail ${index}: ${"source ".repeat(200)}`), recall];
+    const text = summarize({ stage: "final", allowedSourceRefIds: ["s1"], maxOutputTokens: 8_192,
+      messages: [{ role: "user", content: JSON.stringify({ kind: "untrusted_compaction_transcript", units: [{ messages: [
+        { role: "user", content: JSON.stringify({ kind: "agenc_compaction_context_v2", facts }) },
+      ] }] }) }] });
+    const body = JSON.parse(text);
+    expect(conservativeOutputTokenEstimate(text)).toBeLessThanOrEqual(2_048);
+    expect(body.facts.length).toBeLessThanOrEqual(8);
+    expect(body.facts.some((fact: { text: string }) => fact.text.includes(recall))).toBe(true);
+    expect(body.facts.every((fact: { source_ref_ids: string[] }) => fact.source_ref_ids.join() === "s1")).toBe(true);
+  });
+
+  test("reduction retains a later child's quoted recall fact within the same eight-record limit", () => {
+    const summarize = createRuntimeEmergencySummarizer(2_048);
+    const recall = "Recall fact: original endpoint region violet-4, retry limit 23.";
+    const text = summarize({ stage: "reduce", allowedSourceRefIds: ["s1", "s2"], maxOutputTokens: 8_192,
+      messages: structuredReductionMessages({ stage: "reduce", children: [
+        { ref_id: "child-one", body: { narrative: "", open_actions: [], facts: Array.from({ length: 8 }, (_, index) => ({
+          id: `detail-${index}`, text: `Earlier recorded fact:\nCode detail ${index}`, source_ref_ids: ["source-one"],
+        })) } },
+        { ref_id: "child-two", body: { narrative: "", open_actions: [], facts: [{ id: "recall", text: recall, source_ref_ids: ["source-two"] }] } },
+      ] }) });
+    const body = JSON.parse(text);
+    expect(conservativeOutputTokenEstimate(text)).toBeLessThanOrEqual(2_048);
+    expect(body.facts.length).toBeLessThanOrEqual(8);
+    expect(body.facts.find((fact: { text: string }) => fact.text.includes(recall)).source_ref_ids).toEqual(["s2"]);
+  });
+
   test("reduce stage merges children: earliest request, latest state, summed counts", () => {
     const summarize = createRuntimeEmergencySummarizer();
     const child = (request: string, latest: string, messages: number) => ({

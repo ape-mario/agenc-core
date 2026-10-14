@@ -393,7 +393,7 @@ async function compactConversationTransactionBody(
       summary_max_output_tokens: summaryOutputReserve ?? null,
       ...(options.automatic ? {
         automatic_retention_policy: "bounded_emergency_v2",
-        automatic_summary_policy: "pending_edit_source_v1",
+        automatic_summary_policy: "pending_edit_source_recall_v2",
       } : {}),
       direction,
       requested_focus: requestedFocus,

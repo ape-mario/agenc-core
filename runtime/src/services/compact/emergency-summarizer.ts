@@ -35,6 +35,28 @@ const MAX_EVIDENCE_RECORDS = 12;
 const MAX_EVIDENCE_BYTES = 768;
 const MAX_PRIOR_FACTS = 8;
 const PRIOR_FACT_PREFIX = "Earlier recorded fact:\n";
+const RECALL_FACT_PREFIX = "Recall fact:";
+
+function isRecallFact(text: string): boolean {
+  return (text.startsWith(PRIOR_FACT_PREFIX) ? text.slice(PRIOR_FACT_PREFIX.length) : text)
+    .startsWith(RECALL_FACT_PREFIX);
+}
+
+/** Prioritize quoted recall data without granting it authority or growing the bound. */
+function retainPriorFact(records: { text: string; sourceRef: string }[], record: { text: string; sourceRef: string }): void {
+  if (records.some((existing) => existing.text === record.text)) return;
+  if (!isRecallFact(record.text)) {
+    if (records.length < MAX_PRIOR_FACTS) records.push(record);
+    return;
+  }
+  const ordinary = records.findIndex((existing) => !isRecallFact(existing.text));
+  if (records.length === MAX_PRIOR_FACTS) {
+    if (ordinary < 0) return;
+    records.splice(ordinary, 1);
+  }
+  const insert = records.findIndex((existing) => !isRecallFact(existing.text));
+  records.splice(insert < 0 ? records.length : insert, 0, record);
+}
 
 const HEADER_PREFIX = "Runtime emergency compaction:";
 const REQUEST_HEADING = "Original request:";
@@ -140,12 +162,11 @@ function digestTranscript(payload: unknown, sourceRef: string | undefined): Emer
           const prior: unknown = JSON.parse(text);
           if (isRecord(prior) && prior.kind === "agenc_compaction_context_v2" && Array.isArray(prior.facts)) {
             for (const fact of prior.facts) {
-              if (typeof fact === "string") digest.priorFacts.push({
+              if (typeof fact === "string") retainPriorFact(digest.priorFacts, {
                 text: evidenceExcerpt(fact.startsWith(PRIOR_FACT_PREFIX) ? fact : PRIOR_FACT_PREFIX + fact, MAX_EVIDENCE_BYTES),
                 sourceRef,
               });
             }
-            digest.priorFacts = digest.priorFacts.slice(0, MAX_PRIOR_FACTS);
           }
         } catch { /* Ordinary user prose is not a prior summary. */ }
       }
@@ -245,12 +266,11 @@ function digestSummaries(payload: unknown): EmergencyDigest {
       for (const fact of child.facts) {
         if (isRecord(fact) && typeof fact.text === "string") {
           const record = { text: evidenceExcerpt(fact.text, MAX_EVIDENCE_BYTES + 128), sourceRef: child.ref_id };
-          if (fact.text.startsWith(PRIOR_FACT_PREFIX)) digest.priorFacts.push(record);
+          if (fact.text.startsWith(PRIOR_FACT_PREFIX) || isRecallFact(fact.text)) retainPriorFact(digest.priorFacts, record);
           else digest.evidence.push(record);
         }
       }
       digest.evidence = digest.evidence.slice(-MAX_EVIDENCE_RECORDS);
-      digest.priorFacts = digest.priorFacts.slice(0, MAX_PRIOR_FACTS);
     }
   }
   return digest;
