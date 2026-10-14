@@ -139,6 +139,7 @@ import type {
   McpSurfaceTool,
 } from "../../session/session.js";
 import { makeUserMessage, useSessionTranscript } from "../session-transcript.js";
+import { awaitSubmissionTerminal, createSubmissionTerminalEvents } from "../submission-terminal.js";
 import { countUserTextRows, lastUserText, type PendingUserEcho, withPendingUserEcho } from "../pending-user-echo.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { ContentWidthProvider } from "../context/contentWidthContext.js";
@@ -2522,10 +2523,12 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     () => appStateStore.getState(),
     [appStateStore],
   );
+  const submissionTerminalEvents = useMemo(createSubmissionTerminalEvents, [props.session]);
   useEffect(() => {
     const subscribe = props.session.subscribeToEvents;
     if (typeof subscribe !== "function") return;
     const unsubscribe = subscribe((event: unknown) => {
+      submissionTerminalEvents.publish(event);
       const recovered = submissionRecoveryNotification(event);
       if (recovered !== null) {
         if (recovered.clientMessageId === pendingSubmissionIdRef.current) setPendingSubmission(false);
@@ -2544,6 +2547,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     props.session,
     props.session.conversationId,
     setAppState,
+    submissionTerminalEvents,
   ]);
   const [toolPermissionContext, setToolPermissionContext] =
     useSyncedPermissionContext(props.session);
@@ -3068,7 +3072,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     [allQueuedCommands, commandQueueOwner],
   );
   const queueDrainActiveRef = useRef(false);
-  const [, setQueueDrainTick] = useState(0);
+  const [queueDrainTick, setQueueDrainTick] = useState(0);
 
   // Tool-use context builder. Declared above submit so the slash-command
   // interceptor can read it without TDZ on first render. Also handed to
@@ -3421,14 +3425,16 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       setActiveModelSubmissionCount(activeModelSubmissionTokensRef.current.size);
       effectiveInputBusyRef.current = true;
       try {
-        await submitSession(value, options);
+        await awaitSubmissionTerminal(props.session.subscribeToEvents === undefined
+          ? props.session : submissionTerminalEvents, options?.clientMessageId,
+          () => submitSession(value, options));
       } finally {
         if (activeModelSubmissionTokensRef.current.delete(token)) {
           setActiveModelSubmissionCount(activeModelSubmissionTokensRef.current.size);
         }
       }
     },
-    [props.session],
+    [props.session, submissionTerminalEvents],
   );
   const submit = useCallback(
     async (value: string, options?: LiveSubmitOptions) => {
@@ -4136,6 +4142,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     submit,
     runQueuedBashCommand,
     commandQueueOwner,
+    queueDrainTick,
   ]);
   // Start the cron scheduler on session mount so durable scheduled tasks
   // restored from disk actually fire (CronCreate starts it when a task is made

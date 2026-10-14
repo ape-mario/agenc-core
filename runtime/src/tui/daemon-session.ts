@@ -695,6 +695,8 @@ export function createDaemonTuiSession<
   type PendingDaemonSubmission = {
     readonly clientMessageId: string;
     dispatched: boolean;
+    turnId?: string;
+    terminalObserved?: boolean;
     cancellation?: { readonly reason?: string };
   };
   const pendingSubmissions = new Map<string, PendingDaemonSubmission>();
@@ -767,6 +769,9 @@ export function createDaemonTuiSession<
       }
     }
     const turnId = activeDaemonTurnId();
+    if (turnId !== undefined && observedSubmission?.dispatched === true) {
+      observedSubmission.turnId ??= turnId;
+    }
     if (
       turnId === undefined || !observedSubmission?.dispatched ||
       observedSubmission.cancellation === undefined
@@ -801,6 +806,34 @@ export function createDaemonTuiSession<
       observedSubmission = [...pendingSubmissions.values()].find(
         (submission) => submission.clientMessageId === clientMessageId,
       );
+    }
+    if (eventType === "turn_complete" || eventType === "turn_aborted" || eventType === "turn_failed") {
+      const value = event as JsonObject;
+      const payload = value.payload;
+      if (isJsonObject(payload) && typeof payload.turnId === "string" && payload.turnId.length > 0) {
+        const clientMessageId = value.clientMessageId ?? payload.clientMessageId;
+        const submission = [...pendingSubmissions.values()].find(candidate =>
+          clientMessageId === undefined
+            ? candidate.turnId === payload.turnId
+            : candidate.clientMessageId === clientMessageId);
+        // A status update may already have cleared the active turn, or a
+        // successor may have started. Retire only this bound submission;
+        // the current-turn classifier below still protects the successor.
+        if (submission?.dispatched === true && classifyTurnTerminal({
+          type: eventType, payload,
+        }, { expectedTurnId: submission.turnId })?.turnId === payload.turnId) {
+          submission.turnId ??= payload.turnId;
+          submission.terminalObserved = true;
+          // A terminal can precede the start event. Replace only this
+          // submission's placeholder, so the classifier can retire it
+          // without disturbing a successor's active turn.
+          if (activeTurnSnapshot !== null &&
+              pendingSubmissions.get(activeTurnSnapshot.turnId) === submission) {
+            activeTurnSnapshot = { turnId: payload.turnId };
+            lastObservedTurnId = payload.turnId;
+          }
+        }
+      }
     }
     const terminal = typeof eventType === "string"
       ? classifyTurnTerminal({
@@ -1327,6 +1360,9 @@ export function createDaemonTuiSession<
           }
         }
       } catch (error) {
+        // A validated terminal already consumed this submission. Its later
+        // RPC error must not restore inputs and replay them in the next turn.
+        if (submission.terminalObserved === true) return;
         // gaphunt3 #16: message.stream can reject on a transient/dropped daemon
         // socket (the same failure cancelTurn/setPendingProviderSwitch
         // anticipate). The queued idle inputs (pasted images, attachments,
