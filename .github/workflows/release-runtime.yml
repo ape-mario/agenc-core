@@ -1228,6 +1228,13 @@ jobs:
           "AGENC_NPM_DISTRIBUTION_SHA256=$($toolchain.npmDistribution.sha256)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Run native probes and build from two isolated worktrees
         shell: bash
+        env:
+          # Windows runners default to core.autocrlf=true, but build checks compare
+          # generated files and hash migration sources byte for byte. Both build
+          # worktrees keep the committed LF bytes on every platform.
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: "false"
         run: |
           set -euo pipefail
           umask 022
