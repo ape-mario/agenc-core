@@ -190,6 +190,8 @@ export interface LiveToolDispatchOptions {
   readonly signal?: AbortSignal;
   readonly abortController?: AbortController;
   readonly source?: ToolCallSource;
+  /** Lifetime authority for effects outside an active model turn. */
+  readonly getActiveTurnId?: () => string | null;
   readonly approvalPolicy: ApprovalPolicy;
   readonly sandboxMode: SandboxMode;
   readonly execPolicy?: Policy;
@@ -1226,6 +1228,9 @@ export class ToolRouter {
       const result = await orchestrateToolCall({
         tool: spec.tool,
         approvalCtx,
+        ...(opts.getActiveTurnId !== undefined
+          ? { getActiveTurnId: opts.getActiveTurnId }
+          : {}),
         ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
         approvalPolicy: effectiveApprovalPolicy,
         sandboxMode: opts.sandboxMode,
@@ -1621,6 +1626,9 @@ function rawDispatchOptions(
     parsedArgs: opts.parsedArgs,
     signal: opts.abortController.signal,
     currentTurnId: opts.turn.subId,
+    ...(opts.getActiveTurnId !== undefined
+      ? { getActiveTurnId: opts.getActiveTurnId }
+      : {}),
     eventLog: opts.session.eventLog,
     subId: opts.subId,
     tool: opts.tool,

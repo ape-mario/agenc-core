@@ -1883,6 +1883,7 @@ export function adaptTranscriptEvents(
   const toolNames = new Set<string>();
   const runningToolNames = new Map<string, string>();
   const settledToolCallIds = new Set<string>();
+  const directShellErrorCallIds = new Set<string>();
   const suppressedToolResults = new Set<string>();
   const suppressedStreamingToolCallIds = new Set<string>();
   const suppressedStreamingToolInputIndexes = new Map<number, string>();
@@ -1984,6 +1985,7 @@ export function adaptTranscriptEvents(
         toolNames.clear();
         runningToolNames.clear();
         settledToolCallIds.clear();
+        directShellErrorCallIds.clear();
         suppressedToolResults.clear();
         suppressedStreamingToolCallIds.clear();
         suppressedStreamingToolInputIndexes.clear();
@@ -2010,6 +2012,7 @@ export function adaptTranscriptEvents(
         toolNames.clear();
         runningToolNames.clear();
         settledToolCallIds.clear();
+        directShellErrorCallIds.clear();
         suppressedToolResults.clear();
         suppressedStreamingToolCallIds.clear();
         suppressedStreamingToolInputIndexes.clear();
@@ -2261,6 +2264,11 @@ export function adaptTranscriptEvents(
         lastAssistantText = "";
         if (typeof payload.queuedCommandUuid === "string") {
           durableQueuedPromptUuids.add(payload.queuedCommandUuid);
+          const text = payload.displayText ?? payload.message;
+          // The canonical failed tool row already displays this shell error.
+          // Keep its durable user-shell context without a second visible row.
+          if (directShellErrorCallIds.has(payload.queuedCommandUuid) &&
+              typeof text === "string" && text.startsWith("<bash-stdout>")) break;
         }
         out.push(makeUserMessage(payload.displayText ?? payload.message, nextUuid()));
         break;
@@ -2672,6 +2680,9 @@ export function adaptTranscriptEvents(
               ? "MCP"
               : "tool");
         if (settledToolCallIds.has(callId)) break;
+        if (isError && payloadRecord(payload.metadata).source === "direct") {
+          directShellErrorCallIds.add(callId);
+        }
         const interruptedAdmission = isError && isInterruptedAdmissionResult(payload.result);
         if (interruptedAdmission) {
           interruptionNotices.add("admission");
