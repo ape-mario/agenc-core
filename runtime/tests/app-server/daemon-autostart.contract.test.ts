@@ -225,6 +225,82 @@ async function closeServer(server: Server | null): Promise<void> {
 }
 
 describe("AgenC daemon autostart", () => {
+  it.each(["linux", "darwin"] as const)("retries a newly spawned %s daemon's timed-out identity probe within readiness", async (platform) => {
+    const agencHome = await tempAgencHome();
+    const host = createHost(agencHome);
+    host.platform = platform;
+    let now = 0;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    host.sleep = async (ms) => { now += ms; };
+    const request = vi.fn(() => {
+      if (request.mock.calls.length < 3) {
+        now += 2_000;
+        throw Object.assign(new Error("Timed out waiting for daemon response"), { code: "ETIMEDOUT" });
+      }
+      return host.requestDaemonInstanceIdentity();
+    });
+    const connect = vi.fn();
+    try {
+      await expect(ensureAgenCDaemonAutostart({
+        host, waitTimeoutMs: 10_000, isReady: () => true,
+        requestDaemonInstanceIdentity: request,
+        findOrphanDaemonPids: () => [], findSupersededDaemonPids: () => [], connect,
+      })).resolves.toMatchObject({ status: "started", connected: true });
+      expect(request).toHaveBeenCalledTimes(3);
+      expect(connect).toHaveBeenCalledExactlyOnceWith({ pid: 5201, pidPath: resolveAgenCDaemonPidPath(host.env, host.userHome) });
+      expect(now).toBeLessThan(10_000);
+    } finally {
+      clock.mockRestore();
+      await rm(agencHome, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps an existing daemon's identity timeout single-shot", async () => {
+    const agencHome = await tempAgencHome();
+    const host = createHost(agencHome);
+    host.runningPids.add(5302);
+    host.recordDaemon(5302);
+    await writeAgenCDaemonPid(resolveAgenCDaemonPidPath(host.env, host.userHome), 5302);
+    const request = vi.fn(() => { throw Object.assign(new Error("Timed out waiting for daemon response"), { code: "ETIMEDOUT" }); });
+    try {
+      await expect(ensureAgenCDaemonAutostart({ host, isReady: () => true, requestDaemonInstanceIdentity: request })).rejects.toThrow(/authenticated identity RPC failed/u);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(host.spawnedPids).toEqual([]);
+      expect(host.runningPids.has(5302)).toBe(true);
+    } finally {
+      await rm(agencHome, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["deadline", "sidecar", "generation", "authentication"] as const)("refuses a spawned daemon after identity retry %s failure", async (failure) => {
+    const agencHome = await tempAgencHome();
+    const host = createHost(agencHome);
+    let now = 0;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    host.sleep = async (ms) => { now += ms; };
+    const request = vi.fn(() => {
+      now += 2_000;
+      if (failure === "sidecar") host.recordDaemon(5201);
+      if (failure === "generation") host.readProcessIdentity = (pid) => `replacement:${pid}`;
+      throw Object.assign(new Error(failure === "authentication" ? "Authentication failed" : "Timed out waiting for daemon response"), { code: failure === "authentication" ? "EACCES" : "ETIMEDOUT" });
+    });
+    // Exercise the probe separately from the existing cleanup re-proof.
+    host.cancelSpawnedDaemon = (pid) => { host.runningPids.delete(pid); };
+    const connect = vi.fn();
+    try {
+      await expect(ensureAgenCDaemonAutostart({
+        host, waitTimeoutMs: 4_100, isReady: () => true,
+        requestDaemonInstanceIdentity: request,
+        findOrphanDaemonPids: () => [], findSupersededDaemonPids: () => [], connect,
+      })).rejects.toThrow(/identity|Authentication/u);
+      expect(request).toHaveBeenCalledTimes(failure === "deadline" ? 2 : 1);
+      expect(connect).not.toHaveBeenCalled();
+    } finally {
+      clock.mockRestore();
+      await rm(agencHome, { recursive: true, force: true });
+    }
+  });
+
   it("wakes the owned provisional child's initial lifecycle acquisition, then proves identity", async () => {
     const agencHome = await tempAgencHome();
     const base = createHost(agencHome);
