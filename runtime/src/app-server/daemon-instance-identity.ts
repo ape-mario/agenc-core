@@ -520,7 +520,23 @@ async function inspectLinuxAgenCDaemonProcessWithTracker(
     }
     return { pid, processStart: confirmedProcessStart };
   } catch (error) {
-    if (isLinuxProcessDisappearanceError(error)) return null;
+    if (isLinuxProcessDisappearanceError(error)) {
+      // A cwd or entrypoint can be missing only in the scanner's namespace
+      // while the candidate is still alive. A missing pathname is not proof
+      // of process disappearance; confirm that through the process token.
+      try {
+        consumeLinuxAgenCDaemonScanIo(scanTracker);
+        if (await readAgenCDaemonProcessStart(pid, host.readProcessIdentity) === null) {
+          return null;
+        }
+      } catch (identityError) {
+        throw new AgenCDaemonProcessScanIncompleteError(
+          `process ${pid} disappearance could not be proved: ` +
+          `${identityError instanceof Error ? identityError.message : "identity unavailable"}; ` +
+          "stop that process in its namespace or make its daemon home readable before retrying",
+        );
+      }
+    }
     if (containsAgenCDaemonProcessScanIncompleteError(error)) {
       throw new AgenCDaemonProcessScanIncompleteError(
         `process ${pid}: ${error instanceof Error ? error.message : "identity unavailable"}; ` +

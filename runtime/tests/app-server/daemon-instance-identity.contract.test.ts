@@ -386,6 +386,67 @@ describe("daemon instance identity", () => {
   );
 
   it.skipIf(process.platform !== "linux")(
+    "refuses a live same-home process when its cwd path is unavailable on the host",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "agenc-live-missing-cwd-"));
+      const entrypoint = join(root, "daemon-entrypoint.js");
+      await writeFile(entrypoint, "setInterval(() => {}, 1_000);\n");
+      const child = spawn(process.execPath, [entrypoint, "daemon", "start", "--foreground"], {
+        stdio: "ignore", env: { ...process.env, AGENC_HOME: root },
+      });
+      try {
+        await once(child, "spawn");
+        await expect(findLinuxAgenCDaemonProcesses({
+          entrypointPath: entrypoint, pid: process.pid, platform: "linux",
+          isPidRunning: pid => pid === child.pid && child.exitCode === null,
+        }, root, "exact", {
+          readProcessCwdPath: async () => join(root, "container-only-cwd"),
+        })).rejects.toThrow(new RegExp(`process ${child.pid}.*stop that process in its namespace`));
+        expect(child.exitCode).toBeNull();
+      } finally {
+        const exited = once(child, "exit");
+        child.kill("SIGTERM");
+        await exited.catch(() => {});
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.skipIf(process.platform !== "linux")(
+    "skips a candidate only after a missing cwd read confirms process disappearance",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "agenc-vanished-cwd-"));
+      const entrypoint = join(root, "daemon-entrypoint.js");
+      await writeFile(entrypoint, "setInterval(() => {}, 1_000);\n");
+      const child = spawn(process.execPath, [entrypoint, "daemon", "start", "--foreground"], {
+        stdio: "ignore", env: { ...process.env, AGENC_HOME: root },
+      });
+      try {
+        await once(child, "spawn");
+        await expect(findLinuxAgenCDaemonProcesses({
+          entrypointPath: entrypoint, pid: process.pid, platform: "linux",
+          isPidRunning: pid => pid === child.pid && child.exitCode === null,
+        }, root, "exact", {
+          readProcessCwdPath: async () => {
+            const exited = once(child, "exit");
+            child.kill("SIGKILL");
+            await exited;
+            throw Object.assign(new Error("process disappeared"), { code: "ENOENT" });
+          },
+        })).resolves.toEqual([]);
+        expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
+      } finally {
+        if (child.exitCode === null && child.signalCode === null) {
+          const exited = once(child, "exit");
+          child.kill("SIGTERM");
+          await exited.catch(() => {});
+        }
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.skipIf(process.platform !== "linux")(
     "matches a relative daemon entrypoint and fails closed when its cwd proof fails",
     async () => {
       const root = await mkdtemp(join(tmpdir(), "agenc-candidate-cwd-"));
