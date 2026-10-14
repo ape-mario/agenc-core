@@ -246,8 +246,8 @@
         "15af5dac6d745a60"
       ],
       "sha256": {
-        "x64": "20da0fd525fe8dbe596068bb896b949fe84c5ede3c2829e9481f6c2c97de0a5e",
-        "arm64": "98d1259fca66152fb91e739a15a4fa7f76b0a222369cb34ba853d7d72f02239f"
+        "x64": "69cfc60fcb6f5e386fd6898935d432b13e84ce48b9ffdbbf25534781c37754e3",
+        "arm64": "2e96a5c3d84bd475bde1a8bfb0799d2c2d565fbf74e67a159fd9023379a13b7a"
       }
     },
     "compilerVersion": "12.2.1",

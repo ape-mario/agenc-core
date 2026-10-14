@@ -617,6 +617,7 @@ describe("reproducible install and release contract", () => {
     expect(workflow).toContain("libgcc-8.5.0-28.el8_10");
     expect(workflow).toContain("gcc-toolset-12-gcc-c++-12.2.1-7.8.el8_10");
     expect(workflow).toContain("kernel-headers-4.18.0-553.150.1.el8_10");
+    expect(workflow).toContain("glibc-devel-2.28-251.el8_10.43");
     expect(workflow).toContain("python3.12-3.12.13-2.el8_10");
     expect(workflow).toContain('["rpmContentInventory"]');
     expect(workflow).toContain("%{SHA256HEADER}");
@@ -1167,9 +1168,9 @@ describe("reproducible install and release contract", () => {
         "name|epoch|version|release|arch|sha256header|payloaddigest|payloaddigestalgo|rsaheader-pgpsig",
       signatureKeyIds: ["15af5dac6d745a60"],
       sha256: {
-        x64: "20da0fd525fe8dbe596068bb896b949fe84c5ede3c2829e9481f6c2c97de0a5e",
+        x64: "69cfc60fcb6f5e386fd6898935d432b13e84ce48b9ffdbbf25534781c37754e3",
         arm64:
-          "98d1259fca66152fb91e739a15a4fa7f76b0a222369cb34ba853d7d72f02239f",
+          "2e96a5c3d84bd475bde1a8bfb0799d2c2d565fbf74e67a159fd9023379a13b7a",
       },
     });
   });
