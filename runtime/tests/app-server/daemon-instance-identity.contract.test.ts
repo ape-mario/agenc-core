@@ -205,6 +205,69 @@ describe("daemon instance identity", () => {
   );
 
   it.skipIf(process.platform !== "linux")(
+    "ignores an unavailable entrypoint only for a proven different daemon home",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "agenc-foreign-home-"));
+      const targetHome = join(root, "target-home");
+      const foreignHome = join(root, "foreign-home");
+      await mkdir(targetHome);
+      await mkdir(foreignHome);
+      const child = spawn(process.execPath, [
+        "-e", "setInterval(() => {}, 1_000)",
+        join(root, "missing", "bin", "agenc"),
+        "daemon", "start", "--foreground",
+      ], { stdio: "ignore", env: { ...process.env, AGENC_HOME: foreignHome } });
+      try {
+        await once(child, "spawn");
+        await expect(findLinuxAgenCDaemonProcesses({
+          entrypointPath: join(process.cwd(), "bin", "agenc"),
+          pid: process.pid,
+          platform: "linux",
+          isPidRunning: pid => pid === child.pid && child.exitCode === null,
+        }, targetHome, "any-install")).resolves.toEqual([]);
+        expect(child.exitCode).toBeNull();
+      } finally {
+        const exited = once(child, "exit");
+        child.kill("SIGTERM");
+        await exited.catch(() => {});
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.skipIf(process.platform !== "linux").each([true, false])(
+    "still refuses an unavailable entrypoint for a same or unknown home (known=%s)",
+    async (knownHome) => {
+      const root = await mkdtemp(join(tmpdir(), "agenc-same-home-"));
+      const child = spawn(process.execPath, [
+        "-e", "setInterval(() => {}, 1_000)",
+        join(root, "missing", "bin", "agenc"),
+        "daemon", "start", "--foreground",
+      ], {
+        stdio: "ignore",
+        env: knownHome
+          ? { ...process.env, AGENC_HOME: root }
+          : { PATH: process.env.PATH },
+      });
+      try {
+        await once(child, "spawn");
+        await expect(findLinuxAgenCDaemonProcesses({
+          entrypointPath: join(process.cwd(), "bin", "agenc"),
+          pid: process.pid,
+          platform: "linux",
+          isPidRunning: pid => pid === child.pid && child.exitCode === null,
+        }, root, "any-install")).rejects.toBeInstanceOf(AgenCDaemonProcessScanIncompleteError);
+        expect(child.exitCode).toBeNull();
+      } finally {
+        const exited = once(child, "exit");
+        child.kill("SIGTERM");
+        await exited.catch(() => {});
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.skipIf(process.platform !== "linux")(
     "fails closed for a missing agenc path with the foreground daemon tail",
     async () => {
       const root = await mkdtemp(join(tmpdir(), "agenc-daemon-argv-"));

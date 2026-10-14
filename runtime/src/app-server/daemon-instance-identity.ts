@@ -391,6 +391,32 @@ async function inspectLinuxAgenCDaemonProcessWithTracker(
     }
     const cwdBefore = await readLinuxProcessCwdIdentity(procDir, scanTracker);
 
+    // Compare home directory identities before reading another install's
+    // entrypoint. A process serving a different device/inode cannot own this
+    // home. Same-home and unknown candidates retain the full identity checks.
+    const environment = await readProcEnv(
+      join(procDir, "environ"),
+      scanTracker,
+    );
+    const candidateHome =
+      environment.AGENC_HOME === undefined && environment.HOME === undefined
+        ? null
+        : resolveHomeContext(environment, {
+            ...(environment.HOME !== undefined
+              ? { platformHome: environment.HOME }
+              : {}),
+          }).path;
+    const targetHomeBefore = candidateHome === null
+      ? null
+      : await readLinuxDaemonHomeIdentity(resolve(daemonHome), scanTracker);
+    const candidateHomeBefore = candidateHome === null
+      ? null
+      : await readLinuxDaemonHomeIdentity(candidateHome, scanTracker);
+    if (targetHomeBefore !== null && candidateHomeBefore !== null &&
+      !sameLinuxDaemonHomeIdentity(targetHomeBefore, candidateHomeBefore)) {
+      return null;
+    }
+
     let entrypointIndex = -1;
     for (let index = 0; index < argv.length; index += 1) {
       const value = argv[index];
@@ -426,30 +452,12 @@ async function inspectLinuxAgenCDaemonProcessWithTracker(
       return null;
     }
 
-    const environment = await readProcEnv(
-      join(procDir, "environ"),
-      scanTracker,
-    );
-    if (environment.AGENC_HOME === undefined && environment.HOME === undefined) {
-      return null;
-    }
-    const candidateHome = resolveHomeContext(environment, {
-      ...(environment.HOME !== undefined
-        ? { platformHome: environment.HOME }
-        : {}),
-    }).path;
-    const targetHomeBefore = await readLinuxDaemonHomeIdentity(
-      resolve(daemonHome),
-      scanTracker,
-    );
-    const candidateHomeBefore = await readLinuxDaemonHomeIdentity(
-      candidateHome,
-      scanTracker,
-    );
-    if (!sameLinuxDaemonHomeIdentity(targetHomeBefore, candidateHomeBefore)) {
-      return null;
-    }
 
+    // No home coordinates cannot prove a foreign owner. Keep the entrypoint
+    // check above even in that case, then retain the original no-home result.
+    if (candidateHome === null || targetHomeBefore === null || candidateHomeBefore === null) {
+      return null;
+    }
     const cwdAfter = await readLinuxProcessCwdIdentity(procDir, scanTracker);
     consumeLinuxAgenCDaemonScanIo(scanTracker);
     const confirmedProcessStart = await readAgenCDaemonProcessStart(
