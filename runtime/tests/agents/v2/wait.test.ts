@@ -311,6 +311,41 @@ describe("structured child result delivery", () => {
     expect(JSON.parse(response.content).text).toBe('  {"ok":true}\n');
   });
 
+  it("treats the placeholder result_ref GPT models send as a plain wait", async () => {
+    // Live on 473af774f with gpt-6.1-sol: wait_agent arrived with
+    // result_ref {"agent_id":"","turn_id":"","offset":0} and was refused.
+    for (const placeholder of [
+      { agent_id: "", turn_id: "", offset: 0 },
+      { agent_id: "/root/helper_one", turn_id: "", offset: 0 },
+      { agent_id: "  ", turn_id: "turn" },
+      {},
+      null,
+    ]) {
+      const { tool, control, waitForMailboxChange } = fixture();
+      const read = vi.fn();
+      Object.assign(control, { readChildResultPage: read });
+      const response = await tool.execute({ result_ref: placeholder, timeout_ms: 30_000 });
+      expect(response.isError).toBeFalsy();
+      expect(read).not.toHaveBeenCalled();
+      expect(waitForMailboxChange).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("still refuses a result_ref that is malformed rather than empty", async () => {
+    for (const bad of [
+      { agent_id: "child", turn_id: "turn", offset: -1 },
+      { agent_id: "child", turn_id: "turn", extra: 1 },
+      { agent_id: "", turn_id: "", extra: 1 },
+      { agent_id: 7, turn_id: "turn" },
+      "child",
+    ]) {
+      const { tool, waitForMailboxChange } = fixture();
+      const response = await tool.execute({ result_ref: bad });
+      expect(response.isError).toBe(true);
+      expect(waitForMailboxChange).not.toHaveBeenCalled();
+    }
+  });
+
   it("preserves the exact final answer through notification, mailbox and wait JSON", async () => {
     const { tool, session, waitForMailboxChange } = fixture();
     const exact = '  \n' + JSON.stringify({ text: '\" \\ 🐈 </subagent_notification> &amp;', rows: Array.from({ length: 2000 }, (_, i) => i) }) + '\n ';

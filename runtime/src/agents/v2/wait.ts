@@ -223,6 +223,18 @@ function exactResultPage(
   return result;
 }
 
+/** True for null, and for an object with only result_ref keys that lacks a
+ * nonempty agent_id or turn_id. Anything else still gets the strict checks. */
+function isPlaceholderResultRef(ref: unknown): boolean {
+  if (ref === null) return true;
+  if (typeof ref !== "object" || Array.isArray(ref)) return false;
+  const value = ref as Record<string, unknown>;
+  if (Object.keys(value).some(key => !["agent_id", "turn_id", "offset"].includes(key))) return false;
+  const missing = (id: unknown): boolean =>
+    id === undefined || id === null || (typeof id === "string" && id.trim().length === 0);
+  return missing(value.agent_id) || missing(value.turn_id);
+}
+
 export function createWaitAgentTool(opts: MultiAgentV2Options): Tool {
   const session = opts.getSession();
   const { defaultTimeoutMs, minTimeoutMs, maxTimeoutMs } = session
@@ -271,8 +283,12 @@ export function createWaitAgentTool(opts: MultiAgentV2Options): Tool {
     if (session === undefined || !callerIsCurrent()) {
       return agentValidationError("invalid-runtime-identity: calling agent session is not live");
     }
-    if (args.result_ref !== undefined) {
-      const ref = args.result_ref;
+    // GPT models fill every optional field, so a plain wait arrives with
+    // result_ref {"agent_id":"","turn_id":"","offset":0}. No result page has an
+    // empty id: a null reference, or one without both ids, is a plain wait.
+    const resultRef = isPlaceholderResultRef(args.result_ref) ? undefined : args.result_ref;
+    if (resultRef !== undefined) {
+      const ref = resultRef;
       if (ref === null || typeof ref !== "object" || Array.isArray(ref)) return agentValidationError("result_ref must be an object");
       const value = ref as Record<string, unknown>;
       if (Object.keys(value).some(key => !["agent_id", "turn_id", "offset"].includes(key)) ||

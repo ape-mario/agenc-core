@@ -34,7 +34,9 @@ export const agentMessageReferenceSchema = {
  * "Use either message or message_ref, not both". Treat null and empty values
  * as absent; when message has text and the reference selects no excerpt, the
  * explicit message wins. A message next to a reference that selects an
- * excerpt is still a conflict.
+ * excerpt keeps both: GPT models write their own instruction in message and
+ * point at the user's words with the excerpt, so resolveAgentMessage puts the
+ * message first and the excerpt after it.
  */
 export function normalizeAgentMessageArgs(args: Record<string, unknown>): {
   readonly message?: unknown;
@@ -68,7 +70,7 @@ export function resolveAgentMessage(
     if (typeof args.message !== "string") throw new Error("message or message_ref is required");
     text = args.message;
   } else {
-    if (args.message !== undefined) throw new Error("Use either message or message_ref, not both");
+    if (args.message !== undefined && typeof args.message !== "string") throw new Error("message must be a string");
     const ref = args.message_ref;
     if (ref === null || typeof ref !== "object" || Array.isArray(ref)) throw new Error("message_ref must be an object");
     const record = ref as Record<string, unknown>;
@@ -90,7 +92,8 @@ export function resolveAgentMessage(
       else end = index;
     }
     if (end <= start) throw new Error("message_ref delimiters select an empty or reversed excerpt");
-    text = source.slice(start, end);
+    const excerpt = source.slice(start, end);
+    text = args.message === undefined ? excerpt : `${args.message}\n\n${excerpt}`;
   }
   if (text.trim().length === 0) throw new Error("message or message_ref must contain a nonempty task");
   if (Buffer.byteLength(text, "utf8") > MAX_AGENT_MESSAGE_BYTES) throw new Error("Expanded agent message exceeds 256 KiB UTF-8; select a smaller excerpt or pass permitted file paths");

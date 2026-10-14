@@ -27,8 +27,23 @@ describe("agent message references", () => {
   it("does not reuse a previous turn or silently truncate an oversized task", () => {
     expect(() => resolveAgentMessage(ref(), { currentRootHumanTurn: () => null })).toThrow(/no active human/);
     expect(() => resolveAgentMessage(ref(), source("🐈".repeat(MAX_AGENT_MESSAGE_BYTES / 4 + 1)))).toThrow(/256 KiB/);
-    // A message next to a reference that selects an excerpt is a conflict.
-    expect(() => resolveAgentMessage({ ...ref({ after: "<t>" }), message: "replacement" }, source("<t>task"))).toThrow(/either/);
+  });
+  it("keeps both an instruction and a selected excerpt, instruction first", () => {
+    // Live on 473af774f with gpt-6.1-sol: every first spawn carried a full
+    // instruction plus an excerpt of the user's words and was refused with
+    // "Use either message or message_ref, not both".
+    const both = {
+      message: "Read only notes-a.txt. Return its first word.",
+      message_ref: { source: "current_user_message", after: "Helper one: ", before: " Helper two:" },
+    };
+    const user = "Use two helpers. Helper one: read notes-a.txt and return its first word. Helper two: read notes-b.txt.";
+    expect(resolveAgentMessage(both, source(user))).toBe(
+      "Read only notes-a.txt. Return its first word.\n\nread notes-a.txt and return its first word.",
+    );
+    // The excerpt is still checked: a delimiter that is not in the message fails.
+    expect(() => resolveAgentMessage({ ...both, message_ref: { ...both.message_ref, after: "Helper three: " } }, source(user)))
+      .toThrow(/exactly once/);
+    expect(() => resolveAgentMessage({ message: 42, ...ref({ after: "<t>" }) }, source("<t>task"))).toThrow(/must be a string/);
   });
   it("accepts the placeholder fields models fill in when they fill every field", () => {
     // Live on 0.19 RCs with OpenAI models: a real message plus a reference
