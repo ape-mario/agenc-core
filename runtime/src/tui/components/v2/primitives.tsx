@@ -764,6 +764,10 @@ const KITTY_PLACEHOLDER_DIACRITICS = [
   '\u0351',
   '\u0352',
   '\u0357',
+  '\u035b',
+  '\u0363',
+  '\u0364',
+  '\u0365',
 ] as const
 
 export function supportsKittyGraphics(
@@ -794,7 +798,7 @@ export function kittyLogoPlaceholderRows(
     columns > KITTY_PLACEHOLDER_DIACRITICS.length ||
     rows > KITTY_PLACEHOLDER_DIACRITICS.length
   ) {
-    throw new RangeError('Kitty logo grid must be between 1 and 16 cells')
+    throw new RangeError(`Kitty logo grid must be between 1 and ${KITTY_PLACEHOLDER_DIACRITICS.length} cells`)
   }
 
   return Array.from({ length: rows }, (_, row) =>
@@ -878,7 +882,9 @@ function AgencLogoMark({ compact = false }: { readonly compact?: boolean }): Rea
   return (
     <Box flexDirection="column">
       {lines.map((line, index) => (
-        <ThemedText key={index} color="text">
+        // Brand purple in bold: braille dots are thin in most terminal fonts,
+        // so the accent color keeps the mark readable on dark and light.
+        <ThemedText key={index} color="agenc" bold>
           {line}
         </ThemedText>
       ))}
@@ -940,7 +946,8 @@ function WelcomeHintLine(): React.ReactNode {
 export function WelcomeColdPanel(): React.ReactNode {
   const availableWidth = useWelcomeAvailableWidth()
   const { rows: terminalRows } = useTerminalSize()
-  const compactLogo = availableWidth < 96 || terminalRows < 20
+  // The full mark is 20x10 cells; short panes get the 12x6 mark.
+  const compactLogo = availableWidth < 96 || terminalRows < 24
   const showHint = terminalRows >= 16
 
   return (
