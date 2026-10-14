@@ -1,11 +1,11 @@
 # Installing AgenC
 
-**Current version in tree: 0.19.0.** The standalone installer, npm launcher,
+Current version in tree: 0.19.0. The standalone installer, npm launcher,
 updater, and Homebrew template share the same reviewed immutable runtime
 contract.
 
-User install is this page through **After install**. **Release/publish
-procedure** further down is maintainer-only (the agenc-release skill still
+User install is this page through After install. Release/publish
+procedure further down is maintainer-only (the agenc-release skill still
 points here).
 
 Install paths that actually work for users: Unix curl, Windows iwr, npm, and
@@ -308,7 +308,7 @@ npm install -g @tetsuo-ai/agenc
 
 The launcher's postinstall resolves the same runtime contract via
 `packages/agenc/lib/runtime-manager.mjs`. Prefer a version that resolves
-runtime **0.19.0** when you need parity with this doc set. npm itself still
+runtime 0.19.0 when you need parity with this doc set. npm itself still
 requires a compatible host Node; use the standalone installer or Homebrew
 formula when you want a self-contained installation.
 
@@ -394,7 +394,7 @@ On Linux, a userland install puts `agenc-linux-sandbox` under
 the workspace, so the helper sits inside the writable tree and startup fails
 closed (`[sandbox_required_unavailable]`). That refusal is correct: a jailed
 process that can rewrite its jailer is not jailed. The remediation names the
-home workspace and tells you to open a project directory — do not reinstall
+home workspace and tells you to open a project directory. Do not reinstall
 the helper. See
 [tools-permissions-sandbox.md](reference/tools-permissions-sandbox.md).
 A different pitfall: putting `AGENC_HOME` under a writable sandbox ancestor
@@ -421,7 +421,7 @@ There are two authorized lanes:
 
 1. Prepare the version, landing copy, release notes, and source changes on a
    branch. Run the fast PR checks and any targeted release-package tests,
-   commit with hooks enabled, create the PR, and squash-merge it. Do **not** run
+   commit with hooks enabled, create the PR, and squash-merge it. Do not run
    the full clean-build acceptance before the final merge commit exists.
 2. Fetch `origin/main`, switch to its clean exact commit, and run the complete
    verification plan once:
@@ -767,12 +767,12 @@ superseded by `release:verify`.
 
 ## Archived manual release procedure
 
-Binaries publish to the **public** `tetsuo-ai/agenc-releases` repo. The
+Binaries publish to the public `tetsuo-ai/agenc-releases` repo. The
 `tetsuo-ai/agenc-core` source repository must also remain public: npm trusted
 publishing can authenticate a private repository, but npm cannot generate the
 required public-package provenance from one, so both release workflows fail
 closed if source visibility changes. The installers default to
-`releases/latest/download/agenc-runtime-manifest-v2.json` there — a regression
+`releases/latest/download/agenc-runtime-manifest-v2.json` there. A regression
 test pins that default.
 
 Release builds require exactly Node.js 26.5.0 and npm 11.17.0 as declared by
@@ -832,7 +832,7 @@ resolved package inventory is stored at
    ! git show-ref --verify --quiet "refs/tags/$tag"
    npm run release:preflight
    tested_sha="$(git rev-parse HEAD)"
-   evidence_path="${AGENC_RELEASE_EVIDENCE_DIR:-$HOME/.agenc/release-evidence}/${tag}-${tested_sha}.json"
+   evidence_path="${AGENC_RELEASE_STATE_DIR:-$HOME/.local/state/agenc-release}/${tag}-${tested_sha}/evidence.json"
    test -f "$evidence_path"
    evidence_sha256="$(sha256sum "$evidence_path" | cut -d ' ' -f 1)"
    [[ "$evidence_sha256" =~ ^[0-9a-f]{64}$ ]]
@@ -1238,7 +1238,7 @@ resolved package inventory is stored at
 
    ```bash
    tested_sha="$(git rev-parse "${tag}^{commit}")"
-   evidence_path="${AGENC_RELEASE_EVIDENCE_DIR:-$HOME/.agenc/release-evidence}/${tag}-${tested_sha}.json"
+   evidence_path="${AGENC_RELEASE_STATE_DIR:-$HOME/.local/state/agenc-release}/${tag}-${tested_sha}/evidence.json"
    test -f "$evidence_path"
    evidence_sha256="$(sha256sum "$evidence_path" | cut -d ' ' -f 1)"
    [[ "$evidence_sha256" =~ ^[0-9a-f]{64}$ ]]
@@ -1346,8 +1346,8 @@ Interactive AgenC launches check the release manifest in the background once,
 with a three-second deadline. The welcome screen and composer do not wait for
 this check. An available release opens `/update` only when the composer is
 empty, no turn or other dialog is active, and keyboard input has been quiet.
-Choose **Update now**, **Skip this version**, or **Not now**. Escape means
-**Not now**. Skipping acknowledges only that version in AgenC's runtime state;
+Choose Update now, Skip this version, or Not now. Escape means
+Not now. Skipping acknowledges only that version in AgenC's runtime state;
 a later release prompts again. Not now asks again on the next launch.
 
 `/update` checks on request, shows the installed and latest versions and install
