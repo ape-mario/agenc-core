@@ -1,3 +1,4 @@
+import { finalizeCompactionTransaction } from "../../../src/services/compact/finalize-transaction.js";
 import { largeGrokReplay, unpaddedGrokReplays } from "../../helpers/grok-encrypted-replay.js";
 import { llmMessageToDurableResponseItem, responseItemToLlmMessage } from "../../../src/session/message-history-conversion.js";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -668,7 +669,7 @@ describe("transactional compaction production path", () => {
   });
 
   it.each(["PreCompact", "PostCompact"] as const)(
-    "releases the durable lease when an abort-ignoring %s hook is cancelled",
+    "releases the durable lease after cancelling an abort-ignoring %s hook and finalizing any commit",
     async (event) => {
       await withTransactionalStore(`transaction-${event}-abort-lease`, async (store) => {
         const source = appendSourceMessages(store, 8, 4_000);
@@ -704,6 +705,16 @@ describe("transactional compaction production path", () => {
           expect(result.transaction).toBeDefined();
           expect(store.readAll().filter(isCompactionLifecycleItem).map((item) => item.type))
             .toEqual(["compaction_intent", "compaction_committed"]);
+          // A committed transaction still owns the parent until its caller
+          // publishes replacement/checkpoint and finishes cleanup.
+          expect(() => store.acquireCompactionLease("before-projection"))
+            .toThrow(/compaction already in progress/);
+          const cleanup = vi.fn();
+          await finalizeCompactionTransaction({
+            store, attemptId: result.transaction!.attempt_id,
+            applyProjection: () => {}, cleanup,
+          });
+          expect(cleanup).toHaveBeenCalledOnce();
         }
 
         const probeLease = await store.acquireCompactionLease(`probe-${event}`);
