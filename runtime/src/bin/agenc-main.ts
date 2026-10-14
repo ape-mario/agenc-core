@@ -30,7 +30,7 @@ import type { ResolveDaemonToolCallParams } from "../commands/resolve.js";
 import type { ProviderModelSelectionOutcome } from "../contracts/provider-model-selection.js";
 import { ConfigStore } from "../config/store.js";
 import { resolveAgencHome, resolveWorkspace as resolveWorkspaceFromEnv } from "../config/env.js";
-import { resolveBuiltInProviderInfo } from "../llm/registry/provider-info.js";
+import { canonicalProviderApiKeyEnvVar } from "../llm/registry/provider-ingress.js";
 import { snapshotProviderEnvironment } from "../llm/provider-options.js";
 import { captureSecureStorageIngress } from "../utils/secureStorage/home.js";
 import { logForDebugging } from "../utils/debug.js";
@@ -2061,8 +2061,8 @@ async function createDeferredDaemonPromptTuiSession(params: {
       if (deferredSessionClosed || liveSessionPromise !== null) {
         throw new Error("Wait for session startup to finish, then try again.");
       }
-      const credentials = resolveBuiltInProviderInfo(provider)?.credentials;
-      if (credentials?.kind !== "api-key" || !apiKey.trim() || /\s/u.test(apiKey)) {
+      const envVar = canonicalProviderApiKeyEnvVar(provider);
+      if (envVar === undefined || !apiKey.trim() || /\s/u.test(apiKey)) {
         throw new Error("A provider API key must be a single non-empty token.");
       }
       if (liveSession !== null) {
@@ -2074,7 +2074,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
       // Before the first prompt, no daemon agent exists. Stage only the
       // provider ingress snapshot for agent.create; hooks and process.env
       // keep their original environment. Nothing persists this secret.
-      sessionProviderKeys[credentials.apiKey.envVars[0]!] = apiKey;
+      sessionProviderKeys[envVar] = apiKey;
     },
     mcpSurfaceSnapshot: currentMcpSurfaceSnapshot,
     refreshMcpSurface: refreshCurrentMcpSurface,

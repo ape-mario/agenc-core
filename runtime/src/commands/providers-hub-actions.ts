@@ -9,6 +9,7 @@
 import { removeProviderKey, saveProviderKey } from "../auth/provider-keys.js";
 import { AgenCConfigEditsBuilder } from "../config/edit.js";
 import type { ProviderSlug } from "../config/provider-model-authority.js";
+import { canonicalProviderApiKeyEnvVar } from "../llm/registry/provider-ingress.js";
 import { resolveBuiltInProviderInfo } from "../llm/registry/provider-info.js";
 import { verifyApiKey } from "../onboarding/useApiKeyVerification.js";
 import {
@@ -83,8 +84,7 @@ export async function connectProviderWithKey(
         ? "Linux Secret Service is unavailable (no usable keyring or session bus)."
         : "Native secure storage is unavailable on this computer."
       : "Native secure storage could not save the key (locked, unreadable, or write failed).";
-    const credentials = resolveBuiltInProviderInfo(provider)?.credentials;
-    const envName = credentials?.kind === "api-key" ? credentials.apiKey.envVars[0] : undefined;
+    const envName = canonicalProviderApiKeyEnvVar(provider);
     return {
       ok: true,
       sessionOnly: true,

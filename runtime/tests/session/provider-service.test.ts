@@ -3,6 +3,7 @@ import { resolveHomeContext } from "../../src/config/home.js";
 import { resolveProviderFactoryOptions } from "../../src/llm/provider-options.js";
 import { createProvider } from "../../src/llm/provider.js";
 import { resolveProviderRuntimeRequest } from "../../src/llm/provider-request.js";
+import { resolveProviderApiKeyEnvironment } from "../../src/llm/registry/provider-ingress.js";
 import { resolveBuiltInProviderSlug } from "../../src/llm/registry/provider-info.js";
 import { defaultConfig } from "../../src/config/schema.js";
 import {
@@ -60,6 +61,23 @@ describe("SessionProviderService", () => {
     expect(environment.DEEPSEEK_API_KEY).toBe("old-placeholder");
     const next = await service.prepare({ provider: "deepseek", model: "deepseek-pro" });
     expect(next.binding.factoryOptions.apiKey).toBe("new-placeholder");
+  });
+
+  test.each([
+    ["grok", "XAI_API_KEY", "GROK_API_KEY"],
+    ["gemini", "GEMINI_API_KEY", "GOOGLE_API_KEY"],
+  ])("keeps %s alias precedence for an explicit session key without changing ingress", async (provider, canonical, fallback) => {
+    const environment = Object.freeze({ [canonical]: "original-primary", [fallback]: "original-fallback" });
+    const service = new SessionProviderService({
+      initialProvider: createProvider("deepseek", { model: "deepseek-flash", apiKey: "other-provider-key" }),
+      environment,
+    });
+    const binding = service.current();
+    await service.useSessionApiKey(provider, "session-placeholder");
+    expect(resolveProviderApiKeyEnvironment(provider, service.environment())).toEqual({ envVar: canonical, value: "session-placeholder" });
+    expect(service.environment()[fallback]).toBe("original-fallback");
+    expect(environment).toEqual({ [canonical]: "original-primary", [fallback]: "original-fallback" });
+    expect(service.current()).toBe(binding);
   });
 
   test("rolls back failed credential preparation without exposing the key", async () => {

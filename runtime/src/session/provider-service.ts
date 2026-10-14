@@ -23,7 +23,7 @@ import {
   resolveBuiltInProviderInfo,
   resolveBuiltInProviderRegionalEndpoint,
 } from "../llm/registry/provider-info.js";
-import { resolveProviderBaseURLEnvironment } from "../llm/registry/provider-ingress.js";
+import { canonicalProviderApiKeyEnvVar, resolveProviderBaseURLEnvironment } from "../llm/registry/provider-ingress.js";
 import { readGeminiRuntimeOptions } from "../llm/providers/gemini/runtime-options.js";
 import { createPinnedProviderFetch } from "../llm/credential-redirect-fetch.js";
 import { isGrokComposerModel } from "../llm/providers/grok/acp-adapter.js";
@@ -269,8 +269,8 @@ export class SessionProviderService {
   /** Explicit user ingress. Memory only; never changes process or shell environment. */
   async useSessionApiKey(provider: string, apiKey: string): Promise<void> {
     const slug = resolveBuiltInProviderSlug(provider);
-    const info = slug === undefined ? undefined : resolveBuiltInProviderInfo(slug);
-    if (info?.credentials.kind !== "api-key" || !apiKey.trim() || /\s/u.test(apiKey)) {
+    const envVar = slug === undefined ? undefined : canonicalProviderApiKeyEnvVar(slug);
+    if (envVar === undefined || !apiKey.trim() || /\s/u.test(apiKey)) {
       throw new Error("A provider API key must be a single non-empty token.");
     }
     const previousEnvironment = this.#environment;
@@ -278,7 +278,7 @@ export class SessionProviderService {
     this.#sessionApiKeys.set(provider, apiKey);
     this.#environment = snapshotProviderEnvironment({
       ...previousEnvironment,
-      [info.credentials.apiKey.envVars[0]!]: apiKey,
+      [envVar]: apiKey,
     });
     try {
       if (this.#binding.provider === provider) {
