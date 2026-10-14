@@ -83,6 +83,41 @@ describe("FileHistory (I-28)", () => {
     history.stop();
   });
 
+  test("a failed diagnostic delivery does not block later diagnostics or restore", async () => {
+    const key = join(project, "rollout#epoch:1");
+    const file = join(project, "durable.txt");
+    writeFileSync(file, "original\n");
+    let attempts = 0;
+    const delivered: string[] = [];
+    const history = new FileHistory({
+      projectDir: project,
+      onDiagnostic: (diagnostic) => {
+        if (++attempts === 1) throw new Error("canonical run journal is sealed");
+        delivered.push(diagnostic.cause);
+      },
+      withCanonicalBackgroundWork: (work) => withCanonicalBackgroundWork(key, work),
+    });
+    const sidecar = new FileHistorySidecar({ fileHistory: history });
+    try {
+      await history.makeSnapshot("before-edit");
+      await history.trackEdit(file, "edit");
+      writeFileSync(file, "changed\n");
+      // Trying to back up a directory produces real filesystem diagnostics.
+      await history.trackEdit(project, "first-diagnostic");
+      await history.trackEdit(project, "second-diagnostic");
+      await expect(history.flush()).resolves.toBeUndefined();
+      expect(attempts).toBe(2);
+      expect(delivered).toEqual(["file_history_track_failed"]);
+      expect((await history.previewRewind("before-edit"))?.filesChanged).toEqual([file]);
+      await expect(history.rewindToMessage("before-edit")).resolves.toEqual([file]);
+      expect(readFileSync(file, "utf8")).toBe("original\n");
+      await expect(history.clear()).resolves.toBeUndefined();
+      await expect(sidecar.stop()).resolves.toBeUndefined();
+    } finally {
+      history.stop();
+    }
+  });
+
   test("resumes published barriers without overwriting origins or another session", async () => {
     const file = join(project, "durable.txt");
     writeFileSync(file, "original\n");

@@ -679,10 +679,9 @@ export class FileHistory {
     // Filesystem backups keep their existing scheduling. Only publication
     // writes the parent journal, so defer it until the canonical owner is free.
     this.pendingDiagnostics = this.pendingDiagnostics.then(() =>
-      this.runCanonicalWork(() => { this.onDiagnostic?.(d); }));
-    // flush/stop observes delivery errors; asynchronous snapshot callbacks
-    // must not leave an unhandled rejection while that drain is pending.
-    void this.pendingDiagnostics.catch(() => {});
+      this.runCanonicalWork(() => { this.onDiagnostic?.(d); })).catch(() => {});
+    // Diagnostics are best-effort. A failed delivery must not poison later
+    // publications or prevent restore, preview, clear, or stop from draining.
   }
 
   /**
