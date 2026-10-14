@@ -2062,6 +2062,8 @@ export function normalizeHistoryMessages(
                   : {}),
               ...(typeof candidate.runtimeOnly?.userMessageId === "string"
                 ? { userMessageId: candidate.runtimeOnly.userMessageId }
+                : candidate.role === "user" && typeof candidate.id === "string"
+                  ? { userMessageId: candidate.id }
                 : {}),
               ...(durable.toolResultIntegrity !== undefined
                 ? { toolResultIntegrity: durable.toolResultIntegrity }
