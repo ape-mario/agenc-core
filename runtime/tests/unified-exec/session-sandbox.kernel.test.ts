@@ -27,7 +27,7 @@ const namespace = "readlink /proc/self/ns/pid";
 function run(cmd = namespace, extra: Record<string, unknown> = {}) {
   return manager.execCommand({ cmd, login: false, runtimeSandbox: policy, yield_time_ms: 1000, ...extra });
 }
-describe.runIf(process.platform === "linux")("persistent unified exec lifecycle", () => {
+describe("persistent unified exec lifecycle", () => {
   it("keeps fresh bypass commands on the subreaper without session sandbox activity", async () => {
     const sandboxSpawn = vi.spyOn(SessionSandbox.prototype, "spawn");
     const sandboxClose = vi.spyOn(SessionSandbox.prototype, "close");

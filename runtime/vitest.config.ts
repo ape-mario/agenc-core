@@ -137,10 +137,14 @@ export const HOSTED_FND_TEST_INCLUDE = Object.freeze([
 
 /** Real Linux-kernel sandbox coverage executed on a disposable hosted runner. */
 export const KERNEL_TEST_INCLUDE = Object.freeze([
+  "tests/routines/scheduled-session-mode-sandbox.kernel.test.ts",
   "tests/sandbox/landlock-seccomp.kernel.test.ts",
-  "tests/sandbox/linux-launcher/linux-launcher.kernel.test.ts",
   "tests/sandbox/linux-launcher/direct-bwrap.kernel.test.ts",
+  "tests/sandbox/linux-launcher/linux-launcher.kernel.test.ts",
+  "tests/sandbox/linux-launcher/session-sandbox.kernel.test.ts",
   "tests/sandbox/readonly-delegation.kernel.test.ts",
+  "tests/unified-exec/session-sandbox.kernel.test.ts",
+  "tests/utils/process-broker-v2-lifecycle.kernel.test.ts",
 ]);
 
 /** PowerShell integration tests executed by the pinned hosted capability lane. */

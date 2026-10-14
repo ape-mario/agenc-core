@@ -37,7 +37,7 @@ async function runInput(invocation: ReturnType<typeof input>, signal?: AbortSign
   return { out, err, pid: child!.pid, code: child!.exitCode,
     outcome: await terminateProcessTreeAndReport(child!) };
 }
-describe.runIf(process.platform === "linux")("session sandbox", () => {
+describe("session sandbox", () => {
   it("tries a timed-out keeper once and logs the session fallback once", async () => {
     const original = supervised.spawnContainedProcess;
     const launch = vi.spyOn(supervised, "spawnContainedProcess").mockImplementationOnce((...args) => {
@@ -270,7 +270,7 @@ describe.runIf(process.platform === "linux")("session sandbox", () => {
     expect((await run("echo intact")).out).toBe("intact\n");
   });
 
-  it.runIf(process.arch === "x64")("supports i386 commands without exposing keeper process controls", async () => {
+  it("supports i386 commands without exposing keeper process controls", async () => {
     const assembly = path.join(root, "work/compat.s"), executable = path.join(root, "work/compat");
     fs.writeFileSync(assembly, `.global _start
 .text
