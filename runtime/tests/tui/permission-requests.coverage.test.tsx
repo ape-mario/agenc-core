@@ -109,6 +109,41 @@ function createPendingRequest(
 }
 
 describe("permission request overlay coverage", () => {
+  test.each([
+    "I have 2 questions and 3 notes\r",
+    "1 pasted sentence\r",
+    "\x1b[200~1\x1b[201~\r",
+  ])("keeps typing and paste %j out of approval shortcuts", async (input) => {
+    const resolved: ReviewDecision[] = [];
+    const request = createPendingRequest(decision => resolved.push(decision), {
+      input: { command: "printf safe_fixture" }, description: "Print a fixture",
+    });
+    const { stdin, stdout, output } = createStreams();
+    const root = await createRoot({ patchConsole: false,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stdout: stdout as unknown as NodeJS.WriteStream });
+    try {
+      root.render(<AgenCPermissionOverlay request={request} tools={[{ name: "Bash" }]} />);
+      await sleep();
+      stdin.write(input);
+      await sleep();
+      expect(resolved).toEqual([]);
+      // Raw output uses incremental cursor updates; the real TUI proof checks
+      // the complete hint in the rendered screen rather than concatenated ANSI.
+      expect(stripAnsi(output())).toContain("waiting");
+      stdin.write("2"); // Still in the same typing burst.
+      await sleep();
+      expect(resolved).toEqual([]);
+      await sleep(550);
+      stdin.write("1");
+      await sleep();
+      stdin.write("1");
+      await sleep();
+      expect(resolved).toEqual([APPROVED]);
+    } finally {
+      root.unmount(); stdin.end(); stdout.end(); await sleep();
+    }
+  });
   test.each(["delete", "del", "delete extra"])("handles a confirmation input chunk %s without premature approval", async (chunk) => {
     const resolved: ReviewDecision[] = [];
     const request = createPendingRequest(decision => resolved.push(decision), {
@@ -128,6 +163,7 @@ describe("permission request overlay coverage", () => {
       await sleep();
       expect(stripAnsi(output())).toContain(chunk === "del" ? "del" : "delete");
       expect(resolved).toEqual([]);
+      await sleep(550);
       stdin.write("\r");
       await sleep();
       expect(resolved).toEqual(chunk === "delete" ? [APPROVED] : []);
@@ -183,6 +219,7 @@ describe("permission request overlay coverage", () => {
       expect(typedFrame).toContain("stake");
       expect(resolved).toEqual([]);
 
+      await sleep(550);
       stdin.write("\r");
       await sleep();
 
@@ -235,6 +272,7 @@ describe("permission request overlay coverage", () => {
         stdin.write(character);
         await sleep();
       }
+      await sleep(550);
       stdin.write("\r");
       await sleep();
 
