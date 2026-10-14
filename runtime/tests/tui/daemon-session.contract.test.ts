@@ -2127,6 +2127,61 @@ describe("AgenC TUI daemon session adapter", () => {
     });
   });
 
+  it.each(["foreign", "local abort", "matching", "matching after status", "matching after successor", "matching without start", "matching without start after successor"])("retains inputs after an unknown RPC failure but consumes them after a matching terminal (terminal=%s)", async terminal => {
+    const confirmed = terminal.startsWith("matching");
+    const client = createClient();
+    const original = client.request.bind(client);
+    const rpc = Promise.withResolvers<never>();
+    let messageCalls = 0;
+    client.request = (async (method, params, options) => {
+      if (method !== "message.stream") return original(method, params, options);
+      client.requests.push({ method, params });
+      messageCalls += 1;
+      if (messageCalls === 1) return rpc.promise;
+      return {};
+    }) as AgenCDaemonTuiClient["request"];
+    const session = createDaemonTuiSession({ baseSession: createBaseSession(), client,
+      sessionId: "session_1", clientId: "tui_1" });
+    const stop = session.subscribeToEvents(() => undefined);
+    try {
+      session.enqueueIdleInputBatch([{ role: "user", content: "old private paste" }]);
+      const pending = session.submit("first", { clientMessageId: "owned-message" });
+      const observed = pending.then(() => "resolved", () => "rejected");
+      await vi.waitFor(() => expect(messageCalls).toBe(1));
+      if (!terminal.includes("without start")) {
+        client.emit("session_1", { method: "event.session_event", params: {
+          clientMessageId: "owned-message", turnId: "owned-turn",
+          event: { type: "turn_started", payload: { turnId: "owned-turn" } },
+        } });
+      }
+      if (terminal.includes("after")) {
+        client.emit("session_1", { msg: { type: "background_agent_status", payload: { status: "failed", turnId: "owned-turn" } } });
+      }
+      if (terminal.includes("after successor")) {
+        client.emit("session_1", { method: "event.session_event", params: {
+          clientMessageId: "sibling-message", turnId: "successor-turn",
+          event: { type: "turn_started", payload: { turnId: "successor-turn" } },
+        } });
+      }
+      client.emit("session_1", { method: "event.session_event", params: terminal === "local abort" ? {
+        event: { type: "turn_aborted", payload: { reason: "interrupted" } },
+      } : {
+        clientMessageId: confirmed ? "owned-message" : "foreign-message",
+        turnId: confirmed ? "owned-turn" : "foreign-turn",
+        event: { type: "turn_failed", payload: {
+          turnId: confirmed ? "owned-turn" : "foreign-turn", code: "fixture_failed", message: "failed",
+        } },
+      } });
+      rpc.reject(new Error("late socket failure"));
+      expect(await observed).toBe(confirmed ? "resolved" : "rejected");
+      if (terminal.includes("after successor")) expect(session.activeTurn?.unsafePeek()).toMatchObject({ turnId: "successor-turn" });
+      await session.submit("next");
+      const content = client.requests.filter(request => request.method === "message.stream").at(-1)!.params!.content;
+      if (confirmed) expect(content).toBe("next");
+      else expect(JSON.stringify(content)).toContain("old private paste");
+    } finally { stop(); }
+  });
+
   it("discards queued pasted inputs and their admission leases on clear", async () => {
     const client = createClient();
     const session = createDaemonTuiSession({ baseSession: createBaseSession(), client, sessionId: "session_1", clientId: "tui_1" });
