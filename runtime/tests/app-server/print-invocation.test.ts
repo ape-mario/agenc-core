@@ -3,6 +3,8 @@ import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { format } from "node:util";
+import { fileURLToPath } from "node:url";
+import { buildSync } from "esbuild";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrintInvocation, validatePrintInvokeParams } from "../../src/app-server/print-invocation.js";
 import { runDefaultCliRoute } from "../../src/bin/default-cli-route.js";
@@ -202,11 +204,12 @@ describe("canonical/resident print byte and exit parity", () => {
 // Use a fresh process with the client environment installed BEFORE module
 // import. An in-process thin call would reuse this test daemon's captured OS
 // temp fallback and hide the production A-daemon/B-client regression.
+let thinRuntimeAuthorityScript: string | undefined;
 function thinRuntimeAuthority(env: Readonly<Record<string, string>>):
   { options: AgentRuntimeOptions } | { error: string } {
-  const moduleUrl = new URL("../../src/session/runtime-options.ts", import.meta.url).href;
+  const modulePath = fileURLToPath(new URL("../../src/session/runtime-options.ts", import.meta.url));
   const script = `
-    import { resolveAgentRuntimeOptions } from ${JSON.stringify(moduleUrl)};
+    import { resolveAgentRuntimeOptions } from ${JSON.stringify(modulePath)};
     try {
       const options = resolveAgentRuntimeOptions(process.env, {
         nonInteractive: true, exactOutput: false, relaxedOneShot: true,
@@ -214,9 +217,18 @@ function thinRuntimeAuthority(env: Readonly<Record<string, string>>):
       process.stdout.write(JSON.stringify({ options }));
     } catch (error) { process.stdout.write(JSON.stringify({ error: error.message })); }
   `;
+  // Compile without evaluating the product modules, then use plain Node.
+  // Loading tsx in the child attempts an IPC connection beneath os.tmpdir(),
+  // which is deliberately relative, whitespace-prefixed or symlinked here.
+  thinRuntimeAuthorityScript ??= buildSync({
+    stdin: { contents: script, resolveDir: import.meta.dirname },
+    bundle: true, platform: "node", format: "esm", write: false,
+  }).outputFiles[0]!.text;
+  const probe = join(home, "thin-runtime-authority.mjs");
+  writeFileSync(probe, thinRuntimeAuthorityScript);
   return JSON.parse(execFileSync(process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", script],
-    { env: { ...env, TSX_DISABLE_CACHE: "1" }, encoding: "utf8", timeout: 20_000 }));
+    [probe],
+    { env: { ...env }, encoding: "utf8", timeout: 20_000 }));
 }
 
 function clientEnvironment(): Record<string, string> {
