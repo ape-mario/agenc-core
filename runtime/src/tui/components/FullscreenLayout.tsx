@@ -675,7 +675,9 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const swarmMode = useAppStateMaybeOutsideOfProvider(state => state.swarmMode) === true;
   const tasks = useAppStateMaybeOutsideOfProvider(state => state.tasks) ?? {};
   const runningAgents = React.useMemo(
-    () => Object.values(tasks).filter(task => (task.type === "local_agent" || task.type === "in_process_teammate") && (task.status === "running" || task.status === "pending")).length,
+    // A helper with an end time has finished: cancelling the parent briefly
+    // re-sends finished helpers as running with their old end time.
+    () => Object.values(tasks).filter(task => (task.type === "local_agent" || task.type === "in_process_teammate") && (task.status === "running" || task.status === "pending") && task.endTime === undefined).length,
     [tasks],
   );
   const shellCount = Object.values(tasks).filter(task =>

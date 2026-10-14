@@ -132,6 +132,24 @@ describe("FullscreenLayout modal viewport", () => {
     expect(output).not.toContain("swarm (3)");
   });
 
+  test("does not count a finished helper that is briefly re-sent as running", async () => {
+    // Cancelling the parent re-emits finished helpers as running, still
+    // carrying their end time, before they settle again (swc RC4.8 Esc case).
+    const state = getDefaultAppState();
+    const tasks = {
+      live: { id: "live", type: "local_agent", status: "running" },
+      stale: { id: "stale", type: "local_agent", status: "running", startTime: 1, endTime: 2 },
+    } as unknown as typeof state.tasks;
+    const output = await renderToString(
+      <AppStateProvider initialState={{ ...state, swarmMode: true, tasks }}>
+        {fullscreen(<FullscreenLayout scrollable={<Text>research</Text>} bottom={<Text>prompt</Text>} />)}
+      </AppStateProvider>,
+      { columns: 180, rows: 24 },
+    );
+    expect(output).toContain("swarm (1)");
+    expect(output).not.toContain("swarm (2)");
+  });
+
   test("omits the Light label without changing other status facts", () => {
     const regular = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort");
     const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort", true);
