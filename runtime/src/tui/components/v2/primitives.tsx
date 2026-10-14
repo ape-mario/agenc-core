@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import React from 'react'
 import type { PermissionMode } from '../../../permissions/types.js'
+import { permissionModePlainDescription, permissionModePlainLabel } from '../../../permissions/mode-display.js'
 import { AURA_PLAN_GLYPHS, supportsRowTints, type Theme } from '../../../utils/theme.js'
 import { useModalOrTerminalSize } from '../../context/modalContext.js'
 import { useQueuedMessage } from '../../context/QueuedMessageContext.js'
@@ -266,26 +267,6 @@ export function visibleUserFacingModes(
   )
 }
 
-function modeDescription(mode: PermissionMode): string {
-  switch (mode) {
-    case 'default':
-      return 'standard · ask for ambiguous tools'
-    case 'acceptEdits':
-      return 'auto-accept file edits in this session'
-    case 'plan':
-      return 'read-only · propose plans, never execute'
-    case 'auto':
-      return 'auto-approve everything allowlisted'
-    case 'bypassPermissions':
-      return 'DANGER · all approvals bypassed'
-    case 'dontAsk':
-      return 'internal prompt suppression mode'
-    case 'unattended':
-      return 'background-agent unattended mode'
-    case 'bubble':
-      return 'nested-agent permission bubbling'
-  }
-}
 
 export function ModeSwitcher({
   currentMode,
@@ -311,13 +292,13 @@ export function ModeSwitcher({
       >
       <ThemedBox flexDirection="row" borderBottom borderBottomColor="agenc" paddingX={1} gap={2}>
         <Box width={16} flexShrink={0}>
-          <ThemedText color="agenc" wrap="truncate-end">permission mode</ThemedText>
+          <ThemedText color="agenc" wrap="truncate-end">permissions</ThemedText>
         </Box>
         <Box width={22} flexShrink={0}>
-          <ThemedText color="inactive" wrap="truncate-end">{`current · ${currentMode}`}</ThemedText>
+          <ThemedText color="inactive" wrap="truncate-end">{`now · ${permissionModePlainLabel(currentMode)}`}</ThemedText>
         </Box>
         <Box flexGrow={1} />
-        <ThemedText color="inactive" wrap="truncate-end">{`1–${modes.length} pick · ⇧⇥ cycle · esc`}</ThemedText>
+        <ThemedText color="inactive" wrap="truncate-end">{`1-${modes.length} pick · esc close`}</ThemedText>
       </ThemedBox>
       <Box flexDirection="column">
         {modes.map((mode, index) => {
@@ -339,11 +320,11 @@ export function ModeSwitcher({
               </Box>
               <Box width={24} flexShrink={0}>
                 <ThemedText color={chrome.fg} bold={active} wrap="truncate-end">
-                  {`${mode}${active ? ' · current' : ''}`}
+                  {permissionModePlainLabel(mode)}
                 </ThemedText>
               </Box>
               <ThemedText color={active ? 'text2' : 'subtle'} wrap="truncate-end">
-                {modeDescription(mode)}
+                {permissionModePlainDescription(mode)}
               </ThemedText>
             </ThemedBox>
             {spacerAfter > 0 ? <Box minHeight={spacerAfter} /> : null}
@@ -352,7 +333,7 @@ export function ModeSwitcher({
         })}
       </Box>
       <ThemedBox flexDirection="row" borderTop borderTopColor="lineSoft" paddingX={1}>
-        <ThemedText color="inactive">shift+tab cycles forward · /permissions for full rule table</ThemedText>
+        <ThemedText color="inactive">shift+tab or option+m: next mode · /permissions: all settings</ThemedText>
       </ThemedBox>
       </ThemedBox>
     </Box>
