@@ -423,7 +423,7 @@ function chooseKeepCount(messages: readonly RuntimeMessage[]): number {
   return Math.min(4, Math.max(1, Math.floor(messages.length * 0.2)));
 }
 
-/** Keep the newest complete exchange even in degraded tiers. Older exchanges
+/** Keep the two newest current-step exchanges even in degraded tiers. Older exchanges
  * share a bounded tail budget; the canonical seal length accounts for results
  * whose live body has already been replaced by an in-memory marker. Oversized
  * results are bounded/offloaded at the tool execution boundary, before sealing.
@@ -446,6 +446,12 @@ export function automaticCompactionSplit(
   const liveUserIndex = automaticCompactionLiveUserIndex(messages, liveUserMessageId);
   let split = Math.min(beforeExchange(messages.length - 1),
     latestToolIndex <= liveUserIndex ? messages.length - 1 : beforeExchange(latestToolIndex));
+  // A state check (for example reading the ledger before an append) can
+  // follow the result being used. Keep that preceding exchange too, rather
+  // than replacing the still-needed result with an emergency digest.
+  const precedingToolIndex = messages.findLastIndex((message, index) =>
+    index < split && index > liveUserIndex && isToolRoleMessage(message));
+  if (precedingToolIndex >= 0) split = beforeExchange(precedingToolIndex);
   if (degraded) return split;
   const budgetBytes = Math.floor(contextWindow * 0.4 * 2);
   const messageBytes = (message: RuntimeMessage): number =>

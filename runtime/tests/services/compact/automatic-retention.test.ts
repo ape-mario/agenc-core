@@ -36,6 +36,14 @@ describe("automatic continuation retention", () => {
       { role: "user" as const, content: "new incident review", runtimeOnly: { responseItemId: "next-request" } }];
     expect(automaticCompactionSplit(nextTurn, 32_768, true, "next-request")).toBe(6);
   });
+  test("a degraded state check retains the preceding result needed for the next edit", () => {
+    const checked: RuntimeMessage[] = [...history,
+      { role: "assistant", content: "check ledger before append", toolCalls: [{ id: "ledger", name: "FileRead", arguments: '{}' }] },
+      { role: "tool", toolCallId: "ledger", content: "batches 01-02 appended" }];
+    expect(automaticCompactionSplit(checked, 32_768, true)).toBe(3);
+    expect(checked.slice(automaticCompactionSplit(checked, 32_768, true)))
+      .toContainEqual(history.at(-1));
+  });
   test("protects the actual caller request rather than an internal recovery prompt", () => {
     const recovering = history.map((message, index) => index === 2
       ? { ...message, runtimeOnly: { responseItemId: "live-request" } }

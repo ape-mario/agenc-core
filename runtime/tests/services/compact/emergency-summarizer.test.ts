@@ -40,8 +40,11 @@ describe("runtime emergency summarizer", () => {
   test("map stage keeps the original request, latest state and dropped counts, and never exceeds the reserve", () => {
     const summarize = createRuntimeEmergencySummarizer();
     const body = JSON.parse(summarize({ stage: "map", messages: [transcriptPayload()], allowedSourceRefIds: ["ref-1"], maxOutputTokens: 4_096 })) as
-      { narrative: string; facts: unknown[]; open_actions: unknown[] };
-    expect(body.facts).toEqual([]);
+      { narrative: string; facts: { text: string; source_ref_ids: string[] }[]; open_actions: unknown[] };
+    expect(body.facts).toHaveLength(6);
+    expect(body.facts.every((fact) => fact.source_ref_ids.join() === "ref-1")).toBe(true);
+    expect(body.facts.some((fact) => fact.text.includes("3 passed"))).toBe(true);
+    expect(body.facts.some((fact) => fact.text.includes("def score()"))).toBe(true);
     expect(body.open_actions).toEqual([]);
     expect(body.narrative).toContain("Runtime emergency compaction: the model summarizer could not reduce this context; 10 messages and 6 tool calls (exec_command×2, FileRead×1, Write×1, MultiEdit×1, TaskList×1) were dropped.");
     expect(body.narrative).toContain("Original request:\nPlease migrate the parity scorer.");
@@ -54,6 +57,19 @@ describe("runtime emergency summarizer", () => {
     const tiny = summarize({ stage: "map", messages: [transcriptPayload()], allowedSourceRefIds: ["ref-1"], maxOutputTokens: 64 });
     expect(conservativeOutputTokenEstimate(tiny)).toBeLessThanOrEqual(64);
     expect((JSON.parse(tiny) as { narrative: string }).narrative).toContain("Runtime emergency compaction");
+  });
+
+  test("emergency evidence preserves a computed tail and cites the current reduce child", () => {
+    const summarize = createRuntimeEmergencySummarizer();
+    const output = "α".repeat(4_000) + '\n{"batch":"04","latency":70075}';
+    const body = JSON.parse(summarize({ stage: "final", allowedSourceRefIds: ["s1"], maxOutputTokens: 4_096,
+      messages: [{ role: "user", content: JSON.stringify({ kind: "untrusted_compaction_transcript", units: [{ messages: [{ role: "tool", tool_name: "exec_command", content: output }] }] }) }] }));
+    expect(body.facts[0].text).toContain('"latency":70075');
+    expect(body.facts[0].text).not.toContain("�");
+    const reduced = JSON.parse(summarize({ stage: "reduce", allowedSourceRefIds: ["s1"], maxOutputTokens: 4_096,
+      messages: structuredReductionMessages({ stage: "reduce", children: [{ ref_id: "old-ref", body }] }) }));
+    expect(reduced.facts[0].text).toContain('"latency":70075');
+    expect(reduced.facts[0].source_ref_ids).toEqual(["s1"]);
   });
 
   test("reduce stage merges children: earliest request, latest state, summed counts", () => {
