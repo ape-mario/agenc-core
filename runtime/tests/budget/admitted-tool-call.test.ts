@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
+import { itOnDarwin } from "../helpers/platform-registration.js";
 
 import { AdmissionDeniedError } from "../../src/budget/admission-client.js";
 import { createAllowAdmissionHarness } from "./admission-test-harness.js";
@@ -70,7 +71,7 @@ function toolHarness() {
 }
 
 describe("runAdmittedToolCall", () => {
-  it.runIf(process.platform === "darwin")("settles a real pre-read CronDelete refusal and admits the next prompt's mutation", async () => {
+  itOnDarwin("settles a real pre-read CronDelete refusal and admits the next prompt's mutation", async () => {
     const root = await mkdtemp(join(tmpdir(), "agenc-cron-delete-settlement-"));
     const state = toolHarness();
     const metadata = join(root, ".agenc");

@@ -151,6 +151,16 @@ export const POWERSHELL_TEST_INCLUDE = Object.freeze([
 ]);
 
 /**
+ * Default-suite files whose every test is macOS behavior. Off macOS they are
+ * not discovered at all: the hermetic release run on Linux requires zero
+ * skipped tests. Single macOS tests inside mixed files use
+ * tests/helpers/platform-registration.ts instead.
+ */
+export const DARWIN_ONLY_DEFAULT_TEST_FILES = Object.freeze([
+  "tests/utils/supervisedProcess.watchdog-spawn-failure.test.ts",
+]);
+
+/**
  * Tests that may contact a provider, browser, or chain are never discovered by
  * the default suite. `HookProgressMessage.live.parity.test.ts` deliberately
  * remains a default test: "live" describes its production-rendering source
@@ -173,6 +183,7 @@ export const DEFAULT_TEST_EXCLUDE = Object.freeze([
   ...DESIGN_TEST_INCLUDE,
   ...CROSS_REPO_TEST_INCLUDE,
   ...NATIVE_TEST_INCLUDE,
+  ...(process.platform === "darwin" ? [] : DARWIN_ONLY_DEFAULT_TEST_FILES),
   ...KERNEL_TEST_INCLUDE,
   ...POWERSHELL_TEST_INCLUDE,
 ]);

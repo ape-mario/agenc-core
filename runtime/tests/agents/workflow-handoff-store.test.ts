@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { itOnDarwin } from "../helpers/platform-registration.js";
 
 import {
   MAX_WORKFLOW_ARTIFACT_BYTES,
@@ -165,7 +166,7 @@ function seedIntents(options: {
 }
 
 describe("workflow handoff publication and integrity", () => {
-  it.runIf(process.platform === "darwin")("refuses descriptor-unsafe reads and cleanup without changing bytes", async () => {
+  itOnDarwin("refuses descriptor-unsafe reads and cleanup without changing bytes", async () => {
     const artifactStore = store();
     const artifact = await publish(artifactStore, "darwin-confined", "safe");
     await expectStoreCode(() => artifactStore.read(artifact.artifact_id), "WORKFLOW_HANDOFF_SAFE_IO_UNSUPPORTED");
