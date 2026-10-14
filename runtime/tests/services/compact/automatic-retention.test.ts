@@ -44,6 +44,33 @@ describe("automatic continuation retention", () => {
     expect(checked.slice(automaticCompactionSplit(checked, 32_768, true)))
       .toContainEqual(history.at(-1));
   });
+  test("emergency retention budgets older reasoning but preserves the newest complete exchange", () => {
+    const large: RuntimeMessage[] = [...history.map((message, index) => index === 3
+      ? { ...message, providerReasoningContent: "used reasoning".repeat(5_000) }
+      : message),
+      { role: "assistant", content: "check current state", toolCalls: [{ id: "latest", name: "FileRead", arguments: '{}' }] },
+      { role: "tool", toolCallId: "latest", content: "current result" }];
+    expect(automaticCompactionSplit(large, 32_768, true)).toBe(3);
+    expect(automaticCompactionSplit(large, 32_768, true, undefined, 1)).toBe(6);
+    expect(large.slice(automaticCompactionSplit(large, 32_768, true, undefined, 1)))
+      .toEqual(large.slice(6));
+    const small = large.map((message) => ({ ...message, providerReasoningContent: "" }));
+    expect(automaticCompactionSplit(small, 32_768, true, undefined, 1)).toBe(3);
+  });
+  test("emergency retention makes room when the remaining history is mostly recent exchanges", () => {
+    const thin: RuntimeMessage[] = [
+      { role: "user", content: "continue the current build" },
+      { role: "assistant", content: "older step", providerReasoningContent: "r".repeat(6_000),
+        toolCalls: [{ id: "older", name: "FileRead", arguments: '{}' }] },
+      { role: "tool", toolCallId: "older", content: "used output".repeat(500) },
+      { role: "assistant", content: "latest step", providerReasoningContent: "r".repeat(3_000),
+        toolCalls: [{ id: "newest", name: "exec_command", arguments: '{}' }] },
+      { role: "tool", toolCallId: "newest", content: "current result".repeat(80) },
+    ];
+    expect(automaticCompactionSplit(thin, 65_536, true, undefined, 1)).toBe(3);
+    expect(thin.slice(automaticCompactionSplit(thin, 65_536, true, undefined, 1)))
+      .toEqual(thin.slice(3));
+  });
   test("protects the actual caller request rather than an internal recovery prompt", () => {
     const recovering = history.map((message, index) => index === 2
       ? { ...message, runtimeOnly: { responseItemId: "live-request" } }

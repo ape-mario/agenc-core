@@ -1,5 +1,6 @@
 import { readCompactionTransactionAdapter } from "./transaction-adapter.js";
 export { readCompactionTransactionAdapter } from "./transaction-adapter.js";
+import { resolveReasoningEffort } from "../../llm/reasoning-effort.js";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 
@@ -364,10 +365,14 @@ async function compactConversationTransactionBody(
     providerOptions.model ??
     session.modelInfo.slug ??
     COMPACTION_UNKNOWN_MODEL;
-  // Summary calls send the effort the main loop sends. Without one the
-  // provider default applies, which can be higher: xAI's is high on grok-4.6,
-  // the configured default is medium.
-  const reasoningEffort = resolveSummaryReasoningEffort(session);
+  // Automatic summaries have their own bounded reasoning and output budget.
+  // Inheriting MAX can consume the entire reserve without emitting a summary.
+  // Keep the agent's effort and its next-request output reserve unchanged.
+  const reasoningEffort = resolveSummaryReasoningEffort(session, options.automatic);
+  const summaryOutputReserve = options.automatic
+    ? Math.min(MAX_COMPACTION_INTERMEDIATE_TOKENS,
+        Math.max(1, Math.floor((context.options?.contextWindowTokens ?? 128_000) / 4)))
+    : context.options?.maxOutputTokens;
   const policyMaterial = {
     map: getCompactionSystemPrompt("map", direction),
     reduce: getCompactionSystemPrompt("reduce", direction),
@@ -384,6 +389,12 @@ async function compactConversationTransactionBody(
       provider: providerName,
       context_window_tokens: context.options?.contextWindowTokens ?? null,
       max_output_tokens: context.options?.maxOutputTokens ?? null,
+      summary_reasoning_effort: reasoningEffort ?? null,
+      summary_max_output_tokens: summaryOutputReserve ?? null,
+      ...(options.automatic ? {
+        automatic_retention_policy: "bounded_emergency_v2",
+        automatic_summary_policy: "pending_edit_source_recall_v2",
+      } : {}),
       direction,
       requested_focus: requestedFocus,
     },
@@ -416,7 +427,10 @@ async function compactConversationTransactionBody(
     (_, index) => !selectedIndexes.has(index),
   );
   const plan = buildCompactionMapReducePlan(selected.messages, {
-    context,
+    context: {
+      ...context,
+      options: { ...context.options, maxOutputTokens: summaryOutputReserve },
+    },
     source: prepared.source,
     systemPrompts: policyMaterial,
     requestedFocus,
@@ -755,13 +769,14 @@ function readCompactionPermissionMode(
 }
 
 /**
- * The effort the session's next main-loop turn sends. A turn resolves it
- * under the session's own settings authority, which Session.runTurn binds.
+ * Resolve under the session's own settings authority, which Session.runTurn binds.
  * A compaction can run outside a turn with no authority bound (the daemon's
  * manual compaction), so it binds the session's here.
+ * Automatic summaries cap that resolved level without changing session settings.
  */
 function resolveSummaryReasoningEffort(
   session: NonNullable<CompactContext["admissionSession"]>,
+  automatic: boolean,
 ): LLMChatOptions["reasoningEffort"] {
   const resolve = () =>
     resolveMainLoopReasoningEffort(session, {
@@ -770,9 +785,21 @@ function resolveSummaryReasoningEffort(
       modelInfo: session.modelInfo,
     });
   const configStore = session.services.configStore;
-  return configStore === undefined
+  const effort = configStore === undefined
     ? resolve()
     : runWithCanonicalSettingsAuthority(configStore, resolve);
+  if (!automatic || effort === undefined || effort === "none" ||
+      effort === "minimal" || effort === "low") return effort;
+  const contract = resolveReasoningEffort({
+    provider: session.services.provider.name,
+    model: session.config?.model ?? session.modelInfo.slug,
+  });
+  const levels = session.modelInfo.supportedReasoningLevels ?? contract.levels;
+  // Use an accepted level, never an invented provider enum or an opt-out.
+  if (levels.includes("low")) return "low";
+  if (levels.includes("medium")) return "medium";
+  if (levels.includes("high")) return "high";
+  return effort;
 }
 
 function mergeCompactionFocus(

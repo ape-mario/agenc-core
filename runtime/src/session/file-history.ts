@@ -207,6 +207,8 @@ export interface FileHistoryOptions {
   readonly sessionId?: string;
   readonly maxSnapshots?: number;
   readonly enabled?: boolean;
+  /** Serialize journal diagnostics with canonical compaction. */
+  readonly withCanonicalBackgroundWork?: <T>(work: () => T | Promise<T>) => Promise<T>;
   readonly onDiagnostic?: (d: {
     readonly cause: string;
     readonly message: string;
@@ -244,6 +246,8 @@ export class FileHistory {
   private readonly degraded: DegradedStore<DeferredBackup>;
   private readonly statePath: string | undefined;
   private pending: Promise<void> = Promise.resolve();
+  private pendingDiagnostics: Promise<void> = Promise.resolve();
+  private readonly withCanonicalBackgroundWork: FileHistoryOptions["withCanonicalBackgroundWork"];
 
   constructor(opts: FileHistoryOptions) {
     this.projectDir = opts.projectDir;
@@ -254,6 +258,7 @@ export class FileHistory {
     this.maxSnapshots = opts.maxSnapshots ?? MAX_SNAPSHOTS;
     this.enabled = opts.enabled !== false;
     this.onDiagnostic = opts.onDiagnostic;
+    this.withCanonicalBackgroundWork = opts.withCanonicalBackgroundWork;
     this.degraded = new DegradedStore<DeferredBackup>({
       capacity: 500,
       flushFn: async (entries) => this.replayDegraded(entries),
@@ -309,7 +314,10 @@ export class FileHistory {
     }
   }
 
-  async flush(): Promise<void> { await this.pending; }
+  async flush(): Promise<void> {
+    await this.pending;
+    await this.pendingDiagnostics;
+  }
 
   private enqueue(operation: () => Promise<void>): Promise<void> {
     const next = this.pending.then(operation);
@@ -317,6 +325,12 @@ export class FileHistory {
       this.emitDiagnostic({ cause: "file_history_save_failed", message: String(err) });
     });
     return this.pending;
+  }
+
+  private runCanonicalWork<T>(work: () => T | Promise<T>): Promise<T> {
+    return this.withCanonicalBackgroundWork === undefined
+      ? Promise.resolve().then(work)
+      : this.withCanonicalBackgroundWork(work);
   }
 
   private async persistState(): Promise<void> {
@@ -658,7 +672,17 @@ export class FileHistory {
   }
 
   private emitDiagnostic(d: { cause: string; message: string }): void {
-    this.onDiagnostic?.(d);
+    if (this.withCanonicalBackgroundWork === undefined) {
+      this.onDiagnostic?.(d);
+      return;
+    }
+    // Filesystem backups keep their existing scheduling. Only publication
+    // writes the parent journal, so defer it until the canonical owner is free.
+    this.pendingDiagnostics = this.pendingDiagnostics.then(() =>
+      this.runCanonicalWork(() => { this.onDiagnostic?.(d); }));
+    // flush/stop observes delivery errors; asynchronous snapshot callbacks
+    // must not leave an unhandled rejection while that drain is pending.
+    void this.pendingDiagnostics.catch(() => {});
   }
 
   /**

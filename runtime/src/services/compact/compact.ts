@@ -251,7 +251,8 @@ async function compactConversationImpl(
   // compatible endpoint 400s on an orphaned tool message).
   const candidateSplit = Math.max(0, summaryInputMessages.length - keepCount);
   const toolPairSafeSplitIndex = automatic
-    ? automaticCompactionSplit(messages, getEffectiveContextWindowSize(context), options.keepCount === 0, context.liveUserMessageId)
+    ? automaticCompactionSplit(messages, getEffectiveContextWindowSize(context), options.keepCount === 0,
+        context.liveUserMessageId, options.summarizer === undefined ? 2 : 1)
     : resolveAtomicSliceIndex(summaryInputMessages, candidateSplit);
   const splitIndex = moveSplitBeforeAgentInvocation(
     summaryInputMessages,
@@ -423,7 +424,10 @@ function chooseKeepCount(messages: readonly RuntimeMessage[]): number {
   return Math.min(4, Math.max(1, Math.floor(messages.length * 0.2)));
 }
 
-/** Keep the two newest current-step exchanges even in degraded tiers. Older exchanges
+/** Keep recent current-step exchanges. The emergency tier guarantees the newest
+ * complete exchange and budgets the preceding one; its older results become
+ * quoted evidence rather than keeping unbounded, already-consumed reasoning.
+ * Standard and aggressive summaries retain both exchanges unconditionally. Older exchanges
  * share a bounded tail budget; the canonical seal length accounts for results
  * whose live body has already been replaced by an in-memory marker. Oversized
  * results are bounded/offloaded at the tool execution boundary, before sealing.
@@ -433,6 +437,7 @@ export function automaticCompactionSplit(
   contextWindow: number,
   degraded = false,
   liveUserMessageId?: string,
+  minimumRecentExchanges: 1 | 2 = 2,
 ): number {
   if (messages.length === 0) return 0;
   const beforeExchange = (candidate: number): number => {
@@ -451,21 +456,24 @@ export function automaticCompactionSplit(
   // than replacing the still-needed result with an emergency digest.
   const precedingToolIndex = messages.findLastIndex((message, index) =>
     index < split && index > liveUserIndex && isToolRoleMessage(message));
-  if (precedingToolIndex >= 0) split = beforeExchange(precedingToolIndex);
-  if (degraded) return split;
-  const budgetBytes = Math.floor(contextWindow * 0.4 * 2);
+  if (precedingToolIndex >= 0 && minimumRecentExchanges === 2) split = beforeExchange(precedingToolIndex);
+  if (degraded && minimumRecentExchanges === 2) return split;
   const messageBytes = (message: RuntimeMessage): number =>
     (message.runtimeOnly?.toolResultIntegrity?.persisted.byteLength ??
       Buffer.byteLength(JSON.stringify(message.content ?? message.message?.content ?? ""), "utf8")) +
     Buffer.byteLength(JSON.stringify(message.toolCalls ?? []), "utf8") +
     Buffer.byteLength(message.providerReasoningContent ?? "", "utf8");
+  const budgetBytes = Math.floor(Math.min(contextWindow * 0.4 * 2,
+    degraded ? messages.reduce((sum, message) => sum + messageBytes(message), 0) * 0.4 : Infinity));
   let bytes = messages.slice(split).reduce((sum, message) => sum + messageBytes(message), 0);
   while (split > 0 && messages.length - split < 12) {
     const previous = beforeExchange(split - 1);
+    if (degraded && (precedingToolIndex < 0 || previous <= liveUserIndex)) break;
     const extra = messages.slice(previous, split).reduce((sum, message) => sum + messageBytes(message), 0);
     if (bytes + extra > budgetBytes) break;
     bytes += extra;
     split = previous;
+    if (degraded) break;
   }
   return split;
 }

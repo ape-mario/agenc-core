@@ -22,6 +22,10 @@ import {
   type FileHistorySnapshot,
 } from "./file-history.js";
 import type { RolloutItem } from "./rollout-item.js";
+import {
+  acquireCanonicalCompactionLease,
+  withCanonicalBackgroundWork,
+} from "../../src/session/canonical-background-work.js";
 
 let previousAgencHome: string | undefined;
 
@@ -49,6 +53,34 @@ describe("FileHistory (I-28)", () => {
   });
   afterEach(() => {
     if (project) rmSync(project, { recursive: true, force: true });
+  });
+
+  test("defers snapshot diagnostics while compaction owns the journal", async () => {
+    const key = join(project, "rollout#epoch:1");
+    const directory = join(project, "new-scene");
+    const events: string[] = [];
+    const history = new FileHistory({
+      projectDir: project,
+      onDiagnostic: (diagnostic) => { events.push(diagnostic.cause); },
+      withCanonicalBackgroundWork: (work) => withCanonicalBackgroundWork(key, work),
+    });
+    // Shell tracking can record a nonexistent path that becomes a directory.
+    await history.trackEdit(directory, "before");
+    mkdirSync(directory);
+    const lease = await acquireCanonicalCompactionLease(key, () => new Error("busy"));
+    await history.makeSnapshot("after");
+    // Real filesystem work finished, but its EISDIR warning cannot enter
+    // the intent-to-commit window. The sidecar drain waits for publication.
+    expect(history.getState().snapshots.at(-1)?.messageId).toBe("after");
+    expect(events).toEqual([]);
+    let flushed = false;
+    const drain = history.flush().then(() => { flushed = true; });
+    await Promise.resolve();
+    expect(flushed).toBe(false);
+    lease.release();
+    await drain;
+    expect(events).toEqual(["file_history_snapshot_failed"]);
+    history.stop();
   });
 
   test("resumes published barriers without overwriting origins or another session", async () => {
