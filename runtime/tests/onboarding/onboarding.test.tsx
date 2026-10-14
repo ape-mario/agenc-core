@@ -277,7 +277,7 @@ describe("first-run onboarding wizard", () => {
     let state = createInitialFirstRunOnboardingState(context);
 
     expect(firstRunOnboardingInputPresentation(state)).toMatchObject({
-      placeholder: "Enter keeps dark",
+      placeholder: "Enter keeps olive",
       allowEmptySubmit: true,
     });
     state = (await submitFirstRunOnboardingInput(state, "", context)).state;
@@ -2438,7 +2438,7 @@ describe("model access checks in place", () => {
     };
     expect(detailLinesForStep(state, context)).toEqual([
       "AgenC is set up for this machine.",
-      "Theme: dark",
+      "Theme: olive",
       "Model: grok / grok-4.6",
       "Access: not set up yet",
       "Mode: default, asks before tools that need it",

@@ -48,7 +48,8 @@ vi.mock("../../../utils/settings/settings.js", () => ({
   updateSettingsForSource: mocks.updateSettingsForSource,
 }));
 
-vi.mock("../../../utils/terminalBackground.js", () => ({
+vi.mock("../../../utils/terminalBackground.js", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   getTerminalBackground: mocks.getTerminalBackground,
 }));
 

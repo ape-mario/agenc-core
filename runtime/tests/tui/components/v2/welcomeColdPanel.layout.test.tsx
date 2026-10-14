@@ -43,10 +43,11 @@ describe('WelcomeColdPanel layout', () => {
     )
   })
 
-  // Monochrome-theme SGR truecolor sequences.
-  const INACTIVE_SGR = '\u001b[38;2;112;112;112m'
-  const SECONDARY_SGR = '\u001b[38;2;178;178;178m'
-  const INK_SGR = '\u001b[38;2;255;255;255m'
+  // Default (olive) theme SGR truecolor sequences for the same roles:
+  // inactive, secondary text and primary ink.
+  const INACTIVE_SGR = '\u001b[38;2;143;141;114m'
+  const SECONDARY_SGR = '\u001b[38;2;201;193;172m'
+  const INK_SGR = '\u001b[38;2;235;227;208m'
 
   // Adjacent Ink Text nodes may insert reset/style SGR codes between the
   // foreground color and the label. Read the last foreground SGR before it.

@@ -1237,7 +1237,9 @@ export function defaultConfig(): AgenCConfig {
     // `autoUpdates` is intentionally not defaulted. An absent operator setting
     // means enabled; every consumer reads the effective ConfigStore snapshot.
     tui: Object.freeze({
-      theme: "dark",
+      // Owner choice for 0.19: olive, cream and wine. "dark" stays the
+      // classic black and purple theme for anyone who picks it.
+      theme: "olive",
       showTurnDuration: true,
       terminalProgressBarEnabled: true,
       copyOnSelect: true,
