@@ -3158,7 +3158,9 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
 
   test("refreshes MCP clients and tools when same-metadata objects are replaced", async () => {
     const { AgenCTuiApp } = await import("./App.js");
-    let notifySessionEvent: (() => void) | undefined;
+    // Real session notifications fan out to MCP, compaction and other views.
+    // Keeping only the last subscriber makes unrelated new views hide updates.
+    const sessionEventListeners = new Set<() => void>();
     let generation = 0;
     const firstClient = {
       name: "files",
@@ -3195,8 +3197,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     const session = {
       ...createSession(),
       subscribeToEvents: vi.fn((callback: () => void) => {
-        notifySessionEvent = callback;
-        return () => {};
+        sessionEventListeners.add(callback);
+        return () => { sessionEventListeners.delete(callback); };
       }),
       listMcpClients: vi.fn(() => clientGenerations[generation]),
       listMcpTools: vi.fn(() => toolGenerations[generation]),
@@ -3224,7 +3226,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
         expect(context.options.tools).toContain(firstTool);
 
         generation = 1;
-        notifySessionEvent?.();
+        for (const listener of [...sessionEventListeners]) listener();
         await new Promise((resolve) => setTimeout(resolve, 25));
 
         promptProps = providerProbe.promptProps.at(-1)!;

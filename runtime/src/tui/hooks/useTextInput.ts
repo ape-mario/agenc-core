@@ -180,6 +180,9 @@ export function useTextInput({
     () => {
       const currentValue = getLiveValue()
       if (currentValue) {
+        if (currentValue.trim() !== '') {
+          addToHistory(currentValue)
+        }
         updateRenderedInput('', 0)
         onChange('')
         onOffsetChange(0)

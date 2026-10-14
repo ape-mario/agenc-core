@@ -3425,7 +3425,7 @@ function PromptInput({
     maxVisibleLines,
     disableCursorMovementForUpDownKeys:
       suggestions.length > 0 || !!footerItemSelected,
-    disableEscapeDoublePress: suggestions.length > 0,
+    disableEscapeDoublePress: suggestions.length > 0 || isLoading,
     cursorOffset,
     onChangeCursorOffset: setCurrentCursorOffset,
     onPaste: onTextPaste,
