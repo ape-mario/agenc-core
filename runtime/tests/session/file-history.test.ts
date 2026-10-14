@@ -51,6 +51,32 @@ describe("FileHistory (I-28)", () => {
     if (project) rmSync(project, { recursive: true, force: true });
   });
 
+  test("resumes published barriers without overwriting origins or another session", async () => {
+    const file = join(project, "durable.txt");
+    writeFileSync(file, "original\n");
+    const first = new FileHistory({ projectDir: project, sessionId: "first" });
+    await first.makeSnapshot("before-edit");
+    await first.trackEdit(file, "edit");
+    writeFileSync(file, "changed\n");
+    await first.makeSnapshot("after-edit");
+    first.stop();
+    const other = new FileHistory({ projectDir: project, sessionId: "other" });
+    await other.trackEdit(file, "other-edit");
+    other.stop();
+    const resumed = new FileHistory({ projectDir: project, sessionId: "first" });
+    await resumed.loadFromDisk();
+    expect((await resumed.previewRewind("before-edit"))?.filesChanged).toEqual([file]);
+    await resumed.rewindToMessage("before-edit");
+    expect(readFileSync(file, "utf8")).toBe("original\n");
+    await resumed.makeSnapshot("restored");
+    await resumed.trackEdit(file, "again");
+    writeFileSync(file, "another\n");
+    await resumed.makeSnapshot("after-again");
+    await resumed.rewindToMessage("after-edit");
+    expect(readFileSync(file, "utf8")).toBe("changed\n");
+    resumed.stop();
+  });
+
   test("trackEdit creates v1 backup of tracked file", async () => {
     const file = join(project, "src.txt");
     writeFileSync(file, "original", "utf8");
