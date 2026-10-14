@@ -5091,6 +5091,31 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     }
   });
 
+  test("auto-drains only queued content and preserves the live composer draft and attachments", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const { enqueue, getSoleActiveCommandQueueOwnerForTesting, resetCommandQueueForTesting } =
+      await import("../../utils/messageQueueManager.js");
+    const submit = vi.fn(async () => {});
+    const admission = vi.fn(() => ({ token: "queued-admission" }));
+    const session = { ...createSession(), submit, enqueueIdleInputBatchOwned: admission };
+    const draft = "unsent draft with cursor still inside";
+    const attachment = { 9: { id: 9, type: "text", content: "private unsent attachment" } };
+    resetCommandQueueForTesting();
+    try {
+      await withRenderedApp(<AgenCTuiApp session={session as any} isInteractive={false} />, async () => {
+        (providerProbe.promptProps.at(-1)!.onInputChange as (value: string) => void)(draft);
+        (providerProbe.promptProps.at(-1)!.setPastedContents as (value: unknown) => void)(attachment);
+        await vi.waitFor(() => expect(providerProbe.promptProps.at(-1)!.input).toBe(draft));
+        enqueue({ value: "queued prompt only", mode: "prompt", queueOwner: getSoleActiveCommandQueueOwnerForTesting() });
+        await vi.waitFor(() => expect(submit).toHaveBeenCalled());
+        expect(submit).toHaveBeenCalledWith("queued prompt only", expect.anything());
+        expect(admission).not.toHaveBeenCalled();
+        expect(providerProbe.promptProps.at(-1)!.input).toBe(draft);
+        expect(providerProbe.promptProps.at(-1)!.pastedContents).toEqual(attachment);
+      });
+    } finally { resetCommandQueueForTesting(); }
+  });
+
   test("queues slash command prompt results for next-turn drain", async () => {
     const { enqueueSlashPromptResult } = await import("./App.js");
     const { getCommandQueueSnapshot, resetCommandQueueForTesting } =
