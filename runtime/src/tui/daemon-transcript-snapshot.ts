@@ -85,7 +85,9 @@ export function daemonTranscriptSnapshotEvents(
       event: {
         id: `snapshot:${snapshot.historyEpoch}:${message.messageId}`,
         type: message.role === "user" ? "user_message" : "agent_message",
-        payload: { message: message.text },
+        payload: { message: message.text,
+          ...(message.role === "user"
+            ? { canonicalUserMessageId: message.clientMessageId ?? message.messageId } : {}) },
       } satisfies JsonObject,
     };
   });
@@ -146,6 +148,14 @@ export function daemonTranscriptSnapshotEvents(
       type: "turn_started",
       payload: { turnId: snapshot.activeTurn.turnId },
     });
+  }
+  if (snapshot.activeUserMessageIds !== undefined) {
+    if (!Array.isArray(snapshot.activeUserMessageIds) ||
+        snapshot.activeUserMessageIds.some((id) => typeof id !== "string")) {
+      throw new Error("Daemon returned invalid active user identities");
+    }
+    transcript.push({ id: `snapshot:${snapshot.historyEpoch}:active-users:${snapshot.asOfSequence}`,
+      type: "active_conversation", payload: { activeUserMessageIds: snapshot.activeUserMessageIds } });
   }
   return transcript;
 }

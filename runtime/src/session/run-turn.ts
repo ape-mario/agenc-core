@@ -2290,7 +2290,7 @@ async function* runTurnKernelInner(
       responseItemId: seedUserMessageId,
     };
   }
-  const liveSeedRequestId = seedUserMessageId ?? (opts.resume === undefined
+  const liveSeedRequestId = seedUserMessageId ?? user.runtimeOnly?.responseItemId ?? (opts.resume === undefined
     ? `user-request-${crypto.randomUUID()}` : undefined);
   if (liveSeedRequestId !== undefined) {
     user.runtimeOnly = { ...user.runtimeOnly, responseItemId: liveSeedRequestId };

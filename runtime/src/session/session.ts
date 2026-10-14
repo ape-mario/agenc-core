@@ -2133,7 +2133,7 @@ function lastTextBlock(content: LLMMessage["content"]): string {
   return "";
 }
 
-function isSelectableHistoryUserMessage(message: LLMMessage): boolean {
+export function isSelectableHistoryUserMessage(message: LLMMessage): boolean {
   if (message.role !== "user") return false;
   if (isHiddenGoalContinuation(message)) return false;
   const invocationChannel = message.runtimeOnly?.agentInvocation;

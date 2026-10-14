@@ -29,7 +29,7 @@ import type { FpsMetrics } from "../../utils/fpsTracker.js";
 import { Messages } from "./Messages.js";
 import {
   MessageSelector,
-  selectableUserMessagesFilter,
+  selectableMessageOrdinal,
 } from "./MessageSelector.js";
 import { ExitFlow } from "./ExitFlow.js";
 import PromptInput from "./PromptInput/PromptInput.js";
@@ -4436,10 +4436,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           "Conversation rewind is not supported by this session.",
         );
       }
-      const selectableMessages = (transcript.messages as any[]).filter(
-        selectableUserMessagesFilter as any,
-      );
-      const messageOrdinal = selectableMessages.indexOf(message_1);
+      const messageOrdinal = selectableMessageOrdinal(transcript.messages as any[], message_1);
       if (messageOrdinal === -1) {
         throw new Error("The selected message is no longer available.");
       }
@@ -4464,10 +4461,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   );
   const resolveSelectableMessageOrdinal = useCallback(
     (message: any): number => {
-      const selectableMessages = (transcript.messages as any[]).filter(
-        selectableUserMessagesFilter as any,
-      );
-      return selectableMessages.indexOf(message);
+      return selectableMessageOrdinal(transcript.messages as any[], message);
     },
     [transcript.messages],
   );
@@ -4534,10 +4528,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           "Conversation summarization is not supported by this session.",
         );
       }
-      const selectableMessages_0 = (transcript.messages as any[]).filter(
-        selectableUserMessagesFilter as any,
-      );
-      const messageOrdinal_0 = selectableMessages_0.indexOf(message_3);
+      const messageOrdinal_0 = selectableMessageOrdinal(transcript.messages as any[], message_3);
       if (messageOrdinal_0 === -1) {
         throw new Error("The selected message is no longer available.");
       }

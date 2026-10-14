@@ -519,6 +519,8 @@ export interface PermissionDecisionEvent {
 }
 
 export interface ContextCompactedEvent {
+  /** Canonical selectable root-user IDs in the committed conversation order. */
+  readonly activeUserMessageIds?: readonly string[];
   readonly turnId?: string;
   readonly summary?: string;
   readonly preCompactTokens?: number;

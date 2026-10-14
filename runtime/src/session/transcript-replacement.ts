@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { LLMMessage } from "../llm/types.js";
 import { isHiddenGoalContinuation } from "./hidden-goal-history.js";
+import { isAuthenticatedCompactionBoundary } from "./compaction-history-marker.js";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | {
@@ -44,9 +45,12 @@ export function createHistoryReplacedEvent(params: {
 function llmHistoryToRuntimeTranscriptMessages(
   history: readonly LLMMessage[],
 ): RuntimeTranscriptMessage[] {
-  return history.flatMap((message, index) =>
-    llmMessageToRuntimeTranscriptMessages(message, index),
-  );
+  const boundaryIndex = history.findLastIndex(isAuthenticatedCompactionBoundary);
+  return history.flatMap((message, index) => {
+    const projected = llmMessageToRuntimeTranscriptMessages(message, index);
+    return index <= boundaryIndex && message.role === "user"
+      ? projected.map((row) => ({ ...row, isVisibleInTranscriptOnly: true })) : projected;
+  });
 }
 
 function llmMessageToRuntimeTranscriptMessages(
@@ -121,6 +125,8 @@ function makeUserMessage(
     ...(isCompactSummary ? { isCompactSummary: true } : {}),
     ...(marker === undefined ? {} : { compactionHistory: marker }),
     uuid: `history-user-${index}`,
+    ...(source.runtimeOnly?.responseItemId !== undefined
+      ? { canonicalUserMessageId: source.runtimeOnly.responseItemId } : {}),
     timestamp: new Date(0).toISOString(),
   };
 }

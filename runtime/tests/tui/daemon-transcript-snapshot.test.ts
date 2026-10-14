@@ -7,6 +7,7 @@ import {
   resolveDaemonTranscriptTextArtifacts,
 } from "../../src/tui/daemon-transcript-snapshot.js";
 import { adaptTranscriptEvents } from "../../src/tui/session-transcript.js";
+import { selectableMessageOrdinal, selectableUserMessagesFilter } from "../../src/tui/components/message-selector-filter.js";
 
 function snapshot(overrides: Partial<SessionTranscriptV2Result> = {}): SessionTranscriptV2Result {
   return {
@@ -44,6 +45,19 @@ function covers(state: SessionTranscriptV2Result, sequence: number, type: string
 }
 
 describe("daemon transcript snapshot", () => {
+  it("binds cold snapshot selectors to canonical active user identities without a fake compaction notice", () => {
+    const state = snapshot({ activeUserMessageIds: ["user_1"] });
+    const transcript = adaptTranscriptEvents(daemonTranscriptSnapshotEvents({
+      ...state, messages: [{ messageId: "archived", commitEventId: "event:0", role: "user", text: "Archived request", committedSequence: 0 }, ...state.messages],
+    }, "session_1"));
+    const users = transcript.messages.filter(selectableUserMessagesFilter);
+    expect(users).toHaveLength(1);
+    expect(users[0].canonicalUserMessageId).toBe("user_1");
+    expect(selectableMessageOrdinal(transcript.messages, users[0])).toBe(0);
+    expect(JSON.stringify(transcript.messages)).toContain("Archived request");
+    expect(JSON.stringify(transcript.messages)).not.toContain("Context compacted");
+    expect(() => daemonTranscriptSnapshotEvents(snapshot({ activeUserMessageIds: [3] as never }), "session_1")).toThrow(/invalid active user/u);
+  });
   it("fetches every chunk of an oversized answer before restoring it", async () => {
     const answer = "Answer with detail. ".repeat(35_000);
     const bytes = Buffer.from(answer);

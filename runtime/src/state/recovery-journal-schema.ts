@@ -985,6 +985,7 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
   context_compacted: objectShape(
     {},
     {
+      activeUserMessageIds: isStringArray,
       turnId: isString,
       summary: isString,
       preCompactTokens: isNumber,

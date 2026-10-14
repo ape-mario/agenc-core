@@ -142,6 +142,7 @@ import type {
   PreparedSessionProviderSwitch,
   Session,
 } from "../session/session.js";
+import { isSelectableHistoryUserMessage, normalizeHistoryMessages, splitActiveHistory } from "../session/session.js";
 import type { Event } from "../session/event-log.js";
 import { respondToSessionElicitation } from "../elicitation/respond.js";
 import type {
@@ -3430,7 +3431,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     const submission = active.messageSubmission;
     const liveTurnId =
       submission?.turnId ?? runtimeActiveTurnId(active.bootstrap.session);
-    return sessionTranscriptV2FromRollout(
+    const snapshot = sessionTranscriptV2FromRollout(
       active.bootstrap.rolloutStore.readAll(),
       params.sessionId,
       active.thread.threadId,
@@ -3446,6 +3447,15 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       active.bootstrap.rolloutStore.store?.sessionDir,
       { includeCompleteMessages: params.includeCompleteMessages },
     );
+    const state = active.bootstrap.session.state?.unsafePeek?.() as { history?: unknown[] } | undefined;
+    if (!Array.isArray(state?.history)) return snapshot;
+    const activeUserMessageIds = splitActiveHistory(normalizeHistoryMessages(state.history)).activeHistory
+      .filter(isSelectableHistoryUserMessage)
+      .flatMap((message) => typeof message.runtimeOnly?.responseItemId === "string"
+        ? [message.runtimeOnly.responseItemId] : []);
+    const pendingId = snapshot.activeTurn?.clientMessageId;
+    if (pendingId !== undefined && !activeUserMessageIds.includes(pendingId)) activeUserMessageIds.push(pendingId);
+    return { ...snapshot, activeUserMessageIds };
   }
 
   async resolveLiveEffectReview(

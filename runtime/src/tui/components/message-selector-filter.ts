@@ -49,3 +49,10 @@ export function selectableUserMessagesFilter(message: Message): message is UserM
     messageText.indexOf(`<${TEAMMATE_MESSAGE_TAG}`) !== -1
   );
 }
+
+export function selectableMessageOrdinal(messages: readonly Message[], message: UserMessage): number {
+  const visibleOrdinal = messages.filter(selectableUserMessagesFilter).indexOf(message);
+  if (visibleOrdinal < 0) return -1;
+  return Number.isSafeInteger(message.activeConversationOrdinal) && message.activeConversationOrdinal >= 0
+    ? message.activeConversationOrdinal : visibleOrdinal;
+}

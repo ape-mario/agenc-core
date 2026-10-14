@@ -17,7 +17,7 @@ import { unescapeXml } from '../../utils/xml.js';
 import { type OptionWithDescription, Select } from './CustomSelect/select';
 import { Spinner } from './spinner/Spinner.js';
 import { selectableUserMessagesFilter } from './message-selector-filter.js';
-export { selectableUserMessagesFilter } from './message-selector-filter.js';
+export { selectableUserMessagesFilter, selectableMessageOrdinal } from './message-selector-filter.js';
 type MessageSelectorTextBlock = {
   type: 'text';
   text: string;

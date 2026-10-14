@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { selectableUserMessagesFilter } from "./components/message-selector-filter.js";
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
 import { getInkInstance } from "./ink/instances.js";
 
@@ -1911,6 +1912,7 @@ export function adaptTranscriptEvents(
   const interruptionNotices = new Set<string>();
   let admissionCancellationNoticeUuid: string | null = null;
   let pendingTaskBudgetNotice: { message: string; uuid: string } | null = null;
+  let nextActiveUserOrdinal: number | undefined;
 
   const flushPendingTaskBudgetNotice = (): void => {
     if (pendingTaskBudgetNotice !== null) {
@@ -1977,6 +1979,7 @@ export function adaptTranscriptEvents(
         sessionUsage = latestSessionUsage(sessionUsage, event);
         break;
       case "history_cleared":
+        nextActiveUserOrdinal = undefined;
         pendingTaskBudgetNotice = null;
         out.length = 0;
         seen.clear();
@@ -2004,6 +2007,7 @@ export function adaptTranscriptEvents(
         isStreaming = false;
         break;
       case "history_replaced": {
+        nextActiveUserOrdinal = undefined;
         pendingTaskBudgetNotice = null;
         out.length = 0;
         seen.clear();
@@ -2252,7 +2256,7 @@ export function adaptTranscriptEvents(
           );
         }
         break;
-      case "user_message":
+      case "user_message": {
         flushPendingTaskBudgetNotice();
         interruptionNotices.clear();
         admissionCancellationNoticeUuid = null;
@@ -2270,8 +2274,16 @@ export function adaptTranscriptEvents(
           if (directShellErrorCallIds.has(payload.queuedCommandUuid) &&
               typeof text === "string" && text.startsWith("<bash-stdout>")) break;
         }
-        out.push(makeUserMessage(payload.displayText ?? payload.message, nextUuid()));
+        const userMessage = {
+          ...makeUserMessage(payload.displayText ?? payload.message, nextUuid()),
+          canonicalUserMessageId: payload.canonicalUserMessageId ?? payload.messageId ?? payload.queuedCommandUuid ?? (raw as { id?: string }).id,
+        };
+        if (nextActiveUserOrdinal !== undefined && selectableUserMessagesFilter(userMessage)) {
+          userMessage.activeConversationOrdinal = nextActiveUserOrdinal++;
+        }
+        out.push(userMessage);
         break;
+      }
       case "queued_command":
         if (
           typeof payload.uuid === "string" &&
@@ -2729,9 +2741,25 @@ export function adaptTranscriptEvents(
         clearSuppressedStreamingToolInput(callId);
         break;
       }
-      case "context_compacted":
-        out.push(makeSystemMessage(typeof payload.displayText === "string" ? payload.displayText : "Context compacted", "info", nextUuid()));
+      case "active_conversation":
+      case "context_compacted": {
+        if (Array.isArray(payload.activeUserMessageIds) &&
+            payload.activeUserMessageIds.every((id: unknown) => typeof id === "string")) {
+          const ids = payload.activeUserMessageIds as string[];
+          for (let i = 0; i < out.length; i++) {
+            const message = out[i];
+            if (message?.type !== "user" || message.isMeta || message.isCompactSummary) continue;
+            const ordinal = ids.indexOf(message.canonicalUserMessageId);
+            out[i] = { ...message, isVisibleInTranscriptOnly: ordinal < 0,
+              activeConversationOrdinal: ordinal < 0 ? undefined : ordinal };
+          }
+          nextActiveUserOrdinal = ids.length;
+        }
+        if (event.type === "context_compacted") {
+          out.push(makeSystemMessage(typeof payload.displayText === "string" ? payload.displayText : "Context compacted", "info", nextUuid()));
+        }
         break;
+      }
       case "token_count":
         sessionCostUsd += computeUsdCostWithResolution(
           usageFromTokenCountPayload(payload),
