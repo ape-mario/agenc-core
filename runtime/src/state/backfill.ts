@@ -390,6 +390,7 @@ export function withPreparedPinnedRolloutRun<T>(
     readonly projectDir: string;
     readonly sources: readonly BackfillPinnedRolloutSource[];
     readonly threads: StateThreadRepository;
+    readonly canonicalProjectionEpoch?: string;
     readonly limits?: RecoveryFileLimitOverrides;
     readonly descriptorBudget?: RecoveryDescriptorBudget;
     readonly nowMilliseconds?: () => number;
@@ -471,6 +472,7 @@ export function withPreparedPinnedRolloutRun<T>(
                 sources[index]!,
                 journal,
                 metadata[index]!,
+                options.canonicalProjectionEpoch,
               ),
             ),
           );
@@ -563,6 +565,7 @@ function projectPinnedJournal(
     readonly first?: Extract<RolloutItem, { type: "session_meta" }>;
     readonly latest?: Extract<RolloutItem, { type: "session_meta" }>;
   },
+  canonicalProjectionEpoch?: string,
 ): BackfillPinnedRolloutFileResult {
   const threadId = threadIdFromRolloutPath(source.rolloutPath);
   const now = new Date(journal.proof.snapshot.mtimeMs).toISOString();
@@ -578,6 +581,14 @@ function projectPinnedJournal(
     metaForCreate: metadata.first?.payload,
   });
   let itemIndex = 0;
+  // First-pass validation and the digest-anchored replay stay unchanged.
+  // An fsynced exact-file marker lets admission recovery reuse this already
+  // committed projection instead of deleting and inserting it a second time.
+  const canonicalMarker = canonicalProjectionEpoch !== undefined && journal.syncSource !== undefined
+    ? { epoch: canonicalProjectionEpoch, ...journal.syncSource(),
+        size: journal.proof.sourceByteLength, mtimeMs: journal.proof.snapshot.mtimeMs,
+        sha256: journal.proof.sourceSha256 }
+    : undefined;
   threads.replaceRolloutItemsFromProducer({
     threadId,
     sourcePath: source.rolloutPath,
@@ -586,6 +597,7 @@ function projectPinnedJournal(
     size: journal.proof.sourceByteLength,
     sha256: journal.proof.sourceSha256,
     lineCount: journal.proof.physicalLineCount + 1,
+    ...(canonicalMarker !== undefined ? { canonicalMarker } : {}),
     produce: (insert) => {
       replayProof = journal.replay((record) => {
         insert(

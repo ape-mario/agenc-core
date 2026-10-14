@@ -666,6 +666,7 @@ async function runAgenCDaemonForegroundLocked(
       process.cwd(),
       activeConfig,
       (message) => io.stderr.write(`agenc: ${message}\n`),
+      distVersion !== null ? `${distVersion.runtimeVersion}+${distVersion.commit}+${distVersion.buildTime}` : undefined,
     );
     reportAgenCDaemonStartupRecovery(io, startupRecovery);
     writeAgenCDaemonStartupDebug(
@@ -2253,6 +2254,7 @@ export function recoverAgenCDaemonStartupState(
   cwd: string,
   config: AgenCConfig,
   log: (message: string) => void = () => {},
+  canonicalProjectionEpoch?: string,
 ): DaemonStartupRecoveryReport {
   const recoveredAt = new Date().toISOString();
   const paths = discoverExistingAgenCDaemonStateDatabasePaths(daemonHome, cwd);
@@ -2306,6 +2308,7 @@ export function recoverAgenCDaemonStartupState(
           now: () => recoveredAt,
           retainRuntimeResumeSources: true,
           startupResumeSourceBudget,
+          ...(canonicalProjectionEpoch !== undefined ? { canonicalProjectionEpoch } : {}),
         });
         recoveredRuns.push(...report.recoveredRuns);
         recoveredToolCalls.push(...report.recoveredToolCalls);

@@ -3713,6 +3713,7 @@ async function resumeResolvedTUIEntry(
       );
       return 1;
     }
+    process.stderr.write(`Restoring session ${displayId}...\n`);
     const daemonClient = await deps.createConnectedTuiClient();
     let transferred = false;
     try {

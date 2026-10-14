@@ -1205,6 +1205,7 @@ function recoverStrictRun(
         projectDir: driver.projectDir,
         sources,
         threads,
+        ...(strict.canonicalProjectionEpoch !== undefined ? { canonicalProjectionEpoch: strict.canonicalProjectionEpoch } : {}),
         ...(limits !== undefined ? { limits } : {}),
         ...(strict.descriptorBudget !== undefined
           ? { descriptorBudget: strict.descriptorBudget }
@@ -1329,6 +1330,18 @@ function projectRunEvents(
     )
     .all(...sourcePaths);
   validateCanonicalIdentities(identityRows, run.id);
+  // These projection rows are frozen inside the surrounding transaction.
+  // Reuse their exact per-source bounds rather than rescanning the entire
+  // rollout table for every effect/lifecycle event we project.
+  const sourceBounds = new Map<string, SourceBoundsRow>();
+  for (const row of identityRows) {
+    if (row.event_seq === null) continue;
+    const prior = sourceBounds.get(row.source_path);
+    sourceBounds.set(row.source_path, {
+      first_sequence: Math.min(prior?.first_sequence ?? row.event_seq, row.event_seq),
+      last_sequence: Math.max(prior?.last_sequence ?? row.event_seq, row.event_seq),
+    });
+  }
   const rows = identityRows.filter(
     (row): row is ProjectionRow =>
       row.event_id !== null &&
@@ -1368,7 +1381,7 @@ function projectRunEvents(
     const payload = message.payload;
     if (type === "effect_intent") {
       bindSource(
-        driver,
+        sourceBounds,
         repository,
         run.id,
         projectionEpoch,
@@ -1400,7 +1413,7 @@ function projectRunEvents(
         );
       }
       bindSource(
-        driver,
+        sourceBounds,
         repository,
         run.id,
         projectionEpoch,
@@ -1456,7 +1469,7 @@ function projectRunEvents(
         throw invalidEvent(row, run.id, "run_suspended epoch is out of order");
       }
       bindSource(
-        driver,
+        sourceBounds,
         repository,
         run.id,
         projectionEpoch,
@@ -1492,7 +1505,7 @@ function projectRunEvents(
         throw invalidEvent(row, run.id, "run_resumed epoch is out of order");
       }
       bindSource(
-        driver,
+        sourceBounds,
         repository,
         run.id,
         projectionEpoch,
@@ -1544,7 +1557,7 @@ function projectRunEvents(
         );
       }
       bindSource(
-        driver,
+        sourceBounds,
         repository,
         run.id,
         projectionEpoch,
@@ -1579,7 +1592,7 @@ function projectRunEvents(
         );
       }
       bindSource(
-        driver,
+        sourceBounds,
         repository,
         run.id,
         projectionEpoch,
@@ -1621,7 +1634,7 @@ function projectRunEvents(
         "run terminal conflicts with its cancellation request",
       );
     }
-    bindSource(driver, repository, run.id, epoch, row, projectionOpenedAt);
+    bindSource(sourceBounds, repository, run.id, epoch, row, projectionOpenedAt);
     repository.recordTerminalResult({
       epoch,
       result: terminalResult(row, run.id, payload),
@@ -2080,21 +2093,14 @@ function effectReviewResolution(value: unknown): EffectReviewResolution {
 }
 
 function bindSource(
-  driver: StateSqliteDriver,
+  sourceBounds: ReadonlyMap<string, SourceBoundsRow>,
   repository: StateRunDurabilityRepository,
   runId: string,
   epoch: number,
   row: ProjectionRow,
   boundAt: string,
 ): void {
-  const bounds = driver
-    .prepareState<[string], SourceBoundsRow>(
-      `SELECT MIN(event_seq) AS first_sequence,
-              MAX(event_seq) AS last_sequence
-       FROM thread_rollout_items
-       WHERE source_path = ? AND event_seq IS NOT NULL`,
-    )
-    .get(row.source_path);
+  const bounds = sourceBounds.get(row.source_path);
   if (
     bounds?.first_sequence === null ||
     bounds?.first_sequence === undefined ||

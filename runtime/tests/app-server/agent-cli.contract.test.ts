@@ -1915,6 +1915,7 @@ autostart = false
   });
 
   it.each([
+    "agent.create",
     "session.partialCompactFromMessage",
     "session.rewindConversationToMessage",
   ] as const)(
@@ -2285,7 +2286,7 @@ autostart = false
     expect(starts).toHaveLength(1);
     expect(io.stdoutText()).toBe("");
     expect(io.stderrText()).toContain(
-      "Daemon connection closed before response",
+      "Daemon connection closed",
     );
   });
 });

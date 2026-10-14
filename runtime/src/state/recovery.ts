@@ -1,3 +1,4 @@
+import { repairLegacySessionConfiguredQuarantines } from "./legacy-session-configured-recovery.js";
 import type { StateSqliteDriver } from "./sqlite-driver.js";
 import type { JsonObject } from "../app-server/protocol/index.js";
 import type { ToolRecoveryCategory } from "../tools/types.js";
@@ -163,6 +164,7 @@ export function recoverDaemonStateOnStartup(
   driver: StateSqliteDriver,
   options: {
     readonly now?: () => string;
+    readonly canonicalProjectionEpoch?: string;
     readonly retainRuntimeResumeSources?: boolean;
     readonly startupResumeSourceBudget?: StartupResumeSourceBudget;
     /** Test-only race seam after cwd fd open and before pathname reproof. */
@@ -185,6 +187,7 @@ export function recoverDaemonStateOnStartup(
       const incidents = new StateRecoveryIncidentRepository(driver);
       incidents.releaseExpiredLiveSourceDeferrals(recoveredAtMs);
       incidents.releaseExpiredDescriptorPathDeferrals(recoveredAtMs);
+      repairLegacySessionConfiguredQuarantines(driver, recoveredAtMs);
     }
     const preexistingExclusions = loadStartupRecoveryExclusions(driver);
     const startupBudget = new StartupRecoveryBudget();
@@ -197,7 +200,7 @@ export function recoverDaemonStateOnStartup(
     // work merely because the legacy snapshot write did not happen.
     const recoverableProjection = recoverCanonicalRunJournalsOnStartup(driver, {
       recoverableStatuses: RECOVERABLE_AGENT_RUN_STATUSES,
-      strict: { startupBudget },
+      strict: { startupBudget, ...(options.canonicalProjectionEpoch !== undefined ? { canonicalProjectionEpoch: options.canonicalProjectionEpoch } : {}) },
       ...(options.retainRuntimeResumeSources === true
         ? {
             onResumeSource: (source: StartupRunResumeSource) => {

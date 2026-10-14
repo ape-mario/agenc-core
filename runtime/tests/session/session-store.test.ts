@@ -359,6 +359,43 @@ describe("session-store", () => {
     }
   });
 
+  test("descriptor-bound open preserves sequence after a large legacy bootstrap copy", () => {
+    const cwd = mkdtempSync(join(home, "resume-large-bootstrap-cwd-"));
+    mkdirSync(join(cwd, ".git"));
+    const sessionId = "conv-largebootstrap1";
+    const meta = {
+      sessionId, timestamp: "2026-08-19T00:00:00.000Z", cwd,
+      originator: "agenc-cli", agencVersion: "0.2.0",
+    } as const;
+    const seed = new SessionStore({ cwd, sessionId, agencVersion: "0.2.0" });
+    seed.open(meta);
+    seed.close();
+    const initialMessages = [{ type: "agent_message", payload: {
+      message: "a".repeat(4 * 1024 * 1024 + 1024),
+    } }];
+    const configured = JSON.stringify({ type: "event_msg", payload: {
+      id: "bootstrap", msg: { type: "session_configured", payload: {
+        sessionId, model: "m", modelProviderId: "p", cwd,
+        historyLogId: 0, historyEntryCount: 1, initialMessages,
+      } }, eventId: "bootstrap", seq: 1,
+    } }) + "\n";
+    writeFileSync(seed.rolloutPath, configured, { flag: "a" });
+    const before = readFileSync(seed.rolloutPath);
+    const resumed = new SessionStore({
+      cwd, sessionId, agencVersion: "0.2.0", resume: true,
+      resumeRolloutPath: seed.rolloutPath,
+    });
+    resumed.open(meta);
+    resumed.append({
+      id: "next", eventId: "next", seq: 2,
+      msg: { type: "agent_message", payload: { message: "next reply" } },
+    }, { durable: true });
+    resumed.close();
+    const after = readFileSync(seed.rolloutPath);
+    expect(after.subarray(0, before.length)).toEqual(before);
+    expect(after.subarray(before.length).toString()).toContain('"seq":2');
+  });
+
   test("descriptor handoff never treats a missing resume path as a fresh rollout", () => {
     const cwd = mkdtempSync(join(home, "resume-handoff-missing-cwd-"));
     mkdirSync(join(cwd, ".git"));

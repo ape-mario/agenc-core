@@ -87,7 +87,6 @@ import {
   SESSION_LIFECYCLE_SHUTDOWN_BUDGET_MS,
   shutdownSessionLifecycle,
 } from "../session/lifecycle.js";
-import type { EventMsg } from "../session/event-log.js";
 import type { RolloutItem } from "../session/rollout-item.js";
 import type { RunResumeReason } from "../contracts/run-contracts.js";
 import { AgentControl } from "../agents/control.js";
@@ -468,17 +467,6 @@ function transcriptEventsFromRollout(
   return out;
 }
 
-function transcriptMessagesFrom(
-  events: ReadonlyArray<BootstrapTranscriptEvent>,
-): EventMsg[] {
-  return events.filter((event) => event.type !== "session_configured").map(
-    (event) =>
-      ({
-        type: event.type,
-        payload: event.payload,
-      }) as EventMsg,
-  );
-}
 
 /**
  * Map operator `max_turns` (schema / TOML) onto turn-loop `maxTurns`.
@@ -1655,7 +1643,6 @@ async function bootstrapLocalRuntimeSessionScoped(
       : {}),
   };
   let initialTranscriptEvents: readonly BootstrapTranscriptEvent[] = [];
-  let initialMessages: ReadonlyArray<EventMsg> = [];
 
   const sessionProjectRootMarkers = startup.config.project_root_markers;
   const ownedExecutionAdmissionKernel =
@@ -1923,7 +1910,7 @@ async function bootstrapLocalRuntimeSessionScoped(
       ...(options.deferAgentStartupSideEffects === true
         ? { deferOrdinaryStartup: true }
         : {}),
-      // Lazy payload — `rolloutPath`, `initialMessages`, and
+      // Lazy payload — `rolloutPath` and
       // `historyEntryCount` are populated inside the before-hook when
       // the rollout store mounts and resume-history reconstruction
       // updates `initialState`.
@@ -1934,7 +1921,10 @@ async function bootstrapLocalRuntimeSessionScoped(
         cwd: workspaceRoot,
         historyLogId: 0,
         historyEntryCount: initialState.history.length,
-        initialMessages,
+        // The transcript is already canonical and supplied separately to the
+        // TUI. Copying it into every resume's metadata row creates unbounded
+        // duplicates and eventually exceeds the strict record ceiling.
+        initialMessages: [],
         ...(rolloutStoreForReturn !== null
           ? { rolloutPath: rolloutStoreForReturn.rolloutPath }
           : {}),
@@ -2104,7 +2094,6 @@ async function bootstrapLocalRuntimeSessionScoped(
               ...existingItems,
               ...reconstruction.synthesizedEvents,
             ]);
-            initialMessages = transcriptMessagesFrom(initialTranscriptEvents);
             s.setInitialTranscriptEvents(initialTranscriptEvents);
             copyPlanForResume(
               { sessionId: conversationId, agencHome },
@@ -2263,7 +2252,7 @@ async function bootstrapLocalRuntimeSessionScoped(
               cwd: workspaceRoot,
               historyLogId: 0,
               historyEntryCount: initialState.history.length,
-              initialMessages,
+              initialMessages: [],
               ...(rolloutPath !== undefined ? { rolloutPath } : {}),
             },
           },
