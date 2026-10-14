@@ -3763,7 +3763,9 @@ describe("AgenC daemon CLI", () => {
     expect(status.out).toContain(
       "replaced: the previous daemon (pid 79303) exited without recording a reason",
     );
-    expect(status.out).toContain("45 s ago: rss 397 MB");
+    // The heartbeat was written 45 s before the call; a loaded test host can
+    // render one more second by the time status reads the clock.
+    expect(status.out).toMatch(/4[5-7] s ago: rss 397 MB/);
     expect(status.out).toContain(status.keptPath);
     expect(status.out).toContain(status.spawnStderrPath);
   });
