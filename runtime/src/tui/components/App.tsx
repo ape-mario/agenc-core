@@ -2356,6 +2356,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     [],
   );
   const [pastedContents, setPastedContents] = useState<Record<number, any>>({});
+  const composerCursorRef = useRef<{ input: string; offset: number } | null>(null);
   const liveComposerDraftRef = useRef({ input, pastedContents });
   liveComposerDraftRef.current = { input, pastedContents };
   const retrySubmissionRef = useRef<ComposerSubmission | null>(null);
@@ -3482,7 +3483,8 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           : null;
       const clientMessageId = retry?.clientMessageId ?? randomUUID();
       const activePastedContents =
-        retry?.pastedContents ?? options?.pastedContentsOverride ?? pastedContents;
+        retry?.pastedContents ?? options?.pastedContentsOverride ??
+        (options?.fromQueue ? {} : pastedContents);
       const hasAttachments = Object.keys(activePastedContents).length > 0;
       if (text_0.length === 0 && !hasAttachments) return;
       const rejectNonModelSubmission = (): void => {
@@ -3604,8 +3606,11 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         // user action, so it never fights a deliberate scroll-up mid-turn.
         scrollRef.current?.scrollToBottom();
       }
-      setComposerInput("");
-      retrySubmissionRef.current = null;
+      // A queued item owns its captured content, not the draft being edited.
+      if (!options?.fromQueue) {
+        setComposerInput("");
+        retrySubmissionRef.current = null;
+      }
       // Persist the submitted prompt so Up-arrow / Ctrl+R history recall
       // can find it. The daemon-backed AgenCTuiApp dispatch path used to
       // skip this, so the picker said "No history yet" right after a
@@ -3684,7 +3689,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         try {
           try {
             startPendingSubmission();
-            setComposerPastedContents({});
+            if (!options?.fromQueue) setComposerPastedContents({});
             const loaded = await loadDollarSkillCommandForTurn(
               parsedCommand,
               command,
@@ -3828,7 +3833,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
               return {
                 forwardedToModel: false,
               };
-            if (commandName === "clear" && result.kind === "text") {
+            if (!options?.fromQueue && commandName === "clear" && result.kind === "text") {
               setComposerPastedContents({});
               retrySubmissionRef.current = null;
               // A clear is an authoritative draft reset, even when the
@@ -3977,7 +3982,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           attachmentAdmissionToken = admitPendingInputs(submission.inputs);
           attachmentAdmitted = true;
         }
-        setComposerPastedContents({});
+        if (!options?.fromQueue) setComposerPastedContents({});
         // Pass `value` as displayUserMessage so the daemon emits the
         // user-message transcript event with the user's raw typed text,
         // not the model-facing expanded payload. Without this the
@@ -4768,6 +4773,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
             onAutoUpdaterResult={() => {}}
             autoUpdaterResult={null}
             input={input}
+            composerCursorRef={composerCursorRef}
             onInputChange={changeOnboardingInput}
             mode={mode}
             onModeChange={setMode}
@@ -4972,6 +4978,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       onAutoUpdaterResult={() => {}}
       autoUpdaterResult={null}
       input={input}
+      composerCursorRef={composerCursorRef}
       onInputChange={changeComposerInput}
       mode={mode}
       onModeChange={setMode}

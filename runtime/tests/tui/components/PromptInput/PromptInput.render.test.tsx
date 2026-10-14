@@ -403,6 +403,10 @@ vi.mock("../../keybindings/shortcutFormat.js", () => ({
 }));
 
 vi.mock("../../keybindings/useKeybinding.js", () => ({
+  useInputCapture: (
+    handler: (input: string, key: Record<string, boolean>, event?: unknown) => unknown,
+    options?: Record<string, unknown>,
+  ) => { harness.inputHandlers.push({ handler, options }); },
   useKeybinding: (
     action: string,
     handler: () => unknown,
@@ -1172,6 +1176,22 @@ describe("PromptInput render surface", () => {
     } finally {
       await rendered.dispose();
     }
+  });
+
+  test("preserves the live draft cursor across an approval overlay unmount", async () => {
+    const input = "unsent draft stays editable";
+    const composerCursorRef = { current: null as { input: string; offset: number } | null };
+    const first = await renderPromptInput({ input, composerCursorRef });
+    try {
+      (harness.baseProps?.onChangeCursorOffset as (offset: number) => void)(7);
+      await vi.waitFor(() => expect(composerCursorRef.current).toEqual({ input, offset: 7 }));
+    } finally { await first.dispose(); }
+    const restored = await renderPromptInput({ input, composerCursorRef });
+    try {
+      expect(harness.baseProps?.cursorOffset).toBe(7);
+      rerenderPromptInput(restored, { input: "a different draft" });
+      await vi.waitFor(() => expect(harness.baseProps?.cursorOffset).toBe("a different draft".length));
+    } finally { await restored.dispose(); }
   });
 
   test("puts the cursor after a draft restored in the same commit as the submit clear", async () => {

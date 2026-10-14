@@ -481,6 +481,8 @@ type Props = {
     readonly onMoveSelection?: (delta: -1 | 1) => void;
   };
   runtimeStateRepository: RuntimeStateRepository;
+  /** Retain the draft cursor while an approval or elicitation hides the editor. */
+  composerCursorRef?: React.MutableRefObject<{ input: string; offset: number } | null>;
   settingsAuthority: CanonicalSettingsAuthority;
 };
 
@@ -599,6 +601,7 @@ function PromptInput({
   onAutoUpdaterResult,
   autoUpdaterResult,
   input,
+  composerCursorRef,
   onInputChange,
   mode,
   onModeChange,
@@ -651,7 +654,17 @@ function PromptInput({
   }>({
     show: false,
   });
-  const [cursorOffset, setCursorOffset] = useState<number>(input.length);
+  const [cursorOffset, setCursorOffset] = useState<number>(() => {
+    const saved = composerCursorRef?.current;
+    return saved?.input === input
+      ? Math.max(0, Math.min(input.length, saved.offset))
+      : input.length;
+  });
+  React.useLayoutEffect(() => {
+    if (composerCursorRef !== undefined) {
+      composerCursorRef.current = { input, offset: cursorOffset };
+    }
+  }, [composerCursorRef, input, cursorOffset]);
   // Input-mode changes originate in TextInput and can be submitted before
   // React commits the parent-owned mode prop. Keep that same-tick authority
   // synchronous so a freshly entered ! command cannot reach the model path.
