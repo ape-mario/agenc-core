@@ -607,16 +607,27 @@ export async function runAdmittedModelCall(
   const configuredMaxOutputTokens =
     positiveInteger(params.options.maxOutputTokens) ??
     positiveInteger(profile?.maxOutputTokens);
-  // A denied preflight still enters the durable admission API. Zero is only
-  // a persisted placeholder for the rejected request; it never reaches a
-  // provider because denialReason is resolved before queue/claim.
-  const maxOutputTokens = configuredMaxOutputTokens ?? 0;
   const hasHardCostCap =
     client?.scope.hasHardCostCap === true ||
     client?.scope.maxCostUsd !== undefined;
   const hasHardTokenCap =
     client?.scope.hasHardTokenCap === true ||
     client?.scope.maxTokens !== undefined;
+  // A provider that cannot take a request ceiling may still declare the
+  // model's documented maximum output (the ChatGPT sign-in backend). No
+  // answer can exceed it, so under a hard cap the reservation uses it.
+  const modelOutputBound = profile?.supportsMaxOutputTokens === true
+    ? undefined
+    : positiveInteger(profile?.modelMaximumOutputTokens);
+  // A denied preflight still enters the durable admission API. Zero is only
+  // a persisted placeholder for the rejected request; it never reaches a
+  // provider because denialReason is resolved before queue/claim.
+  const maxOutputTokens =
+    (hasHardCostCap || hasHardTokenCap) &&
+    modelOutputBound !== undefined &&
+    configuredMaxOutputTokens !== undefined
+      ? Math.max(configuredMaxOutputTokens, modelOutputBound)
+      : configuredMaxOutputTokens ?? 0;
   // Under a hard aggregate token/USD cap the reservation must be a real
   // upper bound, so the provider has to enforce the request-scoped output
   // ceiling and report authoritative usage. Without a hard cap that
@@ -626,8 +637,9 @@ export async function runAdmittedModelCall(
   // their usage is conservatively held unknown after dispatch.
   const providerContractUnavailable =
     (hasHardCostCap || hasHardTokenCap) &&
-    (profile?.supportsMaxOutputTokens !== true ||
-      profile.usageReporting !== "authoritative");
+    (profile?.usageReporting !== "authoritative" ||
+      (profile.supportsMaxOutputTokens !== true &&
+        modelOutputBound === undefined));
 
   const contextWindowTokens =
     positiveInteger(params.options.contextWindowTokens) ??

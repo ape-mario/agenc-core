@@ -435,6 +435,13 @@ export interface LLMProviderExecutionProfile {
   /** Whether request-scoped output-token limits reach the provider wire. */
   readonly supportsMaxOutputTokens: boolean;
   /**
+   * The model's documented maximum output, declared only by a provider that
+   * cannot take a request-scoped ceiling but whose model cannot answer past
+   * this bound (the ChatGPT sign-in backend). Hard-budget admission reserves
+   * it in place of a wire ceiling.
+   */
+  readonly modelMaximumOutputTokens?: number;
+  /**
    * Extra context this provider reserves beyond prompt and output before it
    * will accept a request. Preflight and admission must reserve the same room
    * or they admit requests the provider then refuses at its own boundary.

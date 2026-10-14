@@ -102,6 +102,7 @@ import {
   openAiChatCompletionsRejectsFunctionTools,
   openAiModelDefaultsToNoReasoning,
 } from "../../registry/openai-reasoning-models.js";
+import { resolveModelCatalogMetadata } from "../../registry/model-catalog.js";
 import {
   providerApiKeyEnvironmentLabel,
   resolveBuiltInProviderInfo,
@@ -1268,6 +1269,11 @@ export class OpenAIProvider implements LLMProvider {
       model,
       usageReporting: "authoritative" as const,
       supportsMaxOutputTokens: this.config.chatgptBackend !== true && !separateThinkingLimit,
+      // The ChatGPT backend rejects max_output_tokens, but the model still
+      // cannot answer past its documented maximum, which bounds hard budgets.
+      ...(this.config.chatgptBackend === true && !separateThinkingLimit
+        ? chatGptModelOutputBound(model)
+        : {}),
       // Only the chat-completions path applies this buffer
       // (`fitRequestWithinContextWindow`). The Responses path does not, so it
       // must not inherit it.
@@ -2691,4 +2697,11 @@ export class OpenAIProvider implements LLMProvider {
     }
     return `${basePath}${normalizedPath}`;
   }
+}
+
+function chatGptModelOutputBound(model: string): { modelMaximumOutputTokens?: number } {
+  const documented = resolveModelCatalogMetadata({ provider: "openai", model })?.maxOutputTokens;
+  return documented !== undefined && Number.isSafeInteger(documented) && documented > 0
+    ? { modelMaximumOutputTokens: documented }
+    : {};
 }

@@ -49,6 +49,7 @@ function harness(options: {
   readonly hasHardTokenCap?: boolean;
   readonly authoritative?: boolean;
   readonly supportsMaxOutputTokens?: boolean;
+  readonly modelMaximumOutputTokens?: number;
 }) {
   const {
     acknowledgeCompletion,
@@ -77,6 +78,9 @@ function harness(options: {
       usageReporting:
         options.authoritative === false ? "unavailable" : "authoritative",
       supportsMaxOutputTokens: options.supportsMaxOutputTokens !== false,
+      ...(options.modelMaximumOutputTokens !== undefined
+        ? { modelMaximumOutputTokens: options.modelMaximumOutputTokens }
+        : {}),
     }),
   } as unknown as LLMProvider;
   return {
@@ -911,6 +915,43 @@ describe("runAdmittedModelCall", () => {
       reason: "provider_budget_contract_unavailable",
     });
     expect(invoke).not.toHaveBeenCalled();
+  });
+
+  test("admits a hard-capped call bounded by the model's documented maximum output", async () => {
+    // The ChatGPT sign-in backend rejects a request ceiling, but its model
+    // cannot answer past the documented maximum, so the reservation uses it.
+    const state = harness({
+      supportsMaxOutputTokens: false,
+      modelMaximumOutputTokens: 128_000,
+      hasHardTokenCap: true,
+    });
+    const invoke = vi.fn(async () => response());
+
+    await expect(
+      callOptions(state, { maxOutputTokens: 200, contextWindowTokens: 1_050_000 }, invoke),
+    ).resolves.toBeDefined();
+    const acquired = state.acquire.mock.calls[0]?.[0] as
+      | { denialReason?: string; maxOutputTokens?: number }
+      | undefined;
+    expect(acquired?.denialReason).toBeUndefined();
+    expect(acquired?.maxOutputTokens).toBe(128_000);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  test("still denies a hard-capped call without authoritative usage despite a model bound", async () => {
+    const state = harness({
+      supportsMaxOutputTokens: false,
+      modelMaximumOutputTokens: 128_000,
+      hasHardTokenCap: true,
+      authoritative: false,
+    });
+
+    await expect(
+      callOptions(state, { maxOutputTokens: 200 }, async () => response()),
+    ).rejects.toMatchObject({
+      code: "ADMISSION_DENIED",
+      reason: "provider_budget_contract_unavailable",
+    });
   });
 
   test("recognizes period-only hard caps even when the run itself is uncapped", async () => {
