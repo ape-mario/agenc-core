@@ -1341,3 +1341,28 @@ idempotent installs, compatibility/byte/hash failures, redirect downgrade,
 malicious archives, concurrent installers, stale-lock recovery, marker repair,
 and systemd generation against synthetic assets. Equivalent launcher,
 PowerShell, updater, and shared archive-validator suites guard the other paths.
+
+Interactive AgenC launches check the release manifest in the background once,
+with a three-second deadline. The welcome screen and composer do not wait for
+this check. An available release opens `/update` only when the composer is
+empty, no turn or other dialog is active, and keyboard input has been quiet.
+Choose **Update now**, **Skip this version**, or **Not now**. Escape means
+**Not now**. Skipping acknowledges only that version in AgenC's runtime state;
+a later release prompts again. Not now asks again on the next launch.
+
+`/update` checks on request, shows the installed and latest versions and install
+method, and uses the same verified manifest installer as `agenc update`.
+Standalone installs activate a new, separate runtime tree. The current TUI and
+daemon keep their old tree; exit and launch AgenC again to use the update. The
+next launch authenticates and replaces a daemon whose build differs, then
+restores saved sessions. Old runtime trees remain available to running clients.
+For npm or unmanaged installs the menu prints `npm install -g @tetsuo-ai/agenc@latest` and the installer alternative. It does not run npm inside
+a live session, because the launcher pins its runtime through its bundled
+manifest and changing a global package may require permissions outside AgenC.
+
+`DISABLE_AUTOUPDATER=1` or `autoUpdates = false` disables the startup check and
+prompt. `/update` still works on request. Print, exec, piped stdin, and CI runs
+never start this TUI check. Offline startup failures stay silent. Explicit
+local test releases use the existing `AGENC_INSTALL_MANIFEST_URL=file:///...`
+seam. Official releases retain checksum and Sigstore verification; remote
+manifest data cannot change the source or its trust mode.

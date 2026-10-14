@@ -93,17 +93,19 @@ export function UpdateMenu({ checked: initial, startup = false, close }: {
     if (/^[123]$/.test(input)) choose(Number(input) - 1);
     else if (key.return) choose(selected.current);
   });
-  return <MenuModal title="update" summary={checked?.updateAvailable
+  const releaseMessage = checked?.updateAvailable
     ? `AgenC ${checked.latestVersion} is available. You have ${checked.currentVersion}.`
-    : checked ? `AgenC ${checked.currentVersion} is up to date.` : `You have AgenC ${VERSION}.`}
+    : checked ? `AgenC ${checked.currentVersion} is up to date.` : `You have AgenC ${VERSION}.`;
+  return <MenuModal title="update" summary="AgenC runtime"
     columns={[30]} headers={["choice"]} items={choices} activeIndex={Math.min(index, choices.length - 1)}
     renderRow={choice => [<ThemedText key="choice" color="text">{choice}</ThemedText>]}
     detail={<Box flexDirection="column" gap={1}>
+      <ThemedText color="text" wrap="wrap">{releaseMessage}</ThemedText>
       <ThemedText color="text2">Installed: {checked?.currentVersion ?? VERSION} | Latest: {checked?.latestVersion ?? "checking"} | Install type: {installType}</ThemedText>
       {!finished && checked?.updateAvailable && <ThemedText color="text2">{startup ? "Not now asks again on your next launch." : "Skip remembers this version. /update always checks again."}</ThemedText>}
       {message && <ThemedText color={failed ? "error" : "text2"} wrap="wrap">{message}</ThemedText>}
     </Box>}
-    footer={busy ? [] : [{ keyName: "1/2/3", label: "choose" }, { keyName: "enter", label: "select" }, { keyName: "esc", label: "not now" }]} />;
+    footer={busy ? [] : choices.length === 1 ? [{ keyName: "enter", label: "close" }, { keyName: "esc", label: "close" }] : [{ keyName: "1/2/3", label: "choose" }, { keyName: "enter", label: "select" }, { keyName: "esc", label: "not now" }]} />;
 }
 
 export function openUpdateMenu(ctx: SlashCommandContext): boolean {

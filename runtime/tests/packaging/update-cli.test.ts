@@ -46,6 +46,7 @@ import {
   resolveTrustedSystemTar,
   runBoundedProcess,
   runAgenCUpdateCli,
+  checkAgenCUpdate,
   runPreparedOfficialAttestationVerifier,
   sanitizeTerminalText,
   selectUpdateArtifact,
@@ -2260,6 +2261,18 @@ describe("agenc update CLI", () => {
       latestVersion: NEW_VERSION,
       updateAvailable: true,
     });
+    expect(existsSync(join(agencHome, "runtime", NEW_VERSION))).toBe(false);
+  });
+
+  test("TUI check shares the CLI result and rejects a changed release before installation", async () => {
+    const artifact = makeSyntheticArtifact(work);
+    const manifestUrl = `file://${writeManifest(work, artifact)}`;
+    const checked = await checkAgenCUpdate({ kind: "update", check: true, json: false, manifestUrl }, deps);
+    expect(checked).toMatchObject({ currentVersion: OLD_VERSION, latestVersion: NEW_VERSION, updateAvailable: true });
+    expect(existsSync(join(agencHome, "runtime", NEW_VERSION))).toBe(false);
+    const code = await runAgenCUpdateCli({ kind: "update", check: false, json: false, manifestUrl }, { ...deps, expectedVersion: "9.9.7-test" });
+    expect(code).toBe(1);
+    expect(err.join("\n")).toContain("release changed");
     expect(existsSync(join(agencHome, "runtime", NEW_VERSION))).toBe(false);
   });
 
