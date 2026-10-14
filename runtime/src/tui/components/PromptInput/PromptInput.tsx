@@ -211,6 +211,8 @@ import { usePromptInputPlaceholder } from "./usePromptInputPlaceholder.js";
 import { useSwarmBanner } from "./useSwarmBanner.js";
 import {
   clampPromptTextInputColumns,
+  PROMPT_BAND_MARGIN_X,
+  PROMPT_BAND_PADDING_X,
   isNonSpacePrintable,
   pasteReferenceLineThreshold,
 } from "./utils.js";
@@ -3205,7 +3207,10 @@ function PromptInput({
   }, [effortNotificationText, addNotification, removeNotification]);
   const { columns, rows } = useTerminalSize();
   const promptGlyphs = selectAgenCTuiGlyphs();
-  const textInputColumns = clampPromptTextInputColumns(columns);
+  const textInputColumns = clampPromptTextInputColumns(
+    columns,
+    swarmBanner ? "banner" : "band",
+  );
 
   // POC: click-to-position-cursor. Mouse tracking is only enabled inside
   // <AlternateScreen>, so this is dormant in the normal main-screen TUI.
@@ -3597,8 +3602,8 @@ function PromptInput({
           flexDirection="row"
           alignItems="flex-start"
           justifyContent="flex-start"
-          marginX={2}
-          paddingX={1}
+          marginX={PROMPT_BAND_MARGIN_X}
+          paddingX={PROMPT_BAND_PADDING_X}
           paddingY={1}
           backgroundColor="promptBackground"
           opaque

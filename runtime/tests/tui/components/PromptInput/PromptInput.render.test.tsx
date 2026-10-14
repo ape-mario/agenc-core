@@ -1008,7 +1008,8 @@ describe("PromptInput render surface", () => {
       expect(baseProps.placeholder).toBe("Type a prompt");
       expect(baseProps.focus).toBe(true);
       expect(baseProps.showCursor).toBe(true);
-      expect(baseProps.columns).toBe(95);
+      // 100 columns less the borderless band (margin 2 + padding 1 per side) and "❯ ".
+      expect(baseProps.columns).toBe(92);
       expect(baseProps.multiline).toBe(true);
       expect(baseProps.disableCursorMovementForUpDownKeys).toBe(false);
     } finally {
