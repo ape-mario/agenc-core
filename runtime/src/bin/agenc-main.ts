@@ -100,8 +100,8 @@ const DEFAULT_DAEMON_CLI_DEPS: AgenCDaemonCliDeps = {
   findAgentBySessionId: findAgenCDaemonAgentBySessionId,
   createTuiContext: createAgenCDaemonOnlyTuiContext,
   ensureDaemonReady: defaultEnsureDaemonReady,
-  resumeTui: (args: ResumeTUIArgs, startupCliFlags?: StartupCliFlags) =>
-    resumeTUIEntry(args, startupCliFlags),
+  resumeTui: (args, startupCliFlags, options) =>
+    resumeTUIEntry(args, startupCliFlags, options),
 };
 
 
@@ -898,9 +898,11 @@ export async function exitOrResumeAfterTui(
   const resumeId = await consumePendingResumeSessionId();
   if (resumeId === null) return exitCode;
   try {
-    const resumed = await daemonCliDeps().resumeTui({ resumeId }, startupCliFlags);
-    if (resumed === 0) return resumed;
+    return await daemonCliDeps().resumeTui({ resumeId }, startupCliFlags, {
+      throwOnOpenFailure: true,
+    });
   } catch (error) {
+    if (!(error instanceof ResumeTuiOpenError)) throw error;
     process.stderr.write(`agenc: unable to resume session: ${error instanceof Error ? error.message : String(error)}\n`);
   }
   // The previous renderer has already detached. Keep an idle TUI available
@@ -3348,6 +3350,7 @@ export interface AttachAgentTuiEntryArgs {
   readonly daemonClient?: Awaited<
     ReturnType<typeof createConnectedAgenCJsonLineDaemonTuiClient>
   >;
+  readonly onMounted?: () => void;
 }
 
 
@@ -3593,6 +3596,7 @@ export async function attachAgentTuiEntry(
           ...(initialUserMessages.length > 0 ? { initialUserMessages } : {}),
         });
         activeInkUnmount = handle.unmount;
+        args.onMounted?.();
         await handle.waitUntilExit();
       } finally {
         activeInkUnmount = null;
@@ -3625,9 +3629,39 @@ export async function attachAgentTuiEntry(
 
 
 /** Resume a daemon-owned session through the TUI. */
+export class ResumeTuiOpenError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ResumeTuiOpenError";
+  }
+}
+
 export async function resumeTUIEntry(
   args: ResumeTUIArgs,
   startupCliFlags: StartupCliFlags = readStartupCliFlags(process.argv),
+  options?: { readonly throwOnOpenFailure?: boolean },
+): Promise<number> {
+  let opened = false;
+  try {
+    const exitCode = await resumeTUIEntryAttempt(args, startupCliFlags, () => {
+      opened = true;
+    });
+    if (!opened && options?.throwOnOpenFailure === true) {
+      throw new ResumeTuiOpenError("The selected conversation could not be opened.");
+    }
+    return exitCode;
+  } catch (error) {
+    if (!opened && options?.throwOnOpenFailure === true && !(error instanceof ResumeTuiOpenError)) {
+      throw new ResumeTuiOpenError(error instanceof Error ? error.message : String(error), { cause: error });
+    }
+    throw error;
+  }
+}
+
+async function resumeTUIEntryAttempt(
+  args: ResumeTUIArgs,
+  startupCliFlags: StartupCliFlags,
+  onMounted: () => void,
 ): Promise<number> {
   const consumeResumeInput = await startTuiEarlyInputCapture(true);
   try {
@@ -3647,6 +3681,7 @@ export async function resumeTUIEntry(
         return await resumeResolvedTUIEntry(resolved, args.resumeId, {
           agencHome,
           startupCliFlags,
+          onMounted,
         });
       case "ambiguous":
         process.stderr.write(
@@ -3678,6 +3713,7 @@ async function resumeResolvedTUIEntry(
     readonly startupCliFlags?: StartupCliFlags;
     readonly initialComposerText?: string;
     readonly startupImages?: readonly string[];
+    readonly onMounted?: () => void;
   },
 ): Promise<number> {
   const startupCliFlags =
@@ -3785,6 +3821,7 @@ async function resumeResolvedTUIEntry(
         clientId: `agenc-tui-${process.pid}`,
         daemonClient,
         startupCliFlags,
+        ...(options.onMounted !== undefined ? { onMounted: options.onMounted } : {}),
         ...(options.initialComposerText !== undefined
           ? { initialComposerText: options.initialComposerText }
           : {}),
