@@ -10,6 +10,7 @@ import { lstat, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
   createNodeDaemonCliHost,
+  DEFAULT_DAEMON_REQUEST_TIMEOUT_MS,
   readAgenCDaemonPid,
   readAgenCDaemonSpawnStderrTail,
   removeAgenCDaemonPid,
@@ -440,6 +441,8 @@ async function ensureAgenCDaemonAutostartCycle(
     }
 
     const target = { pid, pidPath };
+    const readinessDeadline = Date.now() +
+      (options.waitTimeoutMs ?? resolveAgenCDaemonReadyTimeoutMs(host.env));
     const waitingForReady = waitForAgenCDaemonReady(target, host, options);
     // Start the existing readiness budget first. Observer work is never awaited
     // and cannot alter lifecycle checks, their failures or connection authority.
@@ -579,6 +582,9 @@ async function ensureAgenCDaemonAutostartCycle(
         runtimeInfoPath,
         host,
         options,
+        // Only this invocation's exact child gets the cold-start allowance.
+        // Existing daemons retain the normal single-shot control probe.
+        identityDeadline: spawnedPid === pid ? readinessDeadline : undefined,
       });
     } catch (error) {
       throw error;
@@ -1076,6 +1082,7 @@ async function proveRecordedAgenCDaemonInstance(params: {
   readonly runtimeInfoPath: string;
   readonly host: AgenCDaemonAutostartHost;
   readonly options: AgenCDaemonAutostartOptions;
+  readonly identityDeadline?: number;
 }): Promise<BoundAgenCDaemonInstance | null> {
   return proveRecordedResidentInstance({
     expectedPid: params.expectedPid,
@@ -1084,7 +1091,37 @@ async function proveRecordedAgenCDaemonInstance(params: {
     captureProcess: pid => captureAgenCDaemonProcessIdentity(pid, params.host),
     requestIdentity: async pid => {
       const requestIdentity = params.options.requestDaemonInstanceIdentity ?? params.host.requestDaemonInstanceIdentity;
-      return requestIdentity?.({ pid, pidPath: params.pidPath }) ?? requestAgenCDaemonInstanceIdentity(params.host);
+      if (params.identityDeadline === undefined) {
+        return requestIdentity?.({ pid, pidPath: params.pidPath }) ?? requestAgenCDaemonInstanceIdentity(params.host);
+      }
+      // Keep one immutable binding across every initialize attempt. A slow
+      // restore can time out the RPC, but cannot authorize a changed instance.
+      const expected = daemonInstanceIdentityFromRuntimeInfo(readDaemonRuntimeInfo(params.runtimeInfoPath));
+      if (expected === null || expected.pid !== pid) {
+        throw instanceProofFailed(pid, "identity sidecar changed before probe");
+      }
+      let lastTimeout: unknown = instanceProofFailed(pid, "readiness deadline expired before identity probe");
+      while (Date.now() < params.identityDeadline) {
+        const current = daemonInstanceIdentityFromRuntimeInfo(readDaemonRuntimeInfo(params.runtimeInfoPath));
+        const process = await captureAgenCDaemonProcessIdentity(pid, params.host);
+        if (current === null || !sameAgenCDaemonInstanceIdentity(expected, current) ||
+            process?.processStart !== expected.processStart ||
+            (await readAgenCDaemonPid(params.pidPath)) !== pid) {
+          throw instanceProofFailed(pid, "instance identity changed while waiting for initialize");
+        }
+        const remaining = params.identityDeadline - Date.now();
+        if (remaining <= 0) break;
+        try {
+          return await (requestIdentity?.({ pid, pidPath: params.pidPath }) ??
+            requestAgenCDaemonInstanceIdentity(params.host, Math.min(DEFAULT_DAEMON_REQUEST_TIMEOUT_MS, remaining)));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException | undefined)?.code !== "ETIMEDOUT") throw error;
+          lastTimeout = error;
+        }
+        const backoff = Math.min(100, params.identityDeadline - Date.now());
+        if (backoff > 0) await params.host.sleep(backoff);
+      }
+      throw lastTimeout;
     },
     proofError: instanceProofFailed,
   });
