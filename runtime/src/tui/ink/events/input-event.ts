@@ -194,7 +194,7 @@ export class InputEvent extends Event {
   readonly keypress: ParsedKey
   readonly key: Key
   readonly input: string
-  /** First two printable characters in the stdin batch before keys dispatch. */
+  /** Bounded stdin typing preview, including Enter when batched with text. */
   readonly textInBatch?: string
 
   constructor(keypress: ParsedKey, textInBatch?: string) {

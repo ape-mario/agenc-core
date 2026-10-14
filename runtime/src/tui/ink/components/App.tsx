@@ -542,6 +542,10 @@ function processKeysInBatch(app: App, items: ParsedInput[], _unused1: undefined,
       if (textInBatch.length === 2) break;
     }
   }
+  // A digit plus Enter in one read is a typing batch, not an isolated choice.
+  // Keep a bare Enter (and navigation without printable text) unchanged.
+  if (textInBatch.length === 1 && items.some(item => item.kind === 'key' &&
+      (item.name === 'return' || item.name === 'enter'))) textInBatch += '\r';
   // Update interaction time for notification timeout tracking.
   // This is called from the central input handler to avoid having multiple
   // stdin listeners that can cause race conditions and dropped input.
