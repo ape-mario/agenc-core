@@ -13,13 +13,13 @@ describe("SwarmStatusIndicator", () => {
     [-2, "swarm", "text", false],
     [Number.NaN, "swarm", "text", false],
     [Number.POSITIVE_INFINITY, "swarm", "text", false],
-    [1, "swarm (1)", "accent", false],
-    [2, "swarm (2)", "accent", false],
-    [2.9, "swarm (2)", "accent", false],
-    [3, "swarm (3)", "accent", true],
-    [5, "swarm (5)", "accent", true],
-    [6, "swarm (6)", "warning", false],
-    [12, "swarm (12)", "warning", false],
+    [1, "swarm (1)", "accentSoft", false],
+    [2, "swarm (2)", "accentSoft", false],
+    [2.9, "swarm (2)", "accentSoft", false],
+    [3, "swarm (3)", "accent", false],
+    [5, "swarm (5)", "accent", false],
+    [6, "swarm (6)", "accent", true],
+    [12, "swarm (12)", "accent", true],
   ])("formats running-agent count %s", (count, label, color, bold) => {
     expect(swarmStatusPresentation(count as number)).toMatchObject({ label, color, bold });
   });

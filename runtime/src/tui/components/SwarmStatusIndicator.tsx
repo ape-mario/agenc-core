@@ -6,7 +6,7 @@ import ThemedText from "./design-system/ThemedText.js";
 export type SwarmStatusPresentation = {
   readonly glyph: "◆" | "◇";
   readonly label: string;
-  readonly color: "text" | "accent" | "warning";
+  readonly color: "text" | "accentSoft" | "accent";
   readonly bold: boolean;
 };
 
@@ -28,13 +28,15 @@ export function swarmStatusPresentation(
   return {
     glyph: "◆",
     label: `swarm (${count})`,
-    color: count >= 6 ? "warning" : "accent",
-    bold: count >= 3 && count <= 5,
+    // The monochrome themes keep color for meaning and have no amber, so
+    // the count grows in the brand purple: soft, then full, then bold.
+    color: count >= 3 ? "accent" : "accentSoft",
+    bold: count >= 6,
   };
 }
 
 /**
- * Activity uses the theme accent, with a warning tone for larger swarms.
+ * Activity uses the brand purple, stronger as more helpers work.
  */
 export function SwarmStatusIndicator({
   runningAgents,

@@ -695,7 +695,7 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   ].filter((label): label is string => label !== null);
   const rightWidth = stringWidth(rightLabels.join(' · '));
   const leftWidth = Math.max(1, columns - 4 - rightWidth - (rightWidth > 0 ? 1 : 0));
-  const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error' | 'accent' | 'warning'; bold?: boolean }> = [
+  const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error' | 'accentSoft' | 'accent'; bold?: boolean }> = [
     ...(segments.folder !== null ? [{ key: 'folder', label: `${segments.folder}${segments.branch ? ` (${segments.branch})` : ''}`, color: 'text2' as const }] : []),
     { key: 'model', label: segments.model, color: 'text' },
     ...(segments.effort !== null ? [{ key: 'effort', label: segments.effort, color: 'text' as const }] : []),
