@@ -113,6 +113,25 @@ describe("FullscreenLayout modal viewport", () => {
     },
   );
 
+  test.each([true, false])("counts only working helper tasks when swarm is %s", async swarmMode => {
+    const state = getDefaultAppState();
+    const statuses = ["running", "pending", "completed", "failed", "killed"] as const;
+    const tasks = Object.fromEntries(statuses.map(status => [status, {
+      id: status, type: "local_agent", status,
+    }])) as typeof state.tasks;
+    const output = await renderToString(
+      <AppStateProvider initialState={{ ...state, swarmMode, tasks: {
+        ...tasks,
+        shell: { id: "shell", type: "local_bash", status: "running", isBackgrounded: true } as typeof state.tasks[string],
+      } }}>
+        {fullscreen(<FullscreenLayout scrollable={<Text>research</Text>} bottom={<Text>prompt</Text>} />)}
+      </AppStateProvider>,
+      { columns: 180, rows: 24 },
+    );
+    expect(output.includes("swarm (2)")).toBe(swarmMode);
+    expect(output).not.toContain("swarm (3)");
+  });
+
   test("omits the Light label without changing other status facts", () => {
     const regular = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort");
     const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort", true);

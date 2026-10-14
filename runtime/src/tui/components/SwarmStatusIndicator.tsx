@@ -6,6 +6,8 @@ import ThemedText from "./design-system/ThemedText.js";
 export type SwarmStatusPresentation = {
   readonly glyph: "◆" | "◇";
   readonly label: string;
+  readonly color: "text" | "accent" | "warning";
+  readonly bold: boolean;
 };
 
 /**
@@ -20,18 +22,19 @@ export function swarmStatusPresentation(
     : 0;
 
   if (count === 0) {
-    return { glyph: "◇", label: "swarm" };
+    return { glyph: "◇", label: "swarm", color: "text", bold: false };
   }
 
   return {
     glyph: "◆",
-    label: `${count} ${count === 1 ? "agent" : "agents"}`,
+    label: `swarm (${count})`,
+    color: count >= 6 ? "warning" : "accent",
+    bold: count >= 3 && count <= 5,
   };
 }
 
 /**
- * Match the effort segment: plain primary ink. Activity is carried by the
- * label's count; the footer needs no extra glyph.
+ * Activity uses the theme accent, with a warning tone for larger swarms.
  */
 export function SwarmStatusIndicator({
   runningAgents,
@@ -45,7 +48,7 @@ export function SwarmStatusIndicator({
       <ThemedText color="inactive" wrap="truncate-end">
         {" · "}
       </ThemedText>
-      <ThemedText color="text" wrap="truncate-end">
+      <ThemedText color={presentation.color} bold={presentation.bold} wrap="truncate-end">
         {presentation.label}
       </ThemedText>
     </Box>
