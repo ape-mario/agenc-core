@@ -1888,6 +1888,7 @@ export function MenuModal<T>({
   activeIndex = 0,
   renderRow,
   preview,
+  detail,
   previewWidth,
   footer,
   hint,
@@ -1908,6 +1909,8 @@ export function MenuModal<T>({
   readonly activeIndex?: number
   readonly renderRow: (item: T, index: number, active: boolean) => readonly ReactNode[]
   readonly preview?: ReactNode
+  /** Plain description of the highlighted item, shown under the list. */
+  readonly detail?: ReactNode
   readonly previewWidth?: `${number}%`
   readonly footer: readonly { readonly keyName: string; readonly label: string }[]
   readonly hint?: string
@@ -1971,9 +1974,13 @@ export function MenuModal<T>({
           <Box flexDirection="row" paddingX={paddingX} gap={columnGap}>
             <Box width={2} flexShrink={0} />
             {headers.map((header, index) => (
-              <ThemedText key={`${index}-${header}`} color="inactive" wrap="truncate-end">
-                {header.padEnd(columns[index] ?? header.length, ' ')}
-              </ThemedText>
+              // Same fixed cell as the rows below, so headers line up with their
+              // column and never shrink into a stray ellipsis.
+              <Box key={`${index}-${header}`} width={columns[index]} flexShrink={0} overflow="hidden">
+                <ThemedText color="inactive" wrap="truncate-end">
+                  {header}
+                </ThemedText>
+              </Box>
             ))}
           </Box>
           {visibleItems.map((item, visibleIndex) => {
@@ -2000,6 +2007,13 @@ export function MenuModal<T>({
               </ThemedBox>
             )
           })}
+          {detail ? (
+            <Box flexDirection="column" paddingX={paddingX} marginTop={1} flexShrink={0}>
+              <Box paddingLeft={2 + columnGap} flexDirection="column">
+                {detail}
+              </Box>
+            </Box>
+          ) : null}
         </Box>
         {preview ? (
           <ThemedBox
