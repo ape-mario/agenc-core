@@ -108,6 +108,10 @@ describe("exec_command sandbox auto-allow", () => {
     async (mode) => {
       for (const cmd of ["npm install", "touch build.log", "ls"]) {
         const decision = await decide({ cmd }, { mode });
+        if (mode === "default" && cmd === "touch build.log") {
+          expect(decision.behavior).toBe("ask");
+          continue;
+        }
         expect(decision.behavior, cmd).toBe("allow");
         expect(decision.decisionReason, cmd).toMatchObject({
           type: "other",

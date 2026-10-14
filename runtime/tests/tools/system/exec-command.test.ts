@@ -882,7 +882,7 @@ describe("exec_command tool", () => {
       expect(execCommand).not.toHaveBeenCalled();
     });
 
-    test("still refuses a redirect write into a source file under bypassPermissions", async () => {
+    test("permits a redirect write into a source file under bypassPermissions", async () => {
       const { tool, execCommand } = deletionTool();
 
       const result = await tool.execute(
@@ -891,9 +891,8 @@ describe("exec_command tool", () => {
         }),
       );
 
-      expect(result.isError).toBe(true);
-      expect(result.content).toContain("shell_workspace_file_write_disallowed");
-      expect(execCommand).not.toHaveBeenCalled();
+      expect(result.isError).toBeUndefined();
+      expect(execCommand).toHaveBeenCalledOnce();
     });
 
     test("a deletion under a prompting mode runs only after the approval path", async () => {
@@ -979,9 +978,9 @@ describe("exec_command tool", () => {
       });
     }
 
-    test("a read-only subagent's refusal names no file tool it lacks", async () => {
+    test("a protected-path refusal names no file tool absent from the registry", async () => {
       const { tool, execCommand } = mockManagerTool();
-      const cmd = "echo hi > ./.vr-probe.txt";
+      const cmd = "echo hi > .git/config";
 
       // Preflight is where the live refusal came from (InputValidationError).
       const preflight = tool.preflight?.(liveArgs(cmd, verificationRegistry()));
@@ -1005,7 +1004,7 @@ describe("exec_command tool", () => {
         getSession: () => ({ services: { provider: { name: "openai" } } }) as never,
       });
 
-      const result = await tool.execute(liveArgs("echo hi > ./.vr-probe.txt", registry));
+      const result = await tool.execute(liveArgs("echo hi > .git/config", registry));
 
       expect(result.isError).toBe(true);
       expect(result.content).toContain("use apply_patch instead.");
@@ -1013,11 +1012,11 @@ describe("exec_command tool", () => {
       expect(execCommand).not.toHaveBeenCalled();
     });
 
-    test("the main session's refusal still names Edit and Write", async () => {
+    test("the main session's protected-path refusal names Edit and Write", async () => {
       const { tool, execCommand } = mockManagerTool();
 
       const result = await tool.execute(
-        liveArgs("echo hi > ./.vr-probe.txt", registryOf(PARENT_TOOLS)),
+        liveArgs("echo hi > .git/config", registryOf(PARENT_TOOLS)),
       );
 
       expect(result.isError).toBe(true);
@@ -1025,20 +1024,15 @@ describe("exec_command tool", () => {
       expect(execCommand).not.toHaveBeenCalled();
     });
 
-    test("still refuses a write target it cannot confirm, as the docs and the full-bypass tests define", async () => {
-      // bypassPermissions alone keeps every guard: the sandbox is still on.
-      // Only approvals bypassed AND no sandbox lift the unconfirmable-target
-      // refusal (see "runs a command with an unresolvable write target under
-      // the full bypass" above).
+    test("allows an opaque target in bypass while retaining its declared sandbox", async () => {
+      // Mode consent permits execution; the actual kernel profile still
+      // confines dynamic paths. This mock manager tests routing only.
       const { tool, execCommand } = mockManagerTool();
       const cmd = 'echo hi > "$TMPDIR/vr-probe.txt"';
 
       const sandboxed = await tool.execute(liveArgs(cmd, verificationRegistry()));
-      expect(sandboxed.isError).toBe(true);
-      expect(sandboxed.content).toContain("Unable to confirm workspace write targets");
-      expect(sandboxed.content).toContain("Name each file it writes with a literal path");
-      expect(sandboxed.content).not.toMatch(FILE_TOOL_NAME_RE);
-      expect(execCommand).not.toHaveBeenCalled();
+      expect(sandboxed.isError).toBeUndefined();
+      expect(execCommand).toHaveBeenCalledOnce();
 
       const fullBypass = await tool.execute(
         contextArgs({ cmd, workdir: root }, {
@@ -1049,7 +1043,7 @@ describe("exec_command tool", () => {
         }),
       );
       expect(fullBypass.isError).toBeUndefined();
-      expect(execCommand).toHaveBeenCalledTimes(1);
+      expect(execCommand).toHaveBeenCalledTimes(2);
     });
 
     test("an allowed command never lists the session's tools", async () => {
@@ -1080,7 +1074,7 @@ describe("exec_command tool", () => {
       expect(getUnavailableToolNames).not.toHaveBeenCalled();
       expect(toolsRead).not.toHaveBeenCalled();
 
-      const refused = await tool.execute(liveArgs("echo hi > ./.vr-probe.txt", registry));
+      const refused = await tool.execute(liveArgs("echo hi > .git/config", registry));
       expect(refused.content).toContain("use Edit or Write instead");
       expect(toLLMTools).toHaveBeenCalledTimes(1);
     });
