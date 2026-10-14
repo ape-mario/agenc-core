@@ -63,10 +63,11 @@ export const JSON_RPC_VERSION = "2.0" as const;
  * 1.31 adds optional child routing explanations.
  * 1.32 adds the optional `toolPolicy` on `agent.create`: a fixed tool
  * allowlist for the session, with an optional frozen permission mode.
+ * 1.33 adds memory-only provider API key replacement for an idle session.
  * Clients that need any of the additive surfaces above must not negotiate an
  * older daemon.
  */
-export const AGENC_DAEMON_PROTOCOL_VERSION = "1.32.0" as const;
+export const AGENC_DAEMON_PROTOCOL_VERSION = "1.33.0" as const;
 export const AGENC_DAEMON_PROTOCOL_SCHEMA_ID =
   "urn:agenc:app-server:protocol" as const;
 export const AGENC_DAEMON_PROTOCOL_PACKAGE_NAME =
@@ -243,6 +244,7 @@ export const AGENC_DAEMON_INTERNAL_METHODS = [
   "session.previewFileRewind",
   "session.rewindFilesToMessage",
   "session.shell.execute",
+  "session.setProviderKey",
   "session.setModel",
   "session.setPermissionMode",
   "session.permissions.mutateRule",
@@ -1177,6 +1179,13 @@ export const AGENC_DAEMON_INTERNAL_METHOD_SPECS = defineInternalMethodSpecs({
     description:
       "TUI-internal request to run one admitted shell command on the daemon-owned session.",
   },
+  "session.setProviderKey": {
+    method: "session.setProviderKey",
+    direction: "client-to-server",
+    params: "required",
+    result: "object",
+    description: "TUI-internal, memory-only provider key replacement. Never journal the credential.",
+  },
   "session.setModel": {
     method: "session.setModel",
     direction: "client-to-server",
@@ -2055,6 +2064,13 @@ export interface SessionShellExecuteParams extends JsonObject {
   readonly sessionId: string;
   readonly commandId: string;
   readonly command: string;
+}
+
+export interface SessionSetProviderKeyParams extends JsonObject {
+  readonly sessionId: string;
+  readonly provider: string;
+  /** Secret ingress, memory only. Must never enter logs, events or saved state. */
+  readonly apiKey: string;
 }
 
 export interface SessionSetModelParams extends JsonObject {
@@ -4535,6 +4551,7 @@ export interface AgenCDaemonInternalResultByMethod {
   readonly "session.previewFileRewind": SessionPreviewFileRewindResult;
   readonly "session.rewindFilesToMessage": SessionRewindFilesToMessageResult;
   readonly "session.shell.execute": SessionShellExecuteResult;
+  readonly "session.setProviderKey": { readonly sessionId: string };
   readonly "session.setModel": SessionSetModelResult;
   readonly "session.setPermissionMode": SessionSetPermissionModeResult;
   readonly "session.permissions.mutateRule": SessionPermissionRuleMutationResult;

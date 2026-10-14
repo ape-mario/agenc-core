@@ -154,6 +154,7 @@ import type {
   SessionShellExecuteResult,
   SessionStatusLineExecuteParams,
   SessionStatusLineExecuteResult,
+  SessionSetProviderKeyParams,
   SessionSetModelParams,
   SessionSetModelResult,
   SessionSetPermissionModeParams,
@@ -4075,6 +4076,19 @@ export class AgenCDaemonAgentManager {
     });
   }
 
+  async setSessionProviderKey(
+    params: SessionSetProviderKeyParams,
+  ): Promise<{ readonly sessionId: string }> {
+    if (this.#runner?.setAgentProviderKey === undefined) {
+      throw new AgenCDaemonAgentLifecycleError(
+        "BACKGROUND_RUNNER_UNAVAILABLE", "Session key replacement is unavailable.",
+      );
+    }
+    const agentId = await this.#resolveActiveAgentIdForSession(params.sessionId, { allowSetProviderKey: true });
+    await this.#runner.setAgentProviderKey(agentId, { provider: params.provider, apiKey: params.apiKey });
+    return { sessionId: params.sessionId };
+  }
+
   async setSessionModel(
     params: SessionSetModelParams,
   ): Promise<SessionSetModelResult> {
@@ -4531,6 +4545,7 @@ export class AgenCDaemonAgentManager {
       readonly allowMcpRemoveServer?: boolean;
       readonly allowSnapshot?: boolean;
       readonly allowProcessControl?: boolean;
+      readonly allowSetProviderKey?: boolean;
       readonly allowSetModel?: boolean;
       readonly allowSetPermissionMode?: boolean;
       readonly allowMutatePermissionRule?: boolean;
@@ -4597,6 +4612,8 @@ export class AgenCDaemonAgentManager {
     const hasProcessControlRunner = options.allowProcessControl === true &&
       (this.#runner?.listAgentSessionProcesses !== undefined ||
         this.#runner?.stopAgentSessionProcess !== undefined);
+    const hasSetProviderKeyRunner = options.allowSetProviderKey === true &&
+      this.#runner?.setAgentProviderKey !== undefined;
     const hasSetModelRunner =
       options.allowSetModel === true &&
       this.#runner?.setAgentModel !== undefined;
@@ -4646,6 +4663,7 @@ export class AgenCDaemonAgentManager {
       !hasMcpRemoveServerRunner &&
       !hasSnapshotRunner &&
       !hasProcessControlRunner &&
+      !hasSetProviderKeyRunner &&
       !hasSetModelRunner &&
       !hasSetPermissionModeRunner &&
       !hasMutatePermissionRuleRunner &&

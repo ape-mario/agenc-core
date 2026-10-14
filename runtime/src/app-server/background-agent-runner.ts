@@ -3824,6 +3824,24 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     };
   }
 
+  async setAgentProviderKey(
+    agentId: string,
+    params: { readonly provider: string; readonly apiKey: string },
+  ): Promise<void> {
+    const active = this.#active.get(agentId);
+    if (active === undefined || !isRunnableActiveAgent(active)) {
+      throw new Error("The session is no longer running.");
+    }
+    await withRuntimeSettingsMutation(active, async () => {
+      if (!isRunnableActiveAgent(active)) throw new Error("The session is no longer running.");
+      const session = active.bootstrap.session;
+      if (session.activeTurn.unsafePeek() !== null || session.pendingProviderSwitch !== null) {
+        throw new Error("Wait for the current turn or model switch to finish, then try again.");
+      }
+      await session.providerService.useSessionApiKey(params.provider, params.apiKey);
+    });
+  }
+
   async setAgentModel(
     agentId: string,
     params: AgenCBackgroundAgentSetModelParams,

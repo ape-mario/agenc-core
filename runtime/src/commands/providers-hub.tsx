@@ -480,7 +480,9 @@ export function ProvidersHubView({
 
   const run = (work: () => Promise<void>): void => {
     setBusy(true);
-    void work().finally(() => setBusy(false));
+    void work().catch(() => {
+      setNotice({ text: "Could not complete this action. Try again or press Esc to go back.", failed: true });
+    }).finally(() => setBusy(false));
   };
 
   const submitKey = (row: ProvidersHubRow, value: string): void => {
@@ -491,10 +493,15 @@ export function ProvidersHubView({
         setNotice({ text: result.message, failed: true });
         return;
       }
+      setKeyValue("");
+      if (result.sessionOnly) {
+        setNotice({ text: result.message, failed: false });
+        return;
+      }
       const next = services.reload();
       setSnapshot(next);
       const connected = next.rows.find((candidate) => candidate.provider === row.provider) ?? row;
-      openModels(connected);
+      openModels(connected, result.message);
     });
   };
 

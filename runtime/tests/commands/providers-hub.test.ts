@@ -9,6 +9,8 @@ import {
   removeProviderKey,
   saveProviderKey,
 } from "../auth/provider-keys.js";
+import * as providerKeys from "../auth/provider-keys.js";
+import { NativeSecureStorageUnavailableError } from "../utils/secureStorage/native.js";
 import { readLocalByokCredential } from "../auth/native-credentials.js";
 import type { EnvSnapshot } from "../config/env.js";
 import { resolveHomeContext, type HomeContext } from "../config/home.js";
@@ -41,6 +43,7 @@ function tempHome(): { readonly home: HomeContext; readonly environment: EnvSnap
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const path of homes.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 
@@ -69,6 +72,7 @@ function ctxFor(params: {
     },
     activeTurn: { unsafePeek: () => null },
     pendingProviderSwitch: null as unknown,
+    useSessionProviderKey: vi.fn(async () => {}),
     services: { configStore, providerEnvironment: params.environment },
     setPendingProviderSwitch(next: unknown) {
       this.pendingProviderSwitch = next;
@@ -187,8 +191,40 @@ describe("providers screen actions", () => {
 
     await expect(
       connectProviderWithKey(ctx, "deepseek", "sk-good", { fetchImpl: accepted }),
-    ).resolves.toEqual({ ok: true, message: "Key checked and saved." });
+    ).resolves.toEqual({ ok: true, message: "Key checked and saved. Ready for your next prompt." });
     expect(readLocalByokCredential(home, "deepseek")?.apiKey).toBe("sk-good");
+  });
+
+  it("keeps a verified key active and explains unavailable persistence without echoing secrets", async () => {
+    const { home, environment } = tempHome();
+    const ctx = ctxFor({ home, environment });
+    const store = vi.spyOn(providerKeys, "saveProviderKey").mockImplementation(() => {
+      throw new NativeSecureStorageUnavailableError("backend accidentally echoed sk-placeholder-key");
+    });
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
+    const result = await connectProviderWithKey(ctx, "deepseek", "sk-placeholder-key", { fetchImpl });
+    expect(result).toMatchObject({ ok: true, sessionOnly: true });
+    expect(result.message).toContain("was not saved");
+    expect(result.message).toContain("DEEPSEEK_API_KEY");
+    expect(result.message).toContain("restarting the daemon");
+    expect(result.message).not.toContain("sk-placeholder-key");
+    expect(store).toHaveBeenCalledOnce();
+    expect((ctx.session as unknown as { useSessionProviderKey: unknown }).useSessionProviderKey)
+      .toHaveBeenCalledWith("deepseek", "sk-placeholder-key");
+  });
+
+  it("does not save a key when its session activation fails", async () => {
+    const { home, environment } = tempHome();
+    const ctx = ctxFor({ home, environment });
+    const activate = (ctx.session as unknown as { useSessionProviderKey: ReturnType<typeof vi.fn> }).useSessionProviderKey;
+    activate.mockRejectedValue(new Error("sk-placeholder-key"));
+    const store = vi.spyOn(providerKeys, "saveProviderKey");
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
+    const result = await connectProviderWithKey(ctx, "deepseek", "sk-placeholder-key", { fetchImpl });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("could not be activated");
+    expect(result.message).not.toContain("sk-placeholder-key");
+    expect(store).not.toHaveBeenCalled();
   });
 
   it("switches and saves the pair as the default in the config store's home", async () => {

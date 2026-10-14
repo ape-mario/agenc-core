@@ -461,6 +461,20 @@ describe("deferred daemon input ownership", () => {
     );
   });
 
+  it("stages a first-run key without starting an agent and forwards later key replacements", async () => {
+    const harness = daemonHarness();
+    const preparePrompt = vi.fn(async ({ message }: { message: string }) => message);
+    const session = await createDeferredInputSession({ baseSession: harness.baseSession, deps: harness.deps, preparePrompt });
+    const keyed = session as typeof session & { useSessionProviderKey(provider: string, key: string): Promise<void> };
+    await keyed.useSessionProviderKey("deepseek", "cold-placeholder");
+    expect(harness.startPromptAgent).not.toHaveBeenCalled();
+    await session.submit("first prompt");
+    expect(harness.startPromptAgent).toHaveBeenCalledWith(expect.objectContaining({ env: expect.objectContaining({ DEEPSEEK_API_KEY: "cold-placeholder" }) }));
+    expect(preparePrompt).toHaveBeenCalledWith(expect.objectContaining({ env: {} }));
+    await keyed.useSessionProviderKey("deepseek", "live-placeholder");
+    expect(harness.requests).toContainEqual({ method: "session.setProviderKey", params: { sessionId: "session-1", provider: "deepseek", apiKey: "live-placeholder" } });
+  });
+
   it("commits cold and live rule edits through daemon authority before submitting", async () => {
     const harness = daemonHarness();
     const session = await createDeferredInputSession({

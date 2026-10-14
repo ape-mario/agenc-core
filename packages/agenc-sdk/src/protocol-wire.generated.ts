@@ -54,10 +54,11 @@ export const JSON_RPC_VERSION = "2.0" as const;
  * 1.31 adds optional child routing explanations.
  * 1.32 adds the optional `toolPolicy` on `agent.create`: a fixed tool
  * allowlist for the session, with an optional frozen permission mode.
+ * 1.33 adds memory-only provider API key replacement for an idle session.
  * Clients that need any of the additive surfaces above must not negotiate an
  * older daemon.
  */
-export const AGENC_DAEMON_PROTOCOL_VERSION = "1.32.0" as const;
+export const AGENC_DAEMON_PROTOCOL_VERSION = "1.33.0" as const;
 
 export const AGENC_DAEMON_METHODS = [
     "remote.capabilities",
@@ -1344,6 +1345,7 @@ export const AGENC_DAEMON_INTERNAL_METHODS = [
     "session.previewFileRewind",
     "session.rewindFilesToMessage",
     "session.shell.execute",
+    "session.setProviderKey",
     "session.setModel",
     "session.setPermissionMode",
     "session.permissions.mutateRule",

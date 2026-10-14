@@ -207,7 +207,8 @@ export function bindingFromProvider(params: {
  * allowing two concurrent switch attempts to overwrite one another.
  */
 export class SessionProviderService {
-  readonly #environment: ProviderEnvironment;
+  #environment: ProviderEnvironment;
+  readonly #sessionApiKeys = new Map<string, string>();
   readonly #credentialHome: ProviderFactoryOptions["credentialHome"];
   readonly #readSavedApiKey: ReadSavedProviderApiKey | undefined;
   readonly #authBackend: AuthBackend | undefined;
@@ -263,6 +264,34 @@ export class SessionProviderService {
 
   environment(): ProviderEnvironment {
     return this.#environment;
+  }
+
+  /** Explicit user ingress. Memory only; never changes process or shell environment. */
+  async useSessionApiKey(provider: string, apiKey: string): Promise<void> {
+    const slug = resolveBuiltInProviderSlug(provider);
+    const info = slug === undefined ? undefined : resolveBuiltInProviderInfo(slug);
+    if (info?.credentials.kind !== "api-key" || !apiKey.trim() || /\s/u.test(apiKey)) {
+      throw new Error("A provider API key must be a single non-empty token.");
+    }
+    const previousEnvironment = this.#environment;
+    const previousKey = this.#sessionApiKeys.get(provider);
+    this.#sessionApiKeys.set(provider, apiKey);
+    this.#environment = snapshotProviderEnvironment({
+      ...previousEnvironment,
+      [info.credentials.apiKey.envVars[0]!]: apiKey,
+    });
+    try {
+      if (this.#binding.provider === provider) {
+        const prepared = await this.prepare({ provider, model: this.#binding.model });
+        this.commit(prepared);
+      }
+    } catch {
+      this.#environment = previousEnvironment;
+      if (previousKey === undefined) this.#sessionApiKeys.delete(provider);
+      else this.#sessionApiKeys.set(provider, previousKey);
+      // Provider exceptions can contain credential material. Do not echo them.
+      throw new Error("Could not activate the key in this session. Try again when the session is idle.");
+    }
   }
 
   /** Give a child an independent binding with the same captured authority sources. */
@@ -459,7 +488,9 @@ export class SessionProviderService {
         `${provider} provider switch has no canonical preparation request`,
       );
     }
-    const requestedOptions = preparation.requested;
+    const sessionApiKey = this.#sessionApiKeys.get(provider);
+    const requestedOptions = sessionApiKey === undefined ? preparation.requested
+      : { ...preparation.requested, apiKey: sessionApiKey };
     const runtimeOptions = preparation.runtime ?? {};
     const canonicalEndpointRequired = this.#crossProviderProvenance ||
       (child && (crossProviderProvenance || provider !== this.#binding.provider));

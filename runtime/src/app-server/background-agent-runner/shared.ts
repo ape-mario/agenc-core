@@ -619,6 +619,10 @@ export interface AgenCBackgroundAgentRunner {
     agentId: string,
     params: AgenCBackgroundAgentConversationRewindParams,
   ): Promise<SessionRewindFilesToMessageResult>;
+  setAgentProviderKey?(
+    agentId: string,
+    params: { readonly provider: string; readonly apiKey: string },
+  ): Promise<void>;
   setAgentModel?(
     agentId: string,
     params: AgenCBackgroundAgentSetModelParams,

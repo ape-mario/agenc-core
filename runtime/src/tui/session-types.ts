@@ -264,6 +264,7 @@ export interface AgenCBridgeSession extends AgenCCompactProgressControls {
     setExpandedView?: (next: "none" | "tasks") => void;
     setAppState?: (updater: (prev: unknown) => unknown) => void;
   };
+  useSessionProviderKey?(provider: string, apiKey: string): Promise<void>;
   applyProviderModelSelection?(selection: {
     readonly provider: string;
     readonly model: string;

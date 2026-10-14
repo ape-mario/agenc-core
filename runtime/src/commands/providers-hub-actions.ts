@@ -24,11 +24,12 @@ import {
   type SignInProvider,
   type SignInResult,
 } from "./provider-sign-in.js";
+import { NativeSecureStorageUnavailableError } from "../utils/secureStorage/native.js";
 import { env as hostEnv } from "../utils/env.js";
 import type { SlashCommandContext } from "./types.js";
 
 export type ProvidersHubActionResult =
-  | { readonly ok: true; readonly message: string }
+  | { readonly ok: true; readonly message: string; readonly sessionOnly?: boolean }
   | { readonly ok: false; readonly message: string };
 
 /** Check a pasted key against the provider, then save it on this computer. */
@@ -55,8 +56,44 @@ export async function connectProviderWithKey(
       message: verification.error?.trim() || "The provider did not accept this key.",
     };
   }
-  saveProviderKey(configStore.homeContext, provider, key);
-  return { ok: true, message: "Key checked and saved." };
+  const session = ctx.session as unknown as {
+    useSessionProviderKey?: (provider: string, apiKey: string) => Promise<void>;
+  };
+  try {
+    if (session.useSessionProviderKey !== undefined) {
+      await session.useSessionProviderKey(provider, key);
+    } else if (ctx.session.services.providerService !== undefined) {
+      await ctx.session.services.providerService.useSessionApiKey(provider, key);
+    } else {
+      throw new Error("Session credential ingress is unavailable.");
+    }
+  } catch {
+    return {
+      ok: false,
+      message: "The key was accepted, but could not be activated in this session. Wait for the current turn or model switch to finish, then try again.",
+    };
+  }
+  try {
+    saveProviderKey(configStore.homeContext, provider, key);
+    return { ok: true, message: "Key checked and saved. Ready for your next prompt." };
+  } catch (error) {
+    // Never echo a backend exception: a helper may include secret input in it.
+    const reason = error instanceof NativeSecureStorageUnavailableError
+      ? process.platform === "linux"
+        ? "Linux Secret Service is unavailable (no usable keyring or session bus)."
+        : "Native secure storage is unavailable on this computer."
+      : "Native secure storage could not save the key (locked, unreadable, or write failed).";
+    const credentials = resolveBuiltInProviderInfo(provider)?.credentials;
+    const envName = credentials?.kind === "api-key" ? credentials.apiKey.envVars[0] : undefined;
+    return {
+      ok: true,
+      sessionOnly: true,
+      message: `Key checked and active for this session only; it was not saved. ${reason} ` +
+        `You can close this dialog and send your next prompt. After quitting or restarting the daemon, enter the key again. ` +
+        `For headless use, set ${envName ?? "the provider API key environment variable"} in the environment before launching AgenC. ` +
+        "To save it here, enable and unlock your system keyring, then try again.",
+    };
+  }
 }
 
 /**

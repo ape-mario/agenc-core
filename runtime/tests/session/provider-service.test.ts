@@ -47,6 +47,33 @@ function completion(label: string): Response {
 }
 
 describe("SessionProviderService", () => {
+  test("replaces a live provider key in memory and uses it again on later preparation", async () => {
+    const environment = Object.freeze({ DEEPSEEK_API_KEY: "old-placeholder" });
+    const service = new SessionProviderService({
+      initialProvider: createProvider("deepseek", { model: "deepseek-flash", apiKey: "old-placeholder" }),
+      environment,
+      resolvePreparationRequest: ({ model }) => ({ requested: { model, apiKey: "old-placeholder" } }),
+    });
+    await service.useSessionApiKey("deepseek", "new-placeholder");
+    expect(service.current().factoryOptions.apiKey).toBe("new-placeholder");
+    expect(service.environment().DEEPSEEK_API_KEY).toBe("new-placeholder");
+    expect(environment.DEEPSEEK_API_KEY).toBe("old-placeholder");
+    const next = await service.prepare({ provider: "deepseek", model: "deepseek-pro" });
+    expect(next.binding.factoryOptions.apiKey).toBe("new-placeholder");
+  });
+
+  test("rolls back failed credential preparation without exposing the key", async () => {
+    const service = new SessionProviderService({
+      initialProvider: createProvider("deepseek", { model: "deepseek-flash", apiKey: "old-placeholder" }),
+      environment: { DEEPSEEK_API_KEY: "old-placeholder" },
+      resolvePreparationRequest: () => { throw new Error("new-placeholder"); },
+    });
+    const binding = service.current();
+    await expect(service.useSessionApiKey("deepseek", "new-placeholder")).rejects.toThrow("Could not activate");
+    expect(service.current()).toBe(binding);
+    expect(service.environment().DEEPSEEK_API_KEY).toBe("old-placeholder");
+  });
+
   test("router readiness checks only the selected local credential without vending or network", async () => {
     const readSavedApiKey = vi.fn(async (provider: string) => provider === "deepseek" ? "child-secret" : undefined);
     const authBackend = { kind: "local" as const, vendKey: vi.fn() } as never;
