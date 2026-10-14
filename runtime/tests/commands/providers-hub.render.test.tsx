@@ -122,9 +122,11 @@ describe("providers screen", () => {
       expect(first).toContain("in use · key saved");
       expect(first).toContain("groq");
       expect(first).toContain("not set");
+      expect(first).toContain("deepseek: open to choose a model for this conversation.");
 
       await screen.press("g", "r");
       const filtered = screen.screen();
+      expect(filtered).toContain("groq: open to connect your api key.");
       expect(filtered).toContain("filter: gr");
       expect(filtered).toContain("groq");
       expect(filtered).not.toContain("deepseek");

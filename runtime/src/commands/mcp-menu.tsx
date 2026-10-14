@@ -728,7 +728,6 @@ function McpMenuView({
   return (
     <MenuModal
       title="mcp"
-      count={`${servers.length}`}
       summary={`${rows.filter(row => row.state === "connected").length} connected`}
       headerRight="enter detail · a add · n new"
       columns={[3, 14, 22, 8, 36, 10]}

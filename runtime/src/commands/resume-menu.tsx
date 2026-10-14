@@ -87,7 +87,6 @@ function ResumeMenuView({
   return (
     <MenuModal
       title="resume"
-      count={`${entries.length}`}
       summary="recent sessions"
       headerRight="local"
       columns={[3, 18, 20, 48]}

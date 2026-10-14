@@ -101,7 +101,6 @@ function StatusDashboardView({
   return (
     <MenuModal
       title="status dashboard"
-      count={`${rows.length}`}
       summary={snapshot.summary}
       headerRight="runtime · session"
       columns={[3, 12, 22, 28, 46]}

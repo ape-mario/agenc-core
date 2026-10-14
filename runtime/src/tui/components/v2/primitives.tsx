@@ -1924,7 +1924,8 @@ export function MenuModal<T>({
     ? Math.max(1, Math.trunc(viewport.rows))
     : 24
   const rowHeight = Math.max(1, rowMinHeight)
-  const chromeRows = (omitTopBorder ? 1 : 2) + 3
+  // Leave room for the description below the list on short terminals.
+  const chromeRows = (omitTopBorder ? 1 : 2) + 3 + (detail ? 4 : 0)
   const maxVisibleItems = Math.max(
     1,
     Math.floor(Math.max(1, viewportRows - chromeRows) / rowHeight),

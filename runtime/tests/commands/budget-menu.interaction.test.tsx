@@ -32,7 +32,7 @@ it.each([["max", 0], ["3m", 3_000_000]] as const)("applies %s from the frozen da
     } as unknown as SlashCommandContext)).toMatchObject({ kind: "skip" });
     root.render(<AppStateProvider initialState={getDefaultAppState()}><VoiceProvider>{jsx}</VoiceProvider></AppStateProvider>);
     await delay();
-    expect(stripAnsi(output)).toContain("Custom");
+    expect(stripAnsi(output)).toContain("custom");
     // A rapid arrow + Enter must apply the selection even before React paints.
     stdin.write(choice === "max" ? "\x1b[B\r" : "\x1b[B\x1b[B\r"); await delay();
     if (choice === "3m") { stdin.write("3m"); await delay(); stdin.write("\r"); }
@@ -41,7 +41,7 @@ it.each([["max", 0], ["3m", 3_000_000]] as const)("applies %s from the frozen da
     // Capture a complete repaint rather than concatenating cursor-diff patches.
     output = "";
     getInkInstance(stdout as unknown as NodeJS.WriteStream)!.forceRedraw();
-    await vi.waitFor(() => expect(stripAnsi(output).replace(/\s+/gu, "")).toContain(choice === "max" ? "CURRENTMAX(NOTOKENCAP)" : "CURRENTCUSTOM(3,000,000TOKENS)"));
+    await vi.waitFor(() => expect(stripAnsi(output).replace(/\s+/gu, "")).toContain(choice === "max" ? "NOWMAX(NOTOKENCAP)" : "NOWCUSTOM(3,000,000TOKENS)"));
     expect(original.taskTokenBudget).toBe(2_400_000);
     expect(store.current().task_token_budget).toBe(tokens);
     expect(stripAnsi(output)).not.toContain("not extensible");

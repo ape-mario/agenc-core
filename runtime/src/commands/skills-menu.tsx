@@ -135,13 +135,13 @@ function SkillsMenuView({
   return (
     <MenuModal
       title="skills"
-      count={`${rows.length}`}
       summary={`${snapshot.invokedSkills.length} invoked`}
       headerRight={`${snapshot.effectiveSkillRoots.length} roots`}
       columns={[3, 12, 30, 16, 52]}
       headers={["", "status", "skill", "source", "description"]}
       items={displayRows}
       activeIndex={activeIndex}
+      detail={<ThemedText color="text2" wrap="wrap">{selected ? `${selected.name}: ${selected.detail}` : "no skills available."}</ThemedText>}
       renderRow={(row, _index, active) => {
         const color = statusColor(row.status);
         return [

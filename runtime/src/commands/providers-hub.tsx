@@ -708,6 +708,7 @@ export function ProvidersHubView({
   const connected = shown.filter(
     (row) => row.connection === "current" || row.connection === "connected",
   ).length;
+  const highlighted = shown[listIndex];
   return (
     <MenuModal
       title="providers"
@@ -718,6 +719,13 @@ export function ProvidersHubView({
       headers={["", "provider", "status", "model"]}
       items={shown}
       activeIndex={listIndex}
+      detail={highlighted ? <ThemedText color="text2" wrap="wrap">
+        {highlighted.access === "local" || highlighted.access === "environment" || highlighted.access === "managed"
+          ? highlighted.connection === "current" || highlighted.connection === "connected"
+            ? `${highlighted.name}: choose a model to answer in this conversation.`
+            : infoLines(highlighted).join(" ")
+          : `${highlighted.name}: open to ${highlighted.connection === "current" || highlighted.connection === "connected" ? "choose a model for this conversation" : highlighted.signIn !== undefined ? "connect your account or key" : "connect your API key"}.`}
+      </ThemedText> : undefined}
       renderRow={(row, _index, active) => [
         <ThemedText key="dot" color={dotColor(row)}>●</ThemedText>,
         <ThemedText key="name" color={active ? "text" : "text2"} bold={active} wrap="truncate-end">

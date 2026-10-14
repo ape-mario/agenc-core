@@ -32,7 +32,7 @@ function findHooksRuntime(ctx: SlashCommandContext): ConfiguredHooksRuntime | nu
  * daemon path (built from the `session.hooks.status` RPC snapshot), so the
  * rendering helpers stay path-agnostic.
  */
-interface HooksSnapshot {
+export interface HooksSnapshot {
   readonly sourcePath: string;
   readonly disabled: boolean;
   readonly hardSuppressed: boolean;
@@ -339,6 +339,7 @@ async function handleDaemonHooksCommand(
   daemon: DaemonHooksFns,
   args: readonly string[],
   hardSuppressed: boolean,
+  ctx: SlashCommandContext,
 ): Promise<SlashCommandResult> {
   const subcommand = (args[0] ?? "list").toLowerCase();
   if (subcommand === "test" || subcommand === "run") {
@@ -389,8 +390,10 @@ async function handleDaemonHooksCommand(
     case "list":
     case "show-all":
     case "overview":
-      // The interactive hooks menu requires a live ConfiguredHooksRuntime;
-      // on the daemon path render the text overview instead (menu deferred).
+      if (ctx.argsRaw.trim().length === 0 &&
+          (await import("./hooks-menu.js")).openDaemonHooksMenu(ctx, snapshot)) {
+        return { kind: "skip" };
+      }
       return { kind: "text", text: formatOverview(snapshot, false) };
     case "validate":
       return { kind: "text", text: renderValidate(snapshot) };
@@ -423,6 +426,7 @@ async function handleHooksCommand(
       daemon,
       args,
       ownerHooksHardSuppressed(ctx),
+      ctx,
     );
   }
   const runtime = findHooksRuntime(ctx);
