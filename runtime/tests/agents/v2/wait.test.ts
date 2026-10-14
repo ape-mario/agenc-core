@@ -337,6 +337,10 @@ describe("structured child result delivery", () => {
       { agent_id: "child", turn_id: "turn", extra: 1 },
       { agent_id: "", turn_id: "", extra: 1 },
       { agent_id: 7, turn_id: "turn" },
+      // Incomplete ids do not excuse malformed fields.
+      { agent_id: "", turn_id: "", offset: -1 },
+      { agent_id: 7, turn_id: "" },
+      { agent_id: "child", turn_id: "", offset: "bad" },
       "child",
     ]) {
       const { tool, waitForMailboxChange } = fixture();
