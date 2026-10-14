@@ -6,7 +6,7 @@
  */
 
 import { snapshotProviderEnvironment } from "../llm/provider-options.js";
-import { resolveBuiltInProviderInfo } from "../llm/registry/provider-info.js";
+import { canonicalProviderApiKeyEnvVar } from "../llm/registry/provider-ingress.js";
 import { replaceSessionTaskTokenBudgetSnapshot } from "../session/task-budget.js";
 import { randomUUID } from "node:crypto";
 import { readCompactionProgressEvent } from "../services/compact/progress.js";
@@ -1670,12 +1670,12 @@ export function createDaemonTuiSession<
       } satisfies SessionFileRewindParams),
     useSessionProviderKey: async (provider, apiKey) => {
       await client.request("session.setProviderKey", { sessionId, provider, apiKey });
-      const credentials = resolveBuiltInProviderInfo(provider)?.credentials;
-      if (credentials?.kind === "api-key") {
+      const envVar = canonicalProviderApiKeyEnvVar(provider);
+      if (envVar !== undefined) {
         services.providerEnvironment = snapshotProviderEnvironment({
           ...(baseSession.services.providerEnvironment as Record<string, string | undefined> | undefined),
           ...(services.providerEnvironment as Record<string, string | undefined> | undefined),
-          [credentials.apiKey.envVars[0]!]: apiKey,
+          [envVar]: apiKey,
         });
       }
     },
