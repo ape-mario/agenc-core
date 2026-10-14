@@ -290,6 +290,7 @@ import {
 } from "./background-agent-runner/daemon-events.js";
 import {
   historyEpochFromRollout,
+  rolloutHasTranscriptReset,
   findPersistedMessageSubmission,
   sessionTranscriptV2FromRollout,
   currentRunEpochFromRollout,
@@ -1294,6 +1295,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
 
         const restoredAt = this.#now();
         const startedAt = params.startedAt ?? restoredAt;
+        const restoredRolloutItems = bootstrap.rolloutStore.readAll();
         const activationMustBePending =
           params.resumeSuspendedRun === true ||
           params.resumeStartupActivationPending === true;
@@ -1352,7 +1354,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           bufferedEvents: [],
           activeToolCallIds: new Set(),
           historyEpoch: historyEpochFromRollout(
-            bootstrap.rolloutStore.readAll(),
+            restoredRolloutItems,
             params.agentId,
           ),
           messageSubmissionQueue: Promise.resolve(),
@@ -1502,7 +1504,16 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           active,
         );
         const restoredSession = bootstrap.session;
-        const recoveredInitialMessages = params.initialMessages ?? [];
+        // The snapshot conversation fills only an empty history. Once the
+        // user has cleared the conversation (or a reset replaced it), an
+        // empty history is the record, and a snapshot taken before that
+        // reset still holds the removed messages. Hydrating it brought a
+        // cleared conversation back after a daemon restart.
+        const recoveredInitialMessages = rolloutHasTranscriptReset(
+          restoredRolloutItems,
+        )
+          ? []
+          : (params.initialMessages ?? []);
         const recoveredReplayedMessages =
           await this.#hydrateRecoveredAgentState({
             agentId: params.agentId,

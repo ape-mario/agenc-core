@@ -42,6 +42,14 @@ function historyEpochFromRollout(
   );
 }
 
+/**
+ * True when the user cleared the conversation, or a reset replaced its
+ * transcript, at any point in this rollout.
+ */
+function rolloutHasTranscriptReset(items: readonly RolloutItem[]): boolean {
+  return latestTranscriptBoundary(items) !== undefined;
+}
+
 interface TranscriptBoundary {
   readonly index: number;
   readonly id: string;
@@ -771,6 +779,7 @@ function currentRunEpochFromRollout(
 
 export {
   historyEpochFromRollout,
+  rolloutHasTranscriptReset,
   findPersistedMessageSubmission,
   currentRunEpochFromRollout,
 };

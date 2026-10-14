@@ -1600,6 +1600,57 @@ describe("durable resume reaches the daemon approval bridge (#2239)", () => {
     await runner.stopAgent(CONVERSATION_ID).catch(() => undefined);
   }, 60_000);
 
+  it("keeps a cleared conversation cleared and seals the replayed tool result", async () => {
+    // Live on RC4.3: the user ran /clear, the idle daemon restarted, and the
+    // restore refilled the empty history from a snapshot taken before the
+    // clear. Its rebuilt tool results carried no seal, so the next turn's
+    // first checkpoint failed ("checkpoint v2 requires every tool result to
+    // be sealed"). The rollout records the clear; it is the record.
+    const cleared = new RolloutStore({ cwd: workspace, sessionId: CONVERSATION_ID,
+      agencVersion: VERSION, agencHome: home, sessionTempRoot: tmpdir(),
+      resume: true, autoStartScheduler: false });
+    cleared.open({ sessionId: CONVERSATION_ID, timestamp: new Date().toISOString(),
+      cwd: workspace, originator: "agenc-cli", agencVersion: VERSION,
+      model: "base-model", modelProvider: "grok" });
+    cleared.append({ eventId: "history-cleared-before-restart",
+      id: "history-cleared-before-restart", seq: 3,
+      msg: { type: "history_cleared", payload: { timestamp: Date.now() } } },
+    { durable: true });
+    cleared.close();
+
+    await stubProvider();
+    stubProviderAndMcp();
+    let booted: LocalRuntimeBootstrap | undefined;
+    const runner = makeRunner((bootstrap) => {
+      booted = bootstrap;
+    });
+
+    await expect(
+      runner.restoreAgent(restoreParams(recoveredRunState())),
+    ).resolves.toBe(true);
+    const bootstrap = booted!;
+
+    const history = await sessionHistory(bootstrap);
+    expect(hasRecoveredUserMessage(history)).toBe(false);
+    expect(hasReplayedToolResult(history)).toBe(true);
+    const tools = history.filter((message) => message.role === "tool");
+    expect(tools.length).toBeGreaterThan(0);
+    for (const tool of tools) {
+      expect(
+        (tool.runtimeOnly as { readonly toolResultIntegrity?: unknown } | undefined)
+          ?.toolResultIntegrity,
+      ).toBeDefined();
+    }
+
+    await waitUntil(
+      () => bootstrap.session.activeTurn.unsafePeek() === null,
+      "any recovered turn to settle",
+    );
+    expect(hasRecoveredUserMessage(await sessionHistory(bootstrap))).toBe(false);
+
+    await runner.stopAgent(CONVERSATION_ID).catch(() => undefined);
+  }, 60_000);
+
   it("re-applies the recovered conversation once a newer turn releases the slot", async () => {
     // Moving the resume after `#hydrateRecoveredAgentState` created a window
     // that did not exist on base: `syncSessionState` republishes
