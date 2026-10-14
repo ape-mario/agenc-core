@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { findProjectRootSync } from "../session/session-store.js";
@@ -1303,6 +1304,16 @@ function diffLayer(
   return syntheticLayer(scope, label, normalizeRawConfig(patch));
 }
 
+function isSameDirectory(left: string, right: string): boolean {
+  try {
+    const a = statSync(left);
+    const b = statSync(right);
+    return a.isDirectory() && b.isDirectory() && a.dev === b.dev && a.ino === b.ino;
+  } catch {
+    return false;
+  }
+}
+
 async function loadLayeredConfigInternal(
   options: LayeredConfigRepositoryOptions,
   includeWorkspaceLayers: boolean,
@@ -1416,7 +1427,13 @@ async function loadLayeredConfigInternal(
     managedConfigPath: managedPath,
     includeProjectInputs: includeWorkspaceLayers,
   });
-  const project = includeWorkspaceLayers
+  // A workspace at the user's home folder with the default AGENC_HOME has the
+  // AgenC home itself as <root>/.agenc, so its config.toml is the user layer.
+  // The AgenC home is never repository configuration: such a root has no
+  // project or local layer. Every other path collision still fails closed.
+  const workspaceLayersAreAgenCHome =
+    includeWorkspaceLayers && isSameDirectory(join(projectRoot, ".agenc"), home.path);
+  const project = includeWorkspaceLayers && !workspaceLayersAreAgenCHome
     ? await readStrictConfigLayer(
         join(projectRoot, ...PROJECT_CONFIG_RELATIVE_PATH),
         "project",
@@ -1436,7 +1453,7 @@ async function loadLayeredConfigInternal(
     config = merged.config;
     sources.push(merged.source);
   }
-  const local = includeWorkspaceLayers
+  const local = includeWorkspaceLayers && !workspaceLayersAreAgenCHome
     ? await readStrictConfigLayer(
         join(projectRoot, ...LOCAL_CONFIG_RELATIVE_PATH),
         "local",

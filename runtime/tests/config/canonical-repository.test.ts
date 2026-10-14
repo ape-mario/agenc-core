@@ -326,14 +326,40 @@ describe("strict layered repository", () => {
     } satisfies Partial<ConfigRepositoryError>);
   });
 
-  test("rejects one path serving as both user and project configuration", async () => {
-    const root = temp("agenc-config-scope-path-collision");
-    const projectRoot = join(root, "project");
+  test("reads a workspace whose .agenc directory is the AgenC home as user configuration only", async () => {
+    // A session started in the home folder with the default AGENC_HOME.
+    const root = temp("agenc-config-home-workspace");
+    const projectRoot = join(root, "user");
     const home = join(projectRoot, ".agenc");
+    write(
+      join(home, "config.toml"),
+      'config_version = 2\nmodel = "grok-4.6"\nbudget_level = "eco"\n',
+    );
+    write(join(home, "config.local.toml"), 'config_version = 2\nmodel = "grok-4.5"\n');
+
+    const resolved = await loadLayeredConfig({
+      env: { AGENC_HOME: home },
+      projectRoot,
+      managedConfigPath: join(root, "missing-managed.toml"),
+      managedDropInDir: join(root, "missing-drop-ins"),
+    });
+
+    expect(resolved.config.model).toBe("grok-4.6");
+    expect(resolved.config.task_token_budget).toBe(1_000_000);
+    expect(resolved.sources.map((source) => source.scope)).not.toContain("project");
+    expect(resolved.sources.map((source) => source.scope)).not.toContain("local");
+  });
+
+  test("rejects a project config linked to the user configuration file", async () => {
+    const root = temp("agenc-config-scope-path-collision");
+    const home = join(root, "home");
+    const projectRoot = join(root, "project");
     write(
       join(home, "config.toml"),
       'config_version = 2\nmodel = "grok-4.6"\n',
     );
+    mkdirSync(join(projectRoot, ".agenc"), { recursive: true });
+    symlinkSync(join(home, "config.toml"), join(projectRoot, ".agenc", "config.toml"));
 
     await expect(loadLayeredConfig({
       env: { AGENC_HOME: home },
