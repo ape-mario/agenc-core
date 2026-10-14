@@ -139,7 +139,7 @@ export async function* runMinimalTurn(
           const result = await session.services.registry.dispatch(call, {
             prepareArguments: (args, selectedTool) => {
               tool = selectedTool;
-              const projected = filesystemRootsForDispatch(call.name, stripModelSuppliedAgenCInternalArgs(args), {
+              const projected = filesystemRootsForDispatch(selectedTool.name, stripModelSuppliedAgenCInternalArgs(args), {
                 approvalResolved: false, sandboxMode: ctx.sandboxPolicy.value, session,
               });
               const authority = sessionDispatchAuthority(session, session.services.configStore?.homeContext.path, true);
@@ -156,7 +156,7 @@ export async function* runMinimalTurn(
                 // for current permission mode, protected roots and ownership.
                 // Attach the canonical context without rebuilding preflight.
                 attachPreflightRuntimeContext(tool, projected, {
-                  session, turn: ctx, tracker, callId: call.id, toolName: parseToolName(call.name),
+                  session, turn: ctx, tracker, callId: call.id, toolName: parseToolName(selectedTool.name),
                   payload: { kind: "function", arguments: call.arguments }, source: "direct",
                 }, { approvalPolicy: ctx.approvalPolicy.value, sandboxMode: ctx.sandboxPolicy.value });
               }

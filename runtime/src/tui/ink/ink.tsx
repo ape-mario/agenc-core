@@ -70,6 +70,8 @@ export type Options = {
   stderr: NodeJS.WriteStream;
   exitOnCtrlC: boolean;
   stdinMode?: 'readable' | 'data';
+  /** Keep queued bytes when another interactive session will own stdin. */
+  shouldPreserveInputOnExit?: () => boolean;
   patchConsole: boolean;
   waitUntilExit?: () => Promise<void>;
   onFrame?: (event: FrameEvent) => void;
@@ -1580,8 +1582,9 @@ export default class Ink {
       // stale if AlternateScreen's unmount (which flips the flag) raced a
       // busy event loop + SIGINT. No-op if tracking was never enabled.
       writeSync(1, DISABLE_MOUSE_TRACKING);
-      // Drain stdin so in-flight mouse events don't leak to the shell
-      this.drainStdin();
+      // A session handoff must retain user typing queued during final paint.
+      // Ordinary shell exit still drains late terminal reports.
+      if (this.options.shouldPreserveInputOnExit?.() !== true) this.drainStdin();
       // Disable extended key reporting (both kitty and modifyOtherKeys)
       writeSync(1, DISABLE_MODIFY_OTHER_KEYS);
       writeSync(1, DISABLE_KITTY_KEYBOARD);

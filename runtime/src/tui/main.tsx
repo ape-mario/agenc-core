@@ -20,6 +20,8 @@ import type { Event } from "../session/event-log.js";
 import { FpsTracker } from "../utils/fpsTracker.js";
 import { recordTuiBackpressure } from "./backpressure.js";
 import { setIsInteractive } from "../bootstrap/state.js";
+import { hasPendingResumeSession } from "./pending-resume.js";
+import { startCapturingEarlyInput, isCapturingEarlyInput } from "../utils/earlyInput.js";
 import { TuiTeardownBarrier } from "./teardownBarrier.js";
 
 export interface StdinLossSession extends AgenCBridgeSession {
@@ -236,6 +238,7 @@ export async function bootTUI(options: BootTUIOptions): Promise<BootTUIHandle> {
         patchConsole: true,
         exitOnCtrlC: false,
         stdinMode: options.stdinMode,
+        shouldPreserveInputOnExit: () => !firedStdinLoss && hasPendingResumeSession(),
         onFrame: (event) => {
           fpsTracker.record(event.durationMs);
           if (event.durationMs >= RENDER_BACKPRESSURE_THRESHOLD_MS) {
@@ -269,12 +272,17 @@ export async function bootTUI(options: BootTUIOptions): Promise<BootTUIHandle> {
         waitPromise = (async () => {
           try {
             await instance.waitUntilExit();
+            // Ink has released stdin. Keep new typing through teardown and
+            // the next session's attach, instead of handing it to an empty UI.
+            if (!firedStdinLoss && hasPendingResumeSession()) {
+              startCapturingEarlyInput();
+            }
             await teardownBarrier.drain();
           } finally {
             stdin.removeListener("close", onStdinLoss);
             stdin.removeListener("end", onStdinLoss);
             stdin.removeListener("error", onStdinLoss);
-            releaseStartupRawMode?.();
+            if (!isCapturingEarlyInput()) releaseStartupRawMode?.();
             unsubscribeExit();
             restoreTerminal(stdout);
           }

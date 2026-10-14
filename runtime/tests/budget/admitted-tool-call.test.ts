@@ -291,6 +291,41 @@ describe("runAdmittedToolCall", () => {
     });
   });
 
+  it("reports an interrupted started shell with its partial output instead of an admission denial", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agenc-started-interrupt-"));
+    const manager = new UnifiedExecProcessManager({ cwd: root });
+    const state = toolHarness();
+    const began = Promise.withResolvers<void>();
+    const exec = bindExplicitDangerBoundary(createExecCommandTool({ cwd: root, unifiedExecManager: manager, execObserver: { onBegin: () => began.resolve() } }));
+    const running = runAdmittedToolCall({
+      session: state.session, turnId: "turn-1", callId: "started-shell", tool: exec,
+      args: { cmd: "printf PARTIAL_BEFORE_ESC; sleep 30", yield_time_ms: 100000 },
+      invoke: async ({ signal, crossEffectBoundary }) => {
+        crossEffectBoundary();
+        return exec.execute({ cmd: "printf PARTIAL_BEFORE_ESC; sleep 30", yield_time_ms: 100000, __abortSignal: signal });
+      },
+    }).catch(error => error);
+    try {
+      const early = await Promise.race([running.then(error => ({ error })),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 100))]);
+      expect(early, early && String(early.error)).toBeNull();
+      await began.promise;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      state.leaseController.abort(new AdmissionDeniedError("interrupted", "cancelled"));
+      const error = await running;
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(AdmissionDeniedError);
+      expect(error.message).toContain("started");
+      expect(error.message).toContain("interrupted by the user");
+      expect(error.message).toContain("PARTIAL_BEFORE_ESC");
+      expect(error.message).toContain("exit status");
+      expect(state.acknowledgeCompletion).toHaveBeenCalledOnce();
+    } finally {
+      await manager.closeAll();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a late tool success after durable cancellation", async () => {
     const state = toolHarness();
     const tool = {

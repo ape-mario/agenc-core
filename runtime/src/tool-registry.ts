@@ -1,6 +1,8 @@
 import { suggestToolForUnknownName } from "./tools/tool-name-suggestion.js";
 import { unknownToolResult } from "./tools/results.js";
 import { oneShotFastModeActive } from "./one-shot-fast-mode.js";
+import { resolveModelToolAlias } from "./tools/model-tool-aliases.js";
+import { prepareModelToolArgs, validateToolPreflight } from "./tools/execution.js";
 /**
  * Tool registry — the lean coding-profile surface.
  *
@@ -1415,6 +1417,8 @@ export function buildToolRegistry(
     },
     async dispatch(toolCall: LLMToolCall, dispatchOptions?: ToolRegistryDispatchOptions): Promise<ToolDispatchResult> {
       const router = buildRouter();
+      const canonicalName = resolveModelToolAlias(toolCall.name, router.getSpecs().map(spec => spec.tool.name));
+      if (canonicalName !== toolCall.name) toolCall = { ...toolCall, name: canonicalName };
       const spec = router.findSpec(toolCall.name);
       if (!spec) {
         if (!sessionToolPolicyAllowsTool(options.toolPolicy, toolCall.name)) {
@@ -1450,7 +1454,17 @@ export function buildToolRegistry(
             isError: true,
           };
         }
-        return await executeConfiguredTool(spec, toolCall.id, dispatchOptions?.prepareArguments?.(parseResult.args, spec.tool) ?? parseResult.args, dispatchOptions);
+        prepareModelToolArgs(spec.tool, parseResult.args);
+        const executionArgs = dispatchOptions?.prepareArguments?.(parseResult.args, spec.tool) ?? parseResult.args;
+        // The minimal loop supplies the authenticated invocation context here.
+        // Run the same strict schema and tool preflight before physical dispatch.
+        if (dispatchOptions?.prepareArguments !== undefined) {
+          const failure = validateToolPreflight(spec.tool, executionArgs, {
+            discoveredToolNames,
+          });
+          if (failure !== null) return failure;
+        }
+        return await executeConfiguredTool(spec, toolCall.id, executionArgs, dispatchOptions);
       } catch (error) {
         return {
           content: safeStringify({

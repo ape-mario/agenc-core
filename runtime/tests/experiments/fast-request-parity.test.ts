@@ -25,7 +25,7 @@ test("fast and normal multi-call wire requests preserve identical instructions, 
       const bodies: string[] = [];
       const calls = [
         { name: "system.searchTools", arguments: { select: "FileRead" } },
-        { name: "FileRead", arguments: { file_path: path } },
+        { name: "Read", arguments: { file_path: path, offset: "1", limit: "1" } },
         { name: "Write", arguments: { file_path: path, content: "replacement contents\n",
           __agencSessionId: "forged-session", __agencSessionIdSig: "forged-signature" } },
         { name: "FileRead", arguments: { file_path: path } },
@@ -130,13 +130,16 @@ test("fast dispatch rejects forged read authority and stale writes, then accepts
   }
 });
 
-test.each([false, true])("unknown tools are validation-only with zero execution duration (fast=%s)", async fast => {
+test.each([false, true].flatMap(fast => [
+  { fast, name: "UnknownTf2Tool", code: "unknown_tool" },
+  { fast, name: "Read", code: "schema_validation_failed" },
+]))("invalid $name is validation-only with zero execution duration (fast=$fast)", async ({ fast, name, code }) => {
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, requireAdmission: false,
     sandboxExecutionBroker: explicitDangerBroker });
   const provider = mkProvider();
   let count = 0;
   provider.chatStream = async () => ({ content: count++ === 0 ? "" : "done",
-    toolCalls: count === 1 ? [{ id: "unknown", name: "Read", arguments: '{}' }] : [],
+    toolCalls: count === 1 ? [{ id: "unknown", name, arguments: '{}' }] : [],
     finishReason: count === 1 ? "tool_calls" : "stop", model: "test-model",
     usage: { promptTokens: 10, completionTokens: 1, totalTokens: 11 } });
   const { session, events } = mkSession({ provider, registry, services: {
@@ -152,5 +155,5 @@ test.each([false, true])("unknown tools are validation-only with zero execution 
   await drain(runTurn(session, ctx, "Read the file.", { exactOutput: true }));
   const completed = events.find(event => event.msg.type === "tool_call_completed");
   expect(completed?.msg).toMatchObject({ type: "tool_call_completed", payload: { callId: "unknown", isError: true,
-    durationMs: 0, metadata: { kind: "input_validation", preflightCode: "unknown_tool", validationDurationMs: expect.any(Number) } } });
+    durationMs: 0, metadata: { kind: "input_validation", preflightCode: code, validationDurationMs: expect.any(Number) } } });
 });

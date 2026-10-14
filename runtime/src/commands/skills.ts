@@ -18,6 +18,7 @@ import {
 } from "../permissions/session-tool-policy.js";
 import type { Session } from "../session/session.js";
 import { logForDebugging } from "../utils/debug.js";
+import { skillChangeDetector } from "../skills/change-detector.js";
 import { pluginScopedIdentifier } from "../plugins/identifier-normalization.js";
 import { isRecord } from "../utils/record.js";
 import {
@@ -542,6 +543,7 @@ export const skillsCommand: SlashCommand = {
         );
         if ("error" in result) return { kind: "error", message: result.error };
         ctx.session.services.skillsManager.clearSkillCaches?.();
+        skillChangeDetector.notify({ changedPaths: [join(ctx.cwd, ".agenc", "skills")] });
         return { kind: "text", text: result.text };
       }
       const snapshot = await collectSkillsSnapshot(ctx.session, ctx.appState);

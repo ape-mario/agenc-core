@@ -1,3 +1,4 @@
+import { interruptedExecReport } from "../tools/interrupted-exec-report.js";
 import { oneShotFastModeActive, requiresAtomicSpendAdmission } from "../one-shot-fast-mode.js";
 /** Shared M3 boundary for approved tool effects. */
 
@@ -999,13 +1000,16 @@ export async function runAdmittedToolCall(
 
     hitM4DurabilityFailpoint("before_tool_spawn");
     const result = await params.invoke(dispatch.context);
-    const lateCancellation = cancellationAfterDispatch(
+    let lateCancellation = cancellationAfterDispatch(
       lease?.signal ?? dispatch.context.signal,
     );
     const recordedAt = new Date().toISOString();
     const disposition = validateToolEffectDispositionEvidence(
       result.effectDisposition,
     );
+    if (lateCancellation !== undefined && boundaryCrossed && params.tool.name === "exec_command") {
+      lateCancellation = interruptedExecReport(lateCancellation, result) ?? lateCancellation;
+    }
     let commit: EffectEventCommit;
 
     if (!boundaryCrossed) {

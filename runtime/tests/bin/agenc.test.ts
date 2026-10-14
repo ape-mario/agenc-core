@@ -4211,6 +4211,48 @@ describe("main() smoke", () => {
     }
   });
 
+  it("resumeTUIEntry retains text captured while a large transcript is attaching", async () => {
+    const { seedEarlyInput, consumeEarlyInput } = await import("../../src/utils/earlyInput.js");
+    const tmpHome = await mkdtemp(join(canonicalTmpdir(), "agenc-resume-input-home-"));
+    const tmpCwd = await mkdtemp(join(canonicalTmpdir(), "agenc-resume-input-cwd-"));
+    const prevEnv = { ...process.env };
+    const conversationId = "conv-resumeinput1";
+    process.env.AGENC_HOME = tmpHome;
+    process.env.AGENC_WORKSPACE = tmpCwd;
+    process.env.AGENC_CLI_ENTRY_DISABLE = "1";
+    const rolloutPath = await writeResumeRolloutForTest(tmpCwd, conversationId, tmpHome);
+    const identity = await lstat(rolloutPath, { bigint: true });
+    const daemon = installDaemonCliDepsForTest({
+      agentId: conversationId, sessionId: conversationId, cwd: tmpCwd,
+      liveAgent: true, liveAgentPath: "/root",
+      liveAgentMetadata: {
+        agentPath: "/root", canonicalRolloutPath: rolloutPath,
+        canonicalRolloutDev: identity.dev.toString(10), canonicalRolloutIno: identity.ino.toString(10),
+      },
+    });
+    const createContext = daemon.createTuiContext.getMockImplementation()!;
+    daemon.createTuiContext.mockImplementation(async (...args) => {
+      // Input arrives after resume resolution, during the slow attach window.
+      seedEarlyInput("Keep this new resume draft 😅\n");
+      return createContext(...args);
+    });
+    const boot = vi.fn(async () => ({ unmount: vi.fn(), waitUntilExit: vi.fn(async () => undefined) }));
+    vi.doMock("../tui/main.js", () => ({ bootTUI: boot }));
+    try {
+      trustWorkspaceForTest(tmpHome, tmpCwd);
+      await expect(resumeTUIEntry({ resumeId: conversationId })).resolves.toBe(0);
+      expect(boot).toHaveBeenCalledWith(expect.objectContaining({ initialComposerText: "Keep this new resume draft 😅\n" }));
+      expect(consumeEarlyInput()).toBe("");
+    } finally {
+      consumeEarlyInput();
+      vi.doUnmock("../tui/main.js");
+      for (const key of Object.keys(process.env)) if (!(key in prevEnv)) delete process.env[key];
+      Object.assign(process.env, prevEnv);
+      await rm(tmpHome, { recursive: true, force: true });
+      await rm(tmpCwd, { recursive: true, force: true });
+    }
+  });
+
   it("resumeTUIEntry attaches a matching live agent that wins the cold-resume race", async () => {
     const tmpHome = await mkdtemp(join(canonicalTmpdir(), "agenc-raced-resume-home-"));
     const tmpCwd = await mkdtemp(join(canonicalTmpdir(), "agenc-raced-resume-cwd-"));

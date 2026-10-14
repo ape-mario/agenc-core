@@ -733,11 +733,12 @@ describe("durable resume reaches the daemon approval bridge (#2239)", () => {
         messageId: "reject-during-review", streamId: "reject-during-review",
         acceptedAt: recordedAt, ifBusy: "reject",
       })).rejects.toMatchObject({ code: "TURN_IN_PROGRESS" });
-      const queued = runner.submitAgentMessage(CONVERSATION_ID, {
+      await expect(runner.submitAgentMessage(CONVERSATION_ID, {
         sessionId: CONVERSATION_ID, content: "do more", originalContent: "do more",
         messageId: "queued-during-review", streamId: "queued-during-review",
         acceptedAt: recordedAt,
-      });
+      })).rejects.toThrow("requires effect review");
+      expect(observations).toEqual([]);
       const resolution = createOperatorEffectReviewResolution({
         disposition: "confirmed_no_effect", actorId: "operator",
         evidenceRef: "test:verified-no-write", evidenceSha256: "a".repeat(64),
@@ -747,7 +748,11 @@ describe("durable resume reaches the daemon approval bridge (#2239)", () => {
         sessionId: CONVERSATION_ID, toolCallId: "write", resolution,
       })).resolves.toMatchObject({ kind: "resolved", durable: true });
       await waitUntil(() => observations.length >= 1, "reviewed turn continuation");
-      await expect(queued).resolves.toMatchObject({ disposition: "started" });
+      await expect(runner.submitAgentMessage(CONVERSATION_ID, {
+        sessionId: CONVERSATION_ID, content: "do more", originalContent: "do more",
+        messageId: "resubmit-after-review", streamId: "resubmit-after-review",
+        acceptedAt: new Date().toISOString(),
+      })).resolves.toMatchObject({ disposition: "started" });
       expect(booted!.rolloutStore.hasPendingEffectReviews()).toBe(false);
       expect(observations[0]).toMatchObject({ resume: true, hasApprovalResolver: true });
       expect(observations).toContainEqual(expect.objectContaining({ resume: false }));

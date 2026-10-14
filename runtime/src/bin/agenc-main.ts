@@ -956,6 +956,7 @@ type EarlyInputCapture = {
   readonly startCapturingEarlyInput?: () => void;
   readonly consumeEarlyInput?: (options?: {
     readonly restoreRawMode?: boolean;
+    readonly preserveWhitespace?: boolean;
   }) => string;
   readonly stopCapturingEarlyInput?: (options?: {
     readonly restoreRawMode?: boolean;
@@ -963,11 +964,11 @@ type EarlyInputCapture = {
 };
 
 
-async function startTuiEarlyInputCapture(): Promise<() => string> {
+async function startTuiEarlyInputCapture(preserveWhitespace = false): Promise<() => string> {
   try {
     const mod = (await import("../utils/earlyInput.js")) as EarlyInputCapture;
     mod.startCapturingEarlyInput?.();
-    return () => mod.consumeEarlyInput?.({ restoreRawMode: true }) ?? "";
+    return () => mod.consumeEarlyInput?.({ restoreRawMode: true, preserveWhitespace }) ?? "";
   } catch {
     return () => "";
   }
@@ -3306,6 +3307,7 @@ export async function attachAgentTuiEntry(
   let daemonClient: Awaited<
     ReturnType<typeof createConnectedAgenCJsonLineDaemonTuiClient>
   > | null = null;
+  let consumeAttachInput: (() => string) | null = null;
   try {
     validateAgencHome(env);
     daemonClient =
@@ -3328,6 +3330,7 @@ export async function attachAgentTuiEntry(
     ) {
       return 1;
     }
+    consumeAttachInput = await startTuiEarlyInputCapture(true);
     const attachment = await daemonClient.request("agent.attach", {
       agentId: args.agentId,
       clientId: args.clientId,
@@ -3523,15 +3526,16 @@ export async function attachAgentTuiEntry(
             )
           : [];
       try {
+        // Capture until the transcript, context and renderer are ready. Enter
+        // during loading leaves a draft for review; it never auto-submits.
+        const initialComposerText = (args.initialComposerText ?? "") + (consumeAttachInput?.() ?? "");
+        consumeAttachInput = null;
         const handle = await boot({
           session: preparedDaemonSession,
           model,
           stdinMode:
             runtimeOptions.stdinDataMode === true ? "data" : "readable",
-          ...(args.initialComposerText !== undefined &&
-          args.initialComposerText.length > 0
-            ? { initialComposerText: args.initialComposerText }
-            : {}),
+          ...(initialComposerText.length > 0 ? { initialComposerText } : {}),
           ...(initialUserMessages.length > 0 ? { initialUserMessages } : {}),
         });
         activeInkUnmount = handle.unmount;
@@ -3558,6 +3562,7 @@ export async function attachAgentTuiEntry(
     }
     throw error;
   } finally {
+    consumeAttachInput?.();
     await daemonClient?.close().catch(() => {
       /* best effort */
     });
@@ -3570,42 +3575,46 @@ export async function resumeTUIEntry(
   args: ResumeTUIArgs,
   startupCliFlags: StartupCliFlags = readStartupCliFlags(process.argv),
 ): Promise<number> {
-  const cliCwd = resolveCliCwdForStartup(process.env);
-  if (!cliCwd.ok) {
-    return writeUnavailableCliCwd();
-  }
-  const workspaceRoot = cliCwd.cwd;
-  const agencHome = resolveAgencHome(process.env);
-  const resolved = resolveResumeSessionId(
-    workspaceRoot,
-    args.resumeId,
-    agencHome,
-  );
-  switch (resolved.kind) {
-    case "ok":
-      return resumeResolvedTUIEntry(resolved, args.resumeId, {
-        agencHome,
-        startupCliFlags,
-      });
-    case "ambiguous":
-      process.stderr.write(
-        `agenc: ambiguous session id '${resolved.input}' matches: ${resolved.matches.join(", ")}\n`,
-      );
-      return 1;
-    case "none":
-    case "not_found":
-      process.stderr.write(
-        `agenc: session not found in either legacy or hashed project layout: ${args.resumeId}\n`,
-      );
-      return 1;
-    case "search_incomplete":
-      process.stderr.write(
-        `agenc: session search stopped at its ${resolved.reason.replaceAll("_", " ")} safety limit; narrow the session id and retry\n`,
-      );
-      return 1;
+  const consumeResumeInput = await startTuiEarlyInputCapture(true);
+  try {
+    const cliCwd = resolveCliCwdForStartup(process.env);
+    if (!cliCwd.ok) {
+      return writeUnavailableCliCwd();
+    }
+    const workspaceRoot = cliCwd.cwd;
+    const agencHome = resolveAgencHome(process.env);
+    const resolved = resolveResumeSessionId(
+      workspaceRoot,
+      args.resumeId,
+      agencHome,
+    );
+    switch (resolved.kind) {
+      case "ok":
+        return await resumeResolvedTUIEntry(resolved, args.resumeId, {
+          agencHome,
+          startupCliFlags,
+        });
+      case "ambiguous":
+        process.stderr.write(
+          `agenc: ambiguous session id '${resolved.input}' matches: ${resolved.matches.join(", ")}\n`,
+        );
+        return 1;
+      case "none":
+      case "not_found":
+        process.stderr.write(
+          `agenc: session not found in either legacy or hashed project layout: ${args.resumeId}\n`,
+        );
+        return 1;
+      case "search_incomplete":
+        process.stderr.write(
+          `agenc: session search stopped at its ${resolved.reason.replaceAll("_", " ")} safety limit; narrow the session id and retry\n`,
+        );
+        return 1;
+    }
+  } finally {
+    consumeResumeInput();
   }
 }
-
 
 async function resumeResolvedTUIEntry(
   descriptor: ResolvedResumeSession,

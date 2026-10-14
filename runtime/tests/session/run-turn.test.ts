@@ -1599,6 +1599,7 @@ describe("runTurn — T6 gap #119 lifecycle emits", () => {
     const appendRollout = vi.fn();
     session.rolloutStore = {
       assertCompactionProjectionReady: () => {},
+      assertToolAdmissionAllowed: () => {},
       append: vi.fn(), appendRollout,
       rolloutPath: "/tmp/checkpoint-projection-test.jsonl",
     } as unknown as Session["rolloutStore"];
@@ -1606,6 +1607,8 @@ describe("runTurn — T6 gap #119 lifecycle emits", () => {
     expect(requests).toBe(2);
     const message = (getState().history as LLMMessage[]).find((item) => item.role === "tool");
     expect(message).toBeDefined();
+    expect(message!.content).toContain("ordinary echo output");
+    expect(message!.runtimeOnly?.toolResultIsError).toBeUndefined();
     expect(message!.runtimeOnly?.toolResultIntegrity).toBeDefined();
     expect(appendRollout.mock.calls.some(([item]) => item.type === "response_item" &&
       item.payload.role === "tool" && item.payload.toolResultIntegrity !== undefined)).toBe(true);
@@ -7915,7 +7918,7 @@ describe("runTurn — GOAL #4b Stage 1 durable resume continuation", () => {
     expect(cp.taskBudgetRemaining).toBe(9999);
     expect(cp.checkpointVersion).toBe(4);
     expect(cp.toolResultIntegrityVersion).toBe(1);
-    expect(cp.prefixHashVersion).toBe(3);
+    expect(cp.prefixHashVersion).toBe(4);
     expect(
       appendRollout.mock.calls
         .map((call) => call[0])
