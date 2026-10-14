@@ -1742,10 +1742,6 @@ async function createDeferredDaemonPromptTuiSession(params: {
           ? preparedFirstMessage
           : "Multimodal AgenC startup";
       let startedAgentId: string | null = null;
-      // Propagate --dangerously-bypass-approvals-and-sandbox from the user's argv into the daemon-spawned
-      // agent's session config so the deferred TUI mirrors the bootTUI
-      // path. See GAP-PE-GUARDIAN-YOLO-LEAK.
-      const isBypassDeferred = params.permissionMode === "bypassPermissions";
       let startupClient: ConnectedDaemonTuiClient | null = null;
       try {
         const started = await params.deps.startPromptAgent({
@@ -1784,14 +1780,11 @@ async function createDeferredDaemonPromptTuiSession(params: {
                   firstSubmitOptions.displayUserMessage,
               }
             : {}),
-          // Pre-first-turn `/permissions mode` / `/plan` stage their choice in
-          // `pendingPermissionMode`; an explicit `--dangerously-bypass-approvals-and-sandbox` argv still wins so the
-          // bootTUI-parity bypass behavior is preserved.
-          ...(isBypassDeferred
-            ? { permissionMode: "bypassPermissions" as const }
-            : pendingPermissionMode !== undefined
-              ? { permissionMode: pendingPermissionMode }
-              : {}),
+          // Startup flags seed this value. A later explicit TUI choice is the
+          // mode the first task must enforce, including when leaving bypass.
+          ...(pendingPermissionMode !== undefined
+            ? { permissionMode: pendingPermissionMode }
+            : {}),
           metadata: { mode: "tui" },
         });
         startedAgentId = started.agentId;
@@ -2308,8 +2301,11 @@ async function createDeferredDaemonPromptTuiSession(params: {
           }
         ).services?.permissionModeRegistry;
         const previousMode = registry?.current?.().mode ?? "default";
-        // Validated above against USER_ADDRESSABLE_PERMISSION_MODES, which is a
-        // subset of the daemon prompt-agent permissionMode union.
+        if (registry?.update !== undefined && registry.current !== undefined) {
+          await registry.update({ ...registry.current(), mode });
+        }
+        // Stage only a successfully published choice. A rejected local update
+        // must leave the first task's startup mode unchanged.
         pendingPermissionMode = mode as
           | "default"
           | "plan"
@@ -2317,9 +2313,6 @@ async function createDeferredDaemonPromptTuiSession(params: {
           | "bypassPermissions"
           | "dontAsk"
           | "auto";
-        if (registry?.update !== undefined && registry.current !== undefined) {
-          await registry.update({ ...registry.current(), mode });
-        }
         return {
           sessionId: "",
           applied: previousMode !== mode,
