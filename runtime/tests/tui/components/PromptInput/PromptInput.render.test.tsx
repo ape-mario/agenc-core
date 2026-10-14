@@ -1428,6 +1428,51 @@ describe("PromptInput render surface", () => {
     }
   });
 
+  test("option+m on macOS changes the mode from an empty prompt and types inside text", async () => {
+    // macOS terminals send "µ" for option+m unless Option is set as Meta, and
+    // keyboard software can take shift+tab, which left no working mode key.
+    harness.platform = "macos";
+    harness.nextPermissionMode = "acceptEdits";
+    const setToolPermissionContext = vi.fn();
+    const onInputChange = vi.fn();
+    const rendered = await renderPromptInput({ setToolPermissionContext, onInputChange, input: "" });
+
+    try {
+      const baseProps = await waitForPromptInputProps();
+      setToolPermissionContext.mockClear();
+
+      (baseProps.onChange as (value: string) => void)("µ");
+      expect(setToolPermissionContext).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: "acceptEdits" }),
+      );
+      expect(onInputChange).not.toHaveBeenCalledWith("µ");
+
+      setToolPermissionContext.mockClear();
+      (baseProps.onChange as (value: string) => void)("300µs");
+      expect(setToolPermissionContext).not.toHaveBeenCalled();
+      expect(onInputChange).toHaveBeenCalledWith("300µs");
+    } finally {
+      await rendered.dispose();
+    }
+  });
+
+  test("option+m text stays text off macOS", async () => {
+    harness.platform = "linux";
+    const setToolPermissionContext = vi.fn();
+    const onInputChange = vi.fn();
+    const rendered = await renderPromptInput({ setToolPermissionContext, onInputChange, input: "" });
+
+    try {
+      const baseProps = await waitForPromptInputProps();
+      setToolPermissionContext.mockClear();
+      (baseProps.onChange as (value: string) => void)("µ");
+      expect(setToolPermissionContext).not.toHaveBeenCalled();
+      expect(onInputChange).toHaveBeenCalledWith("µ");
+    } finally {
+      await rendered.dispose();
+    }
+  });
+
   test("pastes clipboard images as pills and lazy-spaces the next typed word", async () => {
     vi.mocked(getImageFromClipboard).mockResolvedValue({
       base64: "jpeg-data",

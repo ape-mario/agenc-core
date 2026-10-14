@@ -71,9 +71,11 @@ export type BaseTextInputProps = {
   readonly value: string;
 
   /**
-   * Function to call when value updates.
+   * Function to call when value updates. Return false to refuse an edit the
+   * caller handled itself (a shortcut such as "?" on an empty prompt); the
+   * input then restores the text it showed.
    */
-  readonly onChange: (value: string) => void;
+  readonly onChange: (value: string) => void | boolean;
 
   /**
    * Function to call when `Enter` is pressed, where first argument is a value of the input.

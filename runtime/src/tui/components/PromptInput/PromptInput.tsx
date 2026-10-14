@@ -926,6 +926,9 @@ function PromptInput({
   const [showModeSwitcher, setShowModeSwitcher] = useState(false);
   const modeSwitcherVisibleRef = useRef(showModeSwitcher);
   modeSwitcherVisibleRef.current = showModeSwitcher;
+  // Set below, once the mode-cycle handler exists. Returns true when it
+  // changed the mode.
+  const cycleModeFromOptionMRef = useRef<(() => boolean) | null>(null);
   const [showAutoModeOptIn, setShowAutoModeOptIn] = useState(false);
   const [autoModeOptInPreview, setAutoModeOptInPreview] = useState(false);
   const promptModalOverlayActive =
@@ -1456,7 +1459,20 @@ function PromptInput({
         value === "?"
       ) {
         setHelpOpen((v) => !v);
-        return;
+        return false;
+      }
+      // macOS terminals type "µ" for option+m unless Option is set as Meta.
+      // On an empty prompt it changes the permission mode, like shift+tab
+      // (which some keyboard software takes over); inside text it stays a
+      // character, so "300µs" still types.
+      if (
+        onboardingInput === undefined &&
+        interpretShortcuts &&
+        value === "µ" &&
+        getPlatform() === "macos" &&
+        cycleModeFromOptionMRef.current?.() === true
+      ) {
+        return false;
       }
       setHelpOpen(false);
 
@@ -2835,6 +2851,11 @@ function PromptInput({
     context: "Chat",
     isActive: modeCycleKeybindingActive,
   });
+  cycleModeFromOptionMRef.current = () => {
+    if (!modeCycleKeybindingActive) return false;
+    handleCycleMode();
+    return true;
+  };
 
   // Shift+↑ enters message-actions cursor. Separate isActive so ctrl+r search
   // doesn't leave stale isSearchingHistory on cursor-exit remount.

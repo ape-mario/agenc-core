@@ -38,7 +38,8 @@ function mapInput(input_map: Array<[string, InputHandler]>): InputMapper {
 
 export type UseTextInputProps = {
   value: string
-  onChange: (value: string) => void
+  /** Return false to refuse the edit; the input then restores its text. */
+  onChange: (value: string) => void | boolean
   onSubmit?: (value: string) => void
   onExit?: () => void
   onExitMessage?: (show: boolean, key?: string) => void
@@ -153,8 +154,12 @@ export function useTextInput({
 
     updateRenderedInput(nextValue, nextOffset)
 
-    if (previousValue !== nextValue) {
-      onChange(nextValue)
+    if (previousValue !== nextValue && onChange(nextValue) === false) {
+      // The parent handled this edit as a shortcut and kept its own value.
+      // Restore the mirror, or the refused text shows up and the next
+      // keystroke builds on it, since the parent's props never change.
+      updateRenderedInput(previousValue, previousOffset)
+      return
     }
 
     if (previousOffset !== nextOffset) {
