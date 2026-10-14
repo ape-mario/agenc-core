@@ -128,6 +128,8 @@ export interface SessionTranscriptV2Event extends TranscriptV2JsonObject {
 }
 
 export interface SessionTranscriptV2Result extends TranscriptV2JsonObject {
+  /** Active selectable canonical user IDs; archived display rows are not targets. */
+  readonly activeUserMessageIds?: readonly string[];
   readonly schemaVersion: 2;
   readonly sessionId: string;
   readonly runId: string;
