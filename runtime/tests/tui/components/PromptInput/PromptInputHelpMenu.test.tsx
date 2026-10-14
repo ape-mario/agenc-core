@@ -2,6 +2,8 @@ import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderToString } from '../../../utils/staticRender.js'
 
+const harness = vi.hoisted(() => ({ platform: 'linux' }))
+
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
@@ -16,7 +18,7 @@ vi.mock('../../keybindings/loadUserBindings.js', () => ({
 }))
 
 vi.mock('../../../utils/platform.js', () => ({
-  getPlatform: () => 'linux',
+  getPlatform: () => harness.platform,
 }))
 
 vi.mock('../../../utils/config.js', () => ({
@@ -34,48 +36,59 @@ describe('PromptInputHelpMenu', () => {
     )
 
     const lines = output.split('\n')
-    const bashLine = lines.find(line => line.includes('! for bash mode')) ?? ''
-    const slashLine = lines.find(line => line.includes('/ for commands')) ?? ''
+    const bashLine = lines.find(line => line.includes('run a shell command'))
+    const slashLine = lines.find(line => line.includes('commands'))
     const escLine =
-      lines.find(line => line.includes('double tap esc to clear input')) ?? ''
-    const undoLine = lines.find(line => line.includes('to undo')) ?? ''
+      lines.find(line => line.includes('clear the prompt'))
+    const undoLine = lines.find(line => line.includes('undo'))
 
     // Each shortcut hint should appear on its own line — no two columns
     // should share a single visual row at narrow widths.
-    expect(bashLine).not.toMatch(/double tap esc/)
-    expect(slashLine).not.toMatch(/to auto-accept edits|to cycle modes/)
-    expect(escLine).not.toMatch(/! for bash mode|\/ for commands/)
-    expect(undoLine).not.toMatch(/double tap esc/)
+    for (const line of [bashLine, slashLine, escLine, undoLine]) expect(line).toBeDefined()
+    expect(bashLine).not.toMatch(/clear the prompt/)
+    expect(slashLine).not.toMatch(/change mode/)
+    expect(escLine).not.toMatch(/run a shell command|commands/)
+    expect(undoLine).not.toMatch(/clear the prompt/)
   })
 
-  it('keeps the 3-column row layout at wide terminal widths (>=100)', async () => {
+  it('puts the prefix and key groups side by side at wide terminal widths (>=100)', async () => {
     const { PromptInputHelpMenu } = await import('./PromptInputHelpMenu.js')
     const output = await renderToString(
       <PromptInputHelpMenu runtimeState={{}} />,
       120,
     )
 
-    // At 120 columns, the first column's "! for bash mode" should appear
-    // on the same visual row as the middle column's
-    // "double tap esc to clear input".
+    // The first row of each group shares a visual row on wide terminals.
     const sharedRow = output
       .split('\n')
       .find(
         line =>
-          line.includes('! for bash mode') &&
-          line.includes('double tap esc to clear input'),
+          line.includes('commands') &&
+          line.includes('change mode'),
       )
     expect(sharedRow).toBeDefined()
   })
 
-  it('describes Shift+Tab as cycling modes', async () => {
+  it.each(['linux', 'windows', 'macos'])('advertises both mode keys on %s', async platform => {
+    harness.platform = platform
     const { PromptInputHelpMenu } = await import('./PromptInputHelpMenu.js')
     const output = await renderToString(
       <PromptInputHelpMenu runtimeState={{}} />,
       120,
     )
 
-    expect(output).toContain('shift + tab to cycle modes')
-    expect(output).not.toContain('shift + tab to auto-accept edits')
+    expect(output).toContain(`shift+tab or ${platform === 'macos' ? 'option' : 'alt'}+m`)
+    expect(output).toContain('change mode')
+    expect(output).not.toContain('auto-accept edits')
+    harness.platform = 'linux'
+  })
+
+  it.each(['linux', 'windows', 'macos'])('formats keyboard names and undo on %s', async platform => {
+    const { formatHelpKey } = await import('./PromptInputHelpMenu.js')
+    const modifier = platform === 'macos' ? 'option' : 'alt'
+    expect(formatHelpKey('meta+m', platform)).toBe(`${modifier}+m`)
+    expect(formatHelpKey('alt+p', platform)).toBe(`${modifier}+p`)
+    expect(formatHelpKey('ctrl+_', platform)).toBe('ctrl+shift+-')
+    expect(formatHelpKey('ctrl+shift+o', platform)).toBe('ctrl+shift+o')
   })
 })

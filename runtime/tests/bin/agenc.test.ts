@@ -4526,7 +4526,7 @@ describe("main() smoke", () => {
       );
       expect(observedBareMode).toEqual([true, true]);
       expect(observedTranscript).toEqual([
-        { id: "snapshot:test_epoch:prior_user", type: "user_message", payload: { message: "Earlier request" } },
+        { id: "snapshot:test_epoch:prior_user", type: "user_message", payload: { message: "Earlier request", canonicalUserMessageId: "prior_user" } },
         { id: "snapshot:test_epoch:prior_assistant", type: "agent_message", payload: { message: "Earlier answer" } },
       ]);
       await expect(

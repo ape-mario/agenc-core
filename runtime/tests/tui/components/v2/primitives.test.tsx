@@ -95,17 +95,17 @@ describe('v2 primitives', () => {
       96,
     )
 
-    expect(output).toContain('permission mode')
-    expect(output).toContain('default')
-    expect(output).toContain('acceptEdits')
-    expect(output).toContain('plan')
-    expect(output).toContain('auto')
-    expect(output).toContain('bypassPermissions')
-    expect(output).toContain('read-only · propose plans')
-    expect(output).toContain('bypassPermissions')
-    expect(output).toContain('shift+tab')
+    expect(output).toContain('permissions')
+    expect(output).toContain('asks first')
+    expect(output).toContain('edits freely')
+    expect(output).toContain('plan only')
+    expect(output).toContain('auto approve')
+    expect(output).toContain('never asks')
+    expect(output).toContain('Reads and plans. Changes nothing.')
+    expect(output).toContain('now · plan only')
+    expect(output).toContain('shift+tab or option+m: next mode')
     // The advertised digit range must match the number of visible modes.
-    expect(output).toContain('1–5 pick · ⇧⇥ cycle · esc')
+    expect(output).toContain('1-5 pick · esc close')
   })
 
   it('hides unavailable cycle targets', async () => {
@@ -118,12 +118,12 @@ describe('v2 primitives', () => {
       96,
     )
 
-    expect(output).toContain('acceptEdits')
-    expect(output).toContain('auto-accept file edits')
-    expect(output).not.toContain('auto-approve everything')
-    expect(output).not.toContain('bypassPermissions')
+    expect(output).toContain('edits freely')
+    expect(output).toContain('Edits without asking. Asks before')
+    expect(output).not.toContain('auto approve')
+    expect(output).not.toContain('never asks')
     // The advertised digit range shrinks with the hidden modes.
-    expect(output).toContain('1–3 pick')
+    expect(output).toContain('1-3 pick')
   })
 
   it('renders body overlays without requiring modal content in chat flow', async () => {

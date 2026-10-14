@@ -487,6 +487,7 @@ describe("RolloutStore transactional compaction", () => {
     const metadata = target.readAll().find(item => item.type === "session_meta");
     if (metadata?.type !== "session_meta") throw new Error("branch metadata missing");
     target.open(metadata.payload);
+    target.reAppendSessionMetadata();
     target.appendRollout({
       type: "response_item", payload: { role: "user", content: "later branch work" },
     }, { durable: true });
@@ -495,6 +496,7 @@ describe("RolloutStore transactional compaction", () => {
       const resumed = openStore("resume-source-with-live-branch", { resume: true }, cwd);
       resumed.close();
       expect(existsSync(target.lockPath)).toBe(true);
+      expect(target.readAll().filter(item => item.type === "session_meta")).toHaveLength(2);
       expect(target.readAll().at(-1)).toMatchObject({
         type: "response_item", payload: { content: "later branch work" },
       });

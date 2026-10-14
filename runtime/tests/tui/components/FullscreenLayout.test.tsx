@@ -113,10 +113,11 @@ describe("FullscreenLayout modal viewport", () => {
     },
   );
 
-  test("marks light next to the mode without changing other status facts", () => {
+  test("omits the Light label without changing other status facts", () => {
     const regular = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort");
     const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort", true);
-    expect(light).toEqual({ ...regular, light: "light" });
+    expect(light).toEqual(regular);
+    expect(light.light).toBeNull();
   });
 
   test("shows each status fact once with plain mode labels", () => {
@@ -126,17 +127,17 @@ describe("FullscreenLayout modal viewport", () => {
       folder: "~/project",
       model: "grok-4-fast",
       effort: null,
-      mode: "bypass mode",
+      mode: "never asks",
       light: null,
       branch: "main",
       spend: "$0.04",
     });
     expect(
       statusLineSegments(100, "~/project", "grok-4-fast", "acceptEdits", "main", "$0.00").mode,
-    ).toBe("accept edits");
+    ).toBe("edits freely");
     expect(
       statusLineSegments(100, "~/project", "grok-4-fast", "plan", "main", "$0.00").mode,
-    ).toBe("plan mode");
+    ).toBe("plan only");
   });
 
   test("drops the folder, then the branch, on narrow terminals", () => {
@@ -161,7 +162,7 @@ describe("FullscreenLayout modal viewport", () => {
       folder: "~/project",
       model: "grok-4-fast",
       effort: null,
-      mode: "default mode",
+      mode: "asks first",
       light: null,
       branch: null,
       spend: null,
@@ -193,7 +194,7 @@ describe("FullscreenLayout modal viewport", () => {
 
     const lines = output.split(/\r?\n/u);
     // One status line under the prompt and no top bar.
-    expect(output).toContain("default mode");
+    expect(output).toContain("asks first");
     expect(output).toContain("$0.00");
     expect(output).not.toContain("orchestrator");
     expect(output).not.toContain("spend");

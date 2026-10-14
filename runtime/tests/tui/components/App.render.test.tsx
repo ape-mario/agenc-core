@@ -552,18 +552,10 @@ vi.mock("./Messages.js", async () => {
 
 vi.mock("./MessageSelector.js", async () => {
   const React = await import("react");
+  const filters = await import("../../../src/tui/components/message-selector-filter.js");
   return {
-    selectableUserMessagesFilter: (message: {
-      type?: unknown;
-      message?: { content?: unknown };
-    }) => {
-      const content = message.message?.content;
-      return (
-        message.type === "user" &&
-        typeof content === "string" &&
-        content.trim().length > 0
-      );
-    },
+    selectableUserMessagesFilter: filters.selectableUserMessagesFilter,
+    selectableMessageOrdinal: filters.selectableMessageOrdinal,
     MessageSelector: (props: Record<string, unknown>) => {
       providerProbe.messageSelectorProps.push(props);
       const messages = props.messages as readonly unknown[];
