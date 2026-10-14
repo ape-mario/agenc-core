@@ -2175,6 +2175,7 @@ async function bootstrapLocalRuntimeSessionScoped(
 
         const fileHistory = new FileHistory({
           projectDir,
+          sessionId: conversationId,
           onDiagnostic: (diagnostic) =>
             sidecarManager?.recordDiagnostic({
               sidecar: "file-history",
@@ -2184,6 +2185,7 @@ async function bootstrapLocalRuntimeSessionScoped(
               at: Date.now(),
             }),
         });
+        await fileHistory.loadFromDisk();
         const fileHistorySidecar = new FileHistorySidecar({ fileHistory, workspaceRoot });
         sidecarManager.register(deferredFileHistory?.attach(fileHistorySidecar) ?? fileHistorySidecar);
         s.attachFileHistory(fileHistory);
