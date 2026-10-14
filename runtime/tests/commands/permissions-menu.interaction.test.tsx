@@ -7,13 +7,14 @@ import { describe, expect, it, vi } from "vitest";
 import { permissionsCommand } from "../../src/commands/permissions.js";
 import type { SlashCommandContext } from "../../src/commands/types.js";
 import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
-import { createEmptyToolPermissionContext, USER_ADDRESSABLE_PERMISSION_MODES } from "../../src/permissions/types.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import { ConfigStore } from "../../src/config/store.js";
 import { createRoot } from "../../src/tui/ink.js";
 import { AppStateProvider, getDefaultAppState } from "../../src/tui/state/AppState.js";
 import stripAnsi from "strip-ansi";
 
 const delay = () => new Promise(resolve => setTimeout(resolve, 40));
+const displayedModes = ["default", "acceptEdits", "plan", "bypassPermissions", "dontAsk", "auto"] as const;
 
 describe("permissions picker applies modes with Enter", () => {
   it.each(["bypassPermissions", "dontAsk"] as const)("selects %s and records workspace consent with one Enter", async target => {
@@ -37,7 +38,17 @@ describe("permissions picker applies modes with Enter", () => {
       expect(result.kind).toBe("skip");
       root.render(<AppStateProvider initialState={getDefaultAppState()}>{jsx}</AppStateProvider>);
       await delay();
-      for (let index = 0; index < USER_ADDRESSABLE_PERMISSION_MODES.indexOf(target); index++) {
+      // TTY output can encode spaces with cursor movement rather than bytes.
+      const screen = stripAnsi(output).replace(/\s+/g, "");
+      for (const label of ["asks first", "edits freely", "plan only", "never asks", "rules only", "auto approve"]) {
+        expect(screen).toContain(label.replace(/\s+/g, ""));
+      }
+      expect(screen).toContain("howmuchcantheagentdowithoutasking?");
+      expect(screen).toContain("nocustomrules");
+      expect(screen).toContain("/permissionsadd|remove");
+      expect(screen).not.toContain("runtime");
+      expect(screen).not.toContain("Selected:");
+      for (let index = 0; index < displayedModes.indexOf(target); index++) {
         stdin.write("\x1b[B");
         await delay();
       }

@@ -25,7 +25,7 @@ import { getTotalCost } from '../../cost/tracker.js';
 import { formatUsdCost } from '../../session/cost.js';
 import { isNullRenderingAttachment } from '../message-visibility.js';
 import { PromptDialogOverlay, PromptSuggestionsOverlay } from './PromptOverlaySurfaces.js';
-import { permissionModeShortTitle } from '../../permissions/mode-display.js';
+import { permissionModePlainLabel } from '../../permissions/mode-display.js';
 import type { PermissionMode } from '../../permissions/types.js';
 import type { StickyPrompt } from './VirtualMessageList';
 import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
@@ -605,20 +605,7 @@ function DesignPlanModeBanner(): React.ReactNode {
 
 /** Short label for a permission mode in the status line. */
 function statusModeLabel(mode: PermissionMode): string {
-  switch (mode) {
-    case 'default':
-      return 'default mode';
-    case 'acceptEdits':
-      return 'accept edits';
-    case 'plan':
-      return 'plan mode';
-    case 'auto':
-      return 'auto mode';
-    case 'bypassPermissions':
-      return 'bypass mode';
-    default:
-      return `${permissionModeShortTitle(mode).toLowerCase()} mode`;
-  }
+  return permissionModePlainLabel(mode);
 }
 
 const STATUS_FOLDER_MIN_COLUMNS = 80;
@@ -654,7 +641,8 @@ export function statusLineSegments(
     model: modelLabel,
     effort,
     mode: statusModeLabel(mode),
-    light: lightMode ? "light" : null,
+    // Light is the default harness; it is shown in /status, not the status line.
+    light: null,
     branch: branch !== null && columns >= STATUS_BRANCH_MIN_COLUMNS ? branch : null,
     spend: spend === '' ? null : spend,
   };
