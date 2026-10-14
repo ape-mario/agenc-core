@@ -109,6 +109,32 @@ function createPendingRequest(
 }
 
 describe("permission request overlay coverage", () => {
+  test("requires a deliberate choice after typing, even when Enter follows a pause", async () => {
+    const resolved: ReviewDecision[] = [];
+    const request = createPendingRequest(decision => resolved.push(decision), {
+      input: { command: "printf safe_fixture" }, description: "Print a fixture",
+    });
+    const { stdin, stdout, output } = createStreams();
+    const root = await createRoot({ patchConsole: false,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stdout: stdout as unknown as NodeJS.WriteStream });
+    try {
+      root.render(<AgenCPermissionOverlay request={request} tools={[{ name: "Bash" }]} />);
+      await sleep();
+      stdin.write("I have 2 questions and 3 notes");
+      await sleep(1500);
+      stdin.write("\r");
+      await sleep();
+      expect(resolved).toEqual([]);
+      expect(stripAnsi(output())).toContain("waiting");
+      // The ignored Enter must not start another quiet window or hide the hint.
+      stdin.write("1");
+      await sleep();
+      expect(resolved).toEqual([APPROVED]);
+    } finally {
+      root.unmount(); stdin.end(); stdout.end(); await sleep();
+    }
+  });
   test.each([
     "I have 2 questions and 3 notes\r",
     "1 pasted sentence\r",
