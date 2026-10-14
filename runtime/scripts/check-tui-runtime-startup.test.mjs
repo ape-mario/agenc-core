@@ -283,7 +283,8 @@ test("private gate trust is canonical and deterministic without copied operator 
   }
 });
 
-test("private gate default config disables predictions before ordinary TUI startup", async () => {
+test("private gate default config is the minimal versioned config", async () => {
+  // The [buffer.prediction] block went away with the embedded editor (#2618).
   const state = await createTuiGateState({
     prefix: "agenc-tui-default-config-test-",
   });
@@ -292,13 +293,7 @@ test("private gate default config disables predictions before ordinary TUI start
     assert.equal(configPath, path.join(state.agencHome, "config.toml"));
     assert.equal(
       readFileSync(configPath, "utf8"),
-      [
-        "config_version = 2",
-        "",
-        "[buffer.prediction]",
-        'enabled = "off"',
-        "",
-      ].join("\n"),
+      ["config_version = 2", ""].join("\n"),
     );
     if (process.platform !== "win32") {
       assert.equal(statSync(configPath).mode & 0o777, 0o600);
@@ -309,13 +304,7 @@ test("private gate default config disables predictions before ordinary TUI start
     );
     assert.equal(
       readFileSync(configPath, "utf8"),
-      [
-        "config_version = 2",
-        "",
-        "[buffer.prediction]",
-        'enabled = "off"',
-        "",
-      ].join("\n"),
+      ["config_version = 2", ""].join("\n"),
     );
   } finally {
     await teardownTuiGateState(state);
