@@ -53,6 +53,7 @@ export type AgenCDaemonCliDeps = {
   readonly resumeTui: (
     args: ResumeTUIArgs,
     startupCliFlags?: StartupCliFlags,
+    options?: { readonly throwOnOpenFailure?: boolean },
   ) => Promise<number>;
 };
 

@@ -28,6 +28,8 @@ import {
   __setDaemonCliDepsForTest,
   __setActiveInkUnmountForTest,
   bootTUIEntry,
+  exitOrResumeAfterTui,
+  ResumeTuiOpenError,
   attachAgentTuiEntry,
   detectStartupShortCircuit,
   formatUnavailableCliCwdMessage,
@@ -50,6 +52,7 @@ import {
   validateAgencHome,
   type ConfigReloadLatch,
 } from "./agenc-main.js";
+import { setPendingResumeSessionId, resetPendingResumeSessionIdForTestingOnly } from "../../src/tui/pending-resume.js";
 import { ConfigStore } from "../config/store.js";
 import { defaultConfig } from "../config/schema.js";
 import {
@@ -4877,6 +4880,49 @@ describe("main() smoke", () => {
       Object.assign(process.env, prevEnv);
       await rm(tmpHome, { recursive: true, force: true });
       await rm(tmpCwd, { recursive: true, force: true });
+    }
+  });
+
+  it.each([0, 1, 130])("preserves mounted resumed TUI exit code %s without reopening", async (code) => {
+    const resumeTui = vi.fn(async () => code);
+    const createTuiContext = vi.fn(async () => { throw new Error("unexpected idle reboot"); });
+    __setDaemonCliDepsForTest({ resumeTui, createTuiContext });
+    setPendingResumeSessionId("conv-resumed-exit");
+    try {
+      await expect(exitOrResumeAfterTui(0, {})).resolves.toBe(code);
+      expect(resumeTui).toHaveBeenCalledWith({ resumeId: "conv-resumed-exit" }, {}, { throwOnOpenFailure: true });
+      expect(createTuiContext).not.toHaveBeenCalled();
+    } finally {
+      resetPendingResumeSessionIdForTestingOnly();
+      __setDaemonCliDepsForTest(null);
+    }
+  });
+
+  it("does not mistake a resumed renderer failure for a resume open failure", async () => {
+    const error = new Error("mounted renderer failed");
+    __setDaemonCliDepsForTest({ resumeTui: async () => { throw error; } });
+    setPendingResumeSessionId("conv-renderer-failure");
+    try {
+      await expect(exitOrResumeAfterTui(0, {})).rejects.toBe(error);
+    } finally {
+      resetPendingResumeSessionIdForTestingOnly();
+      __setDaemonCliDepsForTest(null);
+    }
+  });
+
+  it("reports an unmounted resume resolution failure with its typed open error", async () => {
+    const tmpHome = await mkdtemp(join(canonicalTmpdir(), "agenc-resume-missing-home-"));
+    const tmpCwd = await mkdtemp(join(canonicalTmpdir(), "agenc-resume-missing-cwd-"));
+    const prevEnv = { ...process.env };
+    Object.assign(process.env, { AGENC_HOME: tmpHome, AGENC_WORKSPACE: tmpCwd, AGENC_CLI_ENTRY_DISABLE: "1" });
+    try {
+      await expect(resumeTUIEntry({ resumeId: "conv-missing" }, {}, { throwOnOpenFailure: true })).rejects.toBeInstanceOf(ResumeTuiOpenError);
+      await expect(resumeTUIEntry({ resumeId: "conv-missing" }, {})).resolves.toBe(1);
+    } finally {
+      for (const key of Object.keys(process.env)) if (!(key in prevEnv)) delete process.env[key];
+      Object.assign(process.env, prevEnv);
+      await rm(tmpHome, { recursive: true });
+      await rm(tmpCwd, { recursive: true });
     }
   });
 
