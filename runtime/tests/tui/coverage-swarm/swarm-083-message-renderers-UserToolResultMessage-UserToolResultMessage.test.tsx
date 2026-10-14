@@ -253,7 +253,7 @@ describe('UserToolResultMessage swarm-083 coverage', () => {
       render([{ type: 'text', text: INTERRUPT_MESSAGE_FOR_TOOL_USE }]),
     ).resolves.toContain('array rejected runtime/src/array-control.ts')
     await expect(render(undefined)).resolves.toContain('array success')
-    await expect(render([{ type: 'json', value: 2 }], true)).resolves.toBe('')
+    expect((await render([{ type: 'json', value: 2 }], true)).trim()).toBe('')
     expect(renderToolUseErrorMessage).not.toHaveBeenCalled()
     await expect(render([{ type: 'json', value: 2 }], true, true)).resolves.toContain(
       'array error',

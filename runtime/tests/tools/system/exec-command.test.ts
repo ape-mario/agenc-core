@@ -986,16 +986,16 @@ describe("exec_command tool", () => {
       const preflight = tool.preflight?.(liveArgs(cmd, verificationRegistry()));
       expect(preflight?.message).toContain("shell_workspace_file_write_disallowed");
       expect(preflight?.message).not.toMatch(FILE_TOOL_NAME_RE);
-      expect(preflight?.message).toContain("This session has no file editing tool");
+      expect(preflight?.message).toContain("ask the user to change them themselves");
 
       const result = await tool.execute(liveArgs(cmd, verificationRegistry()));
       expect(result.isError).toBe(true);
       expect(result.content).not.toMatch(FILE_TOOL_NAME_RE);
-      expect(result.content).toContain("tmp/, for example");
+      expect(result.content).toContain("protected paths");
       expect(execCommand).not.toHaveBeenCalled();
     });
 
-    test("an OpenAI Light session is pointed at its listed apply_patch", async () => {
+    test("an OpenAI Light session cannot edit protected paths through shell", async () => {
       const { tool, execCommand } = mockManagerTool();
       const registry = buildToolRegistry({
         workspaceRoot: root,
@@ -1007,12 +1007,13 @@ describe("exec_command tool", () => {
       const result = await tool.execute(liveArgs("echo hi > .git/config", registry));
 
       expect(result.isError).toBe(true);
-      expect(result.content).toContain("use apply_patch instead.");
+      expect(result.content).toContain("protected paths");
+      expect(result.content).not.toContain("use apply_patch");
       expect(result.content).not.toMatch(/\b(?:Edit|Write)\b/u);
       expect(execCommand).not.toHaveBeenCalled();
     });
 
-    test("the main session's protected-path refusal names Edit and Write", async () => {
+    test("the main session cannot edit protected paths through shell", async () => {
       const { tool, execCommand } = mockManagerTool();
 
       const result = await tool.execute(
@@ -1020,7 +1021,7 @@ describe("exec_command tool", () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content).toContain("use Edit or Write instead");
+      expect(result.content).toContain("protected paths");
       expect(execCommand).not.toHaveBeenCalled();
     });
 
@@ -1075,8 +1076,9 @@ describe("exec_command tool", () => {
       expect(toolsRead).not.toHaveBeenCalled();
 
       const refused = await tool.execute(liveArgs("echo hi > .git/config", registry));
-      expect(refused.content).toContain("use Edit or Write instead");
-      expect(toLLMTools).toHaveBeenCalledTimes(1);
+      expect(refused.isError).toBe(true);
+      expect(refused.content).toContain("protected paths");
+      expect(toLLMTools).not.toHaveBeenCalled();
     });
 
     test("lets the way out it names through: a scratch file under the workspace's tmp", async () => {
