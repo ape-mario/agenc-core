@@ -267,10 +267,81 @@ describe("daemon instance identity", () => {
     },
   );
 
+  it.skipIf(process.platform !== "linux").each(["direct", "absolute-alias", "relative-alias", "alias-parent"] as const)(
+    "compares a foreign home in the candidate root before entrypoint or cwd reads (%s)",
+    async (kind) => {
+      const root = await mkdtemp(join(tmpdir(), "agenc-process-root-"));
+      const targetHome = join(root, "target-home");
+      const processRoot = join(root, "process-root");
+      await mkdir(targetHome);
+      await mkdir(join(processRoot, "private", "home"), { recursive: true });
+      await mkdir(join(processRoot, "private", "leaf"));
+      if (kind !== "direct") await symlink(
+        kind === "relative-alias" ? "private/home" : kind === "alias-parent" ? "/private/leaf" : "/private/home",
+        join(processRoot, "alias"),
+      );
+      const child = spawn(process.execPath, [
+        "-e", "setInterval(() => {}, 1_000)", "/core/runtime/bin/agenc",
+        "daemon", "start", "--foreground",
+      ], { stdio: "ignore", env: { ...process.env, AGENC_HOME: kind === "direct" ? "/private/home" : kind === "alias-parent" ? "/alias/../home" : "/alias" } });
+      const readProcessCwdPath = vi.fn(async () => { throw new Error("foreign cwd unavailable on host"); });
+      try {
+        await once(child, "spawn");
+        await expect(findLinuxAgenCDaemonProcesses({
+          entrypointPath: join(process.cwd(), "bin", "agenc"),
+          pid: process.pid, platform: "linux",
+          isPidRunning: pid => pid === child.pid && child.exitCode === null,
+        }, targetHome, "any-install", {
+          readProcessCwdPath,
+          readProcessRootPath: async () => processRoot,
+        })).resolves.toEqual([]);
+        expect(readProcessCwdPath).not.toHaveBeenCalled();
+        expect(child.exitCode).toBeNull();
+      } finally {
+        const exited = once(child, "exit");
+        child.kill("SIGTERM");
+        await exited.catch(() => {});
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.skipIf(process.platform !== "linux").each(["same-home", "unreadable-root", "relative-home", "symlink-loop"] as const)(
+    "fails closed with a PID and remedy for a candidate root that cannot prove a different home (%s)",
+    async (kind) => {
+      const root = await mkdtemp(join(tmpdir(), "agenc-root-guard-"));
+      if (kind === "symlink-loop") await symlink("loop", join(root, "loop"));
+      const child = spawn(process.execPath, [
+        "-e", "setInterval(() => {}, 1_000)", "/core/runtime/bin/agenc",
+        "daemon", "start", "--foreground",
+      ], { stdio: "ignore", env: { ...process.env,
+        AGENC_HOME: kind === "relative-home" ? "relative" : kind === "symlink-loop" ? "/loop" : "/",
+      } });
+      try {
+        await once(child, "spawn");
+        await expect(findLinuxAgenCDaemonProcesses({
+          entrypointPath: join(process.cwd(), "bin", "agenc"),
+          pid: process.pid, platform: "linux",
+          isPidRunning: pid => pid === child.pid && child.exitCode === null,
+        }, root, "any-install", {
+          readProcessRootPath: async () => kind === "unreadable-root" ? join(root, "missing") : root,
+        })).rejects.toThrow(new RegExp(`process ${child.pid}:.*stop that process in its namespace`));
+        expect(child.exitCode).toBeNull();
+      } finally {
+        const exited = once(child, "exit");
+        child.kill("SIGTERM");
+        await exited.catch(() => {});
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
   it.skipIf(process.platform !== "linux")(
     "fails closed for a missing agenc path with the foreground daemon tail",
     async () => {
       const root = await mkdtemp(join(tmpdir(), "agenc-daemon-argv-"));
+      const daemonHome = join(root, "daemon-home");
+      await mkdir(daemonHome);
       const missingEntrypoint = join(root, "missing", "bin", "agenc");
       const child = spawn(
         process.execPath,
@@ -282,7 +353,7 @@ describe("daemon instance identity", () => {
           "start",
           "--foreground",
         ],
-        { stdio: "ignore" },
+        { stdio: "ignore", env: { ...process.env, AGENC_HOME: daemonHome } },
       );
       const readProcessCwdPath = vi.fn(async () => process.cwd());
 
@@ -297,7 +368,7 @@ describe("daemon instance identity", () => {
               isPidRunning: (pid) =>
                 pid === child.pid && child.exitCode === null,
             },
-            join(root, "daemon-home"),
+            daemonHome,
             "any-install",
             { readProcessCwdPath },
           ),
