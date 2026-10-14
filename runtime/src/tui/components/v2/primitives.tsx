@@ -882,9 +882,9 @@ function AgencLogoMark({ compact = false }: { readonly compact?: boolean }): Rea
   return (
     <Box flexDirection="column">
       {lines.map((line, index) => (
-        // Brand purple in bold: braille dots are thin in most terminal fonts,
-        // so the accent color keeps the mark readable on dark and light.
-        <ThemedText key={index} color="agenc" bold>
+        // Brand purple (the accent token, like the prompt glyph) in bold: braille
+        // dots are thin in most terminal fonts, so color keeps the mark readable.
+        <ThemedText key={index} color="accent" bold>
           {line}
         </ThemedText>
       ))}
