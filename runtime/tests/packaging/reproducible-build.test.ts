@@ -618,6 +618,8 @@ describe("reproducible install and release contract", () => {
     expect(workflow).toContain("gcc-toolset-12-gcc-c++-12.2.1-7.8.el8_10");
     expect(workflow).toContain("kernel-headers-4.18.0-553.150.1.el8_10");
     expect(workflow).toContain("glibc-devel-2.28-251.el8_10.43");
+    expect(workflow).toContain("glibc-static-2.28-251.el8_10.43");
+    expect(workflow).toContain("dnf install -y --setopt=gpgcheck=1 --enablerepo=powertools");
     expect(workflow).toContain("python3.12-3.12.13-2.el8_10");
     expect(workflow).toContain('["rpmContentInventory"]');
     expect(workflow).toContain("%{SHA256HEADER}");
@@ -1179,9 +1181,9 @@ describe("reproducible install and release contract", () => {
         "name|epoch|version|release|arch|sha256header|payloaddigest|payloaddigestalgo|rsaheader-pgpsig",
       signatureKeyIds: ["15af5dac6d745a60"],
       sha256: {
-        x64: "69cfc60fcb6f5e386fd6898935d432b13e84ce48b9ffdbbf25534781c37754e3",
+        x64: "dd68b6a5168f632115be67586491fc7813f984ba80b56db539cc03b3c4bbd05f",
         arm64:
-          "2e96a5c3d84bd475bde1a8bfb0799d2c2d565fbf74e67a159fd9023379a13b7a",
+          "5829a1e40236ef0f7bc62ed3c6511bd3602a929e964cbb02cb3e0634df5a1c82",
       },
     });
   });
