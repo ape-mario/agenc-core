@@ -15,7 +15,7 @@ import { delegate } from "../delegate.js";
 import { terminalFromAgentStatus } from "../status.js";
 import { liveAgentSession } from "../live-session.js";
 import { READ_ONLY_DELEGATION_PROMPT, sessionIsPlanning, sessionReadOnlyDelegation } from "../readonly-delegation.js";
-import { AGENT_MESSAGE_REFERENCE_GUIDANCE, agentMessageReferenceSchema, resolveAgentMessage } from "../message-reference.js";
+import { AGENT_MESSAGE_REFERENCE_GUIDANCE, agentMessageReferenceSchema, normalizeAgentMessageArgs, resolveAgentMessage } from "../message-reference.js";
 import type { ForkMode } from "../fork-context.js";
 import type { AgentThread } from "../thread.js";
 import {
@@ -645,7 +645,8 @@ export function createSpawnAgentTool(opts: MultiAgentV2Options): Tool {
         return { code: `missing-${key}`, message: `${key} is required` };
       }
     }
-    if (args.message_ref === undefined && (typeof args.message !== "string" || args.message.trim().length === 0)) {
+    const message = normalizeAgentMessageArgs(args);
+    if (message.message_ref === undefined && message.message === undefined) {
       return { code: "missing-message", message: "message or message_ref is required" };
     }
     return null;
