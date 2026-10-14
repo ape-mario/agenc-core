@@ -144,13 +144,21 @@ function emitExtractionWarning(
   ) {
     return;
   }
-  try {
-    bus.emit({
-      id: bus.nextInternalSubId(),
-      msg: { type: "warning", payload: { cause, message } },
-    });
-  } catch {
-    // Diagnostics must never break the turn.
+  const emit = (): void => {
+    try {
+      bus.emit!({
+        id: bus.nextInternalSubId!(),
+        msg: { type: "warning", payload: { cause, message } },
+      });
+    } catch {
+      // Diagnostics must never break the turn.
+    }
+  };
+  const store = session.rolloutStore;
+  if (store !== undefined && store !== null) {
+    void store.withCanonicalBackgroundWork(emit).catch(() => {});
+  } else {
+    emit();
   }
 }
 
@@ -1093,35 +1101,43 @@ export function initExtractMemories(
 
     lane.inProgress = true;
     try {
-      try {
-        // A lane created after a restart, or after the lane map pruned it,
-        // continues from the persisted cadence. This runs under the
-        // in-progress guard so a concurrent request queues behind it.
-        await restoreLane(lane, queued.context.session, memoryDir);
-        await runExtraction(queued, memoryDir, lane, false, readOnlyMemoryRoots);
-      } catch (error) {
-        // Best effort: extraction failures must never break the user turn,
-        // but they must not vanish either.
-        emitExtractionWarning(
-          queued.context.session,
-          "memory_extraction_failed",
-          errorText(error),
-        );
-      }
-      await persistLane(lane, queued.context.session, memoryDir);
-      while (lane.pendingContext) {
-        const trailing = lane.pendingContext;
-        lane.pendingContext = undefined;
+      const run = async (): Promise<void> => {
         try {
-          await runExtraction(trailing, memoryDir, lane, true, readOnlyMemoryRoots);
+          // A lane created after a restart, or after the lane map pruned it,
+          // continues from the persisted cadence. This runs under the
+          // in-progress guard so a concurrent request queues behind it.
+          await restoreLane(lane, queued.context.session, memoryDir);
+          await runExtraction(queued, memoryDir, lane, false, readOnlyMemoryRoots);
         } catch (error) {
+          // Best effort: extraction failures must never break the user turn,
+          // but they must not vanish either.
           emitExtractionWarning(
-            trailing.context.session,
+            queued.context.session,
             "memory_extraction_failed",
-            `trailing run: ${errorText(error)}`,
+            errorText(error),
           );
         }
-        await persistLane(lane, trailing.context.session, memoryDir);
+        await persistLane(lane, queued.context.session, memoryDir);
+        while (lane.pendingContext) {
+          const trailing = lane.pendingContext;
+          lane.pendingContext = undefined;
+          try {
+            await runExtraction(trailing, memoryDir, lane, true, readOnlyMemoryRoots);
+          } catch (error) {
+            emitExtractionWarning(
+              trailing.context.session,
+              "memory_extraction_failed",
+              `trailing run: ${errorText(error)}`,
+            );
+          }
+          await persistLane(lane, trailing.context.session, memoryDir);
+        }
+      };
+      const store = queued.context.session.rolloutStore;
+      if (store !== null && store !== undefined) {
+        await store.withCanonicalBackgroundWork(run);
+      } else {
+        await run();
       }
     } finally {
       lane.inProgress = false;

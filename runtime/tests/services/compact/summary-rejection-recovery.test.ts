@@ -45,7 +45,7 @@ describe("durably rejected summaries can defer to context admission", () => {
           { type: "compaction_failed", payload: { reason: "provenance_invalid" } },
         ]);
       expect(() => harness.store.assertCompactionProjectionReady()).not.toThrow();
-      const lease = harness.store.acquireCompactionLease("after-rejected-summary");
+      const lease = await harness.store.acquireCompactionLease("after-rejected-summary");
       await lease.release();
     } finally {
       harness.close();

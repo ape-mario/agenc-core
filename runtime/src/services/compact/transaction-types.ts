@@ -493,6 +493,7 @@ export interface CompactionTransactionAdapter {
   readonly epoch: number;
   acquireCompactionLease(
     attemptId: string,
+    signal?: AbortSignal,
   ): CompactionTransactionLease | Promise<CompactionTransactionLease>;
   prepareSource(
     attemptId: string,

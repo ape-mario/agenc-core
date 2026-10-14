@@ -165,9 +165,10 @@ interface CompactionAdmissionScope {
 async function acquireCompactionTransactionLease(
   adapter: CompactionTransactionAdapter,
   attemptId: string,
+  signal?: AbortSignal,
 ): Promise<CompactionTransactionLease> {
   try {
-    return await adapter.acquireCompactionLease(attemptId);
+    return await adapter.acquireCompactionLease(attemptId, signal);
   } catch (error) {
     if (error instanceof CompactionTransactionError) throw error;
     throw new CompactionTransactionError(
@@ -195,7 +196,7 @@ export async function compactConversationTransactionally(
     estimateMessagesTokens(options.completeSourceMessages, context, { inputOnly: true }));
   let lease: CompactionTransactionLease;
   try {
-    lease = await acquireCompactionTransactionLease(adapter, attemptId);
+    lease = await acquireCompactionTransactionLease(adapter, attemptId, context.abortController?.signal);
   } catch (error) {
     progress.fail(error);
     throw error;

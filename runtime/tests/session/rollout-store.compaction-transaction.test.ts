@@ -85,20 +85,40 @@ afterEach(() => {
 });
 
 describe("RolloutStore transactional compaction", () => {
-  it("fails fast on a concurrent compaction lease and releases idempotently", () => {
+  it("fails fast on a concurrent compaction lease and releases idempotently", async () => {
     const store = openStore("compaction-lease");
     try {
-      const first = store.acquireCompactionLease("lease-a");
+      const first = await store.acquireCompactionLease("lease-a");
       expect(() => store.acquireCompactionLease("lease-b")).toThrow(
         /compaction already in progress/i,
       );
       first.release();
       first.release();
-      const second = store.acquireCompactionLease("lease-c");
+      const second = await store.acquireCompactionLease("lease-c");
       second.release();
     } finally {
       store.close();
     }
+  });
+
+  it("keeps parent bookkeeping behind committed projection and cleanup", async () => {
+    const store = openStore("compaction-projection-ownership");
+    const attemptId = "projection-ownership";
+    try {
+      const lease = await store.acquireCompactionLease(attemptId);
+      commitSmallCompaction(store, attemptId);
+      lease.release();
+      let published = false;
+      const pending = store.withCanonicalBackgroundWork(() => { published = true; });
+      await Promise.resolve();
+      expect(published).toBe(false);
+      store.markProjectionComplete(attemptId);
+      await Promise.resolve();
+      expect(published).toBe(false);
+      store.markCleanupComplete(attemptId);
+      await pending;
+      expect(published).toBe(true);
+    } finally { store.close(); }
   });
 
   it("rejects dynamically omitted source and commit payload bundles", () => {

@@ -4422,12 +4422,17 @@ export async function* runAgent(
     const allowlist =
       params.toolAllowlist ?? live.role.config.allowlist ?? undefined;
     if (allowlist && allowlist.length > 0) {
-      emitWarning(
-        parent.eventLog,
-        parent.nextInternalSubId(),
-        "subagent_tool_allowlist",
-        `subagent ${live.agentPath} allowlist: ${allowlist.join(",")}`,
-      );
+      const notice = (): void => { emitWarning(
+          parent.eventLog,
+          parent.nextInternalSubId(),
+          "subagent_tool_allowlist",
+          `subagent ${live.agentPath} allowlist: ${allowlist.join(",")}`,
+        ); };
+      if (parent.rolloutStore !== null && parent.rolloutStore !== undefined) {
+        await parent.rolloutStore.withCanonicalBackgroundWork(notice);
+      } else {
+        notice();
+      }
     }
 
     let cacheSafeParamsCaptured = false;

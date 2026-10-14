@@ -23,6 +23,7 @@ import {
   readFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
+import { acquireCanonicalCompactionLease, withCanonicalBackgroundWork } from "./canonical-background-work.js";
 import {
   basename,
   dirname,
@@ -311,7 +312,6 @@ export interface ThreadSpawnEdgeRecord {
 }
 
 const THREAD_SPAWN_EDGE_SNAPSHOT_VERSION = 1;
-const activeCompactionLeases = new Map<string, symbol>();
 
 function rolloutItemsContainTerminal(
   items: readonly RolloutItem[],
@@ -812,6 +812,10 @@ export class RolloutStore {
   private readonly canonicalScanner = new CanonicalRolloutScanner();
   private readonly durablyCommittedCompactionsAwaitingReconstruction =
     new Set<string>();
+  private readonly compactionOwnership = new Map<string, {
+    readonly release: () => void;
+    committed: boolean;
+  }>();
   private readonly compactionSourcePayloadBundles = new Map<
     string,
     CompactionSourcePayloadBundlesV1
@@ -1048,7 +1052,7 @@ export class RolloutStore {
    * writer lock prevents another process/store from owning the same rollout;
    * this lease serializes independent in-process contexts on that writer.
    */
-  acquireCompactionLease(attemptId: string): CompactionTransactionLease {
+  acquireCompactionLease(attemptId: string, signal?: AbortSignal): CompactionTransactionLease | Promise<CompactionTransactionLease> {
     if (attemptId.trim().length === 0) {
       throw new CompactionTransactionError(
         "pin_failed",
@@ -1056,24 +1060,27 @@ export class RolloutStore {
       );
     }
     const key = `${resolve(this.rolloutPath)}#epoch:${this.runEpoch}`;
-    if (activeCompactionLeases.has(key)) {
-      throw new CompactionTransactionError(
+    const acquired = acquireCanonicalCompactionLease(key, () => new CompactionTransactionError(
         "intent_failed",
         "compaction already in progress",
-      );
-    }
-    const owner = Symbol(attemptId);
-    activeCompactionLeases.set(key, owner);
-    let released = false;
-    return {
-      release: () => {
-        if (released) return;
-        released = true;
-        if (activeCompactionLeases.get(key) === owner) {
-          activeCompactionLeases.delete(key);
-        }
-      },
+      ), signal);
+    const bind = (lease: CompactionTransactionLease): CompactionTransactionLease => {
+      const ownership = { release: () => { lease.release(); }, committed: false };
+      this.compactionOwnership.set(attemptId, ownership);
+      return { release: () => {
+        if (this.compactionOwnership.get(attemptId) !== ownership) return;
+        // The transaction returns before its caller publishes replacement
+        // history and the forced checkpoint. Keep memory readers behind both.
+        if (ownership.committed || this.durablyCommittedCompactionsAwaitingReconstruction.has(attemptId)) return;
+        this.compactionOwnership.delete(attemptId);
+        ownership.release();
+      } };
     };
+    return acquired instanceof Promise ? acquired.then(bind) : bind(acquired);
+  }
+
+  withCanonicalBackgroundWork<T>(work: () => T | Promise<T>): Promise<T> {
+    return withCanonicalBackgroundWork(`${resolve(this.rolloutPath)}#epoch:${this.runEpoch}`, work);
   }
   /** Bind the exact canonical records that currently project active history. */
   prepareSource(
@@ -1528,6 +1535,8 @@ export class RolloutStore {
         cause: error,
       });
     }
+    const ownership = this.compactionOwnership.get(committed.attempt_id);
+    if (ownership !== undefined) ownership.committed = true;
     return committed;
   }
 
@@ -1673,6 +1682,7 @@ export class RolloutStore {
 
   markCleanupComplete(attemptId: string): void {
     this.compactionRetentionRepo.markCleanupComplete(attemptId);
+    this.releaseCompactionOwnership(attemptId);
   }
 
   markCleanupPending(attemptId: string, reason: unknown): void {
@@ -1694,6 +1704,14 @@ export class RolloutStore {
       event.recorded_at_ms,
       reason,
     );
+    this.releaseCompactionOwnership(attemptId);
+  }
+
+  private releaseCompactionOwnership(attemptId: string): void {
+    const ownership = this.compactionOwnership.get(attemptId);
+    if (ownership === undefined) return;
+    this.compactionOwnership.delete(attemptId);
+    ownership.release();
   }
 
   /** Explicit operator extension; the durable minimum can never shrink. */
