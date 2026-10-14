@@ -7,6 +7,7 @@ export const APPROVAL_TYPING_QUIET_MS = 500;
 /** Keep typing and paste bursts out of the permission decision shortcuts. */
 export function useApprovalTypingGuard(typedConfirmation = false) {
   const lastTyping = useRef(Number.NEGATIVE_INFINITY);
+  const typedSinceChoice = useRef(false);
   const [waiting, setWaiting] = useState(false);
   const blockTyping = useCallback((input: string, key: Key, event: InputEvent): boolean => {
     // Deliberate cancellation remains available even in a typing burst.
@@ -21,6 +22,7 @@ export function useApprovalTypingGuard(typedConfirmation = false) {
     const textBurst = (event.textInBatch?.length ?? 0) > 1;
     if (paste || textBurst || (printable && !shortcut) || now - lastTyping.current < APPROVAL_TYPING_QUIET_MS) {
       lastTyping.current = now;
+      if (!typedConfirmation) typedSinceChoice.current = true;
       setWaiting(true);
       // Destructive cards still require their exact confirmation word. Allow
       // editing that word, but Enter must be a separate, deliberate gesture.
@@ -28,7 +30,18 @@ export function useApprovalTypingGuard(typedConfirmation = false) {
       event.stopImmediatePropagation();
       return true;
     }
-    if (waiting) setWaiting(false);
+    if (!typedConfirmation && typedSinceChoice.current) {
+      // A pause does not turn text intended for the composer into consent.
+      // Enter stays blocked until a separate shortcut or navigation choice.
+      if (key.return) {
+        event.stopImmediatePropagation();
+        return true;
+      }
+      if ((printable && shortcut) || key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) {
+        typedSinceChoice.current = false;
+      }
+    }
+    if (waiting && (typedConfirmation || !typedSinceChoice.current)) setWaiting(false);
     return false;
   }, [typedConfirmation, waiting]);
   return { waiting, blockTyping };
