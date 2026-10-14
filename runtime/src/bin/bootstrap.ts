@@ -2165,6 +2165,9 @@ async function bootstrapLocalRuntimeSessionScoped(
         const fileHistory = new FileHistory({
           projectDir,
           sessionId: conversationId,
+          withCanonicalBackgroundWork: (work) => s.rolloutStore === null
+            ? Promise.resolve().then(work)
+            : s.rolloutStore.withCanonicalBackgroundWork(work),
           onDiagnostic: (diagnostic) =>
             sidecarManager?.recordDiagnostic({
               sidecar: "file-history",
