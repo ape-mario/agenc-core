@@ -53,9 +53,11 @@ function KeyRows({
   readonly keyWidth: number;
 }): React.ReactNode {
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" flexShrink={0}>
       {rows.map(row => (
-        <Box key={`${row.key}:${row.action}`} flexDirection="row">
+        // Rows never shrink: when the pane is short the transcript gives way,
+        // instead of two shortcut rows collapsing onto one line.
+        <Box key={`${row.key}:${row.action}`} flexDirection="row" flexShrink={0}>
           <Box width={keyWidth} flexShrink={0}>
             <Text dimColor={dimColor}>{row.key}</Text>
           </Box>
@@ -120,9 +122,9 @@ export function PromptInputHelpMenu(props: Props): React.ReactNode {
     // Two short columns and a one-line prefix row keep the whole panel about
     // ten lines tall, so it fits under the prompt on an 80x24 terminal.
     return (
-      <Box paddingX={paddingX} flexDirection="column">
+      <Box paddingX={paddingX} flexDirection="column" flexShrink={0}>
         <Text dimColor={dimColor}>/ commands   ! shell command   @ attach a file</Text>
-        <Box flexDirection="row" gap={2} marginTop={1}>
+        <Box flexDirection="row" gap={2} flexShrink={0}>
           <KeyRows rows={editingRows} dimColor={dimColor} keyWidth={editingKeyWidth} />
           <KeyRows rows={viewRows} dimColor={dimColor} keyWidth={viewKeyWidth} />
         </Box>
@@ -131,8 +133,8 @@ export function PromptInputHelpMenu(props: Props): React.ReactNode {
     );
   }
   return (
-    <Box paddingX={paddingX} flexDirection="column">
-      <Box flexDirection="row" gap={gap ?? 4}>
+    <Box paddingX={paddingX} flexDirection="column" flexShrink={0}>
+      <Box flexDirection="row" gap={gap ?? 4} flexShrink={0}>
         <Box flexDirection="column" flexShrink={0}>
           <Text dimColor>start with</Text>
           <KeyRows rows={prefixRows} dimColor={dimColor} keyWidth={3} />
