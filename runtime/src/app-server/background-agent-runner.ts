@@ -2730,18 +2730,28 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
             emitToolStart(toolName);
             await active.dispatchChain;
             const router = routerFromRegistry(session.services.registry);
-            const result = await router.dispatchModelToolCall(
-              {
-                id: params.commandId,
-                name: toolName,
-                arguments: JSON.stringify({ command: params.command }),
-              },
-              {
-                ...buildLiveToolDispatchOptions(turn, session, executionSignal),
-                source: "direct",
-              },
-            );
-            return { result, toolName, turnId: turn.subId };
+            // Direct shell effects are serialized outside model turns. Their
+            // approvals belong to this command, not the idle activeTurn slot.
+            let shellDispatchActive = true;
+            try {
+              const result = await router.dispatchModelToolCall(
+                {
+                  id: params.commandId,
+                  name: toolName,
+                  arguments: JSON.stringify({ command: params.command }),
+                },
+                {
+                  ...buildLiveToolDispatchOptions(turn, session, executionSignal),
+                  source: "direct",
+                  getActiveTurnId: () => shellDispatchActive &&
+                    !executionSignal.aborted && this.#active.get(agentId) === active
+                    ? turn.subId : null,
+                },
+              );
+              return { result, toolName, turnId: turn.subId };
+            } finally {
+              shellDispatchActive = false;
+            }
           },
         ),
       );

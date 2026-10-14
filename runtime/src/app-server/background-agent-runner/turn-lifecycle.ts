@@ -188,8 +188,7 @@ function normalizeSessionShellResult(
     typeof codeMode.output === "string" ? codeMode.output : undefined;
   const rawStdout =
     metadataStdout ??
-    codeModeOutput ??
-    (dispatch.isError === true ? "" : dispatch.content);
+    (dispatch.isError === true ? "" : codeModeOutput ?? dispatch.content);
   const rawStderr =
     typeof metadata.stderr === "string"
       ? metadata.stderr
