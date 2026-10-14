@@ -472,6 +472,43 @@ function existingSourceFile(base: string): string | null {
   }) ?? null;
 }
 
+// esbuild records a module's type from the first resolution that reaches it, and
+// a path returned by a plugin carries no package.json type. When a file is
+// reachable both natively and through these plugins, the importer that the
+// parallel parse happens to reach first decides its type, and with it the
+// __toESM node-mode flag of its CommonJS imports, so two builds of one commit
+// differ. The plugins therefore leave a path to esbuild whenever esbuild resolves
+// the literal target natively: an exact match, else exactly one candidate file.
+const NATIVE_RESOLUTION_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.mts', '.cts', '.mjs', '.cjs', '.json'];
+const NATIVE_REWRITTEN_EXTENSIONS: Record<string, string[]> = {
+  '.js': ['.ts', '.tsx'],
+  '.jsx': ['.ts', '.tsx'],
+  '.mjs': ['.mts'],
+  '.cjs': ['.cts'],
+};
+
+function isExistingFile(candidate: string): boolean {
+  try {
+    return statSync(candidate).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function uniqueNativeSourceFile(base: string): string | null {
+  // esbuild takes an exact match before trying any other extension.
+  if (isExistingFile(base)) return base;
+  const ext = /\.[^/\\.]+$/.exec(base)?.[0] ?? '';
+  const stem = ext === '' ? base : base.slice(0, -ext.length);
+  const candidates = new Set<string>([
+    ...(NATIVE_REWRITTEN_EXTENSIONS[ext] ?? []).map((rewritten) => `${stem}${rewritten}`),
+    ...NATIVE_RESOLUTION_EXTENSIONS.map((extension) => `${base}${extension}`),
+    ...NATIVE_RESOLUTION_EXTENSIONS.map((extension) => resolve(base, `index${extension}`)),
+  ]);
+  const found = [...candidates].filter(isExistingFile);
+  return found.length === 1 ? found[0] : null;
+}
+
 function isWithin(root: string, file: string): boolean {
   const rel = relative(root, file);
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
@@ -668,8 +705,9 @@ const agencBareSrcAlias = {
   }) {
     build.onResolve({ filter: /^src\// }, (args) => {
       const resolved = resolveAgenCBareSrc(args.path);
-      if (resolved !== null) return { path: resolved };
-      return null;
+      if (resolved === null) return null;
+      const native = uniqueNativeSourceFile(resolve(runtimeSourceRoot, args.path.slice('src/'.length)));
+      return resolved === native ? null : { path: resolved };
     });
   },
 };
@@ -725,7 +763,11 @@ const agencOptionalExternal = {
       }
       if (args.path.startsWith('./') || args.path.startsWith('../')) {
         const resolved = resolveRelativeAgenCSource(args.importer, args.path);
-        if (resolved !== null) return { path: resolved };
+        if (resolved !== null) {
+          const importer = isAbsolute(args.importer) ? args.importer : resolve(runtimeRoot, args.importer);
+          const native = uniqueNativeSourceFile(resolve(dirname(importer), args.path));
+          return resolved === native ? null : { path: resolved };
+        }
         return isKnownMissingOptionalModule(args.path)
           ? { path: args.path, external: true }
           : null;
