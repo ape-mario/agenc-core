@@ -17,7 +17,6 @@ import {
   type ShellToken,
 } from "../utils/shell/command-line.js";
 import { readShellSubstitutions } from "../utils/shell/substitutions.js";
-import { literalGitCommands } from "../utils/shell/git-commands.js";
 import { analyzeSedWrites } from "../utils/shell/sed-writes.js";
 import {
   parseWriteCommandOperands,
@@ -1676,16 +1675,6 @@ function collectDirectCommandWriteTargets(
   params: CommandArguments & { readonly command: string },
 ): ShellWriteTargetCollection {
   const command = basename(params.command);
-  if (command === "git") {
-    const git = literalGitCommands([params.command, ...params.args].map(word =>
-      `'${word.replace(/'/g, "'\\''")}'`,
-    ).join(" "));
-    const collection = params.args[0] === "mv"
-      ? collectMoveTargets(params.args.slice(1), params.cwd, params.environment.bsdSed)
-      : emptyTargetCollection();
-    collection.indeterminate ||= git?.mutates === true;
-    return collection;
-  }
   if (command === "env") {
     return collectEnvCommandWriteTargets(params);
   }

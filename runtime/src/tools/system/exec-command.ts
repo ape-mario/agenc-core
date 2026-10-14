@@ -14,7 +14,6 @@ import {
   shellWorkspaceMutationPermission,
 } from "./shell-mutation-permission.js";
 import { preflightShellWorkspaceWritePolicy } from "./shell-preflight.js";
-import { shellGitMutationPermission } from "./shell-git-permission.js";
 import { recordSessionRead, resolveSessionId, safePathAllowingSessionPlanFile } from "./filesystem.js";
 import type { BashToolConfig } from "./types.js";
 import { UnifiedExecError } from "../../unified-exec/types.js";
@@ -1251,26 +1250,10 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
       }
 
       try {
-        let runtimeSandbox = inspection?.runtimeSandbox ?? runtimeSandboxForExec(
+        const runtimeSandbox = inspection?.runtimeSandbox ?? runtimeSandboxForExec(
           args,
           config?.cwd ?? process.cwd(),
         );
-        const gitMutation = inspection === undefined && !detach && tty !== true &&
-          asBoolean(args.login) !== true ? shellGitMutationPermission(
-            cmd, effectiveWorkdir ?? config?.cwd ?? process.cwd(),
-            config?.cwd ?? config?.allowedPaths?.[0] ?? process.cwd(),
-            shellWorkspaceMutationPermission(args).allowWorkspaceWrites,
-          ) : undefined;
-        if (gitMutation !== undefined && runtimeSandbox !== undefined) {
-          const previous = runtimeSandbox.additionalPermissions;
-          runtimeSandbox = {
-            ...runtimeSandbox,
-            additionalPermissions: { ...previous, fileSystem: { entries: [
-              ...(previous?.fileSystem?.entries ?? []),
-              ...gitMutation.permissions.fileSystem!.entries,
-            ] } },
-          };
-        }
         if (detach) {
           const refusal = detachRefusal(runtimeSandbox, manager);
           if (refusal !== null) return refusal;
@@ -1287,7 +1270,7 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
         const commonRequest = {
           ...(ownerId !== undefined ? { ownerId } : {}),
           ...(ownerBinding !== undefined ? { ownerBinding } : {}),
-          cmd: gitMutation?.command ?? cmd,
+          cmd,
           callId: asString(args.__callId),
           ...(asNumber(args.yield_time_ms) !== undefined
             ? { yield_time_ms: asNumber(args.yield_time_ms) }
