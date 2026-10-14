@@ -4313,6 +4313,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     toolJSX === null &&
     !onboarding.active;
   useStartupUpdate({
+    configStore: getTuiConfigStore(props.session),
     safe: !effectiveInputBusy && input.length === 0 && Object.keys(pastedContents).length === 0 &&
       toolJSX === null && permissionRequests.length === 0 && elicitation.prompt === null &&
       !onboarding.active && !showCostDialog && !isMessageSelectorVisible,

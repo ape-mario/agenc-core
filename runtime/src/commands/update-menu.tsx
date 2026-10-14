@@ -7,13 +7,15 @@ import type { SlashCommandContext } from "./types.js";
 import { checkAgenCUpdate, runAgenCUpdateCli, sanitizeTerminalText } from "../bin/update-cli.js";
 import { findActiveGeneratedWrapper } from "../utils/doctorDiagnostic.js";
 import { getRuntimeState, updateRuntimeState } from "../utils/config.js";
+import type { RuntimeStateRepository } from "../config/runtime-state-repository.js";
+import { requireCommandConfigStore } from "./config-context.js";
 import { VERSION } from "../version.js";
 
 export type UpdateCheck = Awaited<ReturnType<typeof checkAgenCUpdate>>;
 export const NPM_UPDATE_COMMAND = "npm install -g @tetsuo-ai/agenc@latest";
 
-export function UpdateMenu({ checked: initial, startup = false, close }: {
-  checked?: UpdateCheck; startup?: boolean; close: () => void;
+export function UpdateMenu({ checked: initial, startup = false, close, stateRepository }: {
+  checked?: UpdateCheck; startup?: boolean; close: () => void; stateRepository?: RuntimeStateRepository;
 }) {
   const [checked, setChecked] = React.useState(initial);
   const [installType, setInstallType] = React.useState("checking");
@@ -51,7 +53,7 @@ export function UpdateMenu({ checked: initial, startup = false, close }: {
     if (choice === 1) {
       if (!checked) return;
       try {
-        updateRuntimeState(state => ({ ...state, skippedUpdateVersion: checked.latestVersion }));
+        updateRuntimeState(state => ({ ...state, skippedUpdateVersion: checked.latestVersion }), stateRepository);
         close();
       } catch (error) {
         setFailed(true); setMessage(`Could not remember this choice: ${sanitizeTerminalText(error)}.`);
@@ -109,9 +111,9 @@ export function UpdateMenu({ checked: initial, startup = false, close }: {
 }
 
 export function openUpdateMenu(ctx: SlashCommandContext): boolean {
-  return openLocalJsxCommand(ctx, close => <UpdateMenu close={close} />);
+  return openLocalJsxCommand(ctx, close => <UpdateMenu close={close} stateRepository={requireCommandConfigStore(ctx).stateRepository} />);
 }
 
-export function hasSkippedUpdate(version: string): boolean {
-  return getRuntimeState().skippedUpdateVersion === version;
+export function hasSkippedUpdate(version: string, repository?: RuntimeStateRepository): boolean {
+  return getRuntimeState(repository).skippedUpdateVersion === version;
 }
