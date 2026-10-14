@@ -418,19 +418,15 @@ export function addToHistory(command: HistoryEntry | string): void {
   // Register cleanup on first use
   if (!cleanupRegistered) {
     cleanupRegistered = true
-    registerCleanup(async () => {
-      // If there's an in-progress flush, wait for it
-      if (currentFlushPromise) {
-        await currentFlushPromise
-      }
-      // If there are still pending entries after the flush completed, do one final flush
-      if (pendingEntries.length > 0) {
-        await immediateFlushHistory()
-      }
-    })
+    registerCleanup(flushPromptHistoryForExit)
   }
 
   void addToPromptHistory(command)
+}
+
+export async function flushPromptHistoryForExit(): Promise<void> {
+  if (currentFlushPromise) await currentFlushPromise
+  if (pendingEntries.length > 0) await immediateFlushHistory()
 }
 
 export function clearPendingHistoryEntries(): void {

@@ -23,7 +23,7 @@ import {
 import { env } from '../../utils/env.js'
 import type { ImageDimensions } from '../../utils/imageResizer.js'
 import { isModifierPressed, prewarmModifiers } from '../../utils/modifiers.js'
-import { useDoublePress } from './useDoublePress.js'
+import { clearSharedDoublePressState, useDoublePress } from './useDoublePress.js'
 
 type MaybeCursor = void | TextCursor
 type InputHandler = (input: string) => MaybeCursor
@@ -172,25 +172,30 @@ export function useTextInput({
   const cursor = TextCursor.fromText(value, columns, offset)
   const { addNotification, removeNotification } = useNotifications()
 
-  const handleCtrlC = useDoublePress(
+  const handleEmptyCtrlC = useDoublePress(
     (show: boolean) => {
       onExitMessage?.(show, 'Ctrl-C')
     },
     () => onExit?.(),
-    () => {
-      const currentValue = getLiveValue()
-      if (currentValue) {
-        if (currentValue.trim() !== '') {
-          addToHistory(currentValue)
-        }
-        updateRenderedInput('', 0)
-        onChange('')
-        onOffsetChange(0)
-        onHistoryReset?.()
-      }
-    },
+    undefined,
     'app:interrupt',
   )
+
+  function handleCtrlC(): void {
+    const currentValue = getLiveValue()
+    if (currentValue !== '') {
+      // Clearing a draft is editing, not the first of two empty-prompt exits.
+      clearSharedDoublePressState('app:interrupt')
+      onExitMessage?.(false, 'Ctrl-C')
+      if (mask === '' && currentValue.trim() !== '') addToHistory(currentValue)
+      updateRenderedInput('', 0)
+      onChange('')
+      onOffsetChange(0)
+      onHistoryReset?.()
+      return
+    }
+    handleEmptyCtrlC()
+  }
 
   // NOTE(keybindings): This escape handler is intentionally NOT migrated to the keybindings system.
   // It's a text-level double-press escape for clearing input, not an action-level keybinding.
@@ -217,7 +222,7 @@ export function useTextInput({
       if (currentValue) {
         // Track double-escape usage for feature discovery
         // Save to history before clearing
-        if (currentValue.trim() !== '') {
+        if (mask === '' && currentValue.trim() !== '') {
           addToHistory(currentValue)
         }
         updateRenderedInput('', 0)
