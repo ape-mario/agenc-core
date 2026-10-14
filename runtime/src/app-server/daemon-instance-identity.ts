@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { open, opendir, readFile, readlink, realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
-import { assertNoRetiredConfigDir } from "../config/home.js";
+import { resolveProcessHomePathInput } from "../config/home.js";
 import {
   BoundedRegularFileError,
   readBoundedRegularFile,
@@ -419,9 +419,7 @@ async function inspectLinuxAgenCDaemonProcessWithTracker(
       join(procDir, "environ"),
       scanTracker,
     );
-    assertNoRetiredConfigDir(environment);
-    const candidateHome = environment.AGENC_HOME?.trim() ||
-      (environment.HOME?.trim() ? join(environment.HOME.trim(), ".agenc") : null);
+    const candidateHome = resolveProcessHomePathInput(environment);
     const candidateRoot = scanTracker?.readProcessRootPath === undefined
       ? join(procDir, "root")
       : await scanTracker.readProcessRootPath(procDir);
