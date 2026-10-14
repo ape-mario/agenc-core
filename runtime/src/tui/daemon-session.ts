@@ -709,6 +709,7 @@ export function createDaemonTuiSession<
   };
   const pendingSubmissions = new Map<string, PendingDaemonSubmission>();
   let observedSubmission: PendingDaemonSubmission | undefined;
+  const manualCompactions = new Set<AbortController>();
   const activeDaemonTurnId = (): string | undefined => {
     const turnId = activeTurnSnapshot?.turnId === "daemon-turn"
       ? lastObservedTurnId
@@ -1587,6 +1588,12 @@ export function createDaemonTuiSession<
       }
     },
     cancelActiveTurn: async (reason?: string) => {
+      if (manualCompactions.size > 0) {
+        // Cancel only this client's exact outstanding compaction requests.
+        // request.cancel propagates their signals to the daemon transaction.
+        for (const controller of manualCompactions) controller.abort(reason ?? "interrupted");
+        return;
+      }
       const expectedTurnId = activeDaemonTurnId();
       if (expectedTurnId !== undefined) {
         const cancellation = cancelDaemonTurn(expectedTurnId, reason);
@@ -1610,21 +1617,28 @@ export function createDaemonTuiSession<
         [...pendingSubmissions.values()].find((submission) => !submission.dispatched);
       if (pending !== undefined) pending.cancellation = { reason };
     },
-    partialCompactFromMessage: async (params) =>
-      client.request(
-        "session.partialCompactFromMessage",
-        {
-          sessionId,
-          messageOrdinal: params.messageOrdinal,
-          direction: params.direction,
-          ...(params.feedback !== undefined
-            ? { feedback: params.feedback }
-            : {}),
-        } satisfies SessionPartialCompactFromMessageParams,
-        {
-          signal: params.signal,
-        },
-      ),
+    partialCompactFromMessage: async (params) => {
+      const controller = new AbortController();
+      manualCompactions.add(controller);
+      try {
+        return await client.request(
+          "session.partialCompactFromMessage",
+          {
+            sessionId,
+            messageOrdinal: params.messageOrdinal,
+            direction: params.direction,
+            ...(params.feedback !== undefined
+              ? { feedback: params.feedback }
+              : {}),
+          } satisfies SessionPartialCompactFromMessageParams,
+          {
+            signal: params.signal === undefined ? controller.signal : AbortSignal.any([params.signal, controller.signal]),
+          },
+        );
+      } finally {
+        manualCompactions.delete(controller);
+      }
+    },
     rollbackCompaction: async (params) =>
       client.request("session.rollbackCompaction", {
         sessionId,

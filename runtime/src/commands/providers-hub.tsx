@@ -4,6 +4,8 @@ import TextInput from "../tui/components/TextInput.js";
 import ThemedText from "../tui/components/design-system/ThemedText.js";
 import { MenuModal, Popup } from "../tui/components/v2/primitives.js";
 import { Box, useInput } from "../tui/ink.js";
+import { useInputCapture } from "../tui/keybindings/useKeybinding.js";
+import { clearSharedDoublePressState } from "../tui/hooks/useDoublePress.js";
 import {
   providerEnvironmentFromCommandContext,
   readCommandConfig,
@@ -504,6 +506,14 @@ export function ProvidersHubView({
       openModels(connected, result.message);
     });
   };
+
+  useInputCapture((input, key) => {
+    if (input !== "c" || !key.ctrl) return false;
+    signInAbort.current?.abort();
+    clearSharedDoublePressState("app:interrupt");
+    onDone();
+    return true;
+  }, { context: "Chat" });
 
   useInput((input, key) => {
     if (view.kind === "signin") {

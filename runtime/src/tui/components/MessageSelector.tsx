@@ -305,7 +305,10 @@ export function MessageSelector({
       onClose();
     }
   }
-  const exitState = useExitOnCtrlCDWithKeybindings();
+  const exitState = useExitOnCtrlCDWithKeybindings(onClose, () => {
+    onClose();
+    return true;
+  });
   const handleEscape = useCallback(() => {
     if (messageToRestore && !preselectedMessage) {
       // Go back to message list instead of closing entirely

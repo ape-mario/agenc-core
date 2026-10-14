@@ -53,7 +53,7 @@ import {
   type HistoryMode,
   useArrowKeyHistory,
 } from "../../hooks/useArrowKeyHistory.js";
-import { useDoublePress } from "../../hooks/useDoublePress.js";
+import { clearSharedDoublePressState, useDoublePress } from "../../hooks/useDoublePress.js";
 import { useHistorySearch } from "../../hooks/useHistorySearch.js";
 import type { IDESelection } from "../../hooks/useIdeSelection.js";
 import { useInputBuffer } from "../../hooks/useInputBuffer.js";
@@ -67,6 +67,7 @@ import { Box, type ClickEvent, type Key, Text, useInput } from "../../ink.js";
 import { useOptionalKeybindingContext } from "../../keybindings/KeybindingContext.js";
 import { getShortcutDisplay } from "../../keybindings/shortcutFormat.js";
 import {
+  useInputCapture,
   useKeybinding,
   useKeybindings,
 } from "../../keybindings/useKeybinding.js";
@@ -911,6 +912,8 @@ function PromptInput({
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const [showThinkingToggle, setShowThinkingToggle] = useState(false);
   const [showModeSwitcher, setShowModeSwitcher] = useState(false);
+  const modeSwitcherVisibleRef = useRef(showModeSwitcher);
+  modeSwitcherVisibleRef.current = showModeSwitcher;
   const [showAutoModeOptIn, setShowAutoModeOptIn] = useState(false);
   const [autoModeOptInPreview, setAutoModeOptInPreview] = useState(false);
   const promptModalOverlayActive =
@@ -2402,6 +2405,7 @@ function PromptInput({
 
   // Shows the mode-switcher toast and (re)arms its auto-dismiss timer.
   const showModeSwitcherToast = useCallback(() => {
+    modeSwitcherVisibleRef.current = true;
     setShowModeSwitcher(true);
     if (modeSwitcherTimeoutRef.current) {
       clearTimeout(modeSwitcherTimeoutRef.current);
@@ -2418,12 +2422,26 @@ function PromptInput({
   }, []);
 
   const dismissModeSwitcherToast = useCallback(() => {
+    modeSwitcherVisibleRef.current = false;
     if (modeSwitcherTimeoutRef.current) {
       clearTimeout(modeSwitcherTimeoutRef.current);
       modeSwitcherTimeoutRef.current = null;
     }
     setShowModeSwitcher(false);
   }, []);
+
+  // Consume dismissal before TextInput clears a draft, including successive
+  // keys in one stdin chunk before the toast's render has caught up.
+  useInputCapture(
+    (input, key) => {
+      if (input !== "c" || !key.ctrl || !modeSwitcherVisibleRef.current) return false;
+      dismissModeSwitcherToast();
+      clearSharedDoublePressState("app:interrupt");
+      setExitMessage({ show: false, key: "Ctrl-C" });
+      return true;
+    },
+    { context: "Chat" },
+  );
 
   const clearAutoModeOptInPreview = useCallback(() => {
     autoModeOptInPendingRef.current = false;

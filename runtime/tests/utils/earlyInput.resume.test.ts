@@ -14,7 +14,7 @@ test("resume handoff retains whitespace and restores raw mode when consumed", as
     startCapturingEarlyInput();
     stdin.write("\x1b[20");
     await new Promise<void>(resolve => setImmediate(resolve));
-    stdin.write("0~  Keep my indented draft 😅\x1b[201~\x1b[A\r");
+    stdin.write("0~  Keep my indented draft 😅\x1b[201~\x1b[A\r\x03\x03");
     await new Promise<void>(resolve => setImmediate(resolve));
     expect(consumeEarlyInput({ preserveWhitespace: true, restoreRawMode: true })).toBe("  Keep my indented draft 😅\n");
     expect(stdin.listenerCount("readable")).toBe(0);

@@ -264,6 +264,13 @@ export async function bootTUI(options: BootTUIOptions): Promise<BootTUIHandle> {
       instance.unmount();
     } catch {}
   };
+  // Own orderly termination while the TUI is mounted so signal-exit cannot
+  // end the process before the existing awaitable teardown has flushed drafts.
+  const onTerminate = (): void => { unmountRef?.(); };
+  // Keep our listener present through signal-exit's remaining listeners too.
+  // A once-handler disappears before invocation and can be mistaken for an
+  // unhandled signal while asynchronous draft persistence is still pending.
+  process.on("SIGTERM", onTerminate);
   let waitPromise: Promise<void> | null = null;
   return {
     unmount: unmountRef,
@@ -279,6 +286,7 @@ export async function bootTUI(options: BootTUIOptions): Promise<BootTUIHandle> {
             }
             await teardownBarrier.drain();
           } finally {
+            process.removeListener("SIGTERM", onTerminate);
             stdin.removeListener("close", onStdinLoss);
             stdin.removeListener("end", onStdinLoss);
             stdin.removeListener("error", onStdinLoss);

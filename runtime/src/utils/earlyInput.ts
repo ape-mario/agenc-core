@@ -81,14 +81,11 @@ function processChunk(str: string): void {
     const char = str[i]!
     const code = char.charCodeAt(0)
 
-    // Ctrl+C (code 3) - stop capturing and exit immediately.
-    // We use process.exit here instead of gracefulShutdown because at this
-    // early stage of startup, the shutdown machinery isn't initialized yet.
+    // Cancellation and double-press exit belong to the ready composer. During
+    // startup/resume, keep the captured draft until it can be safely delivered.
     if (code === 3) {
-      stopCapturingEarlyInput()
-      // eslint-disable-next-line custom-rules/no-process-exit
-      process.exit(130) // Standard exit code for Ctrl+C
-      return
+      i++
+      continue
     }
 
     // Ctrl+D (code 4) - EOF, stop capturing

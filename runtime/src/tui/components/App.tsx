@@ -78,7 +78,7 @@ import { KeybindingSetup } from "../keybindings/KeybindingProviderSetup.js";
 import { CancelRequestHandler } from "../hooks/useCancelRequest.js";
 import { useApiKeyVerification } from "../hooks/useApiKeyVerification.js";
 import type { ProviderAuthReadContext } from "../../utils/auth.js";
-import { addToHistory } from "../history/history.js";
+import { addToHistory, flushPromptHistoryForExit } from "../history/history.js";
 import { GlobalKeybindingHandlers } from "../hooks/useGlobalKeybindings.js";
 import {
   type AppState,
@@ -113,6 +113,8 @@ import {
   setPendingResumeSessionId,
 } from "../pending-resume.js";
 import { requestTuiSessionTurnCancel } from "../sessionCancel.js";
+import { useInputCapture } from "../keybindings/useKeybinding.js";
+import { clearSharedDoublePressState } from "../hooks/useDoublePress.js";
 import {
   calculateContextPercentages,
   getContextWindowForModelForContext,
@@ -2354,9 +2356,12 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     [],
   );
   const [pastedContents, setPastedContents] = useState<Record<number, any>>({});
+  const liveComposerDraftRef = useRef({ input, pastedContents });
+  liveComposerDraftRef.current = { input, pastedContents };
   const retrySubmissionRef = useRef<ComposerSubmission | null>(null);
   const changeComposerInput = useCallback((nextInput: string) => {
     retrySubmissionRef.current = null;
+    liveComposerDraftRef.current = { ...liveComposerDraftRef.current, input: nextInput };
     setInput(nextInput);
   }, []);
   const changeComposerPastedContents = useCallback<
@@ -2369,8 +2374,6 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   // restored text even when the submit clear and the restore commit in one
   // render, where the input prop never visibly changes.
   const [draftRestoreRevision, setDraftRestoreRevision] = useState(0);
-  const liveComposerDraftRef = useRef({ input, pastedContents });
-  liveComposerDraftRef.current = { input, pastedContents };
   const setComposerInput = useCallback((nextInput: string): void => {
     liveComposerDraftRef.current = { ...liveComposerDraftRef.current, input: nextInput };
     setInput(nextInput);
@@ -2385,6 +2388,30 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     },
     [],
   );
+  const savedExitDraftRef = useRef<typeof liveComposerDraftRef.current | null>(null);
+  const saveComposerDraftBeforeExit = useCallback(() => {
+    const draft = liveComposerDraftRef.current;
+    const saved = savedExitDraftRef.current;
+    if (draft.input.trim() === "" ||
+      (saved?.input === draft.input && saved.pastedContents === draft.pastedContents)) return;
+    addToHistory({ display: draft.input, pastedContents: draft.pastedContents });
+    savedExitDraftRef.current = draft;
+  }, []);
+  // Also cover overlays calling Ink's exit directly instead of App's exit flow.
+  useEffect(() => {
+    const flushExitDraft = async () => {
+      saveComposerDraftBeforeExit();
+      await flushPromptHistoryForExit();
+    };
+    const unregister = registerCleanup(flushExitDraft);
+    // This task must survive React unmount: bootTUI drains the barrier after
+    // Ink exits and before it closes the owning daemon transport.
+    props.registerTuiTeardown?.(flushExitDraft);
+    return () => {
+      saveComposerDraftBeforeExit();
+      unregister();
+    };
+  }, [saveComposerDraftBeforeExit, props.registerTuiTeardown]);
   const restoreComposerDraft = useCallback(
     (failedDraft: {
       readonly input: string;
@@ -2980,6 +3007,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   const hasActiveLocalAgents = getActiveLocalAgentTasks(appTasks).length > 0;
   const hasActiveSessionTurn = hasActiveConversationTurn(props.session);
   const hasActiveModelSubmission = activeModelSubmissionCount > 0;
+  const isCompacting = compactActivity !== null && compactionIsActive(compactActivity);
   const isLoading =
     transcript.isStreaming ||
     pendingSubmission ||
@@ -2987,6 +3015,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     hasActiveModelSubmission;
   const effectiveInputBusy =
     isLoading ||
+    isCompacting ||
     shellAbortController !== null ||
     hasActiveLocalAgents ||
     completionPipelineActive;
@@ -4199,6 +4228,11 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     }
   }, [isLoading]);
   const handleTurnCancel = useCallback(() => {
+    if (isCompacting) {
+      // Manual compaction owns a cancellable daemon RPC, not a model turn.
+      requestTuiSessionTurnCancel(props.session);
+      return;
+    }
     // The checkpoint is waiting before admission, so Escape is its Stop
     // choice. Resolve and dismiss the card locally instead of interrupting
     // the daemon and leaving its pending question mounted.
@@ -4247,7 +4281,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     setPendingSubmission(false);
     activeModelSubmissionTokensRef.current.clear();
     setActiveModelSubmissionCount(0);
-  }, [isLoading, turnAbortController, props.session, elicitation.pending, elicitation.submit]);
+  }, [isLoading, isCompacting, turnAbortController, props.session, elicitation.pending, elicitation.submit]);
   const handleAgentsKilled = useCallback(
     (agents: readonly KilledAgentSummary[]) => {
       const text = formatAgentsKilledNotification(agents);
@@ -4273,6 +4307,19 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     toolJSX === null &&
     !onboarding.active;
   const isLocalJSXCommandActive = toolJSX?.isLocalJSXCommand === true;
+  const localCommandPopupRef = useRef(toolJSX);
+  localCommandPopupRef.current = toolJSX;
+  useInputCapture((value, key) => {
+    const popup = localCommandPopupRef.current;
+    if (value !== "c" || !key.ctrl || popup?.isLocalJSXCommand !== true ||
+      popup.shouldHidePromptInput !== true) return false;
+    localCommandPopupRef.current = null;
+    clearSharedDoublePressState("app:interrupt");
+    // Same close action as the local-command bridge. Capture it before
+    // any embedded input or composer can interpret this as editing or exit.
+    setToolJSX({ jsx: null, shouldHidePromptInput: false, clearLocalJSX: true });
+    return true;
+  }, { context: "Chat", isActive: isLocalJSXCommandActive });
   useEffect(() => {
     if (haveShownCostDialog || showCostDialog) return;
     if (getTotalCost() < 5) return;
@@ -4562,6 +4609,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   );
   const performAppExit = useCallback(
     (intent: AppExitIntent) => {
+      saveComposerDraftBeforeExit();
       if (getCurrentWorktreeSession() !== null) {
         setExitFlow(
           <ExitFlow
@@ -4594,7 +4642,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       stagePendingResumeForExit(intent);
       exit();
     },
-    [exit, stagePendingResumeForExit],
+    [exit, stagePendingResumeForExit, saveComposerDraftBeforeExit],
   );
   const requestSafeAppExit = useCallback(
     (resumeSessionId?: string) => {
@@ -4666,7 +4714,6 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
             ? "thinking"
             : "requesting";
   const cancelStreamMode = visibleCancelStreamMode(showSpinner, streamMode);
-  const isCompacting = compactActivity !== null && compactionIsActive(compactActivity);
   const spinnerElement = isCompacting ? <CompactingStatus progress={compactActivity} /> : showSpinner ? (
     <SpinnerWithVerb
       mode={streamMode}
@@ -5070,7 +5117,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         inputMode={mode as never}
         inputValue={input}
         streamMode={cancelStreamMode as never}
-        canCancelActiveTurn={isLoading || shellAbortController !== null}
+        canCancelActiveTurn={isLoading || isCompacting || shellAbortController !== null}
         queueOwner={commandQueueOwner}
       />
       <FullscreenLayout
