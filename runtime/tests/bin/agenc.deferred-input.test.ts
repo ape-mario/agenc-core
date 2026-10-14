@@ -359,6 +359,48 @@ function daemonHarness(
 }
 
 describe("deferred daemon input ownership", () => {
+  it("waits for an in-flight cold startup before committing a permission mode", async () => {
+    const harness = daemonHarness();
+    let releaseStartup!: () => void;
+    const startupGate = new Promise<void>(resolve => { releaseStartup = resolve; });
+    harness.startPromptAgent.mockImplementationOnce(async () => {
+      await startupGate;
+      return { agentId: "agent-1" };
+    });
+    const session = await createDeferredInputSession({
+      baseSession: harness.baseSession, deps: harness.deps,
+      preparePrompt: async ({ message }) => message,
+    });
+    const controls = session as typeof session & Pick<
+      import("../../src/tui/daemon-session.js").AgenCTuiBridgeSession,
+      "mutateDaemonPermissionRule" | "setDaemonPermissionMode"
+    >;
+    const ruleChange = controls.mutateDaemonPermissionRule!({
+      operation: "add", behavior: "allow", rule: "exec_command",
+    });
+    await vi.waitFor(() => expect(harness.startPromptAgent).toHaveBeenCalledOnce());
+    const modeChange = controls.setDaemonPermissionMode!("plan");
+    let settled = false;
+    void modeChange.then(() => { settled = true; }, () => { settled = true; });
+    try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(settled).toBe(false);
+      const registry = (session.services as unknown as {
+        permissionModeRegistry: PermissionModeRegistry;
+      }).permissionModeRegistry;
+      expect(registry.current().mode).toBe("default");
+      releaseStartup();
+      // This harness has no canonical successor for a mode RPC. The adapter
+      // must attempt the live RPC and reject, rather than claim staged success.
+      const results = await Promise.allSettled([ruleChange, modeChange]);
+      expect(results[1]!.status).toBe("rejected");
+      expect(harness.requests.some(({ method }) => method === "session.setPermissionMode")).toBe(true);
+    } finally {
+      releaseStartup();
+      await Promise.allSettled([ruleChange, modeChange]);
+    }
+  });
+
   it.each(["default", "plan", "acceptEdits"])(
     "uses a pre-first-task %s choice instead of startup bypass",
     async (mode) => {
