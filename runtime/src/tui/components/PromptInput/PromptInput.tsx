@@ -145,7 +145,6 @@ import {
 import { logError } from "../../../utils/log.js";
 import {
   getNextPermissionMode,
-  isAutoModeGateEnabled,
   transitionPermissionMode,
 } from "../../../permissions/permission-mode.js";
 import { getPlatform } from "../../../utils/platform.js";
@@ -191,7 +190,7 @@ import { ThinkingToggle } from "../ThinkingToggle.js";
 import { BackgroundTasksPanel } from "../tasks/BackgroundTasksPanel.js";
 import { shouldHideTasksFooter } from "../tasks/taskStatusUtils.js";
 import { TeamsDialog } from "../teams/TeamsDialog.js";
-import { ModeSwitcher, visibleUserFacingModes } from "../v2/primitives.js";
+import { ModeSwitcher } from "../v2/primitives.js";
 import { ConfiguredPromptTextInput } from "./ConfiguredPromptTextInput.js";
 import {
   detectModeEntry,
@@ -2653,26 +2652,14 @@ function PromptInput({
     selectPermissionMode,
   ]);
 
-  // Digit picks and esc-dismiss for the mode-switcher toast. Active only
-  // while the toast is visible; digits index into the same visible-mode
-  // order the ModeSwitcher renders, so display and picking cannot drift.
+  // Esc dismisses the mode-switcher toast. Digits are not mode picks: the
+  // toast stays up for a few seconds after shift+tab, and a prompt that
+  // starts with a digit typed in that window switched the permission mode,
+  // up to "never asks", while the digit still reached the prompt. Picking a
+  // mode directly belongs to /permissions.
   useInput(
-    (input, key) => {
-      if (key.escape) {
-        dismissModeSwitcherToast();
-        return;
-      }
-      if (!/^[1-9]$/u.test(input)) return;
-      const modes = visibleUserFacingModes(
-        displayedToolPermissionContext.isBypassPermissionsModeAvailable,
-        displayedToolPermissionContext.isAutoModeAvailable,
-      );
-      const targetMode = modes[Number.parseInt(input, 10) - 1];
-      if (targetMode === undefined) return;
-      // The live gate can lag the startup availability flag; picking auto
-      // without the gate would make transitionPermissionMode throw.
-      if (targetMode === "auto" && !isAutoModeGateEnabled()) return;
-      selectPermissionMode(targetMode);
+    (_input, key) => {
+      if (key.escape) dismissModeSwitcherToast();
     },
     { isActive: showModeSwitcher },
   );

@@ -251,11 +251,7 @@ const userFacingModeOrder: readonly PermissionMode[] = [
   'bypassPermissions',
 ]
 
-/**
- * The modes the switcher displays, in display order. The digit-pick handler
- * in PromptInput indexes into this same list, so display and picking can
- * never drift apart.
- */
+/** The modes the switcher displays, in display order. */
 export function visibleUserFacingModes(
   bypassAvailable: boolean,
   autoAvailable: boolean,
@@ -298,10 +294,10 @@ export function ModeSwitcher({
           <ThemedText color="inactive" wrap="truncate-end">{`now · ${permissionModePlainLabel(currentMode)}`}</ThemedText>
         </Box>
         <Box flexGrow={1} />
-        <ThemedText color="inactive" wrap="truncate-end">{`1-${modes.length} pick · esc close`}</ThemedText>
+        <ThemedText color="inactive" wrap="truncate-end">esc close</ThemedText>
       </ThemedBox>
       <Box flexDirection="column">
-        {modes.map((mode, index) => {
+        {modes.map(mode => {
           const chrome = modeChrome[mode]
           const active = mode === currentMode
           const spacerAfter = spacious ? (active ? 2 : mode === 'plan' ? 1 : 0) : 0
@@ -315,9 +311,6 @@ export function ModeSwitcher({
               paddingX={1}
               gap={1}
             >
-              <Box width={4} flexShrink={0}>
-                <ThemedText color="muted3">{`[${index + 1}]`}</ThemedText>
-              </Box>
               <Box width={24} flexShrink={0}>
                 <ThemedText color={chrome.fg} bold={active} wrap="truncate-end">
                   {permissionModePlainLabel(mode)}

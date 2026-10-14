@@ -47,8 +47,10 @@ describe('v2 primitives', () => {
     expect(output).toContain('Reads and plans. Changes nothing.')
     expect(output).toContain('now · plan only')
     expect(output).toContain('shift+tab or option+m: next mode')
-    // The advertised digit range must match the number of visible modes.
-    expect(output).toContain('1-5 pick · esc close')
+    // Digits are not mode picks: nothing on the popup may suggest them.
+    expect(output).toContain('esc close')
+    expect(output).not.toContain('pick')
+    expect(output).not.toContain('[1]')
   })
 
   it('hides unavailable cycle targets', async () => {
@@ -65,8 +67,7 @@ describe('v2 primitives', () => {
     expect(output).toContain('Edits without asking. Asks before')
     expect(output).not.toContain('auto approve')
     expect(output).not.toContain('never asks')
-    // The advertised digit range shrinks with the hidden modes.
-    expect(output).toContain('1-3 pick')
+    expect(output).not.toContain('pick')
   })
 
   it('renders body overlays without requiring modal content in chat flow', async () => {

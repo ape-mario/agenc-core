@@ -713,9 +713,7 @@ vi.mock("../teams/TeamsDialog.js", () => ({
 }));
 
 vi.mock("../v2/primitives.js", async (importOriginal) => {
-  // The real visibleUserFacingModes is the contract the digit-pick handler
-  // indexes into; mocking it would let display and picking drift apart in
-  // exactly the way sharing this helper is meant to prevent.
+  // Keep the real module and stub only the switcher's rendering.
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, ModeSwitcher: () => null };
 });
@@ -1402,24 +1400,15 @@ describe("PromptInput render surface", () => {
     }
   });
 
-  test("requests a permission mode by digit without projecting it early", async () => {
+  test("digits typed while the mode switcher is open never change the mode", async () => {
+    // Shift+tab leaves the switcher up for a few seconds. A prompt that starts
+    // with a digit typed in that window used to switch the permission mode,
+    // up to "never asks", while the digit still reached the prompt.
     const setToolPermissionContext = vi.fn();
     const rendered = await renderPromptInput({ setToolPermissionContext });
 
     try {
       await waitForPromptInputProps();
-
-      // Digits do nothing until the switcher is open.
-      const beforeOpen = harness.inputHandlers.filter(
-        (entry) => entry.options?.isActive === true,
-      );
-      for (const entry of beforeOpen) {
-        entry.handler("3", {});
-      }
-      expect(setToolPermissionContext).not.toHaveBeenCalled();
-
-      // Shift+tab opens the switcher toast; wait for the re-render that
-      // arms the digit handler.
       const handlersBefore = harness.inputHandlers.length;
       harness.keybindings["chat:cycleMode"]?.();
       await waitForInputHandlerCount(handlersBefore + 1);
@@ -1430,39 +1419,7 @@ describe("PromptInput render surface", () => {
         .filter((entry) => entry.options?.isActive === true);
       expect(active.length).toBeGreaterThan(0);
       for (const entry of active) {
-        // [3] is 'plan' in the visible-mode order with both gates available.
-        entry.handler("3", {});
-      }
-
-      expect(setToolPermissionContext).toHaveBeenCalledWith(
-        expect.objectContaining({ mode: "plan" }),
-      );
-      expect(harness.appState.toolPermissionContext.mode).toBe("default");
-    } finally {
-      await rendered.dispose();
-    }
-  });
-
-  test("ignores digits outside the visible mode range and refuses auto when its gate is off", async () => {
-    harness.autoModeGateEnabled = false;
-    const setToolPermissionContext = vi.fn();
-    const rendered = await renderPromptInput({ setToolPermissionContext });
-
-    try {
-      await waitForPromptInputProps();
-      const handlersBefore = harness.inputHandlers.length;
-      harness.keybindings["chat:cycleMode"]?.();
-      await waitForInputHandlerCount(handlersBefore + 1);
-      setToolPermissionContext.mockClear();
-
-      const active = harness.inputHandlers
-        .slice(handlersBefore)
-        .filter((entry) => entry.options?.isActive === true);
-      for (const entry of active) {
-        entry.handler("9", {});
-        // [4] is 'auto'; the live gate is off, so it must be refused rather
-        // than throwing out of the input handler.
-        entry.handler("4", {});
+        for (const digit of ["1", "2", "3", "4", "5", "9"]) entry.handler(digit, {});
       }
 
       expect(setToolPermissionContext).not.toHaveBeenCalled();
