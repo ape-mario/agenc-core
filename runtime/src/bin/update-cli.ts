@@ -3507,6 +3507,37 @@ export interface UpdateCliDeps {
   readonly runtimeCompatibility?: UpdateRuntimeCompatibility;
   readonly userHome?: string;
   readonly verifyStagedPrivateNode?: StagedPrivateNodeVerifier;
+  readonly manifestTimeoutMs?: number;
+  readonly expectedVersion?: string;
+  readonly onProgress?: (line: string) => void;
+}
+
+/** Read-only release check shared by CLI and TUI. Local overrides retain the
+ * existing explicit-local trust seam; remote data cannot select trust policy. */
+export async function checkAgenCUpdate(
+  command: Extract<AgenCUpdateCliCommand, { kind: "update" }> = { kind: "update", check: true, json: false },
+  deps: UpdateCliDeps = {},
+) {
+  const currentVersion = deps.currentVersion ?? VERSION;
+  const manifestRequest = resolveUpdateManifestRequest({ ...command, env: deps.env ?? process.env });
+  const manifest = await fetchRuntimeManifest(manifestRequest.url, deps.fetchImpl, {
+    trustMode: manifestRequest.trustMode,
+    ...(manifestRequest.expectedRuntimeVersion === undefined ? {} : { expectedRuntimeVersion: manifestRequest.expectedRuntimeVersion }),
+    ...(manifestRequest.expectedRepository === undefined ? {} : { expectedRepository: manifestRequest.expectedRepository }),
+    ...(deps.manifestTimeoutMs === undefined ? {} : { timeoutMs: deps.manifestTimeoutMs }),
+  });
+  if (command.pinVersion !== undefined && manifest.runtimeVersion !== command.pinVersion) {
+    throw new Error(`manifest runtime ${manifest.runtimeVersion} does not match pinned version ${command.pinVersion}`);
+  }
+  if (deps.expectedVersion !== undefined && manifest.runtimeVersion !== deps.expectedVersion) {
+    throw new Error("The release changed since the check. Open /update to check again.");
+  }
+  const artifact = selectUpdateArtifact(manifest, updatePlatformSlug(deps.platform, deps.arch),
+    deps.runtimeCompatibility ?? currentUpdateRuntimeCompatibility(deps.platform, deps.arch, deps.nodeModuleAbi ?? process.versions.modules));
+  const latestVersion = manifest.runtimeVersion;
+  const pinned = command.pinVersion !== undefined;
+  const updateAvailable = pinned ? latestVersion !== currentVersion : semverGt(latestVersion, currentVersion);
+  return { currentVersion, latestVersion, updateAvailable, manifestRequest, manifest, artifact };
 }
 
 export async function runAgenCUpdateCli(
@@ -3529,64 +3560,15 @@ export async function runAgenCUpdateCli(
 
   const env = deps.env ?? process.env;
   const currentVersion = deps.currentVersion ?? VERSION;
-  let manifestRequest: ResolvedUpdateManifestRequest;
+  let checked: Awaited<ReturnType<typeof checkAgenCUpdate>>;
   try {
-    manifestRequest = resolveUpdateManifestRequest({ ...command, env });
+    checked = await checkAgenCUpdate(command, deps);
   } catch (error) {
     stderr(`agenc: update failed: ${error instanceof Error ? error.message : String(error)}`);
     return 1;
   }
-
-  let manifest: RuntimeManifest;
-  let artifact: RuntimeManifestArtifact;
-  try {
-    manifest = await fetchRuntimeManifest(
-      manifestRequest.url,
-      deps.fetchImpl,
-      {
-        trustMode: manifestRequest.trustMode,
-        ...(manifestRequest.expectedRuntimeVersion === undefined
-          ? {}
-          : { expectedRuntimeVersion: manifestRequest.expectedRuntimeVersion }),
-        ...(manifestRequest.expectedRepository === undefined
-          ? {}
-          : { expectedRepository: manifestRequest.expectedRepository }),
-      },
-    );
-    if (
-      command.pinVersion !== undefined &&
-      manifest.runtimeVersion !== command.pinVersion
-    ) {
-      throw new Error(
-        `manifest runtime ${manifest.runtimeVersion} does not match pinned version ${command.pinVersion}`,
-      );
-    }
-    artifact = selectUpdateArtifact(
-      manifest,
-      updatePlatformSlug(deps.platform, deps.arch),
-      deps.runtimeCompatibility ?? currentUpdateRuntimeCompatibility(
-        deps.platform,
-        deps.arch,
-        deps.nodeModuleAbi ?? process.versions.modules,
-      ),
-    );
-  } catch (error) {
-    stderr(`agenc: update failed: ${error instanceof Error ? error.message : String(error)}`);
-    return 1;
-  }
-
-  const latestVersion = manifest.runtimeVersion;
-  // Unpinned updates only when remote is semver-greater (todo-121).
-  // --pin installs that exact release even if lower.
+  const { manifestRequest, manifest, artifact, latestVersion, updateAvailable } = checked;
   const pinned = command.pinVersion !== undefined;
-  let updateAvailable = false;
-  try {
-    updateAvailable = pinned
-      ? latestVersion !== currentVersion
-      : semverGt(latestVersion, currentVersion);
-  } catch {
-    updateAvailable = latestVersion !== currentVersion;
-  }
 
   if (!updateAvailable) {
     if (command.json) {
@@ -3695,6 +3677,7 @@ export async function runAgenCUpdateCli(
   }
   let result: InstallRuntimeResult;
   try {
+    deps.onProgress?.("Downloading and verifying the runtime.");
     result = await installRuntimeFromManifest({
       manifest,
       artifact,
@@ -3712,6 +3695,7 @@ export async function runAgenCUpdateCli(
 
   let activation: WrapperActivationResult;
   try {
+    deps.onProgress?.("Activating the verified runtime for the next launch.");
     activation = await activateGeneratedWrappers({
       wrappers,
       runtimeBin: result.binPath,

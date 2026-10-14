@@ -1,3 +1,4 @@
+import { updateCommand } from "./update.js";
 import { budgetCommand } from "./budget.js";
 /**
  * Minimal slash-command registry.
@@ -170,6 +171,7 @@ export function buildDefaultRegistry(
     ...openaiAuthCommands,
     costCommand,
     modelCommand,
+    updateCommand,
     budgetCommand,
     providerCommand,
     effortCommand,
