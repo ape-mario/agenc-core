@@ -897,7 +897,17 @@ export async function exitOrResumeAfterTui(
 ): Promise<number> {
   const resumeId = await consumePendingResumeSessionId();
   if (resumeId === null) return exitCode;
-  return daemonCliDeps().resumeTui({ resumeId }, startupCliFlags);
+  try {
+    const resumed = await daemonCliDeps().resumeTui({ resumeId }, startupCliFlags);
+    if (resumed === 0) return resumed;
+  } catch (error) {
+    process.stderr.write(`agenc: unable to resume session: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
+  // The previous renderer has already detached. Keep an idle TUI available
+  // so a failed picker selection can be corrected without restarting the CLI.
+  return bootTUIEntry({
+    resumeFailureMessage: "Could not open that conversation. Choose another with /resume.",
+  }, startupCliFlags);
 }
 
 
@@ -1184,6 +1194,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
   readonly addDirs?: readonly string[];
   readonly preparePrompt?: typeof prepareDaemonTuiPrompt;
   readonly permissionMode?: AgentCreateParams["permissionMode"];
+  readonly initialNotice?: string;
 }): Promise<{
   readonly session: unknown;
   readonly close: () => Promise<void>;
@@ -2784,11 +2795,15 @@ async function createDeferredDaemonPromptTuiSession(params: {
         const progress = readCompactionProgressEvent(event);
         if (progress !== undefined) cb(progress);
       }),
-    getInitialTranscriptEvents: () =>
-      liveSession?.getInitialTranscriptEvents?.() ??
+    getInitialTranscriptEvents: () => [
+      ...(liveSession?.getInitialTranscriptEvents?.() ??
       (typeof base.getInitialTranscriptEvents === "function"
         ? (base.getInitialTranscriptEvents as () => readonly unknown[])()
-        : []),
+        : [])),
+      ...(params.initialNotice === undefined ? [] : [{
+        type: "slash_result", result: { kind: "error", message: params.initialNotice },
+      }]),
+    ],
   };
 
   return {
@@ -2959,7 +2974,10 @@ export const __wrapDaemonTuiSessionWithPromptPreparationForTest =
   wrapDaemonTuiSessionWithPromptPreparation;
 
 
-type BootTUIEntryArgs = BootTUIArgs & { readonly resumeId?: string };
+type BootTUIEntryArgs = BootTUIArgs & {
+  readonly resumeId?: string;
+  readonly resumeFailureMessage?: string;
+};
 
 
 async function resumeColdDaemonSession(params: {
@@ -3154,6 +3172,8 @@ export async function bootTUIEntry(
         const configStore = baseSession.services.configStore;
         const deferred = await createDeferredDaemonPromptTuiSession({
           baseSession,
+          ...(args.resumeFailureMessage !== undefined
+            ? { initialNotice: args.resumeFailureMessage } : {}),
           deps,
           agencHome: configStore.agencHome,
           env: sessionEnv,
