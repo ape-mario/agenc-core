@@ -1,4 +1,5 @@
 import React from "react";
+import { useInput } from "../ink.js";
 import { isAutoUpdaterDisabled } from "../../utils/config.js";
 import type { ConfigStore } from "../../config/store.js";
 import type { ToolJSXArgs } from "../tool-jsx-state.js";
@@ -12,13 +13,19 @@ export function useStartupUpdate({ safe, setToolJSX, configStore }: {
 }) {
   const safeRef = React.useRef(safe);
   safeRef.current = safe;
+  // Track typing through Ink's own input dispatch. A second raw
+  // process.stdin "data" listener next to Ink's "readable" reader could leave
+  // stdin flowing after the TUI paused and resumed it (for example around
+  // /resume), so every later key went only to that listener and the composer
+  // stopped receiving input.
+  const lastKeyRef = React.useRef(Date.now());
+  useInput(() => {
+    lastKeyRef.current = Date.now();
+  });
   React.useEffect(() => {
     if (!process.stdin.isTTY || !process.stdout.isTTY || process.env.CI || isAutoUpdaterDisabled(configStore.current())) return;
     let active = true;
-    let lastKey = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const onKey = () => { lastKey = Date.now(); };
-    process.stdin.on("data", onKey);
     // Start after the first committed screen; never await this in boot.
     timer = setTimeout(() => {
       launchCheck ??= import("../../bin/update-cli.js")
@@ -30,7 +37,7 @@ export function useStartupUpdate({ safe, setToolJSX, configStore }: {
         if (!active || hasSkippedUpdate(checked.latestVersion, configStore.stateRepository)) return;
         const showWhenIdle = () => {
           if (!active || isAutoUpdaterDisabled(configStore.current())) return;
-          if (!safeRef.current || Date.now() - lastKey < 1200) {
+          if (!safeRef.current || Date.now() - lastKeyRef.current < 1200) {
             timer = setTimeout(showWhenIdle, 250); return;
           }
           // Consume the launch result before the popup can remount this hook.
@@ -41,6 +48,6 @@ export function useStartupUpdate({ safe, setToolJSX, configStore }: {
         showWhenIdle();
       }).catch(() => {});
     }, 0);
-    return () => { active = false; if (timer) clearTimeout(timer); process.stdin.off("data", onKey); };
+    return () => { active = false; if (timer) clearTimeout(timer); };
   }, [setToolJSX, configStore]);
 }
