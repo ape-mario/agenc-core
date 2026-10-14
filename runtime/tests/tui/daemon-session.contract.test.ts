@@ -1120,7 +1120,7 @@ describe("AgenC TUI daemon session adapter", () => {
 
     expect(session.conversationId).toBe("agent_runtime");
     expect(session.getInitialTranscriptEvents()).toEqual([
-      { id: "snapshot:epoch_1:user_1", type: "user_message", payload: { message: "Build a notes CLI" } },
+      { id: "snapshot:epoch_1:user_1", type: "user_message", payload: { message: "Build a notes CLI", canonicalUserMessageId: "user_1" } },
       { id: "snapshot:epoch_1:assistant_1", type: "agent_message", payload: { message: "The notes CLI passes its tests" } },
     ]);
     expect(client.requests).toEqual([
