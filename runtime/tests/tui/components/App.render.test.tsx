@@ -3910,7 +3910,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
         expect.objectContaining({
           apiKeyStatus: "valid",
           onboardingInput: expect.objectContaining({
-            placeholder: "Enter keeps dark",
+            placeholder: "Enter keeps olive",
             allowEmptySubmit: true,
           }),
         }),
