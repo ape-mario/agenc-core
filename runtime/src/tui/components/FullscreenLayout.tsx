@@ -675,7 +675,7 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const swarmMode = useAppStateMaybeOutsideOfProvider(state => state.swarmMode) === true;
   const tasks = useAppStateMaybeOutsideOfProvider(state => state.tasks) ?? {};
   const runningAgents = React.useMemo(
-    () => Object.values(tasks ?? {}).filter((task: any) => task?.type !== "local_bash" && (task?.status === "running" || task?.status === "pending")).length,
+    () => Object.values(tasks).filter(task => (task.type === "local_agent" || task.type === "in_process_teammate") && (task.status === "running" || task.status === "pending")).length,
     [tasks],
   );
   const shellCount = Object.values(tasks).filter(task =>
@@ -695,13 +695,13 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   ].filter((label): label is string => label !== null);
   const rightWidth = stringWidth(rightLabels.join(' · '));
   const leftWidth = Math.max(1, columns - 4 - rightWidth - (rightWidth > 0 ? 1 : 0));
-  const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error'; bold?: boolean }> = [
+  const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error' | 'accent' | 'warning'; bold?: boolean }> = [
     ...(segments.folder !== null ? [{ key: 'folder', label: `${segments.folder}${segments.branch ? ` (${segments.branch})` : ''}`, color: 'text2' as const }] : []),
     { key: 'model', label: segments.model, color: 'text' },
     ...(segments.effort !== null ? [{ key: 'effort', label: segments.effort, color: 'text' as const }] : []),
     { key: 'mode', label: segments.mode, color: bypass ? 'error' : 'text', bold: bypass },
     ...(segments.light !== null ? [{ key: 'light', label: segments.light, color: 'text' as const }] : []),
-    ...(swarmMode ? [{ key: 'swarm', label: swarmStatusPresentation(runningAgents).label, color: 'text' as const }] : []),
+    ...(swarmMode ? [{ key: 'swarm', ...swarmStatusPresentation(runningAgents) }] : []),
     ...(shellCount > 0 ? [{ key: 'shells', label: `${shellCount} ${shellCount === 1 ? 'shell' : 'shells'}`, color: 'text' as const }] : []),
   ];
   // Reserve the truthful context/cost block first. Drop cwd/branch, shorten
