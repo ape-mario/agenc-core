@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
-import { open, opendir, readFile, realpath, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, opendir, readFile, readlink, realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
-import { resolveHomeContext } from "../config/home.js";
+import { assertNoRetiredConfigDir } from "../config/home.js";
 import {
   BoundedRegularFileError,
   readBoundedRegularFile,
@@ -45,6 +46,8 @@ export interface LinuxAgenCDaemonProcessScanLimits {
   readonly openProcDirectory?: OpenLinuxProcDirectory;
   /** @internal Deterministic process-cwd contract-test seam. */
   readonly readProcessCwdPath?: (procDir: string) => Promise<string>;
+  /** @internal Deterministic candidate filesystem-root contract-test seam. */
+  readonly readProcessRootPath?: (procDir: string) => Promise<string>;
 }
 
 export class AgenCDaemonProcessScanIncompleteError extends Error {
@@ -96,6 +99,8 @@ interface LinuxAgenCDaemonProcessScanTracker {
   readonly maxElapsedMs: number;
   readonly now: () => number;
   readonly readProcessCwdPath?: (procDir: string) => Promise<string>;
+  /** @internal Deterministic candidate filesystem-root contract-test seam. */
+  readonly readProcessRootPath?: (procDir: string) => Promise<string>;
   processEntries: number;
   ioOperations: number;
 }
@@ -389,6 +394,58 @@ async function inspectLinuxAgenCDaemonProcessWithTracker(
     ) {
       return null;
     }
+    // Container clients advertise a forwarded command in argv but do not
+    // execute the daemon script. Exclude only the actual protected system
+    // client executable, not a process merely using its name in argv.
+    consumeLinuxAgenCDaemonScanIo(scanTracker);
+    const executable = await stat(join(procDir, "exe"), { bigint: true });
+    for (const client of ["/usr/bin/docker", "/usr/bin/podman"]) {
+      consumeLinuxAgenCDaemonScanIo(scanTracker);
+      try {
+        const clientIdentity = await stat(client, { bigint: true });
+        if (clientIdentity.uid === 0n && (clientIdentity.mode & 0o022n) === 0n &&
+            executable.dev === clientIdentity.dev && executable.ino === clientIdentity.ino) {
+          return null;
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    }
+
+    // Compare home directory identities before reading another install's
+    // entrypoint. A process serving a different device/inode cannot own this
+    // home. Same-home and unknown candidates retain the full identity checks.
+    const environment = await readProcEnv(
+      join(procDir, "environ"),
+      scanTracker,
+    );
+    assertNoRetiredConfigDir(environment);
+    const candidateHome = environment.AGENC_HOME?.trim() ||
+      (environment.HOME?.trim() ? join(environment.HOME.trim(), ".agenc") : null);
+    const candidateRoot = scanTracker?.readProcessRootPath === undefined
+      ? join(procDir, "root")
+      : await scanTracker.readProcessRootPath(procDir);
+    const targetHomeBefore = candidateHome === null
+      ? null
+      : await readLinuxDaemonHomeIdentity(resolve(daemonHome), scanTracker);
+    const candidateHomeBefore = candidateHome === null
+      ? null
+      : await readLinuxDaemonHomeInProcessRoot(candidateRoot, candidateHome, scanTracker);
+    if (targetHomeBefore !== null && candidateHomeBefore !== null &&
+      !sameLinuxDaemonHomeIdentity(targetHomeBefore, candidateHomeBefore)) {
+      // A root or home replacement must not splice a foreign-home observation
+      // into another process generation, including the early exclusion path.
+      consumeLinuxAgenCDaemonScanIo(scanTracker);
+      const confirmedProcessStart = await readAgenCDaemonProcessStart(pid, host.readProcessIdentity);
+      if (confirmedProcessStart === null || confirmedProcessStart !== initialProcessStart) return null;
+      const targetHomeAfter = await readLinuxDaemonHomeIdentity(resolve(daemonHome), scanTracker);
+      const candidateHomeAfter = await readLinuxDaemonHomeInProcessRoot(candidateRoot, candidateHome!, scanTracker);
+      if (!sameLinuxDaemonHomeIdentity(targetHomeBefore, targetHomeAfter) ||
+          !sameLinuxDaemonHomeIdentity(candidateHomeBefore, candidateHomeAfter)) {
+        throw new AgenCDaemonProcessScanIncompleteError("daemon home changed during inspection");
+      }
+      return null;
+    }
     const cwdBefore = await readLinuxProcessCwdIdentity(procDir, scanTracker);
 
     let entrypointIndex = -1;
@@ -426,30 +483,12 @@ async function inspectLinuxAgenCDaemonProcessWithTracker(
       return null;
     }
 
-    const environment = await readProcEnv(
-      join(procDir, "environ"),
-      scanTracker,
-    );
-    if (environment.AGENC_HOME === undefined && environment.HOME === undefined) {
-      return null;
-    }
-    const candidateHome = resolveHomeContext(environment, {
-      ...(environment.HOME !== undefined
-        ? { platformHome: environment.HOME }
-        : {}),
-    }).path;
-    const targetHomeBefore = await readLinuxDaemonHomeIdentity(
-      resolve(daemonHome),
-      scanTracker,
-    );
-    const candidateHomeBefore = await readLinuxDaemonHomeIdentity(
-      candidateHome,
-      scanTracker,
-    );
-    if (!sameLinuxDaemonHomeIdentity(targetHomeBefore, candidateHomeBefore)) {
-      return null;
-    }
 
+    // No home coordinates cannot prove a foreign owner. Keep the entrypoint
+    // check above even in that case, then retain the original no-home result.
+    if (candidateHome === null || targetHomeBefore === null || candidateHomeBefore === null) {
+      return null;
+    }
     const cwdAfter = await readLinuxProcessCwdIdentity(procDir, scanTracker);
     consumeLinuxAgenCDaemonScanIo(scanTracker);
     const confirmedProcessStart = await readAgenCDaemonProcessStart(
@@ -466,9 +505,8 @@ async function inspectLinuxAgenCDaemonProcessWithTracker(
       resolve(daemonHome),
       scanTracker,
     );
-    const candidateHomeAfter = await readLinuxDaemonHomeIdentity(
-      candidateHome,
-      scanTracker,
+    const candidateHomeAfter = await readLinuxDaemonHomeInProcessRoot(
+      candidateRoot, candidateHome, scanTracker,
     );
     if (
       !sameLinuxProcessCwdIdentity(cwdBefore, cwdAfter) ||
@@ -482,10 +520,32 @@ async function inspectLinuxAgenCDaemonProcessWithTracker(
     }
     return { pid, processStart: confirmedProcessStart };
   } catch (error) {
-    if (isLinuxProcessDisappearanceError(error)) return null;
-    if (containsAgenCDaemonProcessScanIncompleteError(error)) throw error;
+    if (isLinuxProcessDisappearanceError(error)) {
+      // A cwd or entrypoint can be missing only in the scanner's namespace
+      // while the candidate is still alive. A missing pathname is not proof
+      // of process disappearance; confirm that through the process token.
+      try {
+        consumeLinuxAgenCDaemonScanIo(scanTracker);
+        if (await readAgenCDaemonProcessStart(pid, host.readProcessIdentity) === null) {
+          return null;
+        }
+      } catch (identityError) {
+        throw new AgenCDaemonProcessScanIncompleteError(
+          `process ${pid} disappearance could not be proved: ` +
+          `${identityError instanceof Error ? identityError.message : "identity unavailable"}; ` +
+          "stop that process in its namespace or make its daemon home readable before retrying",
+        );
+      }
+    }
+    if (containsAgenCDaemonProcessScanIncompleteError(error)) {
+      throw new AgenCDaemonProcessScanIncompleteError(
+        `process ${pid}: ${error instanceof Error ? error.message : "identity unavailable"}; ` +
+        "stop that process in its namespace or make its daemon home readable before retrying",
+      );
+    }
     throw new AgenCDaemonProcessScanIncompleteError(
-      `process ${pid} identity could not be proved`,
+      `process ${pid} identity could not be proved; ` +
+      "stop that process in its namespace or make its daemon home readable before retrying",
     );
   }
 }
@@ -537,6 +597,77 @@ async function readLinuxDaemonHomeIdentity(
     throw new AgenCDaemonProcessScanIncompleteError(
       `daemon home identity unavailable for ${path}`,
     );
+  }
+}
+
+/**
+ * Resolve home symlinks in the candidate's root, not the scanner's root.
+ * Each directory is pinned by an fd; O_NOFOLLOW prevents a replaced component
+ * from redirecting a lookup into the host filesystem. Absolute symlinks restart
+ * at the pinned candidate root. No metadata here authorizes adoption/signals.
+ */
+async function readLinuxDaemonHomeInProcessRoot(
+  processRoot: string,
+  homePath: string,
+  scanTracker?: LinuxAgenCDaemonProcessScanTracker,
+): Promise<LinuxDaemonHomeIdentity> {
+  if (!isAbsolute(homePath)) {
+    throw new AgenCDaemonProcessScanIncompleteError("candidate daemon home is not absolute");
+  }
+  consumeLinuxAgenCDaemonScanIo(scanTracker);
+  const root = await open(processRoot, constants.O_RDONLY | constants.O_DIRECTORY).catch(() => {
+    throw new AgenCDaemonProcessScanIncompleteError("candidate filesystem root is unreadable");
+  });
+  let current = root;
+  let components = homePath.normalize("NFC").split("/").filter(Boolean);
+  let walked: string[] = [];
+  let symlinks = 0;
+  try {
+    while (components.length > 0) {
+      const component = components.shift()!;
+      if (component === ".") continue;
+      if (component === "..") {
+        walked.pop();
+        components = [...walked, ...components];
+        if (current !== root) await current.close();
+        current = root;
+        walked = [];
+        continue;
+      }
+      const path = `/proc/self/fd/${current.fd}/${component}`;
+      consumeLinuxAgenCDaemonScanIo(scanTracker);
+      let next;
+      try {
+        next = await open(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "ELOOP" && code !== "ENOTDIR") throw error;
+        consumeLinuxAgenCDaemonScanIo(scanTracker);
+        const link = await readlink(path);
+        if (++symlinks > 40) throw new Error("candidate daemon home has too many symlinks");
+        components = [...(isAbsolute(link) ? [] : walked), ...link.split("/"), ...components].filter(Boolean);
+        if (current !== root) await current.close();
+        current = root;
+        walked = [];
+        continue;
+      }
+      const previous = current;
+      current = next;
+      if (previous !== root) await previous.close();
+      walked.push(component);
+    }
+    consumeLinuxAgenCDaemonScanIo(scanTracker);
+    const metadata = await current.stat({ bigint: true });
+    return { device: metadata.dev, inode: metadata.ino };
+  } catch (error) {
+    if (error instanceof AgenCDaemonProcessScanIncompleteError) throw error;
+    throw new AgenCDaemonProcessScanIncompleteError("candidate daemon home identity is unreadable in its filesystem root");
+  } finally {
+    try {
+      if (current !== root) await current.close();
+    } finally {
+      await root.close();
+    }
   }
 }
 
@@ -755,6 +886,7 @@ function createLinuxAgenCDaemonProcessScanTracker(
     ),
     now,
     readProcessCwdPath: limits.readProcessCwdPath,
+    readProcessRootPath: limits.readProcessRootPath,
     processEntries: 0,
     ioOperations: 0,
   };

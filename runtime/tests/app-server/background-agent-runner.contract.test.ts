@@ -6724,6 +6724,26 @@ describe("AgenC delegate background-agent runner", () => {
       await h.runner.startAgent({ objective: "work", cwd: process.cwd() });
       return h;
     }
+    function installPublishedReload(h: ReturnType<typeof makeTopLevelRunner>, nextConfig: Record<string, unknown>) {
+      let loaded: Record<string, unknown> = { model_provider: "gemini", model: "gemini-3.5-flash" };
+      const store = h.configStore as typeof h.configStore & {
+        prepareReload: () => Promise<{ config: Record<string, unknown>; publish: (options?: unknown) => void }>;
+      };
+      const prepareReload = store.prepareReload.bind(store);
+      Object.assign(store, {
+        current: () => loaded,
+        reload: async () => nextConfig,
+        prepareReload: async () => {
+          const prepared = await prepareReload();
+          const publish = prepared.publish;
+          prepared.publish = (options) => {
+            publish(options);
+            loaded = prepared.config;
+          };
+          return prepared;
+        },
+      });
+    }
     const liveConfiguration = (h: ReturnType<typeof makeTopLevelRunner>) =>
       h.sessionState.sessionConfiguration as {
         readonly collaborationMode: { readonly reasoningEffort?: string };
@@ -6833,9 +6853,8 @@ describe("AgenC delegate background-agent runner", () => {
       const agentId = "reload-drops-unsupported-effort";
       const h = await startOn(agentId, "gemini", "gemini-3.5-flash");
       await pin(h, "medium");
-      Object.assign(h.configStore, {
-        current: () => ({ model_provider: "gemini", model: "gemma-4-31b-it" }),
-      });
+      const nextConfig = { model_provider: "gemini", model: "gemma-4-31b-it" };
+      installPublishedReload(h, nextConfig);
 
       const result = await h.runner.applyAgentConfig(agentId, { sessionId: "session_1", reload: true });
 
@@ -6848,16 +6867,13 @@ describe("AgenC delegate background-agent runner", () => {
     it("journals none for a configured level the reloaded model rejects", async () => {
       const agentId = "reload-drops-configured-effort";
       const h = await startOn(agentId, "gemini", "gemini-3.5-flash");
-      Object.assign(h.configStore, {
-        current: () => ({
-          model_provider: "gemini",
-          model: "gemma-4-31b-it",
-          reasoning_effort: "medium",
-        }),
+      installPublishedReload(h, {
+        model_provider: "gemini", model: "gemma-4-31b-it", reasoning_effort: "medium",
       });
 
       const result = await h.runner.applyAgentConfig(agentId, { sessionId: "session_1", reload: true });
 
+      expect(result).toMatchObject({ applied: true, model: "gemma-4-31b-it" });
       expect(result.summary).toContain(gemmaNotice);
       expect(result.summary).not.toContain("reasoning effort ->medium");
       expect(await journaledEffort(h, agentId)).toBeNull();

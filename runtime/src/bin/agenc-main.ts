@@ -2278,6 +2278,13 @@ async function createDeferredDaemonPromptTuiSession(params: {
     // synthetic SessionSetPermissionModeResult so `/permissions mode` and
     // `/plan` report honest success instead of throwing / silently faking.
     setDaemonPermissionMode: async (mode) => {
+      // A cold rule edit or shell command may already have dispatched startup
+      // with the old mode. Wait for that session and commit through its live
+      // authority; staging now would be overwritten by the attach snapshot.
+      const pendingStartup = liveSessionPromise;
+      if (liveSession === null && pendingStartup !== null) {
+        await pendingStartup;
+      }
       if (liveSession === null) {
         if (
           !(USER_ADDRESSABLE_PERMISSION_MODES as readonly string[]).includes(
