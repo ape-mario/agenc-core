@@ -2146,7 +2146,7 @@ export interface SessionGoalBaselineFile extends JsonObject {
 }
 
 export interface SessionGoalWorkingTreeBaseline extends JsonObject {
-  readonly version: 1;
+  readonly version: 1 | 2;
   readonly trackedChanges: SessionGoalBaselineFile[];
   readonly untrackedFiles: SessionGoalBaselineFile[];
 }

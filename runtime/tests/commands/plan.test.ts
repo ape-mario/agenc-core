@@ -462,3 +462,47 @@ it("keeps an added plan step private until Enter and drops it on Esc", async () 
     expect(getPlan(planCtx(h))).toBe("- [ ] original step\n- [ ] new plan step\n");
   } finally { root.unmount(); stdin.end(); stdout.end(); }
 });
+
+it.each(["\n", "\r\n"])("editing a long plan heading preserves every untouched byte (%j)", async newline => {
+  const setToolJSX = vi.fn();
+  const h = mkHarness({ initialMode: "plan", appState: { setToolJSX } });
+  const title = `# Full invoice refactor ${"with code and critical file context ".repeat(6)}`;
+  const original = [title, "", "## Context", "  untouched paragraph  ", "", "```python", "def subtotal(items):", "    return sum(items)", "```", "", ...Array.from({ length: 30 }, (_, i) => `- [ ] Preserve detail ${i}`), "", "## Critical files", "| scratch.txt | unchanged |", ""].join(newline);
+  await writePlan(planCtx(h), original);
+  await planCommand.execute(h.ctx);
+  const stdin = Object.assign(new PassThrough(), { isTTY: true, ref() {}, unref() {}, setRawMode() {} });
+  const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false }); stdout.resume();
+  const root = await createRoot({ stdin: stdin as unknown as NodeJS.ReadStream, stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false });
+  try {
+    root.render(React.createElement(AppStateProvider, { initialState: getDefaultAppState(), children: setToolJSX.mock.calls[0][0].jsx }));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    stdin.write("e"); await new Promise(resolve => setTimeout(resolve, 50));
+    stdin.write(" Preserve scratch.txt byte for byte."); await new Promise(resolve => setTimeout(resolve, 50));
+    stdin.write("\r"); await new Promise(resolve => setTimeout(resolve, 80));
+    expect(getPlan(planCtx(h))).toBe(original.replace(newline, ` Preserve scratch.txt byte for byte.${newline}`));
+  } finally { root.unmount(); stdin.end(); stdout.end(); }
+});
+
+it("adding and deleting a step preserve the full document, and stale edits refuse to overwrite newer text", async () => {
+  const setToolJSX = vi.fn();
+  const h = mkHarness({ initialMode: "plan", appState: { setToolJSX } });
+  const original = "# Heading\n\n- [x] one\n  untouched body\n```markdown\n# heading inside code\n```\n" + Array.from({ length: 20 }, (_, i) => `- [ ] detail ${i}\n`).join("");
+  await writePlan(planCtx(h), original);
+  await planCommand.execute(h.ctx);
+  const stdin = Object.assign(new PassThrough(), { isTTY: true, ref() {}, unref() {}, setRawMode() {} });
+  const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false }); stdout.resume();
+  const root = await createRoot({ stdin: stdin as unknown as NodeJS.ReadStream, stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false });
+  const key = async (text: string) => { stdin.write(text); await new Promise(resolve => setTimeout(resolve, 70)); };
+  try {
+    root.render(React.createElement(AppStateProvider, { initialState: getDefaultAppState(), children: setToolJSX.mock.calls[0][0].jsx }));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    await key("a"); await key("\r");
+    expect(getPlan(planCtx(h))).toBe(original.replace("# Heading\n", "# Heading\n- [ ] new plan step\n"));
+    await key("d");
+    expect(getPlan(planCtx(h))).toBe(original);
+    const newer = original + "\nNew detail from another editor.\n";
+    await writePlan(planCtx(h), newer);
+    await key("e"); await key(" user edit"); await key("\r");
+    expect(getPlan(planCtx(h))).toBe(newer);
+  } finally { root.unmount(); stdin.end(); stdout.end(); }
+});

@@ -55,8 +55,16 @@ In a Git workspace, setting a goal also journals the content and mode identities
 of existing tracked changes and untracked files. Review compares against that
 baseline, so unchanged files that predate the goal are not attributed to it.
 Later edits, deletions and restorations still appear in the integrity check.
-The reviewer also sees the current diff against the starting commit, which can
-include pre-existing changes. Older goals without a baseline keep the
+New goals retain the starting bytes of those existing changes in private,
+content-addressed files under the AgenC home. Their bytes and directory entries
+are synced before the goal is journaled. Review diffs compare only files changed
+after that snapshot, including new untracked file contents, later edits and
+deletions. The repository's index, refs and working files are not changed by
+this comparison. Missing or corrupt retained bytes stop review rather than
+being treated as an empty diff. Hash-only baselines from older builds can still
+review new files and initially clean tracked files, but cannot reconstruct a
+later edit to an already dirty file; set a new goal before making that edit.
+Older goals without a baseline keep the
 conservative comparison against that commit and all untracked files, with a
 visible note that some files may predate the goal. An incomplete or unreadable
 baseline prevents setting the goal rather than silently omitting files.

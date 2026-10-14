@@ -202,7 +202,7 @@ function syncDirectorySync(path: string): void {
   throwDurableAtomicFileErrors(hasPrimaryError, primaryError, cleanupErrors);
 }
 
-async function syncDirectory(path: string): Promise<void> {
+export async function syncDirectory(path: string): Promise<void> {
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   let primaryError: unknown;
   let hasPrimaryError = false;

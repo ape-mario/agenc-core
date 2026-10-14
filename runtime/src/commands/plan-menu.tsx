@@ -38,22 +38,48 @@ function itemState(line: string): PlanItemState {
   return "active";
 }
 
-function itemText(line: string): string {
-  return line
-    .replace(/^\s*[-*]\s+\[[xX!\s]\]\s*/u, "")
-    .replace(/^\s*[-*]\s*/u, "")
-    .replace(/^#+\s*/u, "")
-    .trim();
-}
+type PlanSourceItem = {
+  readonly state: PlanItemState;
+  readonly text: string;
+  readonly start: number;
+  readonly end: number;
+  readonly lineStart: number;
+  readonly lineEnd: number;
+  readonly newline: string;
+};
 
-function markerForState(state: PlanItemState): string {
-  if (state === "done") return "x";
-  if (state === "failed") return "!";
-  return " ";
-}
-
-function formatPlanMarkdown(items: PlanDashboardSnapshot["items"]): string {
-  return `${items.map(item => `- [${markerForState(item.state)}] ${item.text}`).join("\n")}\n`;
+/** Editable source spans, never the compact dashboard preview. */
+function planSourceItems(text: string): PlanSourceItem[] {
+  const candidates: PlanSourceItem[] = [];
+  const fallback: PlanSourceItem[] = [];
+  let offset = 0;
+  let fence: string | undefined;
+  for (const fullLine of text.match(/[^\r\n]*(?:\r\n|\n|\r|$)/gu) ?? []) {
+    const newline = fullLine.match(/(?:\r\n|\n|\r)$/u)?.[0] ?? "";
+    const line = fullLine.slice(0, fullLine.length - newline.length);
+    const lineStart = offset;
+    offset += fullLine.length;
+    const marker = line.trimStart().match(/^(`{3,}|~{3,})/u)?.[1];
+    if (fence !== undefined) {
+      if (marker?.[0] === fence[0] && marker.length >= fence.length && line.trim() === marker) fence = undefined;
+      continue;
+    }
+    if (marker !== undefined) { fence = marker; continue; }
+    if (line.trim().length === 0) continue;
+    const prefix = line.match(/^[\t ]*(?:(?:[-*][\t ]+(?:\[[xX!\t ]\][\t ]*)?)|(?:#+[\t ]+))?/u)?.[0] ?? "";
+    const entry: PlanSourceItem = {
+      state: itemState(line),
+      text: line.slice(prefix.length),
+      start: lineStart + prefix.length,
+      end: lineStart + line.length,
+      lineStart,
+      lineEnd: offset,
+      newline,
+    };
+    fallback.push(entry);
+    if (/^\s*[-*]\s+/u.test(line) || /^\s*#+\s+/u.test(line)) candidates.push(entry);
+  }
+  return candidates.length > 0 ? candidates : fallback;
 }
 
 export function planItemsFromText(planText: string | null): PlanDashboardSnapshot["items"] {
@@ -63,20 +89,9 @@ export function planItemsFromText(planText: string | null): PlanDashboardSnapsho
       text: "No plan written yet.",
     }];
   }
-  const candidateLines = planText
-    .split("\n")
-    .map(line => line.trim())
-    .filter(line =>
-      line.length > 0 &&
-      !line.startsWith("```") &&
-      (/^\s*[-*]\s+/u.test(line) || /^#+\s+/u.test(line)),
-    );
-  const lines = candidateLines.length > 0
-    ? candidateLines
-    : planText.split("\n").map(line => line.trim()).filter(Boolean).slice(0, 8);
-  return lines.slice(0, 12).map((line, index) => ({
-    state: index === 0 && itemState(line) === "active" ? "active" : itemState(line),
-    text: compact(itemText(line) || line),
+  return planSourceItems(planText).slice(0, 12).map(item => ({
+    state: item.state,
+    text: compact(item.text),
   }));
 }
 
@@ -103,34 +118,61 @@ function PlanDashboardView({
 }: {
   readonly snapshot: PlanDashboardSnapshot;
   readonly onDone: () => void;
-  readonly onPlanTextChange?: (nextPlanText: string) => void | Promise<void>;
+  readonly onPlanTextChange?: (nextPlanText: string, previousPlanText: string) => void | Promise<void>;
 }): React.ReactNode {
-  const [items, setItems] = React.useState(() => [...snapshot.items]);
+  const [planText, setPlanText] = React.useState(snapshot.planText ?? "");
+  const sourceItems = React.useMemo(() => planSourceItems(planText), [planText]);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [adding, setAdding] = React.useState(false);
   const [notice, setNotice] = React.useState<string | undefined>();
+  const saving = React.useRef(false);
+  const items: readonly { state: PlanItemState; text: string }[] = sourceItems.length > 0
+    ? sourceItems
+    : [{ state: "pending", text: "No plan written yet." }];
+  const visibleItems = adding
+    ? [...items.slice(0, activeIndex), { state: "pending" as const, text: "new plan step" }, ...items.slice(activeIndex)]
+    : items;
+  const windowStart = Math.max(0, activeIndex - 11);
 
-  const persistItems = React.useCallback((nextItems: PlanDashboardSnapshot["items"]) => {
-    setItems([...nextItems]);
-    setNotice("plan updated");
-    if (onPlanTextChange) void onPlanTextChange(formatPlanMarkdown(nextItems));
-  }, [onPlanTextChange]);
+  const persistPlan = React.useCallback(async (nextPlanText: string) => {
+    if (saving.current) return;
+    saving.current = true;
+    setNotice("saving plan");
+    try {
+      await onPlanTextChange?.(nextPlanText, planText);
+      setPlanText(nextPlanText);
+      setActiveIndex(index => Math.min(index, Math.max(0, planSourceItems(nextPlanText).length - 1)));
+      setNotice("plan updated");
+      setEditing(false);
+      setAdding(false);
+    } catch (error) {
+      setNotice(`Failed to save plan: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      saving.current = false;
+    }
+  }, [onPlanTextChange, planText]);
 
   const commitDraft = React.useCallback(() => {
-    const text = draft.trim();
-    if (text.length === 0) return;
-    persistItems(items.map((item, index) => index === activeIndex ? { ...item, text } : item));
-    setEditing(false);
-    setAdding(false);
-  }, [activeIndex, draft, items, persistItems]);
+    if (draft.trim().length === 0) return;
+    const entry = sourceItems[activeIndex];
+    if (adding || entry === undefined) {
+      const previous = adding ? sourceItems[activeIndex - 1] : undefined;
+      const at = previous?.lineEnd ?? planText.length;
+      const newline = previous?.newline || planText.match(/\r\n|\n|\r/u)?.[0] || "\n";
+      const separator = at > 0 && !/[\r\n]$/u.test(planText.slice(0, at)) ? newline : "";
+      void persistPlan(`${planText.slice(0, at)}${separator}- [ ] ${draft}${newline}${planText.slice(at)}`);
+    } else {
+      void persistPlan(`${planText.slice(0, entry.start)}${draft}${planText.slice(entry.end)}`);
+    }
+  }, [activeIndex, adding, draft, planText, sourceItems, persistPlan]);
 
   useInput((input, key) => {
+    if (saving.current) return;
     if (editing) {
       if (key.escape) {
         if (adding) {
-          setItems(current => current.filter((_item, index) => index !== activeIndex));
           setActiveIndex(index => Math.max(0, index - 1));
           setAdding(false);
         }
@@ -164,23 +206,16 @@ function PlanDashboardView({
       return;
     }
     if (input === "e") {
-      setDraft(items[activeIndex]?.text ?? "");
+      setDraft(sourceItems[activeIndex]?.text ?? "");
       setEditing(true);
       return;
     }
     if (input === "d" && items.length > 1) {
-      const nextItems = items.filter((_item, index) => index !== activeIndex);
-      persistItems(nextItems);
-      setActiveIndex(index => Math.min(index, nextItems.length - 1));
+      const entry = sourceItems[activeIndex];
+      if (entry !== undefined) void persistPlan(`${planText.slice(0, entry.lineStart)}${planText.slice(entry.lineEnd)}`);
       return;
     }
     if (input === "a") {
-      const nextItems = [
-        ...items.slice(0, activeIndex + 1),
-        { state: "pending" as const, text: "new plan step" },
-        ...items.slice(activeIndex + 1),
-      ];
-      setItems(nextItems);
       setAdding(true);
       setActiveIndex(activeIndex + 1);
       setDraft("new plan step");
@@ -224,10 +259,11 @@ function PlanDashboardView({
             {notice ? <ThemedText color="agenc">{notice}</ThemedText> : null}
           </ThemedBox>
           <Box flexDirection="column" paddingX={1} paddingY={1}>
-            {items.map((item, index) => {
+            {visibleItems.slice(windowStart, windowStart + 12).map((item, localIndex) => {
+              const index = localIndex + windowStart;
               const active = index === activeIndex;
               const glyph = AURA_PLAN_GLYPHS[item.state];
-              const text = active && editing ? `${draft}█` : item.text;
+              const text = active && editing ? `${draft}█` : compact(item.text);
               return (
                 <ThemedBox
                   key={`${index}-${item.text}`}
@@ -244,7 +280,7 @@ function PlanDashboardView({
                     <ThemedText color={item.state === "pending" ? "muted3" : "agenc"}>{glyph}</ThemedText>
                   </Box>
                   <Box flexGrow={1} overflow="hidden">
-                    <ThemedText color={active ? "agenc" : "text2"} wrap="truncate-end">
+                    <ThemedText color={active ? "agenc" : "text2"} wrap={active && editing ? "truncate-start" : "truncate-end"}>
                       {text}
                     </ThemedText>
                   </Box>
@@ -262,7 +298,7 @@ export function openPlanDashboard(
   ctx: SlashCommandContext,
   snapshot: PlanDashboardSnapshot,
   options: {
-    readonly onPlanTextChange?: (nextPlanText: string) => void | Promise<void>;
+    readonly onPlanTextChange?: (nextPlanText: string, previousPlanText: string) => void | Promise<void>;
   } = {},
 ): boolean {
   return openLocalJsxCommand(ctx, close => (

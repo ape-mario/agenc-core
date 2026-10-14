@@ -2414,7 +2414,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
             defaultMaxRounds: active.bootstrap.configStore.current().goal?.max_rounds,
           });
           if (!built.ok) return refuse(built.message);
-          const baseline = await captureGoalWorkingTreeBaseline(cwd, built.goal.baseCommit);
+          const baseline = await captureGoalWorkingTreeBaseline(cwd, built.goal.baseCommit, session.services.configStore?.homeContext.path);
           return reply(commitSessionGoal(session, {
             ...built.goal,
             ...(baseline === undefined ? {} : { worktreeBaseline: baseline }),
