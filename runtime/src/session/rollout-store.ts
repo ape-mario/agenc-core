@@ -1994,31 +1994,26 @@ export class RolloutStore {
     rollback: CompactionRollbackCommittedV1,
   ): void {
     // A completed branch owns its own writer and may have advanced. Check its
-    // authenticated initial projection without taking its lease. Recovery only
+    // authenticated contiguous initial projection without taking its lease.
+    // Later metadata and branch work do not belong to this source's prefix.
+    // Recovery only
     // needs exclusive access when that original materialization is incomplete.
     const target = this.reviewedRollbackTargetStore(rollback);
     if (existsSync(target.rolloutPath)) {
       const items = target.readAll();
-      const metadata = items.filter(item => item.type === "session_meta");
-      const projected = items.flatMap(item => item.type === "response_item" ? [item.payload] : []);
+      const metadata = items[0];
+      const targetHistory = reviewedRollbackTargetHistory(rollback);
+      const prefix = items.slice(1, targetHistory.length + 1);
       if (
-        metadata.length === 1 && metadata[0]!.type === "session_meta" &&
-        metadata[0]!.payload.sessionId === rollback.target_session_id &&
-        metadata[0]!.payload.originator === reviewedRollbackTargetOriginator(rollback) &&
-        projected.length >= rollback.source_history.length &&
-        rollback.source_history.every((message, index) => {
-          const actual = canonicalizeSourceJson(projected[index]);
-          if (actual === canonicalizeSourceJson(message)) return true;
-          // Interactive branches bind a copied tool receipt to their own run.
-          return message.toolResultIntegrity !== undefined && actual === canonicalizeSourceJson({
-            ...message,
-            toolResultIntegrity: {
-              ...message.toolResultIntegrity,
-              runId: rollback.target_session_id,
-              resultId: deterministicToolResultId(rollback.target_session_id, message.toolResultIntegrity.toolCallId),
-            },
-          });
-        })
+        metadata?.type === "session_meta" &&
+        metadata.payload.sessionId === rollback.target_session_id &&
+        metadata.payload.originator === reviewedRollbackTargetOriginator(rollback) &&
+        prefix.length === targetHistory.length &&
+        prefix.every((item, index) => item.type === "response_item" && (
+          canonicalizeSourceJson(item.payload) === canonicalizeSourceJson(targetHistory[index]) ||
+          // Older authorized copies retain the source run's tool receipt.
+          canonicalizeSourceJson(item.payload) === canonicalizeSourceJson(rollback.source_history[index])
+        ))
       ) return;
     }
     const reservation = this.reserveReviewedRollbackTarget(rollback);
