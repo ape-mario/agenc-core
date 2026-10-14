@@ -1568,6 +1568,7 @@ export function ApprovalCard({
   typedConfirmationValue = '',
   typedConfirmationTarget = 'yes',
   selectedIndex,
+  typingWaiting = false,
 }: {
   readonly risk: 'low' | 'high'
   readonly title: string
@@ -1594,6 +1595,7 @@ export function ApprovalCard({
   readonly typedConfirmationTarget?: string
   /** Selected row of the action picker (0 approve-once, 1 session, 2 deny). */
   readonly selectedIndex?: number
+  readonly typingWaiting?: boolean
 }): React.ReactNode {
   const variant: BadgeVariant = risk === 'high' ? 'error' : 'accent'
   const primaryFact = facts[0]?.value ?? title
@@ -1674,6 +1676,13 @@ export function ApprovalCard({
       }
     >
       <Box flexDirection="column" paddingX={1} flexShrink={0}>
+        {typingWaiting ? (
+          <ThemedText color="text2" wrap="truncate-end">
+            {requireTypedConfirmation
+              ? `Card is waiting. Type ${typedConfirmationTarget}, then press Enter after a pause.`
+              : 'Card is waiting. Press 1, 2 or 3.'}
+          </ThemedText>
+        ) : null}
         <ThemedText color="text2" wrap="truncate-end">
           {approvalSummary}
         </ThemedText>

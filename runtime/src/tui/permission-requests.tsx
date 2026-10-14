@@ -34,6 +34,7 @@ import { EXIT_PLAN_MODE_TOOL_NAME } from "../tools/ExitPlanModeTool/constants.js
 import { PlanApprovalOverlay } from "./components/PlanApprovalOverlay.js";
 import { AskUserQuestionOverlay } from "./components/AskUserQuestionOverlay.js";
 import { setPlanApprovalChoice } from "./plan-approval-choice.js";
+import { useApprovalTypingGuard } from "./hooks/useApprovalTypingGuard.js";
 import {
   classifyApprovalRisk,
   typedConfirmationWordForRisk,
@@ -620,6 +621,7 @@ function AgenCApprovalOverlay({
     toolInput: toolUseConfirm.input,
   });
   const destructive = risk === "destructive";
+  const { waiting: typingWaiting, blockTyping } = useApprovalTypingGuard(destructive);
   const requiredWord = typedConfirmationWordForRisk({
     risk,
     command,
@@ -673,6 +675,7 @@ function AgenCApprovalOverlay({
   const handleSelectionInput = useCallback(
     (input: string, key: Key, event: InputEvent): boolean => {
       if (handleDiffInput(input, key, event)) return true;
+      if (blockTyping(input, key, event)) return true;
       if (input === "1") {
         event.stopImmediatePropagation();
         selectedIndexRef.current = 0;
@@ -713,9 +716,9 @@ function AgenCApprovalOverlay({
       }
       return false;
     },
-    [approve, approveForSession, confirmSelection, reject, handleDiffInput],
+    [approve, approveForSession, confirmSelection, reject, handleDiffInput, blockTyping],
   );
-  useInputCapture(handleDiffInput, { context: "Modal", isActive: destructive });
+  useInputCapture((input, key, event) => handleDiffInput(input, key, event) || blockTyping(input, key, event), { context: "Modal", isActive: destructive });
   useInputCapture(handleSelectionInput, { context: "Modal", isActive: !destructive });
   useInput(handleSelectionInput, { isActive: !destructive });
 
@@ -740,6 +743,7 @@ function AgenCApprovalOverlay({
     (input, key, event) => {
       if (!destructive) return;
       if (handleDiffInput(input, key, event)) return;
+      if (blockTyping(input, key, event)) return;
       event.stopImmediatePropagation();
       if (key.return) {
         if (typedRef.current === requiredWord) approve();
@@ -809,6 +813,7 @@ function AgenCApprovalOverlay({
         typedConfirmationValue={typed}
         typedConfirmationTarget={requiredWord}
         selectedIndex={selectedIndex}
+        typingWaiting={typingWaiting}
       />
     </Box>
   );

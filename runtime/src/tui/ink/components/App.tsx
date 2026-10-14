@@ -532,6 +532,16 @@ export default class App extends PureComponent<Props, State> {
 // Helper to process all keys within a single discrete update context.
 // discreteUpdates expects (fn, a, b, c, d) -> fn(a, b, c, d)
 function processKeysInBatch(app: App, items: ParsedInput[], _unused1: undefined, _unused2: undefined): void {
+  // Carry a bounded text preview so focused cards can distinguish an isolated
+  // shortcut from the first digit of a larger, unmarked typing/paste batch.
+  let textInBatch = '';
+  for (const item of items) {
+    if (item.kind === 'key' && typeof item.sequence === 'string' && !item.fn && !item.ctrl && !item.meta && !item.option && !item.super &&
+        !/[\u0000-\u001f\u007f]/u.test(item.sequence)) {
+      textInBatch += item.sequence.slice(0, 2 - textInBatch.length);
+      if (textInBatch.length === 2) break;
+    }
+  }
   // Update interaction time for notification timeout tracking.
   // This is called from the central input handler to avoid having multiple
   // stdin listeners that can cause race conditions and dropped input.
@@ -592,7 +602,7 @@ function processKeysInBatch(app: App, items: ParsedInput[], _unused1: undefined,
       app.handleSuspend();
       continue;
     }
-    const event = new InputEvent(item);
+    const event = new InputEvent(item, textInBatch);
     if (handleUrgentCancelInput(event.input, event.key)) {
       event.stopImmediatePropagation();
       continue;
