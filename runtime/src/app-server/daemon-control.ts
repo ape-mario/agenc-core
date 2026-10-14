@@ -2566,16 +2566,17 @@ export async function requestAgenCDaemonHealthStats(
  */
 export async function requestAgenCDaemonInstanceIdentity(
   host: Pick<AgenCDaemonCliHost, "env" | "userHome">,
+  timeoutCeilingMs = Number.POSITIVE_INFINITY,
 ): Promise<AgenCDaemonInstanceIdentity> {
   const socketPath = resolveAgenCDaemonSocketPath(host.env, host.userHome);
   const cookiePath = resolveAgenCDaemonCookiePath(host.env, host.userHome);
   const authCookie = await readAgenCDaemonCookie(cookiePath);
   const responses = await sendAgenCDaemonJsonLineRequests(
     socketPath,
-    resolveAgenCDaemonRequestTimeoutMs(
+    Math.min(timeoutCeilingMs, resolveAgenCDaemonRequestTimeoutMs(
       host.env,
       DEFAULT_DAEMON_REQUEST_TIMEOUT_MS,
-    ),
+    )),
     [
       {
         jsonrpc: JSON_RPC_VERSION,
@@ -3001,7 +3002,9 @@ export function sendAgenCDaemonJsonLineRequests(
     let settled = false;
     const timeout = setTimeout(() => {
       finish(
-        new Error(`Timed out waiting for daemon response at ${socketPath}`),
+        Object.assign(new Error(`Timed out waiting for daemon response at ${socketPath}`), {
+          code: "ETIMEDOUT",
+        }),
       );
     }, timeoutMs);
 
