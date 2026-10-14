@@ -10,6 +10,13 @@ import type { SlashCommandContext, SlashCommandResult } from "./types.js";
 
 const levels = Object.keys(TASK_BUDGET_LEVELS) as TaskBudgetLevel[];
 const choices = [...levels, "custom"] as const;
+/** What each choice means for the user, shown under the list. */
+const BUDGET_CHOICE_DESCRIPTIONS: Record<string, string> = {
+  eco: "the cheapest. Fine for small fixes and questions; long jobs stop early.",
+  balanced: "the default. Enough room for most coding tasks.",
+  max: "no limit. For hard or very long jobs; cost grows with the work.",
+  custom: "pick your own limit per task.",
+};
 function BudgetMenu({ current, currentBudget, apply, close }: {
   current: number; currentBudget: () => number; apply: (choice: string) => Promise<SlashCommandResult>; close: () => void;
 }) {
@@ -58,24 +65,27 @@ function BudgetMenu({ current, currentBudget, apply, close }: {
       } else applyChoice(choice);
     }
   });
-  return <MenuModal title="budget" count="4" summary={`current ${taskBudgetLabel(active)}`} columns={[18, 48]} headers={["level", "allowance"]}
+  const highlighted = choices[index] ?? "custom";
+  const highlightedLabel = highlighted === "custom" ? "custom" : highlighted;
+  return <MenuModal title="budget" summary={`now ${taskBudgetLabel(active)}`} columns={[18, 40]} headers={["level", "limit per task"]}
     items={choices} activeIndex={index} renderRow={choice => {
       const isCustom = choice === "custom";
       const isCurrent = isCustom ? !levels.some(level => TASK_BUDGET_LEVELS[level] === active) : TASK_BUDGET_LEVELS[choice] === active;
       return [
-        <ThemedText key="level" color="text">{isCustom ? "Custom" : choice}{isCurrent ? " (current)" : ""}</ThemedText>,
-        <ThemedText key="allowance" color="text2">{isCustom ? "Enter a token number" : taskBudgetLabel(TASK_BUDGET_LEVELS[choice])}</ThemedText>,
+        <ThemedText key="level" color="text">{isCustom ? "custom" : choice}{isCurrent ? " (current)" : ""}</ThemedText>,
+        <ThemedText key="allowance" color="text2">{isCustom ? "your own number" : TASK_BUDGET_LEVELS[choice] === 0 ? "no limit" : `${TASK_BUDGET_LEVELS[choice].toLocaleString("en-US")} tokens`}</ThemedText>,
       ];
-    }} preview={<Box flexDirection="column">
-      <ThemedText color="text2">Apply to this session and save for new sessions.</ThemedText>
+    }} detail={<Box flexDirection="column" gap={1}>
+      <ThemedText color="text" wrap="wrap">{highlightedLabel}: {BUDGET_CHOICE_DESCRIPTIONS[highlighted]}</ThemedText>
+      <ThemedText color="text2" wrap="wrap">A budget caps the tokens one task can use. Near the cap the agent wraps up and stops cleanly. Your choice applies now and to new sessions.</ThemedText>
       {custom ? <Box flexDirection="column">
-        <ThemedText color="text2">Custom token cap: 3000000, 3m, or 500k. Use 0 for no cap.</ThemedText>
+        <ThemedText color="text2">Type a limit like 3000000, 3m or 500k. Use 0 for no limit.</ThemedText>
         <TextInput value={value} onChange={setValue} onSubmit={applyChoice} cursorOffset={cursorOffset} onChangeCursorOffset={setCursorOffset}
           columns={60} focus={!busy} showCursor={!busy} multiline={false} placeholder="token number" />
       </Box> : null}
       {message ? <ThemedText color={failed ? "error" : "text2"} wrap="wrap">{message}</ThemedText> : null}
     </Box>}
-    footer={[{ keyName: custom ? "type" : "up/down", label: custom ? "token number" : "navigate" }, { keyName: "enter", label: "apply" }, { keyName: "esc", label: custom ? "back" : "close" }]} />;
+    footer={[{ keyName: custom ? "type" : "↑↓", label: custom ? "a number" : "choose" }, { keyName: "enter", label: "apply" }, { keyName: "esc", label: custom ? "back" : "close" }]} />;
 }
 export function openBudgetMenu(ctx: SlashCommandContext, current: number, apply: (choice: string) => Promise<SlashCommandResult>): boolean {
   return openLocalJsxCommand(ctx, close => <BudgetMenu current={current} currentBudget={() => ctx.session.config?.taskTokenBudget ?? current} apply={apply} close={close} />);
