@@ -694,6 +694,10 @@ function makeTopLevelRunner(opts: {
     current: () => ({}),
     stateRepository,
     projectRoot: workspaceRoot,
+    homeContext: resolveHomeContext(
+      { AGENC_HOME: join(canonicalTmpdir(), `${opts.conversationId}-home`) },
+      { platformHome: canonicalTmpdir() },
+    ),
     authoritySnapshot: () => ({
       config: {},
       layers: [...(opts.configLayers ?? [])],
