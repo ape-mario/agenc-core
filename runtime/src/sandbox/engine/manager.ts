@@ -222,6 +222,7 @@ export class SandboxManager {
             request.sessionTempRoot,
             inheritedReadOnlyCwd,
             boundReadOnlyCwd,
+            request.network?.allowLocalBinding === true && !inheritedReadOnlyCwd,
           ),
         ];
         // A normal argv0 avoids commandExec's PTY argv0 compatibility wrapper,

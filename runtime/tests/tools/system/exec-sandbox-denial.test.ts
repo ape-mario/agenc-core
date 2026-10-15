@@ -28,6 +28,16 @@ const denial = (overrides: Partial<Parameters<typeof execSandboxDenialNotice>[0]
   });
 
 describe("execSandboxDenialNotice", () => {
+  test("offers the setting in one short line, including a running test with failed listen", () => {
+    for (const escalationAvailable of [false, true]) {
+      const notice = denial({ exitCode: null, escalationAvailable })?.notice;
+      expect(notice).toContain("sandbox.network.allowLocalBinding");
+      expect(notice).toContain("true");
+      expect(notice?.split("\n")).toHaveLength(1);
+      expect(notice!.length).toBeLessThan(340);
+      expect(notice).not.toContain("—");
+    }
+  });
   test("names the sandbox and forbids the retry when nobody can approve", () => {
     const result = denial();
     expect(result?.kind).toBe("network_bind");
@@ -41,7 +51,7 @@ describe("execSandboxDenialNotice", () => {
     const result = denial({ escalationAvailable: true });
     expect(result?.notice).toBe(SANDBOX_BIND_DENIED_ESCALATION_AVAILABLE);
     expect(result?.notice).toContain("require_escalated");
-    expect(result?.notice).toContain("once more");
+    expect(result?.notice).toContain("once");
   });
 
   test("recognizes the phrasings other runtimes use", () => {

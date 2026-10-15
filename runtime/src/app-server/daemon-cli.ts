@@ -717,6 +717,7 @@ async function runAgenCDaemonForegroundLocked(
       agencLinuxSandboxExe: resolveDefaultLinuxSandboxExecutable(),
       sessionTempRoot: resolveSessionTempRootAtIngress(host.env),
       allowGpu: activeConfig.sandbox?.allow_gpu === true,
+      allowLocalBinding: activeConfig.sandbox?.network?.allowLocalBinding === true,
     });
     const closeCommandExec = async () => {
       await commandExec.closeAll("daemon_shutdown");

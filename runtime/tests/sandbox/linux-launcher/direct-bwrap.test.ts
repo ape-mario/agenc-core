@@ -44,6 +44,18 @@ function decode(payload: Buffer) {
 }
 
 describe.runIf(process.platform === "linux")("guarded immutable direct bwrap planning", () => {
+  it("keeps local-only BPF and network isolation in the direct launcher", () => {
+    const f = fixture();
+    f.args.splice(1, 0, "--allow-local-binding");
+    const prepared = prepareDirectBwrapPlan(f);
+    expect(prepared).toBeDefined();
+    const plan = consumeDirectBwrapPlan(prepared!);
+    try {
+      const decoded = decode(plan.payload);
+      expect(decoded.args).toContain("--unshare-net");
+      expect(decoded.bpf).toEqual(createNetworkSeccompProgram("local-only"));
+    } finally { plan.dispose(); }
+  });
   it("prepares V3 against the packaged reserved artifact without changing task policy or BPF", () => {
     const f = fixture();
     const legacy = consumeDirectBwrapPlan(prepareDirectBwrapPlan(f)!);
@@ -225,7 +237,7 @@ describe.runIf(process.platform === "linux")("guarded immutable direct bwrap pla
     f.args[profileIndex] = JSON.stringify(profile);
     expect(prepareDirectBwrapPlan(f)).toBeUndefined();
     expect(fs.readdirSync(f.temp)).toEqual([]);
-    fs.mkdirSync(path.join(extra, ".git"));
+    for (const name of [".git", ".agenc", ".agents"]) fs.mkdirSync(path.join(extra, name));
     const accepted = prepareDirectBwrapPlan(f);
     expect(accepted).toBeDefined();
     consumeDirectBwrapPlan(accepted!).dispose();

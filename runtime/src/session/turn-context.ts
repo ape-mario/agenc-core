@@ -363,6 +363,7 @@ export interface SessionConfiguration {
    * `sandbox.allow_gpu`). Kernel attack surface — off by default.
    */
   readonly sandboxAllowGpu?: boolean;
+  readonly sandboxAllowLocalBinding?: boolean;
   readonly sandboxPersistentSession?: boolean;
   readonly collaborationMode: CollaborationMode;
   /**

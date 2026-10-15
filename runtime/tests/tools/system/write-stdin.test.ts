@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 import { createWriteStdinTool as createUnboundWriteStdinTool } from "../../../src/tools/system/write-stdin.js";
+import { SandboxExecutionBroker, attachSandboxExecutionBroker } from "../../../src/sandbox/execution-broker.js";
 import { RESIDUAL_PROCESSES_NOTE } from "../../../src/tools/system/exec-result-format.js";
 import {
   UnifiedExecError,
@@ -166,4 +167,20 @@ describe("write_stdin reaches a session started in another sandbox", () => {
     expect(properties.additional_permissions).toMatchObject({ type: "object" });
     expect(properties.justification).toMatchObject({ type: "string" });
   });
+});
+
+
+test("annotates a bind denial emitted while polling a still-running test", async () => {
+  const manager: UnifiedExecProcessManagerLike = {
+    maxTimeoutMs: 30_000, execCommand: vi.fn(async () => undefined as never), closeAll: vi.fn(async () => {}),
+    writeStdin: vi.fn(async () => ({ output: "Error: listen EPERM: operation not permitted 127.0.0.1", stdout: "", stderr: "Error: listen EPERM", exitCode: null, exit_code: null, process_id: 7, session_id: 7, durationMs: 1, wall_time_seconds: 0.001, timedOut: false, truncated: false, original_token_count: 10 })),
+  };
+  const tool = createUnboundWriteStdinTool({ cwd: root, unifiedExecManager: manager });
+  const broker = new SandboxExecutionBroker({ mode: "workspace_write", cwd: root, probe: () => ({ kind: "ready", mode: "workspace_write", platform: process.platform }) });
+  const args = { session_id: 7, chars: "" };
+  attachSandboxExecutionBroker(args, broker);
+  const result = await tool.execute(args);
+  expect(result.content).toContain("The sandbox blocks local servers");
+  expect(result.content).toContain("require_escalated");
+  expect(result.metadata?.processId).toBe(7);
 });
