@@ -3751,6 +3751,27 @@ describe("AgenC delegate background-agent runner", () => {
     expect(source).toContain("runtimeSettingsEqual");
   });
 
+  it("restores an uncatalogued pair repeated by automatic daemon restore", async () => {
+    const runId = "automatic-restore-uncatalogued-model";
+    const baseline = canonicalRuntimeSettings();
+    const harness = makeTopLevelRunner({
+      conversationId: runId,
+      rolloutItems: [runtimeSettingsRolloutItem(runId, baseline)],
+      canonicalRuntimeSettings: true,
+    });
+    await expect(harness.runner.restoreAgent({
+      agentId: runId,
+      objective: "restore the saved model",
+      explicitColdResume: true,
+      runtimeSettings: baseline,
+      provider: baseline.provider,
+      model: baseline.model,
+    })).resolves.toBe(true);
+    await expect(harness.runner.getAgentSnapshot(runId)).resolves.toMatchObject({
+      runtimeSettings: { provider: baseline.provider, model: baseline.model },
+    });
+  });
+
   it("durably applies explicit restore overrides after the canonical settings baseline", async () => {
     const baseline = {
       permissionMode: "default" as const,
@@ -3803,7 +3824,7 @@ describe("AgenC delegate background-agent runner", () => {
         objective: "resume with explicit settings",
         explicitColdResume: true,
         runtimeSettings: baseline,
-        model: "override-model",
+        model: "gpt-5",
         provider: "openai",
         profile: "override-profile",
         permissionMode: "plan",
@@ -3828,7 +3849,7 @@ describe("AgenC delegate background-agent runner", () => {
           reason: "permission_mode_changed",
           permissionMode: "plan",
           prePlanMode: "default",
-          model: "override-model",
+          model: "gpt-5",
           provider: "openai",
           profile: "override-profile",
         },
@@ -3840,7 +3861,7 @@ describe("AgenC delegate background-agent runner", () => {
     });
     expect(harness.session.pendingProviderSwitch).toEqual({
       provider: "openai",
-      model: "override-model",
+      model: "gpt-5",
       profile: "override-profile",
     });
   });
@@ -6651,7 +6672,7 @@ describe("AgenC delegate background-agent runner", () => {
     });
   });
 
-  it("keeps the runtime-settings cursor unchanged for the active provider/model pair", async () => {
+  it("keeps the runtime-settings cursor when a saved active model is no longer catalogued", async () => {
     const agentId = "unchanged-provider-model-pair";
     const { runner, session, rolloutItems } = makeTopLevelRunner({
       conversationId: agentId,
@@ -6671,7 +6692,7 @@ describe("AgenC delegate background-agent runner", () => {
       provider: "grok",
       model: "base-model",
       runtimeSettingsEventId: cursor,
-      summary: "Model unchanged: grok/base-model.",
+      summary: `Model switch to "base-model" blocked: unknown model 'base-model' for provider 'grok'. did you mean 'grok-4.7'?`,
     });
     expect(session.pendingProviderSwitch).toBeNull();
     expect(recordedRuntimeSettingsEvents(rolloutItems)).toHaveLength(

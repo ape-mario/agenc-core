@@ -41,6 +41,7 @@ export function resolveProviderModelSelection(
   current: SessionSelection,
   layer: Pick<AgenCConfig, "model_provider" | "model">,
   env: Readonly<Record<string, string | undefined>> = process.env,
+  options: { readonly validateCatalog?: boolean } = {},
 ): ResolvedSessionSelection {
   const configuredBase = mergeProviderModelLayer(defaultConfig(), config ?? {});
   const currentProvider = resolveBuiltInProviderSlug(current.provider);
@@ -63,7 +64,9 @@ export function resolveProviderModelSelection(
   if (model === undefined) {
     throw new Error("model selection values must be non-empty");
   }
-  assertModelCatalogSelection(config ?? {}, provider, model, env);
+  if (options.validateCatalog !== false) {
+    assertModelCatalogSelection(config ?? {}, provider, model, env);
+  }
   if (!isModelAllowed(provider, model, config ?? {})) {
     throw new ModelNotAllowedError(model);
   }

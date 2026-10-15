@@ -2883,6 +2883,10 @@ export class Session {
         model: liveBinding.model,
       },
       { model_provider: pending.provider, model: pending.model },
+      this.services.providerEnvironment,
+      // Interactive ingress already admits names before staging. Profiles,
+      // recovery and restored settings may carry uncatalogued saved routes.
+      { validateCatalog: false },
     );
     const admittedPending: PendingProviderSwitch = Object.freeze({
       ...pending,
