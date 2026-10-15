@@ -2854,6 +2854,28 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     submission: ActiveMessageSubmission,
     userStopGenerationToRelease: number,
   ): Promise<AgenCBackgroundAgentMessageResult> {
+    // The submission records below open the turn they start: like its steps
+    // they are written but not fsynced. The turn keeps them under its own
+    // scope and flushes them at its end; a message that waits behind another
+    // turn gets the background flush.
+    const releaseSubmissionDurability =
+      active.bootstrap.rolloutStore.deferSyncsForTurn?.();
+    try {
+      return await this.#executeAgentMessageSubmissionInTurnScope(
+        active, agentId, params, submission, userStopGenerationToRelease,
+      );
+    } finally {
+      releaseSubmissionDurability?.("background");
+    }
+  }
+
+  async #executeAgentMessageSubmissionInTurnScope(
+    active: ActiveBackgroundAgent,
+    agentId: string,
+    params: AgenCBackgroundAgentMessageParams,
+    submission: ActiveMessageSubmission,
+    userStopGenerationToRelease: number,
+  ): Promise<AgenCBackgroundAgentMessageResult> {
     let input = messageContentToAgentInput(params.content);
     const prepared = await prepareDaemonUserPrompt({
       session: active.bootstrap.session,

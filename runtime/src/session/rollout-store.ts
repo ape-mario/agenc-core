@@ -40,6 +40,7 @@ import {
   withAtomicArtifactObservationSync,
 } from "../durability/atomic-artifact.js";
 import { withPinnedOfflineRolloutLease } from "../durability/offline-rollout.js";
+import type { TurnDurabilityRelease } from "../durability/turn-durability.js";
 import { readSubagentTaskReceipts, type RecoveredChildTaskReceipt } from "./subagent-receipt-recovery.js";
 import {
   AgentIdExistsError,
@@ -4025,6 +4026,11 @@ export class RolloutStore {
   /** Fsync the existing canonical tail even when no batch is pending. */
   syncCanonicalTail(): void {
     this.store.syncCanonicalTail();
+  }
+
+  /** Turn-scoped durability; see {@link SessionStore.deferSyncsForTurn}. */
+  deferSyncsForTurn(): TurnDurabilityRelease {
+    return this.store.deferSyncsForTurn();
   }
 
   /** @internal Test seam for write-success/fsync-failure recovery. */
