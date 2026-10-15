@@ -1,6 +1,7 @@
 import { isAuditedAdmissionRead } from "./synchronous-admission-sql.js";
 import { projectWriteBehindBarrier } from "../session/write-behind.js";
 import { relaxedOneShotTransaction } from "../durability/one-shot-durability.js";
+import { noteUnsyncedSqliteWal, sqliteCommitsDeferSync } from "../durability/turn-durability.js";
 import { randomUUID } from "node:crypto";
 import {
   chmodSync,
@@ -306,7 +307,12 @@ export class StateSqliteDriver {
   }
 
   private withTransactionDurability<T>(db: SqliteDatabase, operation: () => T): T {
-    const relaxed = relaxedOneShotTransaction(this.projectDir, this.durabilityRunId);
+    const oneShot = relaxedOneShotTransaction(this.projectDir, this.durabilityRunId);
+    // Turn-scoped durability: while a turn runs, a commit is durable against
+    // the process dying once SQLite has written its log (NORMAL); the turn
+    // boundary syncs the log. Only where a FULL commit costs a device flush.
+    const turn = !oneShot && sqliteCommitsDeferSync();
+    const relaxed = oneShot || turn;
     if (db.inTransaction) {
       if (!relaxed && db.pragma("synchronous", { simple: true }) !== 2) {
         throw new Error("a full-durability operation cannot nest in a relaxed transaction");
@@ -316,7 +322,10 @@ export class StateSqliteDriver {
     if (!relaxed) return operation();
     db.pragma("synchronous = NORMAL");
     try { return operation(); }
-    finally { db.pragma("synchronous = FULL"); }
+    finally {
+      db.pragma("synchronous = FULL");
+      if (turn) noteUnsyncedSqliteWal(`${db === this.state ? this.stateDbPath : this.logsDbPath}-wal`);
+    }
   }
 
   /** A clean one-shot seal requires stable WAL and database bytes. */

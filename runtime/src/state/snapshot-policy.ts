@@ -2,6 +2,7 @@ import { withOneShotWriteScope } from "../durability/one-shot-durability.js";
 import type { JsonObject, JsonValue } from "../app-server/protocol/index.js";
 import type { ToolRecoveryCategory } from "../tools/types.js";
 import { updateAgentRunStatus } from "./agent-runs.js";
+import { turnDurabilityOpen } from "../durability/turn-durability.js";
 import {
   writeSessionSnapshotAtomically,
   type SessionSnapshotWriteRecord,
@@ -1108,6 +1109,9 @@ export class AgenCSessionSnapshotPolicy {
           writeSessionSnapshotAtomically(this.#driver, pending.record, {
             updateRunLastSnapshotAt: true, replayOnStartup: true, verifyExisting: true,
             oneShotRunId: state.agentId,
+            // Between a running turn's steps: process-crash durable, flushed
+            // at the turn boundary (turn-scoped durability).
+            deferSync: turnDurabilityOpen(state.agentId ?? state.sessionId),
           }),
         );
         state.pendingWrite = undefined;

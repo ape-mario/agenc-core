@@ -1,6 +1,7 @@
 import { SessionWriteBehindQueue, registerSessionWriteBehind, drainRolloutWriteBehind } from "./write-behind.js";
 import { isLegacyConfiguredCacheWithinCeiling, recoveryPendingLineCeiling } from "../state/session-configured-cache.js";
 import { assertOneShotRecoverable, beginOneShotWriter, consumeOneShotSeal, supportsRelaxedOneShot, withOneShotWriteScope, type OneShotWriterAuthority } from "../durability/one-shot-durability.js";
+import { DEFERRED_SYNC_INTERVAL_MS, openTurnDurabilityScope, type TurnDurabilityRelease } from "../durability/turn-durability.js";
 /**
  * Session on-disk store — owns the rollout JSONL file, its fsync
  * guarantees, flock acquisition, atomic write-then-rename, and the
@@ -56,6 +57,7 @@ import {
   existsSync,
   fstatSync,
   ftruncateSync,
+  fsync as fsyncInBackground,
   fsyncSync,
   linkSync,
   lstatSync,
@@ -129,6 +131,32 @@ import {
 } from "./serialization-size.js";
 
 export const I4_FSYNC_RETRY_MS = 100;
+
+/**
+ * Durable events that keep their fsync inside a turn (turn-scoped
+ * durability): a turn's end, which is the turn boundary, and the rare
+ * lifecycle, compaction and protocol records whose recovery orders them
+ * against other stores. Everything else a turn writes between its steps
+ * commits with write().
+ */
+const SYNCED_IN_TURN_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "turn_complete",
+  "turn_aborted",
+  "turn_failed",
+  "context_compacted",
+  "history_cleared",
+  "transcript_epoch",
+  "recovery_decision",
+  "run_terminal",
+  "run_reopened",
+  "run_suspended",
+  "run_resumed",
+  "run_cancel_requested",
+  "protocol_claim",
+  "protocol_settle",
+  "protocol_slash",
+  "protocol_stake",
+]);
 const I83_SUSPEND_DETECTION_MS = 10_000;
 
 type RolloutPhysicalLineExclusion = {
@@ -1859,6 +1887,21 @@ export class SessionStore {
     length: number,
   ) => number = (fd, buffer, offset, length) =>
     writeSync(fd, buffer, offset, length);
+  /** Background half of {@link fsyncImpl}; a seam for the same reason. */
+  private fsyncInBackgroundImpl: (
+    fd: number,
+    callback: (error: NodeJS.ErrnoException | null) => void,
+  ) => void = fsyncInBackground;
+  /**
+   * Turn-scoped durability: open turn scopes (see `deferSyncsForTurn`), the
+   * number of durable flushes written without fsync, and how many of those
+   * the newest fsync of the file covers.
+   */
+  private turnSyncDeferrals = 0;
+  private deferredWrites = 0;
+  private syncedDeferredWrites = 0;
+  private deferredSyncTimer: ReturnType<typeof setTimeout> | undefined;
+  private backgroundSyncInFlight = false;
   /** Exact pre-append boundary whose rollback could not be durably proven. */
   private uncertainAppendStart: number | undefined;
   private readonly trajectoryExport: TrajectoryExportSink;
@@ -2323,6 +2366,16 @@ export class SessionStore {
     this.fsyncImpl = impl;
   }
 
+  /** @internal Test seam for the background flush of turn-scoped durability. */
+  setBackgroundFsyncImplForTest(
+    impl: (
+      fd: number,
+      callback: (error: NodeJS.ErrnoException | null) => void,
+    ) => void,
+  ): void {
+    this.fsyncInBackgroundImpl = impl;
+  }
+
   /** @internal Test seam for short-write recovery. */
   setWriteImplForTest(
     impl: (
@@ -2600,6 +2653,12 @@ export class SessionStore {
       try {
         if (durable && this.oneShotWriter?.relaxed === true) {
           this.writeBytesAppendOnly(lines);
+        } else if (durable && this.defersTurnSync(toWrite)) {
+          // Inside a turn the write is the commit: once write() returns the
+          // bytes survive the process dying. The turn boundary or the
+          // background flush fsyncs them.
+          this.writeBytesAppendOnly(lines);
+          this.noteDeferredWrite();
         } else if (durable) {
           // I-38: async retry on fsync failure routes to degraded via
           // the callback. The bytes were already writeSync'd by this
@@ -2652,6 +2711,7 @@ export class SessionStore {
   }
 
   private syncCanonicalFile(): void {
+    const covered = this.deferredWrites;
     const flags = fsConstants.O_WRONLY | fsConstants.O_APPEND;
     const fd = this.openCanonicalFile(flags, 0o600);
     try {
@@ -2661,6 +2721,160 @@ export class SessionStore {
     } finally {
       this.closeCanonicalOperationFd(fd);
     }
+    this.markDeferredWritesSynced(covered);
+  }
+
+  /**
+   * Open a turn's durability scope on this journal (turn-scoped durability,
+   * see `durability/turn-durability.ts`). Until the returned release runs, a
+   * durable flush returns as soon as its write() completes, in order: the
+   * record already survives the process dying, and it is on disk in the file
+   * before the next model request or tool. The fsync follows at the turn
+   * boundary or from the background flush, at most
+   * {@link DEFERRED_SYNC_INTERVAL_MS} later. A turn's end (complete, aborted,
+   * failed) is itself written with fsync, covering everything before it.
+   * Releasing the last scope with "sync" fsyncs what is still unsynced;
+   * "background" hands that to the background flush.
+   */
+  deferSyncsForTurn(): TurnDurabilityRelease {
+    this.turnSyncDeferrals += 1;
+    const releaseScope = openTurnDurabilityScope(this.sessionId);
+    let released = false;
+    return (mode = "sync") => {
+      if (released) return;
+      released = true;
+      this.turnSyncDeferrals -= 1;
+      if (this.turnSyncDeferrals === 0) {
+        if (mode === "sync") this.syncDeferredWrites();
+        else this.armDeferredSync();
+      }
+      releaseScope(mode);
+    };
+  }
+
+  /**
+   * Whether this durable batch may skip its fsync: inside a turn, and only
+   * events and model items between its steps. Session metadata, compaction
+   * records and {@link SYNCED_IN_TURN_EVENT_TYPES} keep theirs.
+   */
+  private defersTurnSync(items: readonly RolloutItem[]): boolean {
+    if (this.turnSyncDeferrals === 0 || this.closed) return false;
+    return items.every(
+      (item) =>
+        item.type === "response_item" ||
+        (item.type === "event_msg" &&
+          !SYNCED_IN_TURN_EVENT_TYPES.has(item.payload.msg.type)),
+    );
+  }
+
+  private noteDeferredWrite(): void {
+    this.deferredWrites += 1;
+    this.armDeferredSync();
+  }
+
+  private markDeferredWritesSynced(covered: number): void {
+    if (covered > this.syncedDeferredWrites) this.syncedDeferredWrites = covered;
+    if (
+      this.syncedDeferredWrites >= this.deferredWrites &&
+      this.deferredSyncTimer !== undefined
+    ) {
+      clearTimeout(this.deferredSyncTimer);
+      this.deferredSyncTimer = undefined;
+    }
+  }
+
+  private armDeferredSync(): void {
+    if (
+      this.deferredSyncTimer !== undefined ||
+      this.closed ||
+      this.syncedDeferredWrites >= this.deferredWrites
+    ) {
+      return;
+    }
+    this.deferredSyncTimer = setTimeout(() => {
+      this.deferredSyncTimer = undefined;
+      this.syncDeferredWritesInBackground();
+    }, DEFERRED_SYNC_INTERVAL_MS);
+    this.deferredSyncTimer.unref?.();
+  }
+
+  /**
+   * The turn-boundary flush: fsync what turn writes left unsynced. A failure
+   * takes the same path as a failed durable fsync (one retry, then degraded
+   * mode); the bytes themselves are already in the file.
+   */
+  private syncDeferredWrites(): void {
+    if (this.closed || this.syncedDeferredWrites >= this.deferredWrites) return;
+    try {
+      this.syncCanonicalFile();
+    } catch (error) {
+      this.scheduleFsyncRetry(error, (retryError) => {
+        if (!isDegradedErrno(retryError)) return;
+        const entered = !this.degraded.isDegraded;
+        this.degraded.enterDegraded(
+          `${(retryError as { code?: string }).code} during turn flush`,
+        );
+        if (entered) {
+          this.emitDiagnostic({
+            at: Date.now(),
+            level: "error",
+            cause: "rollout_degraded",
+            message: `${(retryError as { code?: string }).code ?? "unknown"} during turn flush; written events are already in the rollout, entering degraded mode`,
+          });
+        }
+      });
+    }
+  }
+
+  /**
+   * The background flush: fsync on the libuv pool, so the event loop never
+   * waits on it, through a descriptor of its own (never the pinned resume
+   * descriptor, which `close()` may release while the flush runs).
+   */
+  private syncDeferredWritesInBackground(): void {
+    if (
+      this.closed ||
+      this.backgroundSyncInFlight ||
+      this.syncedDeferredWrites >= this.deferredWrites
+    ) {
+      return;
+    }
+    const covered = this.deferredWrites;
+    let fd: number;
+    try {
+      fd = this.openForBackgroundSync();
+    } catch {
+      // The journal moved or became unreadable; the next turn boundary
+      // flushes it through the bound path, which reports a real failure.
+      return;
+    }
+    this.backgroundSyncInFlight = true;
+    this.fsyncInBackgroundImpl(fd, (error) => {
+      try {
+        closeSync(fd);
+      } catch {
+        // The descriptor is ours alone; a failed close leaves nothing to undo.
+      }
+      this.backgroundSyncInFlight = false;
+      if (error === null) this.markDeferredWritesSynced(covered);
+      this.armDeferredSync();
+    });
+  }
+
+  private openForBackgroundSync(): number {
+    const fd = openSync(
+      this.rolloutPath,
+      fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
+    );
+    const expected = this.resumeSourceIdentity;
+    if (expected !== undefined) {
+      const opened = fstatSync(fd, { bigint: true });
+      if (opened.dev !== expected.dev || opened.ino !== expected.ino) {
+        closeSync(fd);
+        throw new Error("canonical rollout was replaced");
+      }
+    }
+    return fd;
   }
 
   private writeBytesAppendOnly(content: string): void {
@@ -2782,6 +2996,8 @@ export class SessionStore {
       this.scheduleFsyncRetry(firstErr, onRetryFailure);
       return false;
     }
+    // The fsync covered the whole file, earlier deferred writes included.
+    this.markDeferredWritesSynced(this.deferredWrites);
     return true;
   }
 
@@ -4071,6 +4287,15 @@ export class SessionStore {
     this.closed = true;
     capture(() => {
       if (this.pending.length > 0) this.flushBatch(true);
+    });
+    // Turn writes that are still unsynced (a turn that never reached its
+    // boundary) are flushed before the journal is let go.
+    if (this.deferredSyncTimer !== undefined) {
+      clearTimeout(this.deferredSyncTimer);
+      this.deferredSyncTimer = undefined;
+    }
+    capture(() => {
+      if (this.syncedDeferredWrites < this.deferredWrites) this.syncCanonicalFile();
     });
     // gaphunt3 #19: final best-effort drain of the degraded ring buffer
     // before stopping its retry timer. If the disk recovered after an

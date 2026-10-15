@@ -2077,6 +2077,10 @@ export async function* runTurnKernel(
   });
   const codeModeTurnWorker = startCodeModeTurnWorker(session);
   const signalCleanups: Array<() => void> = [];
+  // Turn-scoped durability: between this turn's steps, records are written
+  // in order but not fsynced; its end (complete, aborted, failed) and the
+  // release below flush them.
+  const releaseTurnDurability = session.rolloutStore?.deferSyncsForTurn?.();
 
   try {
     return yield* runTurnKernelInner(
@@ -2113,9 +2117,15 @@ export async function* runTurnKernel(
         for (const cleanup of signalCleanups) cleanup();
         codeModeTurnWorker.dispose();
       } finally {
-        // A failed persistence barrier must still release the task's done
-        // signal, otherwise Stop can wait forever for this failed turn.
-        await session.onTaskFinished(ctx.subId);
+        try {
+          // The turn boundary: whatever this turn wrote is fsynced before
+          // the turn reports done.
+          releaseTurnDurability?.("sync");
+        } finally {
+          // A failed persistence barrier must still release the task's done
+          // signal, otherwise Stop can wait forever for this failed turn.
+          await session.onTaskFinished(ctx.subId);
+        }
       }
     }
   }
