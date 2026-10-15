@@ -62,6 +62,7 @@ function fixture(options?: {
   } as unknown as MultiAgentV2Options;
   const tool = createWaitAgentTool(opts);
   return {
+    emit,
     control,
     tool,
     session,
@@ -116,7 +117,7 @@ describe("wait_agent consecutive timeouts", () => {
 
   it("returns at once when the turn's abort signal fires, and counts no timeout", async () => {
     // #2201: a stopped swarm held its parent turn open until the wait's deadline.
-    const { tool, waitForMailboxChange } = fixture();
+    const { tool, waitForMailboxChange, emit } = fixture();
     const controller = new AbortController();
     waitForMailboxChange.mockImplementationOnce(async (_timeoutMs, _ownership, signal) => {
       controller.abort("interrupted");
@@ -126,6 +127,12 @@ describe("wait_agent consecutive timeouts", () => {
     Object.defineProperty(args, "__abortSignal", { value: controller.signal, enumerable: false });
     const interrupted = await call(tool, args);
     expect(interrupted.body).toMatchObject({ interrupted: true, timed_out: false });
+    expect(emit).toHaveBeenCalledWith(expect.objectContaining({
+      msg: expect.objectContaining({
+        type: "collab_waiting_end",
+        payload: expect.objectContaining({ interrupted: true, timedOut: false }),
+      }),
+    }));
     expect(waitForMailboxChange).toHaveBeenLastCalledWith(
       expect.any(Number),
       undefined,

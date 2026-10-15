@@ -34,6 +34,13 @@ afterEach(() => {
 });
 
 describe("strict canonical journal contract", () => {
+  it("validates interrupted helper waits while retaining legacy wait events", () => {
+    const payload = { senderThreadId: "root", callId: "wait-1", statuses: {}, timedOut: false };
+    expect(isCanonicalEventPayload("collab_waiting_end", payload)).toBe(true);
+    expect(isCanonicalEventPayload("collab_waiting_end", { ...payload, interrupted: true })).toBe(true);
+    expect(isCanonicalEventPayload("collab_waiting_end", { ...payload, interrupted: "true" })).toBe(false);
+  });
+
   it("requires a genuine full-validation proof before reusing JSON shape validation", () => {
     const raw = validEvent(1, "agent_message", { message: "valid" });
     const proof = validateCanonicalJournalText(raw);
