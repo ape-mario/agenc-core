@@ -16,6 +16,7 @@ import { createEmptyToolPermissionContext } from "../permissions/types.js";
 
 type PrewarmSession = {
   submit(message: string): Promise<void>;
+  subscribeToEvents(cb: (event: unknown) => void): () => void;
   setPendingProviderSwitch(pending: { provider: string; model: string } | null): void;
   executeShellCommand(params: {
     readonly command: string;
@@ -51,9 +52,12 @@ function runtimeSettings() {
   };
 }
 
+type ConnectionListener = (state: { status: string; message?: string }) => void;
+
 function harness() {
   const requests: Array<{ readonly method: string; readonly params: Record<string, unknown> | undefined }> = [];
   let attachAttempts = 0;
+  const connectionListeners: ConnectionListener[] = [];
   const client = {
     request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
       requests.push({ method, params });
@@ -81,9 +85,23 @@ function harness() {
       return {};
     }),
     subscribeToSessionEvents: vi.fn(() => () => undefined),
-    subscribeToConnectionState: vi.fn(() => () => undefined),
+    subscribeToConnectionState: vi.fn((listener: ConnectionListener) => {
+      connectionListeners.push(listener);
+      return () => {
+        const index = connectionListeners.indexOf(listener);
+        if (index >= 0) connectionListeners.splice(index, 1);
+      };
+    }),
     getConnectionState: vi.fn(() => ({ status: "connected" as const })),
     close: vi.fn(async () => undefined),
+  };
+  /** The daemon went away under the client (a restart, for one). */
+  const dropConnection = (order: "subscription" | "reverse" = "subscription"): void => {
+    const listeners = [...connectionListeners];
+    if (order === "reverse") listeners.reverse();
+    for (const listener of listeners) {
+      listener({ status: "disconnected", message: "Daemon connection closed" });
+    }
   };
   let nextAgent = 0;
   const startPromptAgent = vi.fn(async (_params: Record<string, unknown>) => {
@@ -94,6 +112,7 @@ function harness() {
     client,
     requests,
     startPromptAgent,
+    dropConnection,
     deps: {
       startPromptAgent,
       stopPromptAgent: vi.fn(async () => undefined),
@@ -136,6 +155,17 @@ function messageStreams(h: ReturnType<typeof harness>) {
 
 function stops(h: ReturnType<typeof harness>) {
   return h.requests.filter(({ method }) => method === "agent.stop");
+}
+
+/** What the TUI shows when a session's daemon connection drops or cannot come back. */
+function isConnectionNotice(event: unknown): boolean {
+  const record = event as { id?: unknown; type?: unknown; payload?: { cause?: unknown } } | null;
+  return (
+    record !== null &&
+    typeof record === "object" &&
+    ((record.type === "warning" && record.payload?.cause === "daemon_connection_state") ||
+      (typeof record.id === "string" && record.id.startsWith("daemon-runtime-settings-authority-failed-")))
+  );
 }
 
 describe("speculative TUI session provisioning", () => {
@@ -218,7 +248,7 @@ describe("speculative TUI session provisioning", () => {
     await session.submit("prompt for the staged model");
 
     expect(stops(h)).toEqual([
-      { method: "agent.stop", params: { agentId: "agent-1", reason: "tui_closed_before_submit" } },
+      { method: "agent.stop", params: { agentId: "agent-1", reason: "tui_prewarm_unused" } },
     ]);
     expect(h.startPromptAgent).toHaveBeenCalledTimes(2);
     expect(h.startPromptAgent.mock.calls[1]![0]).toMatchObject({
@@ -238,7 +268,7 @@ describe("speculative TUI session provisioning", () => {
     await session.submit("prompt for the staged model");
 
     expect(stops(h).map(({ params }) => params)).toEqual([
-      { agentId: "agent-1", reason: "tui_closed_before_submit" },
+      { agentId: "agent-1", reason: "tui_prewarm_unused" },
     ]);
     expect(h.startPromptAgent.mock.calls[1]![0]).toMatchObject({
       model: "deepseek-pro",
@@ -281,6 +311,99 @@ describe("speculative TUI session provisioning", () => {
     expect(stops(h)).toHaveLength(0);
   });
 
+  it("retires the unused session quietly when the daemon restarts, and the first prompt creates its own", async () => {
+    const h = harness();
+    // The restarting daemon cannot take the stop yet.
+    h.deps.stopPromptAgent.mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+    const { deferred, session } = await deferredSession(h);
+    const seen: unknown[] = [];
+    session.subscribeToEvents((event) => seen.push(event));
+
+    deferred.prewarm();
+    await vi.waitFor(() => expect(h.requests.some(({ method }) => method === "agent.attach")).toBe(true));
+    h.dropConnection();
+    await vi.waitFor(() => expect(h.deps.stopPromptAgent).toHaveBeenCalledOnce());
+    expect(h.client.close).toHaveBeenCalled();
+
+    await session.submit("first prompt after the restart");
+
+    expect(h.startPromptAgent).toHaveBeenCalledTimes(2);
+    expect(h.startPromptAgent.mock.calls[1]![0]).toMatchObject({
+      initialContent: "first prompt after the restart",
+    });
+    expect(h.startPromptAgent.mock.calls[1]![0]).not.toHaveProperty("deferInitialTurn");
+    expect(messageStreams(h)).toHaveLength(0);
+    // No reconnect notice and no "quit and continue" guidance reached the TUI.
+    expect(seen.filter(isConnectionNotice)).toEqual([]);
+    // The stop the restarting daemon missed goes out on the next session.
+    await vi.waitFor(() =>
+      expect(stops(h).map(({ params }) => params)).toContainEqual({
+        agentId: "agent-1",
+        reason: "tui_prewarm_unused",
+      }),
+    );
+  });
+
+  it("hides the unused session's connection notices whichever listener hears the drop first", async () => {
+    const h = harness();
+    const { deferred, session } = await deferredSession(h);
+    const seen: unknown[] = [];
+    session.subscribeToEvents((event) => seen.push(event));
+
+    deferred.prewarm();
+    await vi.waitFor(() => expect(h.requests.some(({ method }) => method === "agent.attach")).toBe(true));
+    h.dropConnection("reverse");
+    await vi.waitFor(() => expect(h.deps.stopPromptAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "agent-1", reason: "tui_prewarm_unused" }),
+    ));
+
+    expect(seen.filter(isConnectionNotice)).toEqual([]);
+  });
+
+  it("leaves a session the first prompt used to the ordinary reconnect path", async () => {
+    const h = harness();
+    const { deferred, session } = await deferredSession(h);
+    const seen: unknown[] = [];
+    session.subscribeToEvents((event) => seen.push(event));
+
+    deferred.prewarm();
+    await vi.waitFor(() => expect(h.requests.some(({ method }) => method === "agent.attach")).toBe(true));
+    await session.submit("fix the failing tests");
+    h.dropConnection();
+
+    expect(h.deps.stopPromptAgent).not.toHaveBeenCalled();
+    expect(stops(h)).toHaveLength(0);
+    expect(seen.filter(isConnectionNotice).length).toBeGreaterThan(0);
+  });
+
+  it("retires a speculative agent whose attach failed without holding up the first prompt", async () => {
+    const h = harness();
+    const request = h.client.request.getMockImplementation()!;
+    let failedAttach = false;
+    h.client.request.mockImplementation(async (method: string, params?: Record<string, unknown>) => {
+      if (method === "agent.attach" && !failedAttach) {
+        failedAttach = true;
+        h.requests.push({ method, params });
+        throw new Error("Daemon connection closed");
+      }
+      return request(method, params);
+    });
+    const { deferred, session } = await deferredSession(h);
+
+    deferred.prewarm();
+    await vi.waitFor(() => expect(failedAttach).toBe(true));
+    await session.submit("first prompt");
+
+    expect(h.startPromptAgent).toHaveBeenCalledTimes(2);
+    expect(h.startPromptAgent.mock.calls[1]![0]).toMatchObject({ initialContent: "first prompt" });
+    await vi.waitFor(() =>
+      expect(stops(h).map(({ params }) => params)).toContainEqual({
+        agentId: "agent-1",
+        reason: "tui_prewarm_unused",
+      }),
+    );
+  });
+
   it("stops the unused session when the TUI closes before any prompt", async () => {
     const h = harness();
     const { deferred } = await deferredSession(h);
@@ -290,7 +413,7 @@ describe("speculative TUI session provisioning", () => {
     await deferred.close();
 
     expect(stops(h).map(({ params }) => params)).toEqual([
-      { agentId: "agent-1", reason: "tui_closed_before_submit" },
+      { agentId: "agent-1", reason: "tui_prewarm_unused" },
     ]);
   });
 });
