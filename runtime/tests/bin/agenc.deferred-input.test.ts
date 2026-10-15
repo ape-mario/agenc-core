@@ -1160,3 +1160,22 @@ describe("deferred daemon input ownership", () => {
     expect(session.rollbackIdleInputAdmission(afterRollback.token)).toBe(true);
   });
 });
+
+
+describe("daemon startup failure recovery", () => {
+  it("names the cause and daemon start command, then retries creation on the next Enter", async () => {
+    const harness = daemonHarness();
+    const original = harness.deps.startPromptAgent;
+    const startPromptAgent = vi.fn(original)
+      .mockRejectedValueOnce(new Error("protected directory chain permits untrusted mutation: /private/home; remove group/world write access before retrying"));
+    const session = await createDeferredInputSession({
+      deps: { ...harness.deps, startPromptAgent },
+      preparePrompt: async ({ message }) => message,
+    });
+    const failed = session.submit("pong");
+    await expect(failed).rejects.toThrow("untrusted mutation");
+    await expect(failed).rejects.toThrow("agenc daemon start");
+    await expect(session.submit("pong")).resolves.toBeUndefined();
+    expect(startPromptAgent).toHaveBeenCalledTimes(2);
+  });
+});

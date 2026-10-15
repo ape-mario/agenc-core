@@ -4008,11 +4008,12 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           err_1 instanceof Error ? err_1.message : String(err_1);
         showTransientResult(message_0, {
           display: "error",
+          // Keep a rejected submission actionable until the next user action.
+          // Its restored composer draft can otherwise look like a silent no-op.
+          persistent: true,
         });
-        // The transient box auto-clears after 3s and is skipped entirely
-        // while a local-JSX overlay is pinned, so a failed submit used to
-        // look like the composer silently ate the prompt. The footer
-        // notification lane renders regardless of overlays.
+        // Also report through the footer lane when a local JSX overlay
+        // owns the main tool surface.
         addNotification({
           key: "prompt-submit-failed",
           text: `Submission failed: ${message_0}`,
