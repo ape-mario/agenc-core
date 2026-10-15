@@ -250,12 +250,16 @@ export function readProviderMenuSnapshot(ctx: SlashCommandContext): ProviderMenu
   const currentProvider = sessionSelection.provider;
   const currentModel = sessionSelection.model;
   const modelCatalog = buildProviderModelCatalog(config);
+  const veniceModels = ctx.session.services?.modelsManager?.tryListModels()
+    ?.filter(entry => entry.provider === "venice");
 
   const unsortedRows = listBuiltInProviderInfo().map((info): ProviderMenuRow => {
     const provider = info.id;
     const providerConfig = config ? readProviderConfig(config, provider) : undefined;
     const status = rowStatus({ config, provider, currentProvider });
-    const configuredModel = providerModel({
+    const discoveredDefault = provider === "venice" && status === "default"
+      ? veniceModels?.find(entry => entry.isDefault)?.slug : undefined;
+    const configuredModel = discoveredDefault ?? providerModel({
       config,
       provider,
       currentProvider,
@@ -278,16 +282,19 @@ export function readProviderMenuSnapshot(ctx: SlashCommandContext): ProviderMenu
       provider,
       currentProvider,
       currentModel,
-      ...(managedModelRequest === undefined
+      ...((managedModelRequest ?? discoveredDefault) === undefined
         ? {}
-        : { requestedModel: managedModelRequest }),
+        : { requestedModel: managedModelRequest ?? discoveredDefault }),
     });
     const access = model === configuredModel
       ? configuredAccess
       : accessOverlay.inspect({ provider, model });
     const baseURL = access.endpoint?.baseURL ?? info.baseURL;
     const auth = providerMenuAuth(access);
-    const rawModels = modelCatalog[provider] ?? [];
+    const discoveredModels = provider === "venice"
+      ? veniceModels?.map(entry => entry.slug)
+      : undefined;
+    const rawModels = discoveredModels ?? modelCatalog[provider] ?? [];
     const models = managedProjectionActive
       ? access.managed.visibleModels
       : rawModels;

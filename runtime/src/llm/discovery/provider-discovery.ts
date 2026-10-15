@@ -3,6 +3,8 @@
  * session environment, BYOK state, local health probes, and auth backend.
  */
 
+import { ModelMetadataResolver } from "../model-metadata.js";
+import { veniceDefaultModel } from "../registry/venice-models.js";
 import type { AuthAgencModel, AuthBackend, AuthBackendKind, AuthSubscriptionTier } from "../../auth/backend.js";
 import { accountDefaultModel, readAccountModelAccess } from "../../auth/account-access.js";
 import { loadCanonicalConfig } from "../../config/repository.js";
@@ -195,7 +197,7 @@ async function resolveProviderAvailabilityEntry(params: {
   readonly localProbeTimeoutMs: number;
 }): Promise<ProviderAvailabilityEntry> {
   const providerConfig = readProviderConfig(params.config, params.provider);
-  const model =
+  let model =
     providerConfig?.default_model?.trim() ??
     BUILT_IN_PROVIDER_DEFAULT_MODELS[params.provider];
   const configuredBaseURL =
@@ -228,6 +230,13 @@ async function resolveProviderAvailabilityEntry(params: {
       usable: false,
       detail: error instanceof Error ? error.message : String(error),
     });
+  }
+  if (params.provider === "venice" && authority.factoryOptions.apiKey && !providerConfig?.default_model) {
+    const models = await new ModelMetadataResolver({
+      fetchImpl: params.fetchImpl ?? fetch,
+      env: { ...params.env, VENICE_API_KEY: authority.factoryOptions.apiKey },
+    }).discoverVeniceModels(params.config);
+    model = veniceDefaultModel(models ?? []) ?? model;
   }
   const credential = authority.credential;
   const credentialReady = credential.status === "ready";

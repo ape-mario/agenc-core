@@ -408,6 +408,14 @@ export const BUILT_IN_PROVIDER_DEFINITIONS = Object.freeze({
     baseURLEnvVars: ["OPENROUTER_BASE_URL"],
     onboarding: onboardingInfo(70, "api-key", true),
   }),
+  venice: providerDefinition({
+    name: "Venice AI",
+    defaultModel: "zai-org-glm-5-2",
+    baseURL: "https://api.venice.ai/api/v1",
+    credentials: apiKeyCredentials(["VENICE_API_KEY"]),
+    baseURLEnvVars: ["VENICE_BASE_URL"],
+    onboarding: onboardingInfo(85, "api-key"),
+  }),
   groq: providerDefinition({
     name: "Groq",
     defaultModel: "openai/gpt-oss-120b",
@@ -694,6 +702,7 @@ export const BUILT_IN_PROVIDER_MODEL_CATALOG: Readonly<
     "z-ai/glm-4.7-flash",
   ] }),
   // Shared API Llama rows retired 2026-08-16; enterprise IDs remain custom.
+  venice: mergeDerivedProviderModels("venice"),
   groq: mergeDerivedProviderModels("groq"),
   deepseek: Object.freeze(["deepseek-flash", "deepseek-v4-pro"]),
   // `/models` also advertises image generation and voice transcription.

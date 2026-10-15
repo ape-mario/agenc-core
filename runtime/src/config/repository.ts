@@ -72,6 +72,8 @@ export interface IgnoredConfigValue extends ConfigLayerSource {
 
 export interface ConfigLayerSnapshot extends ConfigLayerSource {
   readonly config: AgenCConfig;
+  /** Preserve literal selection intent after the layer gains a canonical pair. */
+  readonly modelSelectionSource?: "explicit" | "provider_default";
 }
 
 export interface McpLayerCandidate {
@@ -1196,8 +1198,13 @@ function mergeLayer(
     ignored,
     retainUntrustedProjectCommandHooks,
   );
+  const modelSelectionSource = layer.modelSelectionSource ?? (
+    safe.model !== undefined ? "explicit" :
+    safe.model_provider !== undefined && safe.model_provider !== base.model_provider ? "provider_default" : undefined
+  );
   const safeLayer = Object.freeze({
     ...layer,
+    ...(modelSelectionSource === undefined ? {} : { modelSelectionSource }),
     config: resolveProviderModelLayer(base, safe),
   });
   const merged = mergeConfigLayerSnapshots([safeLayer], base);
@@ -1504,7 +1511,11 @@ async function loadLayeredConfigInternal(
       hasProfileSelection ? ["model_provider", "model"] : [],
     );
     if (profile) {
-      const merged = mergeLayer(config, profile, true, provenance, ignored);
+      const merged = mergeLayer(config, { ...profile,
+        ...(hasProfileSelection ? { modelSelectionSource: selectedProfile?.model !== undefined ? "explicit" as const :
+          selectedProfile?.model_provider !== config.model_provider ? "provider_default" as const :
+          [...sources].reverse().find(layer => layer.modelSelectionSource !== undefined)?.modelSelectionSource ?? "explicit" as const } : {}),
+      }, true, provenance, ignored);
       config = merged.config;
       sources.push(merged.source);
     }
@@ -1522,7 +1533,11 @@ async function loadLayeredConfigInternal(
     hasEnvironmentSelection ? ["model_provider", "model"] : [],
   );
   if (environment) {
-    const merged = mergeLayer(config, environment, true, provenance, ignored);
+    const merged = mergeLayer(config, { ...environment,
+      ...(hasEnvironmentSelection ? { modelSelectionSource: env.AGENC_MODEL?.trim() ? "explicit" as const :
+        env.AGENC_PROVIDER?.trim() !== config.model_provider ? "provider_default" as const :
+        [...sources].reverse().find(layer => layer.modelSelectionSource !== undefined)?.modelSelectionSource ?? "explicit" as const } : {}),
+    }, true, provenance, ignored);
     config = merged.config;
     sources.push(merged.source);
   }

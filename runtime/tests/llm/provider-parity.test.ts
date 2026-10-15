@@ -27,6 +27,7 @@ import {
 import { GeminiProvider } from "./providers/gemini/index.js";
 import { createGeminiEndpointPlan } from "./providers/gemini/endpoint-plan.js";
 import { GrokProvider } from "./providers/grok/adapter.js";
+import { VeniceProvider } from "./providers/venice/index.js";
 import { GroqProvider } from "./providers/groq/index.js";
 import { GitHubProvider } from "./providers/github/index.js";
 import { LMStudioProvider } from "./providers/lmstudio/index.js";
@@ -143,6 +144,7 @@ const CHAT_COMPLETIONS_PROVIDERS: ReadonlySet<ProviderName> = new Set([
   "lmstudio",
   "openai-compatible",
   "openrouter",
+  "venice",
   "groq",
   "deepseek",
   "meta",
@@ -796,6 +798,25 @@ const PROVIDERS: readonly ProviderParityEntry[] = [
             fetchImpl,
           }),
         payload: buildChatCompletionsPayload("openai/gpt-5", parityCase),
+      }),
+  },
+  {
+    provider: "venice",
+    model: "zai-org-glm-5-2",
+    apiKey: "venice-test",
+    env: { VENICE_API_KEY: undefined },
+    createHarness: (parityCase) =>
+      createFetchHarness({
+        factory: (fetchImpl) =>
+          new VeniceProvider({
+            apiKey: "venice-test",
+            model: "zai-org-glm-5-2",
+            tools: parityCase.tools ? [...parityCase.tools] : [],
+            fetchImpl: (input, init) => String(input).endsWith("/models")
+              ? Promise.resolve(new Response("{}", { status: 503 }))
+              : fetchImpl(input, init),
+          }),
+        payload: buildChatCompletionsPayload("zai-org-glm-5-2", parityCase),
       }),
   },
   {

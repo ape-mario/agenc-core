@@ -1,5 +1,7 @@
 import { resolve as resolvePath } from "node:path";
 
+import { ModelMetadataResolver, type ModelMetadataResolverOptions } from "../llm/model-metadata.js";
+import { veniceDefaultModel } from "../llm/registry/venice-models.js";
 import type { ProviderName } from "../llm/provider.js";
 import {
   resolveProviderModelLayer,
@@ -151,4 +153,21 @@ export function resolveCanonicalStartupSelection(params: {
     provider,
     model: canonicalModel,
   };
+}
+
+/** Discover only a provider default. Explicit CLI/config model choices stay pinned. */
+export async function resolveDiscoveredStartupDefault(
+  startup: StartupSelection,
+  modelSelectionSource: "explicit" | "provider_default" | undefined,
+  metadata: ModelMetadataResolverOptions,
+): Promise<StartupSelection> {
+  if (startup.provider !== "venice" || startup.config.providers?.venice?.default_model) return startup;
+  if (modelSelectionSource !== "provider_default") return startup;
+  const models = await new ModelMetadataResolver(metadata).discoverVeniceModels(startup.config);
+  const model = veniceDefaultModel(models ?? []);
+  if (!model || model === startup.model) return startup;
+  return resolveCanonicalStartupSelection({
+    config: { ...startup.config, model },
+    ...(startup.profileName === undefined ? {} : { profileName: startup.profileName }),
+  });
 }

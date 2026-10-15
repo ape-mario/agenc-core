@@ -460,6 +460,12 @@ export class ConfigStore {
     });
   }
 
+  /** Literal model intent, preserved before selection layers gain a model pair. */
+  modelSelectionSource(): "explicit" | "provider_default" | undefined {
+    return [...this.sourceSnapshots].reverse()
+      .find(layer => layer.modelSelectionSource !== undefined)?.modelSelectionSource;
+  }
+
   /** Warnings emitted during the most recent reload. */
   warnings(): readonly string[] {
     return [...this.warningMessages];

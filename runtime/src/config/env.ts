@@ -110,6 +110,8 @@ export interface EnvSnapshot {
   readonly LMSTUDIO_BASE_URL?: string;
   readonly OPENROUTER_API_KEY?: string;
   readonly OPENROUTER_BASE_URL?: string;
+  readonly VENICE_API_KEY?: string;
+  readonly VENICE_BASE_URL?: string;
   readonly GROQ_API_KEY?: string;
   readonly GROQ_BASE_URL?: string;
   readonly DEEPSEEK_API_KEY?: string;

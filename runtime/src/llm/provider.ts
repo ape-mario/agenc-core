@@ -49,6 +49,7 @@ import {
 } from "./providers/bedrock/index.js";
 import { LMStudioProvider } from "./providers/lmstudio/index.js";
 import { OpenRouterProvider } from "./providers/openrouter/index.js";
+import { VeniceProvider } from "./providers/venice/index.js";
 import { GroqProvider } from "./providers/groq/index.js";
 import { DeepSeekProvider } from "./providers/deepseek/index.js";
 import { MetaProvider } from "./providers/meta/index.js";
@@ -1371,6 +1372,7 @@ function buildOpenAICompatibleProvider(
     | "lmstudio"
     | "openai-compatible"
     | "openrouter"
+    | "venice"
     | "groq"
     | "deepseek"
     | "meta"
@@ -2017,6 +2019,12 @@ export function createProvider(
         apiKeyMode: "required",
         useResponsesApi: false,
         providerCtor: OpenRouterProvider,
+      });
+    case "venice":
+      return buildOpenAICompatibleProvider("venice", opts, {
+        apiKeyMode: "required",
+        useResponsesApi: false,
+        providerCtor: VeniceProvider,
       });
     case "groq":
       return buildOpenAICompatibleProvider("groq", opts, {

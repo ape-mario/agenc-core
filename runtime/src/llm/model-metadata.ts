@@ -1,3 +1,4 @@
+import { parseVeniceModels, type VeniceModel } from "./registry/venice-models.js";
 import { EndpointMetadataCache, type EndpointMetadataScope } from "./endpoint-metadata-cache.js";
 import {
   readProviderConfig,
@@ -71,6 +72,7 @@ export interface ResolvedModelMetadata {
 
 export interface ModelMetadataResolverOptions {
   readonly fetchImpl?: typeof fetch;
+  readonly readSavedApiKey?: (provider: string) => string | undefined;
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly timeoutMs?: number;
   readonly onWarn?: (msg: string) => void;
@@ -164,6 +166,9 @@ export class PublicModelCatalogCache {
 export const SHARED_PUBLIC_MODEL_CATALOGS = new PublicModelCatalogCache();
 
 export class ModelMetadataResolver {
+  private veniceResponse?: MetadataJson;
+  private veniceModels?: readonly VeniceModel[];
+  private readonly readSavedApiKey?: (provider: string) => string | undefined;
   private readonly fetchImpl?: typeof fetch;
   private readonly env: Readonly<Record<string, string | undefined>>;
   private readonly timeoutMs: number;
@@ -180,6 +185,7 @@ export class ModelMetadataResolver {
 
   constructor(options: ModelMetadataResolverOptions = {}) {
     this.fetchImpl = options.fetchImpl;
+    this.readSavedApiKey = options.readSavedApiKey;
     this.env = options.env ?? process.env;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_METADATA_TIMEOUT_MS;
     this.onWarn = options.onWarn;
@@ -194,6 +200,8 @@ export class ModelMetadataResolver {
     if (revision !== this.endpointRevision) {
       // Replace maps, do not clear them: an old pending download owns the old
       // maps and must not republish data into this generation.
+      this.veniceResponse = undefined;
+      this.veniceModels = undefined;
       this.inFlightJson = new Map();
       this.jsonCache = new Map();
       this.endpointRevision = revision;
@@ -206,18 +214,32 @@ export class ModelMetadataResolver {
     return this.endpointCatalogs?.observe(provider, this.endpointConfiguration(params));
   }
 
+  private credentialEnvironment(provider: string): Readonly<Record<string, string | undefined>> {
+    if (provider !== "venice" || this.env.VENICE_API_KEY?.trim()) return this.env;
+    return { ...this.env, VENICE_API_KEY: this.readSavedApiKey?.("venice") };
+  }
+
   private endpointConfiguration(params: LookupParams): unknown {
     const provider = normalizeMetadataProviderIdentity(params.provider);
     return {
       config: readProviderConfig(params.config, provider),
       baseUrl: providerBaseUrl(params.config, provider, this.env),
-      headers: authHeaders(provider, params.config, this.env),
+      headers: authHeaders(provider, params.config, this.credentialEnvironment(provider)),
       timeoutMs: this.timeoutMs,
     };
   }
 
   resolveSync(params: LookupParams): ResolvedModelMetadata {
     const explicit = readExplicitConfigMetadata(params);
+    const veniceModel = normalizeMetadataProviderIdentity(params.provider) === "venice"
+      ? this.veniceModels?.find(entry => entry.model === params.model) : undefined;
+    if (veniceModel) {
+      return this.finalize(params, mergeLiveEndpointMetadata({
+        contextWindow: veniceModel.contextWindow,
+        maxOutputTokens: veniceModel.maxOutputTokens,
+        maxOutputTokensUpperLimit: veniceModel.maxOutputTokens,
+      }, explicit), "live_endpoint", false);
+    }
     if (hasAnyMetadata(explicit)) {
       return this.finalize(params, explicit, "explicit_config", false);
     }
@@ -254,6 +276,17 @@ export class ModelMetadataResolver {
 
   private async resolveMetadata(params: LookupParams): Promise<ResolvedModelMetadata> {
     const explicit = readExplicitConfigMetadata(params);
+    if (normalizeMetadataProviderIdentity(params.provider) === "venice") {
+      const model = (await this.discoverVeniceModels(params.config))?.find(entry => entry.model === params.model);
+      if (model) {
+        return this.finalize(params, mergeLiveEndpointMetadata({
+          contextWindow: model.contextWindow,
+          maxOutputTokens: model.maxOutputTokens,
+          maxOutputTokensUpperLimit: model.maxOutputTokens,
+        }, explicit), "live_endpoint", false);
+      }
+      return this.resolveSync(params);
+    }
     if (shouldPreferLiveEndpointOverExplicit(params, this.env)) {
       const live = await this.resolveLiveEndpointMetadata(params);
       if (hasAnyMetadata(live)) {
@@ -360,6 +393,26 @@ export class ModelMetadataResolver {
     this.onWarn?.(msg);
   }
 
+  async discoverVeniceModels(config: AgenCConfig): Promise<readonly VeniceModel[] | undefined> {
+    const params = { provider: "venice", model: "", config };
+    this.cacheRevision(params);
+    const scope = this.endpointScope(params);
+    const baseUrl = providerBaseUrl(config, "venice", this.env);
+    const headers = authHeaders("venice", config, this.credentialEnvironment("venice"));
+    // Do not turn listing the offline catalog into an unauthenticated request.
+    if (!baseUrl || !headers?.Authorization) return undefined;
+    const response = await this.fetchEndpointJson(params, baseUrl, modelsUrlFromBaseUrl(baseUrl), { headers });
+    if (scope !== undefined && !this.endpointCatalogs!.matchesConfiguration(scope, this.endpointConfiguration(params))) {
+      throw new Error("Provider metadata configuration changed during discovery; retry with the current configuration");
+    }
+    if (response === undefined || !Array.isArray(asRecord(response)?.data)) return undefined;
+    if (response !== this.veniceResponse) {
+      this.veniceResponse = response;
+      this.veniceModels = parseVeniceModels(response);
+    }
+    return this.veniceModels;
+  }
+
   private async resolveLiveEndpointMetadata(
     params: LookupParams,
   ): Promise<ModelMetadataValues | undefined> {
@@ -369,7 +422,7 @@ export class ModelMetadataResolver {
     const baseUrl = providerBaseUrl(params.config, provider, this.env);
     if (!baseUrl) return undefined;
     if (provider === "ollama-cloud" && baseUrl.replace(/\/+$/, "") !== OLLAMA_CLOUD_BASE_URL) return undefined;
-    const headers = authHeaders(provider, params.config, this.env);
+    const headers = authHeaders(provider, params.config, this.credentialEnvironment(provider));
     // Ollama serves no context length over its OpenAI-compatible surface, so
     // the native endpoint is the only place the real number exists.
     if (provider !== "ollama" && provider !== "ollama-cloud") {

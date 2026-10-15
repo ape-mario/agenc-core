@@ -20,6 +20,7 @@ import { withoutXaiSignInFastTier } from "../llm/providers/grok/priority-process
 import { isFreeSubscriptionManagedModel } from "../commands/subscription-managed-models.js";
 import type { LLMProvider } from "../llm/types.js";
 import { endpointMetadataForTransport } from "../llm/endpoint-metadata-cache.js";
+import { readLocalByokCredential } from "../auth/native-credentials.js";
 import { SHARED_PUBLIC_MODEL_CATALOGS } from "../llm/model-metadata.js";
 import { StaticModelsManager } from "../llm/models-manager.js";
 import { createManagedFeatures } from "../llm/registry/features.js";
@@ -155,6 +156,7 @@ import { bindSessionAgentControl } from "./delegate-tool.js";
 import {
   readStartupCliFlags,
   resolveCanonicalStartupSelection,
+  resolveDiscoveredStartupDefault,
   resolvedStartupProfileName,
   startupConfigLayerOptions,
   type StartupCliFlags,
@@ -920,7 +922,7 @@ async function bootstrapLocalRuntimeSessionScoped(
     options.providerEnvironment,
     configStore.current(),
   );
-  const startup = resolveCanonicalStartupSelection({
+  let startup = resolveCanonicalStartupSelection({
     config: configStore.current(),
     ...(profileName !== undefined ? { profileName } : {}),
   });
@@ -1226,6 +1228,11 @@ async function bootstrapLocalRuntimeSessionScoped(
     conversationId,
   );
   const localByokAuthBackend = new LocalAuthBackend({ agencHome, env });
+  startup = await resolveDiscoveredStartupDefault(startup, configStore.modelSelectionSource(), {
+    fetchImpl,
+    env: providerEnvironment,
+    readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
+  });
   const modelSelection = await resolveAuthModelSelection({
     authBackend: options.authBackend,
     provider: startup.provider,
@@ -1539,6 +1546,7 @@ async function bootstrapLocalRuntimeSessionScoped(
     metadata: {
       fetchImpl,
       env,
+      readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
       // Sessions on the real network share one download of each public model
       // catalog. An injected fetch keeps its own, so it sees only its data.
       ...(options.fetchImpl === undefined
@@ -2193,6 +2201,7 @@ async function bootstrapLocalRuntimeSessionScoped(
         sidecarManager.register(errorLogSidecar);
 
         const costSidecar = new CostSidecar({
+          ...(profileProvider === "venice" ? { registry: modelsManager.modelCostRegistry() } : {}),
           defaultModel: model,
           defaultProvider: resolvedProvider,
           exitSummary:

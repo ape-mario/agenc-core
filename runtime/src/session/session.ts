@@ -1047,6 +1047,7 @@ export interface RolloutRecorder {
 
 /** Runtime provider/model catalog. */
 export interface ModelsManager {
+  getProviderDefaultModel?(provider: string): Promise<string | undefined>;
   getModelInfo(modelSlug: string, config?: unknown): Promise<ModelInfo>;
   getModelInfoForProvider?(provider: string, model: string): Promise<ModelInfo>;
   tryListModels(): ReadonlyArray<ModelInfo> | undefined;

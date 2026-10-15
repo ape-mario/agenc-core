@@ -83,6 +83,12 @@ export interface ModelInfo {
   readonly defaultReasoningSummary: ReasoningSummary;
   readonly truncationPolicy: TruncationPolicy;
   readonly supportsToolUse?: boolean;
+  readonly supportsImageInput?: boolean;
+  readonly supportsReasoning?: boolean;
+  readonly privacy?: "private" | "anonymized";
+  readonly isDefault?: boolean;
+  /** Unknown for anonymized routes; only documented private routes set true. */
+  readonly zeroDataRetention?: boolean;
   readonly supportsParallelToolCalls?: boolean;
   readonly modelMessages?: ModelMessages;
   readonly supportsPersonality?: boolean;

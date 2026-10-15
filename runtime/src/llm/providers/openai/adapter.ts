@@ -1505,7 +1505,7 @@ export class OpenAIProvider implements LLMProvider {
     reasoningOnlyReplay: boolean;
     value: ReturnType<typeof chatCompletionsCapabilityHintsForProvider> } | undefined;
 
-  private chatCapabilityHints(model: string): ReturnType<typeof chatCompletionsCapabilityHintsForProvider> {
+  protected chatCapabilityHints(model: string): ReturnType<typeof chatCompletionsCapabilityHintsForProvider> {
     const managed = this.config.managedRequestId;
     const reasoningOnlyReplay = deepSeekReasoningOnlyReplayProvenance(this.name, model) !== undefined;
     const memo = this.fastCapabilityMemo;

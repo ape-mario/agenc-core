@@ -35,6 +35,16 @@ export class StaticModelsManager implements ModelsManager {
     });
   }
 
+  modelCostRegistry() {
+    return this.modelRegistry.modelCostRegistry();
+  }
+
+  async getProviderDefaultModel(provider: string): Promise<string | undefined> {
+    const model = await this.modelRegistry.defaultModelForProvider(provider);
+    this.availableModels = undefined;
+    return model;
+  }
+
   async getModelInfo(modelSlug: string): Promise<ModelInfo> {
     const trimmed = modelSlug.trim();
     const fallbackProvider =
@@ -55,7 +65,11 @@ export class StaticModelsManager implements ModelsManager {
   }
 
   async listModels(): Promise<ReadonlyArray<ModelInfo>> {
-    return this.pickerModels();
+    const provider = this.fallbackProvider ?? this.configDefaultProvider;
+    if (provider !== "venice") return this.pickerModels();
+    const entries = await this.modelRegistry.listEntries(provider);
+    return this.availableModels = entries.map(modelRegistryEntryToModelInfo)
+      .filter(model => model.showInPicker !== false && model.visibility !== "hide" && model.visibility !== "none");
   }
 
   /** A new session needs one selected model, not every picker entry. */
@@ -89,8 +103,8 @@ export class StaticModelsManager implements ModelsManager {
     readonly provider: string;
     readonly model: string;
   }): Promise<ModelInfo> {
-    return modelRegistryEntryToModelInfo(
-      await this.modelRegistry.resolve(params),
-    );
+    const entry = await this.modelRegistry.resolve(params);
+    if (params.provider === "venice") this.availableModels = undefined;
+    return modelRegistryEntryToModelInfo(entry);
   }
 }

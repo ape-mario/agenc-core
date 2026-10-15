@@ -17,6 +17,7 @@ import { normalizeProviderIdentity } from "../../provider-identity.js";
 import { oneShotFastModeActive } from "../../one-shot-fast-mode.js";
 import { MISTRAL_MODEL_CATALOG, resolveMistralChatModel } from "./mistral-models.js";
 import { BEDROCK_CONVERSE_MODELS } from "./bedrock-converse-models.js";
+import { VENICE_MODELS } from "./venice-models.js";
 import { GROQ_MODELS } from "./groq-models.js";
 import { OLLAMA_CLOUD_MODELS } from "./ollama-cloud-models.js";
 import { NVIDIA_CURRENT_MODEL_CATALOG } from "./nvidia-current-models.js";
@@ -1080,6 +1081,28 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       priority: 0,
       visibility: "list",
     },
+    ...VENICE_MODELS.map((entry, priority): RegisteredModelCatalogEntry => ({
+      provider: "venice",
+      model: entry.model,
+      displayName: entry.displayName,
+      contextWindow: entry.contextWindow,
+      maxContextWindow: entry.contextWindow,
+      maxOutputTokens: entry.maxOutputTokens,
+      inputModalities: entry.supportsVision ? TEXT_IMAGE_MODALITIES : TEXT_MODALITIES,
+      supportsToolUse: true,
+      supportsParallelToolCalls: false,
+      supportsStructuredOutput: entry.supportsStructuredOutput,
+      supportsSearchTool: false,
+      supportsVerbosity: false,
+      webSearchToolType: "none",
+      supportsReasoningSummaries: false,
+      defaultReasoningSummary: "none",
+      supportedReasoningLevels: entry.supportedReasoningLevels,
+      defaultReasoningLevel: entry.defaultReasoningLevel,
+      additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
+      priority,
+      visibility: "list",
+    })),
     ...GROQ_MODELS.map((entry, priority): RegisteredModelCatalogEntry => ({
       provider: "groq",
       model: entry.model,

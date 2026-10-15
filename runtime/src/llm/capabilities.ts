@@ -8,6 +8,7 @@ import {
 import { resolveModelCapabilityHints } from "./registry/model-catalog.js";
 import { supportsGrokServerSideTools } from "./provider-native-search.js";
 import { normalizeProviderIdentity } from "../provider-identity.js";
+import { VENICE_MODELS } from "./registry/venice-models.js";
 import { ollamaCloudModel } from "./registry/ollama-cloud-models.js";
 import { isOpenAiReasoningFamilyModel } from "./registry/openai-reasoning-models.js";
 import { isRegisteredMetaChatModel } from "./registry/meta-models.js";
@@ -429,6 +430,22 @@ const PROVIDER_CAPABILITIES: Readonly<Record<string, ProviderCapabilityDefinitio
     acceptsAudioHistory: false,
     acceptsThinkingHistory: false,
     acceptsReasoningEffort: false,
+  },
+  venice: {
+    supportsToolUse: true,
+    supportsPromptCaching: false,
+    supportsContextEdits: false,
+    supportsImageInput: model => VENICE_MODELS.find(entry => entry.model === model)?.supportsVision === true,
+    supportsAudioInput: false,
+    supportsAudioOutput: false,
+    supportsStructuredOutput: model => VENICE_MODELS.find(entry => entry.model === model)?.supportsStructuredOutput === true,
+    supportsStructuredOutputWithTools: false,
+    supportsProviderNativeWebSearch: false,
+    supportsExtendedThinking: model => VENICE_MODELS.find(entry => entry.model === model)?.supportsReasoning === true,
+    acceptsImageHistory: model => VENICE_MODELS.find(entry => entry.model === model)?.supportsVision === true,
+    acceptsAudioHistory: false,
+    acceptsThinkingHistory: false,
+    acceptsReasoningEffort: model => (VENICE_MODELS.find(entry => entry.model === model)?.supportedReasoningLevels.length ?? 0) > 0,
   },
   groq: {
     supportsToolUse: true,

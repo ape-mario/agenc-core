@@ -21,6 +21,7 @@ describe("built-in provider info", () => {
       ["lmstudio", "LM Studio", "gpt-4o-mini", "http://localhost:1234/v1", "api-key", ["LMSTUDIO_API_KEY"], ["LMSTUDIO_BASE_URL"], 50, "local", false],
       ["openai-compatible", "OpenAI-compatible", "local-model", "http://localhost:8000/v1", "api-key", ["OPENAI_COMPATIBLE_API_KEY", "OPENAI_API_KEY"], ["OPENAI_COMPATIBLE_BASE_URL", "OPENAI_BASE_URL", "OPENAI_API_BASE"], 60, "local", false],
       ["openrouter", "OpenRouter", "x-ai/grok-4.5", "https://openrouter.ai/api/v1", "api-key", ["OPENROUTER_API_KEY"], ["OPENROUTER_BASE_URL"], 70, "api-key", true],
+      ["venice", "Venice AI", "zai-org-glm-5-2", "https://api.venice.ai/api/v1", "api-key", ["VENICE_API_KEY"], ["VENICE_BASE_URL"], 85, "api-key", false],
       ["groq", "Groq", "openai/gpt-oss-120b", "https://api.groq.com/openai/v1", "api-key", ["GROQ_API_KEY"], ["GROQ_BASE_URL"], 80, "api-key", false],
       ["deepseek", "DeepSeek", "deepseek-flash", "https://api.deepseek.com/v1", "api-key", ["DEEPSEEK_API_KEY"], ["DEEPSEEK_BASE_URL"], 90, "api-key", false],
       ["meta", "Meta", "muse-wonder-1.0", "https://api.meta.ai/v1", "api-key", ["MODEL_API_KEY"], ["META_BASE_URL"], 95, "api-key", false],

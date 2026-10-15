@@ -454,6 +454,14 @@ export function chatCompletionsCapabilityHintsForProvider(
         reasoningContentField: "reasoning_content" as const,
       } : {}),
     } : {}),
+    ...(slug === "venice" ? {
+      acceptsDirectImageInput: acceptsToolResultImages,
+      toolResultImagePolicy: acceptsToolResultImages ? "relay_as_user" as const : "strip" as const,
+      acceptsParallelToolCalls: false,
+      replaysReasoningContent: true,
+      reasoningContentField: "reasoning_content" as const,
+      omitsToolControlsWithoutTools: true,
+    } : {}),
     ...(slug === "groq" ? {
       acceptsDirectImageInput: acceptsToolResultImages,
       toolResultImagePolicy: acceptsToolResultImages ? "relay_as_user" as const : "strip" as const,
