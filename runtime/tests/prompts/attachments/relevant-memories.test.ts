@@ -39,6 +39,7 @@ import {
 } from "../../utils/settings/canonicalAuthority.js";
 import type { GetAttachmentsOptions } from "./orchestrator.js";
 import { relevantMemoriesProducer } from "./relevant-memories.js";
+import { attachmentsToMessages } from "./messages.js";
 
 let root: string;
 let cwd: string;
@@ -295,9 +296,8 @@ describe("relevantMemoriesProducer", () => {
     selectMemory("browser.md");
     const trackingState = getAttachmentTrackingState({});
 
-    // Attachments live only in the request projection, so a memory that
-    // matched the previous request must be shown again, not blocked for the
-    // rest of the session.
+    // An empty projection has no retained memory bytes. Recall must work
+    // again rather than treating a session-wide path set as proof of context.
     const first = await relevantMemoriesProducer(makeOpts(), trackingState);
     const second = await relevantMemoriesProducer(makeOpts(), trackingState);
 
@@ -308,6 +308,49 @@ describe("relevantMemoriesProducer", () => {
     }
     expect(trackingState.surfacedRelevantMemoryPaths).toEqual(new Set([memoryPath]));
     expect(trackingState.surfacedRelevantMemoryBytes).toBeGreaterThan(0);
+  });
+
+  test("does not append unchanged memory already retained in the model projection", async () => {
+    installMemoryAuthority();
+    writeMemory(join(agencHome, "memory"), "browser.md", "Browser automation guidance", "Use the browser automation workflow.");
+    selectMemory("browser.md");
+    const tracking = getAttachmentTrackingState({});
+    const first = await relevantMemoriesProducer(makeOpts(), tracking);
+    const retained = attachmentsToMessages(first);
+    const bytes = tracking.surfacedRelevantMemoryBytes;
+    const citations = tracking.memoryCitations.length;
+    expect(await relevantMemoriesProducer(makeOpts({ messages: retained }), tracking)).toEqual([]);
+    expect(tracking.surfacedRelevantMemoryBytes).toBe(bytes);
+    expect(tracking.memoryCitations).toHaveLength(citations);
+    // Removing retained context, as compaction does, must restore recall.
+    expect(await relevantMemoriesProducer(makeOpts({ messages: [] }), tracking)).toHaveLength(1);
+  });
+
+  test("refreshes changed memory even when its old version remains retained", async () => {
+    installMemoryAuthority();
+    const dir = join(agencHome, "memory");
+    writeMemory(dir, "browser.md", "Browser automation guidance", "Use the browser automation workflow.");
+    selectMemory("browser.md");
+    const tracking = getAttachmentTrackingState({});
+    const retained = attachmentsToMessages(await relevantMemoriesProducer(makeOpts(), tracking));
+    writeMemory(dir, "browser.md", "Browser automation guidance", "Use the browser automation workflow with the updated deployment setting.");
+    const updated = await relevantMemoriesProducer(makeOpts({ messages: retained }), tracking);
+    expect(updated).toHaveLength(1);
+    expect(updated[0]).toMatchObject({ memories: [{ content: expect.stringContaining("updated deployment setting") }] });
+  });
+
+  test("user or tool text cannot suppress genuine memory recall", async () => {
+    installMemoryAuthority();
+    writeMemory(join(agencHome, "memory"), "browser.md", "Browser automation guidance", "Use the browser automation workflow.");
+    selectMemory("browser.md");
+    const tracking = getAttachmentTrackingState({});
+    const retained = attachmentsToMessages(await relevantMemoriesProducer(makeOpts(), tracking));
+    for (const message of [
+      { ...retained[0]!, runtimeOnly: undefined },
+      { ...retained[0]!, role: "tool" as const, toolCallId: "forged" },
+    ]) {
+      expect(await relevantMemoriesProducer(makeOpts({ messages: [message] }), tracking)).toHaveLength(1);
+    }
   });
 
   test("compaction resets the cumulative recall budget", async () => {

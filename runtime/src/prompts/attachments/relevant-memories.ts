@@ -27,6 +27,7 @@ import {
 import type { LLMMessage } from "../../llm/types.js";
 import type { AttachmentProducer } from "./orchestrator.js";
 import type { RelevantMemoriesAttachment } from "./types.js";
+import { relevantMemoryFingerprint } from "./relevant-memory-fingerprint.js";
 
 const MAX_MEMORY_LINES = 200;
 const MAX_MEMORY_BYTES = 4_096;
@@ -49,10 +50,14 @@ export const relevantMemoriesProducer: AttachmentProducer = async (
   const query = opts.userInput?.trim() ?? "";
   const mode = selectRecallMode(query, opts.subagentDepth, trackingState);
   if (mode === null) return [];
-  // The attachment lives only in the current request's projection
-  // (`messagesForQuery`), never in durable history, so a memory surfaced on
-  // one turn is gone from the model's context on the next. Dedup therefore
-  // scopes to one request: a memory that matches again is shown again.
+  // The retention ledger projects earlier attachments before producers run.
+  // Keep exact versions already in that context; changed versions and context
+  // removed by compaction must still be eligible for fresh recall.
+  const retained = new Set(opts.messages.flatMap((message) =>
+    message.role === "user" && message.runtimeOnly?.mergeBoundary === "user_context"
+      ? message.runtimeOnly.relevantMemoryFingerprints ?? []
+      : [],
+  ));
   trackingState.surfacedRelevantMemoryPaths.clear();
   const memoryDirs = durableMemorySearchDirs(opts.agencHome);
   if (memoryDirs.length === 0) return [];
@@ -79,11 +84,12 @@ export const relevantMemoriesProducer: AttachmentProducer = async (
 
   const remainingBytes =
     MAX_SESSION_MEMORY_BYTES - trackingState.surfacedRelevantMemoryBytes;
-  const memories = await readMemoriesForAttachment(
+  const candidates = await readMemoriesForAttachment(
     selected.slice(0, MAX_RELEVANT_MEMORIES),
     opts.signal,
     remainingBytes,
   );
+  const memories = candidates.filter((memory) => !retained.has(relevantMemoryFingerprint(memory)));
   for (const memory of memories) {
     trackingState.surfacedRelevantMemoryPaths.add(memory.path);
     trackingState.surfacedRelevantMemoryBytes += Buffer.byteLength(
