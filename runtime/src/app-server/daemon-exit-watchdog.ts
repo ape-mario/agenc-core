@@ -51,10 +51,10 @@ export async function armDaemonExitWatchdog(): Promise<void> {
     // the process exit boundary, after the caller's durable cleanup.
     process.once("exit", () => process.kill(process.pid, "SIGKILL"));
   };
-  if (process.platform === "win32") {
-    forceSelfExit();
-    return;
-  }
+  // Windows keeps its existing exit: the macOS privacy prompt that motivated
+  // this guard does not exist there, and a forced kill would change the exit
+  // code of every normal stop.
+  if (process.platform === "win32") return;
   try {
     const child = spawn(process.execPath, ["-e", WATCHDOG_SCRIPT, String(process.pid), String(DAEMON_EXIT_WATCHDOG_MS)], {
       cwd: "/", detached: true,
