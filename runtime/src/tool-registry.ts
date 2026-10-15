@@ -709,6 +709,20 @@ export interface BuildToolRegistryOptions {
  * inventory tools are registered as deferred entries and load through
  * `system.searchTools`.
  */
+/**
+ * Core tools whose Light wording standard sessions send too: the same fields
+ * and schema with shorter descriptions. FileRead keeps its own text because
+ * Light's describes sparse line numbers.
+ */
+const STANDARD_COMPACT_PRESENTATION: ReadonlySet<string> = new Set([
+  "exec_command",
+  "write_stdin",
+  "Edit",
+  "Write",
+  "Glob",
+  "Grep",
+]);
+
 export function buildToolRegistry(
   options: BuildToolRegistryOptions,
 ): ToolRegistry {
@@ -1419,8 +1433,12 @@ export function buildToolRegistry(
         !discoveredToolNames.has("exec_command");
       const tools = visible.map((spec) => {
         const tool = toolToLLMTool(spec.tool);
-        return options.lightMode === true && spec.tool.metadata?.source === "builtin"
-          ? lightPresentation(tool, { leanExec }) : tool;
+        if (spec.tool.metadata?.source !== "builtin") return tool;
+        if (options.lightMode === true) return lightPresentation(tool, { leanExec });
+        // Standard sessions with the default deferral send Light's compact
+        // wording for the core tools Light also uses (same fields, same schema).
+        return standardDeferral && STANDARD_COMPACT_PRESENTATION.has(spec.tool.name)
+          ? lightPresentation(tool) : tool;
       });
       if (!deferRareTools) return tools;
       const pointer = rareToolPointer(new Set(router.getSpecs()

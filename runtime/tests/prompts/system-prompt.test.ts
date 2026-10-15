@@ -273,9 +273,11 @@ describe("static section emitters", () => {
     // TodoWrite bullet (taskToolName → TodoWrite): a threshold and a
     // same-response rule instead of an open invitation to call it often.
     expect(s).toContain(
-      "Use TodoWrite only for work with 3 or more distinct steps",
+      "Use TodoWrite only for longer work with 3 or more distinct steps, not for a task a few tool calls finish",
     );
-    expect(s).toContain("update it in the same response as the work it tracks");
+    // A response that only updates the list is a whole model round trip.
+    expect(s).toContain("update it in the same response as the tool call for the next step");
+    expect(s).toContain("never in a response of its own");
     expect(s).toContain(
       "Never call it for a single-step request or when nothing changed",
     );
