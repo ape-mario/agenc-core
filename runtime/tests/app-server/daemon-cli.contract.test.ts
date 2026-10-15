@@ -46,6 +46,7 @@ import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
 import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
 import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
 import { ensureAgenCDaemonAutostart } from "./daemon-autostart.js";
+import { startAgenCDaemon } from "./daemon-control.js";
 import {
   AGENC_DAEMON_HEARTBEAT_FRESH_MS,
   type DaemonHeartbeat,
@@ -2644,6 +2645,149 @@ describe("AgenC daemon CLI", () => {
       finishShutdown();
       await rm(agencHome, { recursive: true, force: true });
     }
+  });
+
+  describe("with a launchd job that runs this home's daemon", () => {
+    // launchd's foreground daemon publishes its own pid at readiness, after the
+    // start released its lifecycle lock; the publication wait sleeps meanwhile.
+    function withLaunchdJob(
+      host: ReturnType<typeof createHost>,
+      agencHome: string,
+      kickstart: () => { readonly pid: number } | { readonly error: string } = () => ({ pid: 5300 }),
+    ) {
+      const pidPath = resolveAgenCDaemonPidPath(host.env, host.userHome);
+      const calls = { spawned: 0, kickstarts: 0 };
+      let pendingPublication: number | null = null;
+      const launchdHost: AgenCDaemonCliHost = {
+        ...host,
+        spawnDetachedDaemon: (env) => {
+          calls.spawned += 1;
+          return host.spawnDetachedDaemon(env);
+        },
+        launchdDaemonJob: () => ({
+          label: "dev.agenc.daemon",
+          kickstart: () => {
+            calls.kickstarts += 1;
+            const started = kickstart();
+            if ("pid" in started) {
+              host.runningPids.add(started.pid);
+              pendingPublication = started.pid;
+            }
+            return started;
+          },
+        }),
+        sleep: async () => {
+          if (pendingPublication === null) return;
+          const pid = pendingPublication;
+          pendingPublication = null;
+          await writeAgenCDaemonPid(pidPath, pid);
+        },
+      };
+      return { launchdHost, calls, pidPath, agencHome };
+    }
+
+    it("starts the job instead of a detached daemon", async () => {
+      const agencHome = await tempAgencHome();
+      const host = createHost(agencHome);
+      const io = createIo();
+      const { launchdHost, calls, pidPath } = withLaunchdJob(host, agencHome);
+      try {
+        await expect(
+          runAgenCDaemonCli(
+            { kind: "command", action: "start" },
+            { host: launchdHost, io, ...createReadyPublishedDaemonOptions(agencHome, launchdHost) },
+          ),
+        ).resolves.toBe(0);
+        expect(calls).toEqual({ spawned: 0, kickstarts: 1 });
+        await expect(readAgenCDaemonPid(pidPath)).resolves.toBe(5300);
+        expect(io.stdoutText()).toContain(
+          "AgenC daemon started by launchd dev.agenc.daemon (pid 5300)",
+        );
+      } finally {
+        await rm(agencHome, { recursive: true, force: true });
+      }
+    });
+
+    it("restart replaces a detached daemon through the job (0.19.1 respawn loop)", async () => {
+      const agencHome = await tempAgencHome();
+      const host = createHost(agencHome);
+      const io = createIo();
+      const { launchdHost, calls, pidPath } = withLaunchdJob(host, agencHome);
+      // `agenc daemon restart` on 0.19.1 left a detached daemon serving while
+      // the KeepAlive job respawned a refused copy every few seconds.
+      const detachedPid = 4450;
+      host.runningPids.add(detachedPid);
+      await writeAgenCDaemonPid(pidPath, detachedPid);
+      const detached = recordTestDaemon(agencHome, detachedPid);
+      const ready = createReadyPublishedDaemonOptions(agencHome, launchdHost);
+      try {
+        await expect(
+          runAgenCDaemonCli(
+            { kind: "command", action: "restart" },
+            {
+              host: launchdHost,
+              io,
+              ...ready,
+              requestDaemonInstanceIdentity: () =>
+                host.runningPids.has(detachedPid) ? detached : ready.requestDaemonInstanceIdentity(),
+              requestDaemonShutdown: async (_host, expected) => {
+                expect(expected.pid).toBe(detachedPid);
+                host.runningPids.delete(detachedPid);
+              },
+            },
+          ),
+        ).resolves.toBe(0);
+        expect(host.runningPids.has(detachedPid)).toBe(false);
+        expect(calls).toEqual({ spawned: 0, kickstarts: 1 });
+        await expect(readAgenCDaemonPid(pidPath)).resolves.toBe(5300);
+        expect(io.stdoutText()).toContain(`AgenC daemon stopped (pid ${detachedPid})`);
+        expect(io.stdoutText()).toContain(
+          "AgenC daemon started by launchd dev.agenc.daemon (pid 5300)",
+        );
+      } finally {
+        await rm(agencHome, { recursive: true, force: true });
+      }
+    });
+
+    it("a provisional start defers to the job and spawns nothing", async () => {
+      const agencHome = await tempAgencHome();
+      const host = createHost(agencHome);
+      const io = createIo();
+      const { launchdHost, calls } = withLaunchdJob(host, agencHome);
+      try {
+        await expect(
+          startAgenCDaemon(launchdHost, io, {
+            provisionalStart: { signal: new AbortController().signal },
+          }),
+        ).resolves.toBe(2);
+        expect(calls).toEqual({ spawned: 0, kickstarts: 0 });
+      } finally {
+        await rm(agencHome, { recursive: true, force: true });
+      }
+    });
+
+    it("reports a failed kickstart without spawning a detached daemon", async () => {
+      const agencHome = await tempAgencHome();
+      const host = createHost(agencHome);
+      const io = createIo();
+      const { launchdHost, calls } = withLaunchdJob(host, agencHome, () => ({
+        error: "launchctl kickstart gui/501/dev.agenc.daemon exited 113",
+      }));
+      try {
+        await expect(
+          runAgenCDaemonCli(
+            { kind: "command", action: "start" },
+            { host: launchdHost, io, ...createReadyPublishedDaemonOptions(agencHome, launchdHost) },
+          ),
+        ).resolves.toBe(1);
+        expect(calls).toEqual({ spawned: 0, kickstarts: 1 });
+        expect(io.stderrText()).toContain(
+          "agenc: launchd could not start dev.agenc.daemon: launchctl kickstart gui/501/dev.agenc.daemon exited 113",
+        );
+      } finally {
+        await rm(agencHome, { recursive: true, force: true });
+      }
+    });
   });
 
   it("start does not report 'started' until the control socket is ready", async () => {
