@@ -3,7 +3,7 @@
 Canonical map of docs under `docs/`. Product overview and install entry:
 [`../README.md`](../README.md).
 
-Version in tree: **runtime / launcher 0.19.1**; embedding SDK
+Version in tree: **runtime / launcher 0.19.2**; embedding SDK
 **0.3.0**. Default provider **grok**; fresh-config session and direct-provider
 default **grok-4.6**. Managed OpenRouter's paid default remains
 **`x-ai/grok-4.5`** (see [providers.md](reference/providers.md)).
@@ -99,6 +99,7 @@ history; the linked pages below are current product truth.
 
 | Doc | Summary |
 | --- | --- |
+| [releases/0.19.2.md](releases/0.19.2.md) | AgenC 0.19.2: on macOS `agenc daemon restart` keeps launchd as the daemon's owner, and the home-folder trust card no longer lists your own settings |
 | [releases/0.19.1.md](releases/0.19.1.md) | AgenC 0.19.1: no task token cap by default, and sessions started in the home folder load and save configuration |
 | [releases/0.19.0.md](releases/0.19.0.md) | AgenC 0.19.0: bypass fast mode, session sandbox reuse, fewer automatic WAL checkpoints, and task budget controls |
 | [releases/0.18.0.md](releases/0.18.0.md) | AgenC 0.18.0: the `/goal` session goal with independent verification, removal of the embedded editor and workbench, four new providers, and compaction that degrades instead of ending the turn |
@@ -135,7 +136,7 @@ Tracked in the repo (safe for GitHub clones):
 
 | Path | Summary |
 | --- | --- |
-| [`../README.md`](../README.md) | Product README (0.19.1) |
+| [`../README.md`](../README.md) | Product README (0.19.2) |
 | [`../packages/agenc-sdk/README.md`](../packages/agenc-sdk/README.md) | SDK package readme |
 | [`../runtime/eval/README.md`](../runtime/eval/README.md) | Agent-eval harness notes |
 | [`../runtime/src/tui/README.md`](../runtime/src/tui/README.md) | TUI architecture (Ink fork, themes) |
