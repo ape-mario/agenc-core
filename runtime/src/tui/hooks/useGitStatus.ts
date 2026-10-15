@@ -4,7 +4,9 @@ import { useStatusTurnBusy } from '../context/statusEffortContext.js';
 import { probeGitStatus, type GitStatus } from '../git-status.js';
 import type { AgenCBridgeSession } from '../session-types.js';
 
-export type GitStatusSession = Pick<AgenCBridgeSession, 'cwd' | 'sessionConfiguration' | 'eventLog' | 'subscribeToEvents'>;
+export type GitStatusSession = Pick<AgenCBridgeSession, 'cwd' | 'sessionConfiguration'>;
+/** A live fan-out of session events, without replay. */
+export type GitStatusEvents = { subscribeToEvents(cb: (event: unknown) => void): () => void };
 const REFRESH_MS = 30_000;
 
 function isToolCompletion(event: unknown): boolean {
@@ -15,8 +17,13 @@ function isToolCompletion(event: unknown): boolean {
     type === 'exec_command_end' || type === 'mcp_tool_call_end' || type === 'patch_apply_end';
 }
 
-/** No input subscription. Coalesce busy refreshes into one follow-up after the probe. */
-export function useGitStatus(cwd: string, enabled: boolean, session?: GitStatusSession): GitStatus | null {
+/**
+ * No input subscription. Coalesce busy refreshes into one follow-up after the probe.
+ * Listen only to the shell's live fan-out: this chrome remounts whenever the
+ * composer returns (after every approval), and a fresh daemon replay
+ * subscription is refused once the session passes the replay capacity.
+ */
+export function useGitStatus(cwd: string, enabled: boolean, events?: GitStatusEvents): GitStatus | null {
   const focused = useTerminalFocus();
   const turnBusy = useStatusTurnBusy();
   const [snapshot, setSnapshot] = useState<{ cwd: string; status: GitStatus | null } | null>(null);
@@ -39,18 +46,16 @@ export function useGitStatus(cwd: string, enabled: boolean, session?: GitStatusS
     };
     refreshRef.current = refresh;
     const onEvent = (event: unknown) => { if (isToolCompletion(event)) refresh(); };
-    const unsubscribeLog = session?.eventLog?.subscribe(onEvent);
-    const unsubscribeEvents = session?.subscribeToEvents?.(onEvent);
+    const unsubscribeEvents = events?.subscribeToEvents(onEvent);
     const interval = setInterval(refresh, REFRESH_MS);
     interval.unref?.();
     return () => {
       cancelled = true;
       refreshRef.current = null;
       clearInterval(interval);
-      unsubscribeLog?.();
       unsubscribeEvents?.();
     };
-  }, [cwd, enabled, session]);
-  useEffect(() => { refreshRef.current?.(); }, [cwd, enabled, session, focused, turnBusy]);
+  }, [cwd, enabled, events]);
+  useEffect(() => { refreshRef.current?.(); }, [cwd, enabled, events, focused, turnBusy]);
   return enabled && snapshot?.cwd === cwd ? snapshot.status : null;
 }
