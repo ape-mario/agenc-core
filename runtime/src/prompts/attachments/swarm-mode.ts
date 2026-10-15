@@ -27,7 +27,7 @@ import type { AttachmentProducer } from "./orchestrator.js";
 interface RoutingInstructionContext {
   readonly planMode: boolean;
   readonly spawnAvailable: boolean;
-  /** Light sessions start with spawn_agent deferred behind system.searchTools. */
+  /** spawn_agent starts deferred behind system.searchTools. */
   readonly spawnDeferred: boolean;
 }
 
@@ -139,7 +139,11 @@ export const swarmModeProducer: AttachmentProducer = async (
   const spawnAvailable = opts.loadedTools.some(
     (tool) => tool.function.name === "spawn_agent",
   );
-  const spawnDeferred = !spawnAvailable && opts.lightMode === true;
+  // Light and standard sessions alike start with spawn_agent deferred behind
+  // system.searchTools; the instruction says how to load it and what to do
+  // when the search reports it missing.
+  const spawnDeferred = !spawnAvailable && (opts.lightMode === true ||
+    opts.loadedTools.some((tool) => tool.function.name === "system.searchTools"));
   trackingState.swarmRoutingDecisionCount =
     (trackingState.swarmRoutingDecisionCount ?? 0) + 1;
   trackingState.lastSwarmRoutingTurnId = turnProvenance.turnId;

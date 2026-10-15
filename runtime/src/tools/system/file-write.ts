@@ -59,7 +59,6 @@ import { readBeforeWriteMessage, unreadFilePreflight } from "./read-before-write
 import { checkMemorySecrets } from "../../memory/privacy.js";
 import {
   FILE_TOOL_PATH_SCHEMA,
-  FILE_TOOL_PATH_USAGE,
   workspaceRelativeToolPath,
 } from "./agent-path-hints.js";
 import { checkToolPathPermission } from "../../permissions/path-validation.js";
@@ -111,23 +110,10 @@ function readFileWriteTouchedPathCallback(
     : undefined;
 }
 
-/**
- * Verbatim wording from the upstream file-write prompt,
- * lightly adapted: the upstream "Edit tool" reference is kept (AgenC
- * exposes `Edit` for incremental edits), and the
- * pre-read instruction is generalized away from the exact
- * `FILE_READ_TOOL_NAME` constant since AgenC doesn't pin a single
- * read-tool name in this description.
- */
-const FILE_WRITE_DESCRIPTION = `Writes a file to the local filesystem.
-
-Usage:
-- This tool will overwrite the existing file if there is one at the provided path.
-- ${FILE_TOOL_PATH_USAGE}
-- If this is an existing file, you MUST use the FileRead tool first to read the file's contents. This tool will fail if you did not read the file first.
-- Prefer the Edit tool for modifying existing files — it only sends the diff. Only use this tool to create new files or for complete rewrites.
-- NEVER create documentation files (*.md) or README files unless explicitly requested by the User.
-- Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.`;
+const FILE_WRITE_DESCRIPTION = `Create a file or replace its whole content.
+- Overwriting an existing file requires reading it first in this session, with FileRead or with exec_command output that printed it whole.
+- For a partial change use Edit, which sends only the change.
+- Create documentation files (*.md, README) only when the user asks for them.`;
 
 /**
  * Verbatim from the upstream file-edit constants. Used when the target was read
@@ -325,7 +311,7 @@ export function createFileWriteTool(config: FileWriteToolConfig = {}): Tool {
         },
         content: {
           type: "string",
-          description: "The content to write to the file.",
+          description: "The complete file content.",
         },
       },
       required: ["file_path", "content"],

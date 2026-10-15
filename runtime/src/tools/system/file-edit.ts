@@ -55,7 +55,6 @@ import { readBeforeWriteMessage, unreadFilePreflight } from "./read-before-write
 import { checkMemorySecrets } from "../../memory/privacy.js";
 import {
   FILE_TOOL_PATH_SCHEMA,
-  FILE_TOOL_PATH_USAGE,
   workspaceRelativeToolPath,
 } from "./agent-path-hints.js";
 import { checkToolPathPermission } from "../../permissions/path-validation.js";
@@ -121,31 +120,22 @@ function shouldBypassSessionGuard(args: Record<string, unknown>): boolean {
 function linePrefixUsage(sparse: boolean): string {
   return sparse
     ? "FileRead output puts a N→ line-number prefix on the first line, every tenth line and the last line; it is not part of the file. Match the file content exactly, with its indentation, and never include a prefix in old_string or new_string."
-    : "When editing text from FileRead tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: line number + tab. Everything after that is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.";
+    : "Copy old_string from the file exactly, with its indentation, and without the line-number prefix (number and tab) of FileRead output.";
 }
 
-// Verbatim from AgenC FileEditTool/prompt.ts:20-27.
-const fileEditDescription = (sparse: boolean): string => `Performs exact string replacements in files.
+const READ_FIRST_USAGE =
+  "Read the file first in this session, with FileRead or with exec_command output that printed it whole; an edit to a file you have not read fails.";
 
-Usage:
-- You must use your \`FileRead\` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.
-- ${FILE_TOOL_PATH_USAGE}
+const fileEditDescription = (sparse: boolean): string => `Replace an exact old_string in a file with new_string.
+- ${READ_FIRST_USAGE}
 - ${linePrefixUsage(sparse)}
-- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
-- Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
-- The edit will FAIL if \`old_string\` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use \`replace_all\` to change every instance of \`old_string\`.
-- Use \`replace_all\` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance.`;
+- old_string must be unique in the file: add surrounding lines to make it unique, or set replace_all to change every occurrence (renaming, for example).
+- Prefer editing existing files to creating new ones.`;
 
-const FILE_MULTI_EDIT_DESCRIPTION = `Performs multiple exact string replacements in a single file.
-
-Usage:
-- Use this tool when you need to make several coordinated edits to the same file.
-- You must use your \`FileRead\` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.
-- ${FILE_TOOL_PATH_USAGE}
-- Each edit is applied in order to the result of the previous edit.
-- The file is only written after every edit validates successfully. If any edit fails, the file is left unchanged.
-- The edit will FAIL if any \`old_string\` is not unique in the file at the time that edit is applied. Either provide more surrounding context or set \`replace_all\` to true for that edit.
-- Use \`replace_all\` for replacing and renaming strings across the file.`;
+const FILE_MULTI_EDIT_DESCRIPTION = `Apply several exact string replacements to one file, in order, each to the result of the one before.
+- ${READ_FIRST_USAGE}
+- Each old_string must be unique in the file when its edit applies, unless that edit sets replace_all.
+- The file is written only if every edit succeeds; otherwise it is left unchanged.`;
 
 // V8/Bun string length cap. 1 GiB stat-size guard prevents OOM on
 // gigabyte files. Lifted from the upstream file-edit guard.
@@ -851,8 +841,7 @@ export function createFileEditTool(config: FileEditToolConfig): Tool {
         },
         old_string: {
           type: "string",
-          description:
-            "The exact text to replace. Must match a unique substring of the file unless replace_all is true.",
+          description: "Exact text to replace; unique in the file unless replace_all is true.",
         },
         new_string: {
           type: "string",
@@ -860,8 +849,7 @@ export function createFileEditTool(config: FileEditToolConfig): Tool {
         },
         replace_all: {
           type: "boolean",
-          description:
-            "Optional. When true, replace every occurrence of old_string. Defaults to false.",
+          description: "Replace every occurrence (default false).",
         },
       },
       required: ["file_path", "old_string", "new_string"],
@@ -1202,15 +1190,13 @@ export function createFileMultiEditTool(config: FileEditToolConfig): Tool {
         edits: {
           type: "array",
           minItems: 1,
-          description:
-            "Ordered list of exact string replacements to apply to the file.",
+          description: "Replacements, applied in order.",
           items: {
             type: "object",
             properties: {
               old_string: {
                 type: "string",
-                description:
-                  "The exact text to replace. Must match a unique substring of the current in-memory file unless replace_all is true.",
+                description: "Exact text to replace; unique in the file at that point unless replace_all is true.",
               },
               new_string: {
                 type: "string",
@@ -1218,8 +1204,7 @@ export function createFileMultiEditTool(config: FileEditToolConfig): Tool {
               },
               replace_all: {
                 type: "boolean",
-                description:
-                  "Optional. When true, replace every occurrence of old_string for this edit. Defaults to false.",
+                description: "Replace every occurrence for this edit (default false).",
               },
             },
             required: ["old_string", "new_string"],

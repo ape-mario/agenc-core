@@ -176,7 +176,7 @@ export function createToolSearchTool(config: CodingToolConfig): Tool {
   return {
     name: SYSTEM_SEARCH_TOOLS_NAME,
     description:
-      "Search the runtime tool catalog by name, family, source, keyword, or preferred profile. Use select or select:<tool_name> to load a deferred tool schema. Selection alone returns only selected tools or scoped name suggestions; use query or filters to search further.",
+      "Find and load tools that are not in your function list. select (or select:<tool_name> in query) loads a tool's schema by its exact name; query and the filters search the catalog by name, family, source, keyword or profile.",
     metadata: {
       ...codingToolMetadata(SYSTEM_SEARCH_TOOLS_NAME, false, ["coding", "general", "operator"]),
       keywords: ["tools", "catalog", "discovery", "select", "deferred"],
@@ -188,16 +188,14 @@ export function createToolSearchTool(config: CodingToolConfig): Tool {
       properties: {
         query: {
           type: "string",
-          description:
-            "Search terms. May include AgenC-style select:<tool_name> to load an exact deferred tool.",
+          description: "Search terms; may include select:<tool_name>.",
         },
         select: {
           anyOf: [
             { type: "string" },
             { type: "array", items: { type: "string" } },
           ],
-          description:
-            "Exact tool name or names to load. Equivalent to query token select:<tool_name>.",
+          description: "Exact tool name or names to load.",
         },
         family: { type: "string" },
         source: { type: "string" },

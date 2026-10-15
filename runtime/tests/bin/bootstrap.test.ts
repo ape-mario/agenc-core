@@ -584,9 +584,14 @@ describe("bootstrapLocalRuntimeSession", () => {
       const providerTools = createProviderSpy.mock.calls[0]?.[1].tools as
         | readonly SpawnToolSchema[]
         | undefined;
-      const startupSpawnSchema = providerTools?.find(
-        (tool) => tool.function?.name === "spawn_agent",
-      )?.function?.parameters;
+      // A standard session starts with spawn_agent deferred behind
+      // system.searchTools; loading it yields the same canonical schema.
+      expect(providerTools?.some((tool) => tool.function?.name === "spawn_agent")).toBe(false);
+      const startupSpawnSchema = boot.registry.tools
+        .find((tool) => tool.name === "spawn_agent")?.inputSchema as
+        | NonNullable<SpawnToolSchema["function"]>["parameters"]
+        | undefined;
+      boot.registry.discoverToolNames?.(["spawn_agent"]);
       const liveSpawnSchema = boot.registry
         .toLLMTools()
         .find((tool) => tool.function.name === "spawn_agent")
@@ -695,10 +700,13 @@ describe("bootstrapLocalRuntimeSession", () => {
         | undefined;
       const providerToolNames =
         providerTools?.map((tool) => tool.function?.name).filter(Boolean) ?? [];
+      // write_stdin is registered but loads when exec_command leaves a
+      // session running (standard tool deferral).
+      expect(boot.registry.tools.map((tool) => tool.name)).toContain("write_stdin");
+      expect(providerToolNames).not.toContain("write_stdin");
       expect(providerToolNames).toEqual(
         expect.arrayContaining([
           "exec_command",
-          "write_stdin",
           "TodoWrite",
           "EnterPlanMode",
           "ExitPlanMode",

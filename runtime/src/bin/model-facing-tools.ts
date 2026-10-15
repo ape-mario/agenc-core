@@ -1748,6 +1748,9 @@ function createMultiAgentV2RuntimeTools(
     const sessionOrError = getSessionOrError(opts);
     if (!("conversationId" in sessionOrError)) return sessionOrError;
     const session = sessionOrError;
+    // The row workers call report_agent_job_result with no discovery step, and
+    // they see this session's tool list: load it here when it is deferred.
+    session.services.registry?.discoverToolNames?.(["report_agent_job_result"]);
     // A run in its deadline reserve (#2503) finishes with what it has.
     if (inDeadlineReserve(session)) {
       return validationErrorToolResult(
@@ -2366,9 +2369,10 @@ function createMultiAgentV2RuntimeTools(
     ...multiAgentV2Tools,
     // The CSV job family is deferred (metadata.deferred): a coding turn almost
     // never touches it, and its six schemas cost about 4 KB of every request.
-    // system.searchTools still lists and loads them; report_agent_job_result
-    // stays visible because the row subagents spawned by the job must call it
-    // without a discovery step.
+    // system.searchTools still lists and loads them. The row subagents spawned
+    // by a job must call report_agent_job_result without a discovery step:
+    // standard sessions defer it too (tools/rare-tool-deferral.ts), so a job
+    // loads it into the session's tool list before it spawns them.
     {
       name: "spawn_agents_on_csv",
       description:

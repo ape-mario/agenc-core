@@ -805,12 +805,14 @@ async function runContextUsage(params: {
     params.ctx.cwd,
   );
   const mcpServers = await loadMcpServerInstructionsForContext(params.session);
+  const deferredToolNames = params.session.services.registry.getDeferredToolNames?.();
   const systemMessage = await buildSyntheticSystemMessage({
     session: params.session,
     ctx: params.ctx,
     projectInstructions,
     mcpServers,
     enabledToolNames,
+    ...(deferredToolNames !== undefined ? { deferredToolNames } : {}),
   });
   const sourceMessages = params.session.snapshotHistoryMessages();
   const conversationMessages = toAgenCRuntimeMessages(sourceMessages);
@@ -943,6 +945,7 @@ async function buildSyntheticSystemMessage(opts: {
   readonly projectInstructions: string;
   readonly mcpServers: readonly McpServerInstructionsInput[];
   readonly enabledToolNames: ReadonlySet<string>;
+  readonly deferredToolNames?: ReadonlySet<string>;
 }): Promise<RuntimeMessage | null> {
   try {
     let permissionContext: ToolPermissionContext | null = null;
@@ -971,6 +974,9 @@ async function buildSyntheticSystemMessage(opts: {
         memoryPrompt: memory.memoryPrompt,
         mcpServers: opts.mcpServers,
         enabledToolNames: opts.enabledToolNames,
+        ...(opts.deferredToolNames !== undefined
+          ? { deferredToolNames: opts.deferredToolNames }
+          : {}),
         provider,
         permissionContext,
         autonomousMode,

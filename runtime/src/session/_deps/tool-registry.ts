@@ -51,6 +51,8 @@ export interface ToolRegistry {
   dispatch(toolCall: LLMToolCall, options?: { readonly prepareArguments?: (args: Record<string, unknown>, tool: RuntimeTool) => Record<string, unknown>; readonly advertisedToolNames?: readonly string[]; readonly abortSignal?: AbortSignal }): Promise<ToolDispatchResult>;
   getDiscoveredToolNames?(): ReadonlySet<string>;
   discoverToolNames?(toolNames: readonly string[]): void;
+  /** Catalog tools that load through system.searchTools; fixed per session. */
+  getDeferredToolNames?(): ReadonlySet<string>;
   /**
    * The session's fixed tool policy (`agent.create` `toolPolicy`), when it has
    * one. Session-level surfaces that are not tools (skill listings, slash

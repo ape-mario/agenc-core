@@ -270,7 +270,10 @@ export function getHeadlessCompletionSection(input: {
  * bullets are gated on `enabledTools`, so slimmer sessions only receive
  * guidance for tools they can actually call.
  */
-export function getUsingYourToolsSection(enabledTools: ReadonlySet<string>): string {
+export function getUsingYourToolsSection(
+  enabledTools: ReadonlySet<string>,
+  deferredTools: ReadonlySet<string> = new Set(),
+): string {
   const hasTool = (...names: readonly string[]): boolean =>
     names.some((name) => enabledTools.has(name));
 
@@ -354,13 +357,15 @@ export function getUsingYourToolsSection(enabledTools: ReadonlySet<string>): str
     );
   }
 
-  if (hasShell && enabledTools.has("write_stdin")) {
+  // Deferred process tools load with their own descriptions when a session
+  // is left running, so their guidance waits for them.
+  if (hasShell && enabledTools.has("write_stdin") && !deferredTools.has("write_stdin")) {
     items.push(
       `For interactive or long-running terminal sessions, call ${shellName} with tty=true. If it returns a session_id, use write_stdin with that session_id to send input or chars="" to poll for more output.`,
     );
   }
 
-  if (hasShell && enabledTools.has("kill_process")) {
+  if (hasShell && enabledTools.has("kill_process") && !deferredTools.has("kill_process")) {
     items.push(
       `To stop background work you started, call kill_process with its session_id (session_ids for several, all=true for every session you still have running)${enabledTools.has("list_processes") ? "; list_processes shows which of your sessions are still live" : ""}. A terminated=false result means that session already exited. Never clean up by searching the process table for task filenames or command text and signalling the matches: that also selects AgenC's own CLI and process brokers and ends the session.`,
     );
@@ -395,8 +400,10 @@ export function getUsingYourToolsSection(enabledTools: ReadonlySet<string>): str
  */
 export function getAgentToolSection(
   enabledTools: ReadonlySet<string>,
+  deferredTools: ReadonlySet<string> = new Set(),
 ): string | null {
   if (!enabledTools.has("spawn_agent")) return null;
+  if (deferredTools.has("spawn_agent")) return getDeferredAgentToolSection();
   const items: Array<string | string[]> = [
     `Decide whether to delegate from the user's full request and its prerequisites. Requests qualified by approval require that approval before spawning; conditional requests require the condition to be satisfied first, including prerequisites stated in another sentence. Quoted examples and programming terms such as worker threads, child processes, and React children props do not authorize subagents.`,
     `When the user explicitly asks for delegation, or the active Goal/workflow requires delegation, and its prerequisites are satisfied, spawn the requested child before doing its assigned work yourself. This includes handing off a single blocking task and waiting for its result. If delegation is unavailable or refused, report that boundary rather than silently substituting your own work.`,
@@ -414,6 +421,23 @@ export function getAgentToolSection(
     `Run independent information-seeking subtasks in parallel, split implementation into disjoint slices for parallel agents when write scopes do not overlap, and delegate verification only when it can run beside implementation and is likely to catch a concrete risk before integration.`,
   ];
   return joinSection("# Subagents", items);
+}
+
+/**
+ * 6b. agent_tool, deferred: the delegation surface while spawn_agent loads
+ * through system.searchTools (tools/rare-tool-deferral.ts). It keeps the rules
+ * that decide whether to delegate, says how to load the tools, and keeps the
+ * working rules short; spawn_agent's own schema documents its arguments once
+ * it is loaded.
+ */
+export function getDeferredAgentToolSection(): string {
+  return joinSection("# Subagents", [
+    `spawn_agent hands a self-contained task to a helper agent. It is not in your function list until you load it: call system.searchTools with select:spawn_agent, which also loads wait_agent, send_message, assign_task, close_agent and list_agents.`,
+    `Delegate when the user asks for it or the active Goal or workflow requires it, once the approvals and conditions in the full request are met. Then load spawn_agent and spawn the requested child before doing its work yourself; if delegation is unavailable or refused, say so instead of silently doing the work. Quoted examples and programming terms such as worker threads, child processes or React children props do not authorize delegation.`,
+    `Without such a requirement, keep the step you are blocked on local and delegate only bounded side tasks that can run while you work. A task you can finish directly with your own tools needs no helper.`,
+    `A helper starts in your working directory without this conversation unless you set fork_turns, so give it the goal, the files it owns, the constraints and how to verify, with paths relative to that directory. Parallel helpers that edit files need disjoint write sets and isolation: "worktree".`,
+    `Call wait_agent only when your next step needs the result, review what comes back before you integrate it, and do not redo delegated work.`,
+  ]);
 }
 
 /**
@@ -810,6 +834,11 @@ export interface AssembleSystemPromptOpts {
   readonly agentsEnabled?: boolean;
   /** Names of currently enabled tools (affects several sections). */
   readonly enabledToolNames?: ReadonlySet<string>;
+  /**
+   * Enabled tools a request carries only after system.searchTools loads
+   * them (`ToolRegistry.getDeferredToolNames`). Fixed per session.
+   */
+  readonly deferredToolNames?: ReadonlySet<string>;
   /** Language preference (ISO code or name). Drives the language section. */
   readonly language?: string;
   /** Output-style preset. */
@@ -991,6 +1020,7 @@ export async function assembleBaseInstructionsForModel(params: {
   readonly ctx: TurnContext;
   readonly registry: {
     readonly tools: ReadonlyArray<{ readonly name: string }>;
+    readonly getDeferredToolNames?: () => ReadonlySet<string>;
   };
   readonly provider: string;
   readonly promptIdentity?: { readonly provider: string; readonly model: string };
@@ -1012,6 +1042,9 @@ export async function assembleBaseInstructionsForModel(params: {
     memoryPrompt: memory.memoryPrompt,
     mcpServers: [],
     enabledToolNames,
+    ...(params.registry.getDeferredToolNames !== undefined
+      ? { deferredToolNames: params.registry.getDeferredToolNames() }
+      : {}),
     agentsEnabled: enabledToolNames.has("spawn_agent"),
     provider: params.provider,
     ...(params.promptIdentity !== undefined
@@ -1045,6 +1078,8 @@ export interface AssembleSystemPromptInputs {
   readonly memoryPrompt: string;
   readonly mcpServers: readonly McpServerInstructionsInput[];
   readonly enabledToolNames: ReadonlySet<string>;
+  /** See {@link AssembleSystemPromptOpts.deferredToolNames}. */
+  readonly deferredToolNames?: ReadonlySet<string>;
   readonly provider: string;
   readonly permissionContext: ToolPermissionContext | null;
   readonly autonomousMode: boolean;
@@ -1071,6 +1106,9 @@ export function buildAssembleSystemPromptOpts(
     memoryPrompt: inputs.memoryPrompt,
     mcpServers: [...inputs.mcpServers],
     enabledToolNames: inputs.enabledToolNames,
+    ...(inputs.deferredToolNames !== undefined
+      ? { deferredToolNames: inputs.deferredToolNames }
+      : {}),
     provider: inputs.provider,
     permissionContext: inputs.permissionContext,
     autonomousMode: inputs.autonomousMode,
@@ -1140,6 +1178,7 @@ export async function assembleSystemPrompt(
 ): Promise<AssembledSystemPrompt> {
   const { ctx, session } = opts;
   const enabledTools = opts.enabledToolNames ?? new Set<string>();
+  const deferredTools = opts.deferredToolNames ?? new Set<string>();
   const agentsEnabled = opts.agentsEnabled ?? false;
   const light = opts.lightProfile === true || session.services?.runtimeOptions?.lightMode === true;
   const lightPrint = isLightPrintRun(
@@ -1238,8 +1277,8 @@ export async function assembleSystemPrompt(
           : null,
         getLeanActionsSection(),
         headlessCompletionSection,
-        getLeanUsingYourToolsSection(enabledTools),
-        getLeanAgentToolSection(enabledTools),
+        getLeanUsingYourToolsSection(enabledTools, deferredTools),
+        getLeanAgentToolSection(enabledTools, deferredTools),
         getLeanToneSection(),
         getMemoryInstructionsSection(opts.memoryInstructions),
       ]
@@ -1251,9 +1290,9 @@ export async function assembleSystemPrompt(
           : null,
         getActionsSection(),
         headlessCompletionSection,
-        getUsingYourToolsSection(enabledTools),
-        getAgentToolSection(enabledTools),
-        getSessionGuidanceSection(enabledTools, agentsEnabled),
+        getUsingYourToolsSection(enabledTools, deferredTools),
+        getAgentToolSection(enabledTools, deferredTools),
+        getSessionGuidanceSection(enabledTools, agentsEnabled && !deferredTools.has("spawn_agent")),
         getSimpleToneAndStyleSection(),
         getOutputEfficiencySection({ headlessContract }),
         getMemoryInstructionsSection(opts.memoryInstructions),

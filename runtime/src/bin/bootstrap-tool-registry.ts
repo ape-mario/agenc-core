@@ -81,7 +81,9 @@ export function buildBootstrapToolRegistry(
     requireAdmission: true,
     // Read from the session's captured environment, so a client sets it per
     // session. An explicit toolRegistryOptions value below still wins.
-    deferRareTools: rareToolDeferralEnabled(options.environment ?? {}),
+    deferRareTools: rareToolDeferralEnabled(options.environment ?? {}, {
+      lightMode: options.toolRegistryOptions?.lightMode === true,
+    }),
     mcpToolsProvider: options.mcpManager,
     workflowController: buildWorkflowToolController({
       getSession: options.getSession,

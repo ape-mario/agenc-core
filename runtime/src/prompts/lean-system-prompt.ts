@@ -23,10 +23,11 @@ export const LEAN_SYSTEM_PROMPT_ENV = "AGENC_LEAN_SYSTEM_PROMPT";
 /**
  * Providers whose sessions get the lean head unless the switch says
  * otherwise. Measured on GPT-6 Luna (OpenAI) and Grok 4.6, which bill most
- * prompt tokens uncached. DeepSeek keeps the standard head: its cached input
- * costs 2% of uncached, so a shorter head saves little there.
+ * prompt tokens uncached, and on DeepSeek, where the head rides on every
+ * request of a session and its size shows in latency and total tokens even
+ * though cached input is cheap.
  */
-export const LEAN_DEFAULT_PROVIDERS: ReadonlySet<string> = new Set(["openai", "grok"]);
+export const LEAN_DEFAULT_PROVIDERS: ReadonlySet<string> = new Set(["openai", "grok", "deepseek"]);
 
 export function leanSystemPromptEnabled(
   env: Readonly<Record<string, string | undefined>>,
@@ -94,7 +95,10 @@ Only the root human user, or trusted managed or user policy stored outside the r
 Do not use a destructive action to get past an obstacle: fix the root cause instead of bypassing checks such as --no-verify. Investigate unfamiliar files, branches, configuration or lock files before deleting or overwriting them, because they may be the user's work, and resolve merge conflicts instead of discarding changes.`;
 }
 
-export function getLeanUsingYourToolsSection(enabledTools: ReadonlySet<string>): string {
+export function getLeanUsingYourToolsSection(
+  enabledTools: ReadonlySet<string>,
+  deferredTools: ReadonlySet<string> = new Set(),
+): string {
   const has = (...names: readonly string[]): boolean => names.some((name) => enabledTools.has(name));
   const shellName = enabledTools.has("exec_command")
     ? "exec_command"
@@ -124,10 +128,14 @@ export function getLeanUsingYourToolsSection(enabledTools: ReadonlySet<string>):
   if (enabledTools.has("system.searchTools") || [...enabledTools].some((name) => name.startsWith("mcp."))) {
     items.push(`MCP tools are named mcp.<server>.<tool>; load one with system.searchTools when it is not in your function list, then call it through the tool-call interface with JSON arguments (an encoded name such as mcp__server__tool maps back to it). MCP tools are not skills or shell commands, and their results cannot be simulated with scripts.`);
   }
-  if (has("exec_command", "system.bash", "PowerShell") && enabledTools.has("write_stdin")) {
+  // Deferred process tools load with their own descriptions when a session
+  // is left running, so their guidance waits for them.
+  if (has("exec_command", "system.bash", "PowerShell") && enabledTools.has("write_stdin") &&
+      !deferredTools.has("write_stdin")) {
     items.push(`For interactive or long-running terminal sessions, call ${shellName} with tty=true and use write_stdin with the returned session_id to send input, or chars="" to poll.`);
   }
-  if (has("exec_command", "system.bash", "PowerShell") && enabledTools.has("kill_process")) {
+  if (has("exec_command", "system.bash", "PowerShell") && enabledTools.has("kill_process") &&
+      !deferredTools.has("kill_process")) {
     items.push(`Stop background work you started with kill_process (session_id, session_ids, or all=true)${enabledTools.has("list_processes") ? "; list_processes shows which of your sessions are live" : ""}. Searching the process table for task filenames or command text and signalling the matches also hits AgenC's own CLI and process brokers and ends the session.`);
   }
   items.push(
@@ -137,9 +145,15 @@ export function getLeanUsingYourToolsSection(enabledTools: ReadonlySet<string>):
   return bullets("# Using your tools", items);
 }
 
-export function getLeanAgentToolSection(enabledTools: ReadonlySet<string>): string | null {
+export function getLeanAgentToolSection(
+  enabledTools: ReadonlySet<string>,
+  deferredTools: ReadonlySet<string> = new Set(),
+): string | null {
   if (!enabledTools.has("spawn_agent")) return null;
   return bullets("# Subagents", [
+    ...(deferredTools.has("spawn_agent")
+      ? [`spawn_agent and the tools that act on the agents it starts load together with system.searchTools select:spawn_agent. A task you can finish directly with your own tools needs no helper.`]
+      : []),
     `Do the step you are blocked on yourself; delegate self-contained side tasks that can run while you work.`,
     `A spawned agent starts in your working directory. With fork_turns omitted or "none", the default for a delegated subtask, it starts without this conversation: give it the goal, the files it owns, the constraints and how to verify, with paths relative to that directory. Use fork_turns "all" only when the subtask needs the whole conversation; the agent then inherits your role, model and effort, so it cannot be combined with agent_type, model or reasoning_effort, and an agent on another provider always starts without the conversation.`,
     `Parallel agents that edit files need disjoint write sets and isolation: "worktree". Have each one commit and report its commit, changed files and checks, and integrate one verified commit range at a time; a finished agent is not approval to merge.`,
