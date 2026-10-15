@@ -11,6 +11,7 @@
  *     allowed roots used by AgenC's file tools.
  */
 
+import { readBeforeWriteMessage } from "../system/read-before-write.js";
 import { open, stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { loadDiff } from "../../utils/lazy-runtime-packages.js";
@@ -118,9 +119,6 @@ export interface ApplyPatchResult {
 // partial offset/limit read authorizes it; only an absent read or a
 // synthetic partial view is rejected), and it must not have drifted on
 // disk since that read.
-const READ_BEFORE_WRITE_ERROR =
-  "File has not been read yet. Read it first before writing to it.";
-
 const FILE_UNEXPECTEDLY_MODIFIED_ERROR =
   "File has been modified since read, either by the user or by a linter. Read it again before attempting to write it.";
 
@@ -522,7 +520,7 @@ async function assertReadBeforeWriteGate(
 
   const recordedSnapshot = getSessionReadSnapshot(sessionId, pathAbs);
   if (!isAuthorizingSessionRead(recordedSnapshot)) {
-    throw new ApplyPatchRuntimeError(READ_BEFORE_WRITE_ERROR);
+    throw new ApplyPatchRuntimeError(readBeforeWriteMessage([pathAbs]));
   }
 
   const recordedTs = recordedSnapshot?.timestamp;

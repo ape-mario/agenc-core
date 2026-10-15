@@ -50,6 +50,7 @@ test("output that differs from the files, or an unsafe or incomplete command, re
     ["cat a.go | head -5", finished("package a\n")],
     ["cat -n a.go", finished("package a\n")],
     ["cat *.go", finished("package a\n")],
+    ['for f in *.go; do echo "===== $f ====="; cat "$f"; echo; done', finished("===== a.go =====\npackage a\n\n")],
     ["nl -ba a.go", finished("     1\tpackage a\n")],
     ["cat a.go", finished("package a\n", { truncated: true })],
     ["cat a.go", finished("package a\n", { exitCode: null, exit_code: null })],

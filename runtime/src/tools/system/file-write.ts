@@ -55,6 +55,7 @@ import {
   SESSION_ID_ARG,
   type SessionReadViewKind,
 } from "./filesystem.js";
+import { readBeforeWriteMessage, unreadFilePreflight } from "./read-before-write.js";
 import { checkMemorySecrets } from "../../memory/privacy.js";
 import {
   FILE_TOOL_PATH_SCHEMA,
@@ -127,13 +128,6 @@ Usage:
 - Prefer the Edit tool for modifying existing files — it only sends the diff. Only use this tool to create new files or for complete rewrites.
 - NEVER create documentation files (*.md) or README files unless explicitly requested by the User.
 - Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.`;
-
-/**
- * Verbatim from the upstream file-write tool. Used when the
- * target file exists but the model has not read it in this session.
- */
-const READ_REQUIRED_MESSAGE =
-  "File has not been read yet. Read it first before writing to it.";
 
 /**
  * Verbatim from the upstream file-edit constants. Used when the target was read
@@ -337,6 +331,11 @@ export function createFileWriteTool(config: FileWriteToolConfig = {}): Tool {
       required: ["file_path", "content"],
       additionalProperties: false,
     },
+    preflight(args) {
+      const filePath = asNonEmptyString(args.file_path);
+      if (!filePath) return { code: "invalid_write", message: "file_path must be a non-empty string" };
+      return unreadFilePreflight(args, [filePath], allowedPaths[0] ?? process.cwd());
+    },
     checkPermissions(input, context) {
       const args = input as FileWriteToolInput;
       const filePath = asNonEmptyString(args.file_path);
@@ -439,7 +438,7 @@ export function createFileWriteTool(config: FileWriteToolConfig = {}): Tool {
       // `Edit`'s gate.
       if (existed && sessionId !== undefined) {
         if (!hasSessionRead(sessionId, absolutePath)) {
-          return preMutationErrorResult(READ_REQUIRED_MESSAGE);
+          return preMutationErrorResult(readBeforeWriteMessage([absolutePath]));
         }
 
         // Modification-since-read drift check. A FULL read carries the
