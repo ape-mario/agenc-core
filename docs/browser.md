@@ -77,6 +77,14 @@ AppleEvents, the keychain and credential services, location, Spotlight,
 iCloud, notifications and the GPU stay blocked; pages render in software. No
 other command gets these rules.
 
+On Linux, snap packages cannot start inside AgenC's sandbox: a `/snap/bin`
+entry is a link to the `snap` launcher, and `snap run` cannot create its
+systemd scope from inside the sandbox. Auto-detection passes over snaps there,
+including Ubuntu's `chromium-browser` script that runs the Chromium snap. A
+configured snap, or a snap that is the only browser found, fails before launch
+with an error that says so. Install Google Chrome or a non-snap Chromium, or
+set `executable_path` to one.
+
 Outside AgenC's sandbox (`danger_full_access`) Chromium keeps its own sandbox
 unless `no_sandbox = true`.
 
@@ -97,7 +105,8 @@ unless `no_sandbox = true`.
 
 ## Operator checklist
 
-1. Install a Chromium-family browser (or set `AGENC_BROWSER_EXECUTABLE`).
+1. Install a Chromium-family browser (or set `AGENC_BROWSER_EXECUTABLE`). On
+   Linux with AgenC's sandbox, use one that is not a snap (see Sandbox).
 2. Leave headless on unless you need a visible window for debugging.
 3. Keep private-network off in production / untrusted workspaces.
 4. Confirm the agent can call `Browser` under your permission mode
