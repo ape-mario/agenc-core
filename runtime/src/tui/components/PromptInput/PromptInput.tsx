@@ -2182,7 +2182,7 @@ function PromptInput({
     const currentInput = lastInternalInputRef.current;
     const currentCursorOffset = cursorOffsetRef.current;
     // Clean up pasted text - strip ANSI escape codes and normalize line endings and tabs
-    let text = stripAnsi(rawText).replace(/\r/g, "\n").replaceAll("\t", "    ");
+    let text = stripAnsi(rawText).replace(/\r\n?/g, "\n").replaceAll("\t", "    ");
 
     // Detect file paths from drag-and-drop and convert to @mentions.
     // When files are dragged into the terminal, the terminal sends their
