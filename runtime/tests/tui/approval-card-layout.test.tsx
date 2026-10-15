@@ -122,6 +122,15 @@ describe('ApprovalCard layout (tool-approval popup)', () => {
     expect(tight).toContain('approve once')
   })
 
+  test('(C) a 40x12 terminal keeps every decision and cancellation visible', async () => {
+    const out = await renderWriteApproval(12, 40)
+    expect(out).toContain('1  approve once')
+    expect(out).toContain('2  approve for session')
+    expect(out).toContain('3  deny')
+    expect(out).toContain('esc cancel')
+    expect(out.split('\n').filter(line => line.length > 0).length).toBeLessThanOrEqual(12)
+  })
+
   test('(A) a non-bash tool is never relabeled as bash', async () => {
     const out = await renderToString(
       <ApprovalCard
