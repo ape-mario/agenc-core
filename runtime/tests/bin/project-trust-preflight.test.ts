@@ -457,6 +457,32 @@ describe("project trust preflight", () => {
     }
   });
 
+  it.each(["--bypass-approvals", "--dangerously-bypass-approvals-and-sandbox"])(
+    "explains how to recover from a clean headless trust refusal with %s", async flag => {
+      const home = await mkdtemp(join(tmpdir(), "agenc-trust-home-"));
+      const workspace = await mkdtemp(join(tmpdir(), "agenc-trust-ws-"));
+      await mkdir(join(workspace, ".git"));
+      const env = makeEnv(home, workspace);
+      const stdio = makeNonTtyStdio();
+      const renderPrompt = vi.fn(async () => true);
+      try {
+        await expect(runProjectTrustPreflightForTui({
+          env, argv: ["node", "agenc", flag, "-p", "hello"], cwd: workspace,
+          stdin: stdio.stdin, stdout: stdio.stdout, stderr: stdio.stderr, renderPrompt,
+        })).resolves.toEqual({ accepted: false, projectRoot: workspace, prompted: false });
+        expect(stdio.stderrText()).toBe(
+          `agenc: project is not trusted: ${workspace}\n` +
+          "agenc: run agenc here in a terminal with the same bypass flags to confirm trust, or rerun without bypass flags\n",
+        );
+        expect(renderPrompt).not.toHaveBeenCalled();
+        expect(resolveProjectTrustKindSync({ agencHome: home, env, projectRoot: workspace })).toBe("none");
+      } finally {
+        await rm(home, { recursive: true, force: true });
+        await rm(workspace, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("asks even for an automatically trusted folder when approvals are bypassed", async () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-trust-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-trust-ws-"));
@@ -950,7 +976,8 @@ describe("main project trust routing", () => {
         try {
           await expect(main()).resolves.toBe(1);
           expect(stderr.text()).toBe(
-            `agenc: project is not trusted: ${workspace}\n`,
+            `agenc: project is not trusted: ${workspace}\n` +
+            "agenc: run agenc here in a terminal with the same bypass flags to confirm trust, or rerun without bypass flags\n",
           );
         } finally {
           stderr.restore();

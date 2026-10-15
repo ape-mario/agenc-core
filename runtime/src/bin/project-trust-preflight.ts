@@ -112,7 +112,7 @@ function headlessRefusalDetail(
   if (location === "root") {
     return "agenc: it is the root of the disk; run agenc there in a terminal to confirm\n";
   }
-  return "";
+  return "agenc: run agenc here in a terminal with the same bypass flags to confirm trust, or rerun without bypass flags\n";
 }
 
 export async function runProjectTrustPreflightForTui(
