@@ -8,6 +8,7 @@ import {
   type ModelMetadataResolverOptions,
 } from "./model-registry.js";
 import { rememberSuccessfulLookup } from "./remember-successful-lookup.js";
+import { resolveModelCatalogMetadata } from "./registry/model-catalog.js";
 import type { ModelsManager } from "../session/session.js";
 import type { ModelInfo } from "../session/turn-context.js";
 
@@ -19,6 +20,7 @@ export class StaticModelsManager implements ModelsManager {
   private metadataRevision = 0;
   private inFlightModelInfo = new Map<string, Promise<ModelInfo>>();
   private modelInfoCache = new Map<string, ModelInfo>();
+  private catalogRefreshes = new Set<string>();
 
   constructor(params: {
     readonly config: AgenCConfig;
@@ -87,10 +89,37 @@ export class StaticModelsManager implements ModelsManager {
     if (revision !== this.metadataRevision) {
       this.inFlightModelInfo = new Map();
       this.modelInfoCache = new Map();
+      this.catalogRefreshes = new Set();
       this.availableModels = undefined;
       this.metadataRevision = revision;
     }
     const key = `${params.provider}:${params.model}`;
+    if (
+      params.provider === "deepseek" &&
+      resolveModelCatalogMetadata(params) !== undefined &&
+      !this.modelInfoCache.has(key)
+    ) {
+      // A proxy URL does not make a catalogued DeepSeek model unknown. Start
+      // the turn with its registered limits; discovery can update later turns.
+      // Explicit configured limits still go through the usual resolver below.
+      const entry = this.modelRegistry.resolveSync(params);
+      if (entry.metadata.source === "built_in_heuristic") {
+        const cache = this.modelInfoCache;
+        const pending = this.catalogRefreshes;
+        if (!pending.has(key)) {
+          pending.add(key);
+          void this.buildResolvedModelInfo(params).then((info) => {
+            if (cache === this.modelInfoCache && !info.usedFallbackModelMetadata) {
+              cache.set(key, info);
+            }
+          }, () => {
+            // Discovery is best effort. Keep the static catalog available if
+            // the endpoint fails or its authority changes during the refresh.
+          }).finally(() => pending.delete(key));
+        }
+        return modelRegistryEntryToModelInfo(entry);
+      }
+    }
     return await rememberSuccessfulLookup(
       { inFlight: this.inFlightModelInfo, success: this.modelInfoCache },
       key,
