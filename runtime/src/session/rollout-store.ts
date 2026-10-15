@@ -4073,7 +4073,7 @@ export class RolloutStore {
     if (this.runDurabilityRepo.getTerminalResult(runId, epoch) !== undefined) {
       return true;
     }
-    if (rolloutItemsContainTerminal(this.store.readAll(), runId, epoch)) {
+    if (this.store.hasTerminalRun(runId, epoch)) {
       return true;
     }
 

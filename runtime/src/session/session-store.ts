@@ -1874,6 +1874,8 @@ export class SessionStore {
   private resumeSourceFaulted = false;
   /** Exact source bytes most recently read through the lifetime fd. */
   private lastBoundReadProof: ResumeSourceReadProof | undefined;
+  /** Only terminal identities survive parsing, never the full hydrated history. */
+  private terminalRunCache: { readonly digest: string; readonly keys: ReadonlySet<string> } | undefined;
   private readonly beforeBoundResumeRewritePublishForTestingOnly?: () => void;
   private readonly boundResumeRewriteRename: (from: string, to: string) => void;
   private readonly afterBoundResumeRewriteStepForTestingOnly?: SessionStoreOpts["afterBoundResumeRewriteStepForTestingOnly"];
@@ -3916,6 +3918,42 @@ export class SessionStore {
 
   /** Read the rollout file fully and return the parsed items. */
   readAll(): RolloutItem[] {
+    return this.parseRolloutBytes(this.readRolloutBytes());
+  }
+
+  /**
+   * Query terminal evidence without repeatedly hydrating an unchanged journal.
+   * Every query still reads the source through the normal descriptor/identity
+   * checks. Only an exact SHA-256 match reuses the bounded terminal index; a
+   * changed source is parsed and its compaction payloads verified as readAll
+   * would do. This cache never supplies history or canonical recovery proofs.
+   */
+  hasTerminalRun(runId: string, epoch: number): boolean {
+    const bytes = this.readRolloutBytes();
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    const key = JSON.stringify([runId, epoch]);
+    if (this.terminalRunCache?.digest === digest) {
+      return this.terminalRunCache.keys.has(key);
+    }
+    this.terminalRunCache = undefined;
+    const keys = new Set<string>();
+    let matched = false;
+    let overCapacity = false;
+    for (const item of this.parseRolloutBytes(bytes)) {
+      if (item.type !== "event_msg" || item.payload.msg.type !== "run_terminal") continue;
+      const terminal = item.payload.msg.payload;
+      const terminalKey = JSON.stringify([terminal.runId, terminal.epoch]);
+      if (terminalKey === key) matched = true;
+      // A large number of terminal identities must not create an unbounded
+      // process-lifetime index. Oversized journals simply use the cold path.
+      if (keys.size < 1_024) keys.add(terminalKey);
+      else if (!keys.has(terminalKey)) overCapacity = true;
+    }
+    if (!overCapacity) this.terminalRunCache = { digest, keys };
+    return matched;
+  }
+
+  private readRolloutBytes(): Buffer {
     this.writeBehind.barrier();
     if (this.oneShotFastMode) this.finishOneShotFastMode();
     if (this.resumeSourceFaulted) {
@@ -3923,7 +3961,11 @@ export class SessionStore {
         "resumed rollout writer authority was revoked after replacement failure",
       );
     }
-    const content = this.readCurrentRolloutBytes().toString("utf8");
+    return this.readCurrentRolloutBytes();
+  }
+
+  private parseRolloutBytes(bytes: Buffer): RolloutItem[] {
+    const content = bytes.toString("utf8");
     const items: RolloutItem[] = [];
     let malformed = 0;
     for (const line of content.split("\n")) {

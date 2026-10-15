@@ -14,6 +14,8 @@ import {
   renameSync,
   rmSync,
   symlinkSync,
+  statSync,
+  utimesSync,
   writeSync,
   writeFileSync,
 } from "node:fs";
@@ -127,6 +129,47 @@ describe("session-store", () => {
       store.close();
     }
     expect(() => store.scanCanonicalChunks(1024, () => {})).toThrow("closed");
+  });
+
+  test("terminal queries refresh on append and same-size edits with restored timestamps", () => {
+    const store = new SessionStore({ cwd: home, sessionId: "terminal-cache", agencVersion: "0.2.0" });
+    store.open({ sessionId: "terminal-cache", timestamp: new Date().toISOString(), cwd: home,
+      originator: "test", agencVersion: "0.2.0" });
+    try {
+      expect(store.hasTerminalRun("terminal-a", 1)).toBe(false);
+      store.append({ id: "terminal", eventId: "terminal", seq: 1,
+        msg: { type: "run_terminal", payload: { runId: "terminal-a", epoch: 1,
+          status: "completed", exitCode: 0, stopReason: "turn_completed", finalMessage: "done",
+          usage: null, lastSequenceBeforeTerminal: null, finishedAt: "2026-10-15T00:00:00Z" } } }, { durable: true });
+      expect(store.hasTerminalRun("terminal-a", 1)).toBe(true);
+      expect(store.hasTerminalRun("terminal-a", 2)).toBe(false);
+      const before = statSync(store.rolloutPath);
+      const bytes = readFileSync(store.rolloutPath, "utf8");
+      writeFileSync(store.rolloutPath, bytes.replace('"runId":"terminal-a"', '"runId":"terminal-b"'));
+      utimesSync(store.rolloutPath, before.atime, before.mtime);
+      expect(statSync(store.rolloutPath).size).toBe(before.size);
+      expect(store.hasTerminalRun("terminal-a", 1)).toBe(false);
+      expect(store.hasTerminalRun("terminal-b", 1)).toBe(true);
+    } finally { store.close(); }
+  });
+
+  test("a cached terminal query still rejects replacement of a resumed source", () => {
+    const sessionId = "terminal-cache-bound";
+    const seed = new SessionStore({ cwd: home, sessionId, agencVersion: "0.2.0" });
+    const meta = { sessionId, timestamp: new Date().toISOString(), cwd: home,
+      originator: "test", agencVersion: "0.2.0" };
+    seed.open(meta);
+    seed.close();
+    const resumed = new SessionStore({ cwd: home, sessionId, agencVersion: "0.2.0",
+      resume: true, resumeRolloutPath: seed.rolloutPath });
+    resumed.open(meta);
+    try {
+      expect(resumed.hasTerminalRun(sessionId, 1)).toBe(false);
+      const bytes = readFileSync(resumed.rolloutPath);
+      renameSync(resumed.rolloutPath, `${resumed.rolloutPath}.old`);
+      writeFileSync(resumed.rolloutPath, bytes);
+      expect(() => resumed.hasTerminalRun(sessionId, 1)).toThrow(/changed|replaced|resume|source/);
+    } finally { resumed.close(); }
   });
 
   test("fresh session metadata canonicalizes a symlink-spelled workspace", () => {
