@@ -647,7 +647,9 @@ function PromptInput({
   // system, so treat them as a modal overlay here to stop navigation keys from
   // leaking into TextInput/footer handlers and stacking a second dialog.
   const upstreamModalOverlayActive =
-    useIsModalOverlayActive() || isLocalJSXCommandActive;
+    // Ledger guidance displays progress without asking for composer input.
+    // Keep typing and /exit available while its dismissal keys remain owned.
+    useIsModalOverlayActive("ledger-verification") || isLocalJSXCommandActive;
   const [isAutoUpdating, setIsAutoUpdating] = useState(false);
   const [exitMessage, setExitMessage] = useState<{
     show: boolean;
