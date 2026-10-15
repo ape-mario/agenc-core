@@ -594,15 +594,15 @@ describe("providerCommand", () => {
     );
     Object.assign(session, { applyProviderModelSelection });
 
-    await providerCommand.execute(mkctx(session, "openai"));
+    await providerCommand.execute(mkctx(session, "openai-compatible"));
     await modelCommand.execute(mkctx(session, "private-openai-model"));
 
     expect(applyProviderModelSelection).toHaveBeenNthCalledWith(1, {
-      provider: "openai",
-      model: "gpt-5",
+      provider: "openai-compatible",
+      model: "local-model",
     });
     expect(applyProviderModelSelection).toHaveBeenNthCalledWith(2, {
-      provider: "openai",
+      provider: "openai-compatible",
       model: "private-openai-model",
     });
   });
