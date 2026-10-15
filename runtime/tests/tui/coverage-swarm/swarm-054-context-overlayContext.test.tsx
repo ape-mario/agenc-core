@@ -276,6 +276,18 @@ describe('overlayContext coverage swarm 054', () => {
     await expect(renderToString(<OverlayStatus />, 40)).resolves.toContain('active:modal');
   });
 
+  test('allows composer input under Ledger guidance while retaining modal dismissal ownership', async () => {
+    function ComposerStatus() {
+      const blocksInput = useIsModalOverlayActive("ledger-verification");
+      const blocksCancel = useIsModalOverlayActive();
+      return <Text>{blocksInput ? 'blocked' : 'input-enabled'}:{blocksCancel ? 'modal' : 'unowned'}</Text>;
+    }
+    appStateHarness.state = { activeOverlays: new Set(['ledger-verification']) };
+    await expect(renderToString(<ComposerStatus />, 40)).resolves.toContain('input-enabled:modal');
+    appStateHarness.state = { activeOverlays: new Set(['ledger-verification', 'select']) };
+    await expect(renderToString(<ComposerStatus />, 40)).resolves.toContain('blocked:modal');
+  });
+
   test('distinguishes any overlay from modal overlays', async () => {
     appStateHarness.state = {
       activeOverlays: new Set(),
