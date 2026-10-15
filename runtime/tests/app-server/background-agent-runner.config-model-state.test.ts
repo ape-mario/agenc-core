@@ -321,6 +321,33 @@ describe("daemon config/model state refresh + atomicity", () => {
     expect(session.pendingProviderSwitch).toMatchObject({ provider: "deepseek", model: "deepseek-v4-pro" });
   });
 
+  it.each(["high", undefined])("retains live effort %s when an unrelated reload leaves configured effort unchanged", async (reasoningEffort) => {
+    const config = { model_provider: "deepseek", model: "deepseek-flash", reasoning_effort: "max", swarmMode: true };
+    const { runner, stateObject } = makeRunnerHarness({
+      configStore: { current: () => config, reload: async () => ({ ...config, swarmMode: false }) },
+      sessionConfiguration: {
+        provider: { slug: "deepseek" },
+        collaborationMode: { model: "deepseek-flash", ...(reasoningEffort ? { reasoningEffort } : {}) },
+        ...(reasoningEffort ? {} : { reasoningEffortCleared: true }),
+      },
+    });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    await runner.applyAgentConfig("parent-session", { sessionId: "session_1", reload: true });
+    expect(stateObject.sessionConfiguration.collaborationMode.reasoningEffort).toBe(reasoningEffort);
+    if (!reasoningEffort) expect(stateObject.sessionConfiguration.reasoningEffortCleared).toBe(true);
+  });
+
+  it("applies a configured effort changed by a reload", async () => {
+    let config = { model_provider: "deepseek", model: "deepseek-flash", reasoning_effort: "max" };
+    const { runner, stateObject } = makeRunnerHarness({
+      configStore: { current: () => config, reload: async () => (config = { ...config, reasoning_effort: "high" }) },
+      sessionConfiguration: { provider: { slug: "deepseek" }, collaborationMode: { model: "deepseek-flash", reasoningEffort: "low" } },
+    });
+    await runner.startAgent({ objective: "work", cwd: "/workspace" });
+    await runner.applyAgentConfig("parent-session", { sessionId: "session_1", reload: true });
+    expect(stateObject.sessionConfiguration.collaborationMode.reasoningEffort).toBe("high");
+  });
+
   it("still applies a model changed in the freshly resolved configuration", async () => {
     const config = { model_provider: "deepseek", model: "deepseek-v4-pro" };
     const { runner, session } = makeRunnerHarness({
