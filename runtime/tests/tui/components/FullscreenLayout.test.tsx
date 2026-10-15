@@ -1,5 +1,7 @@
-import { describe, expect, test } from "vitest";
+import { PassThrough } from "node:stream";
+import { describe, expect, test, vi } from "vitest";
 import React from "react";
+import stripAnsi from "strip-ansi";
 
 import {
   calculateFileTreeGutterWidth,
@@ -10,8 +12,11 @@ import {
   statusLineSegments,
   workspacePathLabel,
 } from "./FullscreenLayout.js";
-import { AppStateProvider, getDefaultAppState } from "../state/AppState.js";
+import { AppStateProvider, AppStoreContext, getDefaultAppState } from "../state/AppState.js";
+import { createStore } from "../state/store.js";
+import { syncCollabAgentEventToAppState } from "../state/collabAgentTaskSync.js";
 import { Box, Text } from "../ink.js";
+import { createRoot } from "../ink/root.js";
 import { renderToString } from "../../utils/staticRender.js";
 import { FullscreenModeProvider } from "../context/fullscreenModeContext.js";
 
@@ -132,6 +137,85 @@ describe("FullscreenLayout modal viewport", () => {
     expect(output).not.toContain("swarm (3)");
   });
 
+  test.each([0, 1, 2])("shows the footer count for %i active agents beside shells", async agentCount => {
+    const state = getDefaultAppState();
+    const tasks = Object.fromEntries(Array.from({ length: agentCount }, (_, index) => [index, {
+      id: String(index), type: "local_agent", status: index === 0 ? "running" : "pending",
+    }])) as typeof state.tasks;
+    const output = await renderToString(
+      <AppStateProvider initialState={{ ...state, swarmMode: false, tasks: {
+        ...tasks,
+        shell: { id: "shell", type: "local_bash", status: "running", isBackgrounded: true } as typeof state.tasks[string],
+        completed: { id: "completed", type: "local_agent", status: "completed" } as typeof state.tasks[string],
+        failed: { id: "failed", type: "local_agent", status: "failed" } as typeof state.tasks[string],
+        killed: { id: "killed", type: "local_agent", status: "killed" } as typeof state.tasks[string],
+      } }}>
+        {fullscreen(<FullscreenLayout scrollable={<Text>research</Text>} bottom={<Text>prompt</Text>} />)}
+      </AppStateProvider>,
+      { columns: 180, rows: 24 },
+    );
+    if (agentCount === 0) {
+      expect(output).not.toMatch(/\b\d+ agents?\b/u);
+      expect(output).toContain("1 shell");
+    } else {
+      expect(output).toContain(`1 shell · ${agentCount} ${agentCount === 1 ? "agent" : "agents"}`);
+    }
+  });
+
+  test("updates the mounted footer when subagents finish after a wait timeout", async () => {
+    const store = createStore({ ...getDefaultAppState(), swarmMode: false });
+    const applyEvent = (event: unknown) => syncCollabAgentEventToAppState(event, updater => {
+      store.setState(state => updater(state) as typeof state);
+    });
+    for (const id of ["agent-1", "agent-2"]) {
+      applyEvent({ type: "collab_agent_spawn_end", payload: { newThreadId: id, status: "running" } });
+    }
+    const stdout = new PassThrough();
+    Object.assign(stdout, { columns: 180, rows: 24 });
+    const stdin = Object.assign(new PassThrough(), {
+      isTTY: true, ref() {}, unref() {}, setRawMode() {},
+    });
+    let output = "";
+    stdout.on("data", chunk => { output += chunk.toString(); });
+    const latestFrame = () => {
+      const end = output.lastIndexOf("\x1b[?2026l");
+      const start = output.lastIndexOf("\x1b[?2026h", end);
+      return stripAnsi(output.slice(start, end));
+    };
+    const root = await createRoot({
+      patchConsole: false,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+    });
+    try {
+      root.render(
+        <AppStoreContext.Provider value={store}>
+          {fullscreen(<FullscreenLayout scrollable={<Text>research</Text>} bottom={<Text>prompt</Text>} />)}
+        </AppStoreContext.Provider>,
+      );
+      await vi.waitFor(() => expect(latestFrame()).toContain("2 agents"));
+      applyEvent({ type: "collab_waiting_end", payload: { timedOut: true, agentStatuses: [] } });
+      expect(latestFrame()).toContain("2 agents");
+      applyEvent({ type: "background_agent_status", payload: {
+        agentId: "agent-1", status: "idle", runStatus: "completed",
+      } });
+      await vi.waitFor(() => {
+        expect(latestFrame()).toContain("1 agent");
+        expect(latestFrame()).not.toContain("2 agents");
+      });
+      output = "";
+      applyEvent({ type: "collab_agent_status", payload: { threadId: "agent-2", status: "completed" } });
+      await vi.waitFor(() => {
+        expect(latestFrame()).toContain("asks first");
+        expect(latestFrame()).not.toMatch(/\b\d+ agents?\b/u);
+      });
+    } finally {
+      root.unmount();
+      stdin.end();
+      stdout.end();
+    }
+  });
+
   test("does not count a finished helper that is briefly re-sent as running", async () => {
     // Cancelling the parent re-emits finished helpers as running, still
     // carrying their end time, before they settle again (swc RC4.8 Esc case).
@@ -148,6 +232,8 @@ describe("FullscreenLayout modal viewport", () => {
     );
     expect(output).toContain("swarm (1)");
     expect(output).not.toContain("swarm (2)");
+    expect(output).toContain("1 agent");
+    expect(output).not.toContain("2 agents");
   });
 
   test("omits the Light label without changing other status facts", () => {

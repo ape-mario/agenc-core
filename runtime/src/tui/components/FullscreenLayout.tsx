@@ -705,6 +705,7 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
     ...(segments.light !== null ? [{ key: 'light', label: segments.light, color: 'text' as const }] : []),
     ...(swarmMode ? [{ key: 'swarm', ...swarmStatusPresentation(runningAgents) }] : []),
     ...(shellCount > 0 ? [{ key: 'shells', label: `${shellCount} ${shellCount === 1 ? 'shell' : 'shells'}`, color: 'text' as const }] : []),
+    ...(runningAgents > 0 ? [{ key: 'agents', label: `${runningAgents} ${runningAgents === 1 ? 'agent' : 'agents'}`, color: 'text' as const }] : []),
   ];
   // Reserve the truthful context/cost block first. Drop cwd/branch, shorten
   // effort/mode, then drop swarm/effort/light before truncating the model.
