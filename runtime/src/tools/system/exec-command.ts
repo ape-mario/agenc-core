@@ -1,6 +1,6 @@
 import { constants as fsConstants, existsSync, realpathSync, statSync } from "node:fs";
-import { open } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { open, readdir } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type { Tool, ToolExecutionInjectedArgs, ToolPreflightFailure, ToolResult } from "../types.js";
 import { safeStringify } from "../types.js";
@@ -458,6 +458,190 @@ export async function recordShellReads(params: {
         ? { content: lines.join("\n"), timestamp: file.mtimeMs, viewKind: "full", rawContent: file.text }
         : { content: shown, timestamp: file.mtimeMs, viewKind: "partial", readOffset: step.start, readLimit: step.end - step.start + 1 });
     }
+  }
+}
+/** Bounds for {@link recordPrintedFileReads}: candidate files, glob matches and checked output. */
+const PRINTED_READ_MAX_CANDIDATES = 32;
+const PRINTED_READ_MAX_GLOB_MATCHES = 64;
+const PRINTED_READ_MAX_OUTPUT_CHARS = 4 * 1024 * 1024;
+/** Shorter text could appear in output by coincidence (an echo, a test name), so it proves nothing. */
+const PRINTED_READ_MIN_BYTES = 64;
+const PRINTED_READ_GLOB = /[*?[]/u;
+
+/**
+ * The command's words outside quotes. A word with any quoted part is dropped: text a command prints
+ * from a quoted argument (`printf '...; cat a.js'`) never names a file it read.
+ */
+function unquotedWords(cmd: string): string[] {
+  const words: string[] = [];
+  let word = "";
+  let tainted = false;
+  const end = (): void => {
+    if (word.length > 0 && !tainted && word.length <= 1024) words.push(word);
+    word = "";
+    tainted = false;
+  };
+  for (let i = 0; i < cmd.length; i += 1) {
+    const ch = cmd[i]!;
+    if (ch === "'" || ch === "\"" || ch === "`") {
+      const close = cmd.indexOf(ch, i + 1);
+      if (close < 0) return words;
+      tainted = true;
+      i = close;
+    } else if (ch === "\\") {
+      tainted = true;
+      i += 1;
+    } else if (/[\s;&|()<>]/u.test(ch)) {
+      end();
+    } else {
+      word += ch;
+    }
+  }
+  end();
+  return words;
+}
+
+/** Whether `needle` occurs in `haystack` starting at the start of a line. */
+function includesAtLineStart(haystack: string, needle: string): boolean {
+  for (let at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + 1)) {
+    if (at === 0 || haystack[at - 1] === "\n") return true;
+  }
+  return false;
+}
+
+/** `cat -n` rendering of a whole file: six-column right-aligned number, a tab, the line. */
+function catNumbered(text: string): string {
+  const lines = text.split("\n");
+  if (lines.at(-1) === "") lines.pop();
+  return lines.map((line, index) => `${String(index + 1).padStart(6, " ")}\t${line}`).join("\n");
+}
+
+function globSegmentPattern(segment: string): RegExp | undefined {
+  let source = "";
+  for (let i = 0; i < segment.length; i += 1) {
+    const ch = segment[i]!;
+    if (ch === "*") {
+      source += "[^/]*";
+      while (segment[i + 1] === "*") i += 1;
+    } else if (ch === "?") {
+      source += "[^/]";
+    } else if (ch === "[") {
+      const close = segment.indexOf("]", i + 2);
+      if (close < 0) return undefined;
+      const body = segment.slice(i + 1, close).replace(/^!/u, "^").replace(/\\/gu, "\\\\");
+      source += `[${body}]`;
+      i = close;
+    } else {
+      source += ch.replace(/[.+^${}()|\\]/gu, "\\$&");
+    }
+  }
+  try {
+    return new RegExp(`^${source}$`, "u");
+  } catch {
+    return undefined;
+  }
+}
+
+function insideAnyRoot(path: string, roots: readonly string[]): boolean {
+  return roots.some((root) => {
+    const tail = relative(root, path);
+    return tail === "" || (tail !== ".." && !tail.startsWith(`..${sep}`) && !isAbsolute(tail));
+  });
+}
+
+/** Expand a glob word the way sh does without globstar (`**` acts as `*`), inside the roots only. */
+async function expandWorkspaceGlob(word: string, base: string, roots: readonly string[]): Promise<string[]> {
+  let dirs = [isAbsolute(word) ? "/" : base];
+  const segments = word.split("/").filter((segment, index) => segment.length > 0 || index === 0);
+  for (const segment of segments) {
+    if (segment.length === 0) continue;
+    const next: string[] = [];
+    if (!PRINTED_READ_GLOB.test(segment)) {
+      for (const dir of dirs) next.push(join(dir, segment));
+    } else {
+      const pattern = globSegmentPattern(segment);
+      if (pattern === undefined) return [];
+      for (const dir of dirs) {
+        if (!insideAnyRoot(dir, roots)) continue;
+        let names: string[];
+        try {
+          names = await readdir(dir);
+        } catch {
+          continue;
+        }
+        for (const name of names.sort()) {
+          if (name.startsWith(".") && !segment.startsWith(".")) continue;
+          if (pattern.test(name)) next.push(join(dir, name));
+          if (next.length >= PRINTED_READ_MAX_GLOB_MATCHES) break;
+        }
+      }
+    }
+    dirs = next;
+    if (dirs.length === 0) return [];
+  }
+  return dirs;
+}
+
+/**
+ * Standard sessions count a workspace file as read when the command printed its exact current
+ * text, raw or as `cat -n` prints it, from the start of a line, whatever shell construct printed it
+ * (a `for` loop over a glob, a `cd` chain, `cat -n`). The model has then seen the current text, which is what the read-before-write
+ * gate asks for; without this, a file read with the shell had its first edit refused and the model
+ * paid a FileRead round trip and a resent edit. Candidates are the workspace files the command names
+ * outside quotes (path words, globs expanded in the working directory and in every `cd` target), and
+ * a file shorter than 64 bytes never counts, since its text can appear by coincidence. Only a shell
+ * that exited on its own, untruncated and with no live session, is checked; snapshots and their bounds
+ * are the ones {@link recordShellReads} uses. Light keeps its stricter parser of executed read steps.
+ */
+export async function recordPrintedFileReads(params: {
+  readonly cmd: string;
+  readonly output: ExecCommandToolOutput;
+  readonly cwd: string;
+  readonly allowedPaths: readonly string[];
+  readonly args: Record<string, unknown>;
+}): Promise<void> {
+  const { output } = params;
+  if (output.exitCode === null || output.truncated || output.timedOut || output.session_id !== undefined) return;
+  const stdout = output.stdout;
+  if (stdout.length === 0 || stdout.length > PRINTED_READ_MAX_OUTPUT_CHARS) return;
+  const sessionId = resolveSessionId(params.args);
+  if (sessionId === undefined) return;
+  const roots = params.allowedPaths.map((root) => resolve(root));
+  const words = unquotedWords(params.cmd);
+  const bases = [resolve(params.cwd)];
+  words.forEach((word, index) => {
+    const target = words[index + 1];
+    if (word === "cd" && target !== undefined && !target.includes("$") && !PRINTED_READ_GLOB.test(target)) {
+      const dir = resolve(params.cwd, target);
+      if (!bases.includes(dir)) bases.push(dir);
+    }
+  });
+  const candidates = new Set<string>();
+  for (const word of words) {
+    if (candidates.size >= PRINTED_READ_MAX_CANDIDATES) break;
+    if (word.startsWith("-") || word.includes("$") || word.includes("=") || !/[./]/u.test(word)) continue;
+    for (const base of isAbsolute(word) ? [bases[0]!] : bases) {
+      const paths = PRINTED_READ_GLOB.test(word)
+        ? await expandWorkspaceGlob(word, base, roots)
+        : [resolve(base, word)];
+      for (const path of paths) {
+        if (candidates.size >= PRINTED_READ_MAX_CANDIDATES) break;
+        if (insideAnyRoot(path, roots)) candidates.add(path);
+      }
+    }
+  }
+  const shown = stdout.replace(/\r\n/gu, "\n");
+  for (const path of candidates) {
+    const file = await stableWorkspaceText(path, params.allowedPaths, params.args);
+    if (file === undefined || Buffer.byteLength(file.text.trim(), "utf8") < PRINTED_READ_MIN_BYTES) continue;
+    const text = file.text.replace(/\r\n/gu, "\n");
+    if (!includesAtLineStart(shown, text) && !includesAtLineStart(shown, catNumbered(text))) continue;
+    recordSessionRead(sessionId, file.canonical, {
+      content: file.text.split(/\r?\n/u).join("\n"),
+      timestamp: file.mtimeMs,
+      viewKind: "full",
+      rawContent: file.text,
+    });
   }
 }
 const MCP_TOOL_NAME_RE = /\bmcp\.[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+\b/u;
@@ -1317,6 +1501,14 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
             output,
             cwd: effectiveWorkdir ?? config.cwd ?? process.cwd(),
             allowedPaths: config.allowedPaths ?? (config.cwd !== undefined ? [config.cwd] : []),
+            args: args as Record<string, unknown>,
+          });
+        } else if (config?.lightMode !== true && !detach && tty !== true) {
+          await recordPrintedFileReads({
+            cmd,
+            output,
+            cwd: effectiveWorkdir ?? config?.cwd ?? process.cwd(),
+            allowedPaths: config?.allowedPaths ?? (config?.cwd !== undefined ? [config.cwd] : []),
             args: args as Record<string, unknown>,
           });
         }
