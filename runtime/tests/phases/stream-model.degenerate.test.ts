@@ -38,6 +38,18 @@ async function sample(text: string, channel: "visible" | "thinking" | "summary",
   return { error, emitted, aborted, state, events, sink };
 }
 
+function compactNumericLog(domain: number): string {
+  let seed = 1234567;
+  const rand = (n: number) => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return (seed >>> 8) % n;
+  };
+  const labels = ["a", "b", "c", "d"];
+  return Array.from({ length: 2000 }, () => labels.map(() =>
+    `${labels[rand(4)]}=${rand(domain)}`,
+  ).join(" ") + "\n").join("");
+}
+
 describe("degenerate model stream guard", () => {
   test.each(["visible", "thinking", "summary"] as const)("stops V2 salad on %s and marks partial output unreliable", async channel => {
     const run = await sample(salad, channel);
@@ -53,6 +65,8 @@ describe("degenerate model stream guard", () => {
   });
 
   test.each([
+    ["compact numeric log", compactNumericLog(1000)],
+    ["compact low-cardinality numeric log", compactNumericLog(2)],
     ["long log", Array.from({ length: 3000 }, (_, i) => `INFO worker ${i} completed request successfully after ${i % 17} attempts\n`).join("")],
     ["identical log lines", "INFO retry waiting for worker to become available\n".repeat(3000)],
     ["long code", Array.from({ length: 2000 }, (_, i) => `function compute${i}(value) { return value * ${i + 1}; }\n`).join("")],
