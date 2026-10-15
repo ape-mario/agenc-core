@@ -1,3 +1,4 @@
+import { assertModelCatalogSelection } from "../llm/model-catalog-selection.js";
 import {
   mergeProviderModelLayer,
   resolveProviderSlugOrThrow,
@@ -39,6 +40,7 @@ export function resolveProviderModelSelection(
   config: AgenCConfig | undefined,
   current: SessionSelection,
   layer: Pick<AgenCConfig, "model_provider" | "model">,
+  env: Readonly<Record<string, string | undefined>> = process.env,
 ): ResolvedSessionSelection {
   const configuredBase = mergeProviderModelLayer(defaultConfig(), config ?? {});
   const currentProvider = resolveBuiltInProviderSlug(current.provider);
@@ -61,6 +63,7 @@ export function resolveProviderModelSelection(
   if (model === undefined) {
     throw new Error("model selection values must be non-empty");
   }
+  assertModelCatalogSelection(config ?? {}, provider, model, env);
   if (!isModelAllowed(provider, model, config ?? {})) {
     throw new ModelNotAllowedError(model);
   }
@@ -230,5 +233,9 @@ export function resolveSessionProviderModelSelection(
     ...options,
     ...(config === undefined ? {} : { fallbackConfig: config }),
   });
-  return resolveProviderModelSelection(config, current, layer);
+  const environment = asRecord(asRecord(sessionRecord?.services)?.providerEnvironment) ?? undefined;
+  return resolveProviderModelSelection(
+    config, current, layer,
+    environment as Readonly<Record<string, string | undefined>> | undefined,
+  );
 }

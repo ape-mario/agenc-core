@@ -65,7 +65,7 @@ function stubSession(opts: StubSessionOpts = {}): Session {
   const sessionConfiguration = {
     provider: { slug: opts.provider ?? "grok" },
     collaborationMode: {
-      model: opts.model ?? "grok-4",
+      model: opts.model ?? "grok-4.6",
       ...(opts.reasoningEffort !== undefined
         ? { reasoningEffort: opts.reasoningEffort }
         : {}),
@@ -184,7 +184,7 @@ describe("checkModelHistoryCompat", () => {
       ],
     });
 
-    const result = checkModelHistoryCompat(session, "grok-4-fast");
+    const result = checkModelHistoryCompat(session, "grok-4.7");
     expect(result).toEqual({ compatible: true, missingCapabilities: [] });
   });
 
@@ -211,7 +211,7 @@ describe("checkModelHistoryCompat", () => {
   it("does not refuse a switch over reasoning effort", () => {
     const session = stubSession({
       provider: "grok",
-      model: "grok-4-fast",
+      model: "grok-4.7",
       reasoningEffort: "high",
       configStore: commandConfigStore(TEST_HOME, {
         providers: { grok: { capability_overrides: { acceptsReasoningEffort: false } } },
@@ -220,7 +220,7 @@ describe("checkModelHistoryCompat", () => {
 
     // The switch drops a level the model rejects and says so
     // (tests/session/reasoning-effort-for-model.test.ts).
-    expect(checkModelHistoryCompat(session, "grok-4-fast")).toEqual({
+    expect(checkModelHistoryCompat(session, "grok-4.7")).toEqual({
       compatible: true,
       missingCapabilities: [],
     });
@@ -257,7 +257,7 @@ describe("Gemini effort switch compatibility", () => {
   it.each([
     ["grok", "grok-4.6", "xhigh", "gemini", "gemini-3.1-pro-preview"],
     ["gemini", "gemini-3.5-flash", "minimal", "gemini", "gemini-3.1-pro-preview"],
-    ["gemini", "gemini-3.1-pro-preview", "medium", "gemini", "gemini-3-pro-preview"],
+    ["gemini", "gemini-3.1-pro-preview", "medium", "gemini", "gemini-2.5-pro"],
     ["gemini", "gemini-3.5-flash", "minimal", "grok", "grok-4.6"],
     ["gemini", "gemini-3.1-pro-preview", "high", "gemini", "gemini-2.5-flash"],
     ["gemini", "gemini-3.5-flash", "medium", "gemini", "gemma-4-31b-it"],
@@ -283,7 +283,7 @@ describe("modelCommand", () => {
     if (res.kind === "text") {
       expect(res.text).toContain("Model selection");
       expect(res.text).toContain("Provider: grok");
-      expect(res.text).toContain("grok-4");
+      expect(res.text).toContain("grok-4.6");
     }
   });
 
@@ -292,7 +292,7 @@ describe("modelCommand", () => {
     const setToolJSX = vi.fn();
     const res = await modelCommand.execute(
       mkctx(session, "", {
-        getAppState: () => ({ mainLoopModel: "grok-4" }),
+        getAppState: () => ({ mainLoopModel: "grok-4.6" }),
         setToolJSX,
       }),
     );
@@ -362,7 +362,7 @@ describe("modelCommand", () => {
   });
 
   it("opens the providers screen on the current provider and routes its choices through provider-model authority", async () => {
-    const session = stubSession({ provider: "grok", model: "grok-4" });
+    const session = stubSession({ provider: "grok", model: "grok-4.6" });
     const setToolJSX = vi.fn();
 
     const res = await modelCommand.execute(
@@ -391,27 +391,27 @@ describe("modelCommand", () => {
   it("applies the switch immediately when no turn is active", async () => {
     const session = stubSession({
       provider: "grok",
-      model: "grok-4",
+      model: "grok-4.6",
       activeTurn: null,
     });
-    const res = await modelCommand.execute(mkctx(session, "grok-4-fast"));
+    const res = await modelCommand.execute(mkctx(session, "grok-4.7"));
     expect(res.kind).toBe("text");
     if (res.kind === "text") {
-      expect(res.text).toMatch(/grok-4-fast/);
-      expect(res.text).toMatch(/was "grok\/grok-4"/);
+      expect(res.text).toMatch(/grok-4.7/);
+      expect(res.text).toMatch(/was "grok\/grok-4.6"/);
     }
     const pending = (
       session as unknown as {
         pendingProviderSwitch: { provider: string; model: string } | null;
       }
     ).pendingProviderSwitch;
-    expect(pending).toEqual({ provider: "grok", model: "grok-4-fast" });
+    expect(pending).toEqual({ provider: "grok", model: "grok-4.7" });
   });
 
   it("can switch provider and model from provider-qualified input", async () => {
     const session = stubSession({
       provider: "grok",
-      model: "grok-4",
+      model: "grok-4.6",
       activeTurn: null,
     });
 
@@ -431,7 +431,7 @@ describe("modelCommand", () => {
   });
 
   it("stores provider-qualified Copilot input as one provider-local pair", async () => {
-    const session = stubSession({ provider: "grok", model: "grok-4" });
+    const session = stubSession({ provider: "grok", model: "grok-4.6" });
 
     const res = await modelCommand.execute(
       mkctx(session, "github:gpt-5.3-codex"),
@@ -445,7 +445,7 @@ describe("modelCommand", () => {
   });
 
   it("resolves a known bare model without inheriting the current provider", async () => {
-    const session = stubSession({ provider: "grok", model: "grok-4" });
+    const session = stubSession({ provider: "grok", model: "grok-4.6" });
 
     const res = await modelCommand.execute(mkctx(session, "gpt-5"));
 
@@ -456,32 +456,38 @@ describe("modelCommand", () => {
     ).toEqual({ provider: "openai", model: "gpt-5" });
   });
 
-  it("keeps an unknown bare model on the current provider", async () => {
-    const session = stubSession({ provider: "grok", model: "grok-4" });
+  it.each(["xyz", "deepseek-flsh", "deepseek:deepseek-flsh"])(
+    "refuses %s without changing the pending model, effort, or chrome", async (input) => {
+      const session = stubSession({
+        provider: "deepseek", model: "deepseek-flash", reasoningEffort: "high",
+        pendingProviderSwitch: { provider: "deepseek", model: "deepseek-v4-pro" },
+        activeTurn: {},
+      });
+      const before = structuredClone(session.state.unsafePeek());
+      const setAppState = vi.fn();
+      const res = await modelCommand.execute(mkctx(session, input, { setAppState }));
+      expect(res).toMatchObject({ kind: "text", text: expect.stringMatching(/blocked:.*[Dd]id you mean 'deepseek-flash'/u) });
+      expect(session.pendingProviderSwitch).toEqual({ provider: "deepseek", model: "deepseek-v4-pro" });
+      expect(session.state.unsafePeek()).toEqual(before);
+      expect(setAppState).not.toHaveBeenCalled();
+      expect(session.abortTerminal).not.toHaveBeenCalled();
+    },
+  );
 
-    const res = await modelCommand.execute(
-      mkctx(session, "private-grok-model"),
-    );
-
+  it("accepts an explicitly qualified custom open-endpoint model", async () => {
+    const session = stubSession({ provider: "grok", model: "grok-4.6" });
+    const res = await modelCommand.execute(mkctx(session, "openai-compatible:private-model"));
     expect(res.kind).toBe("text");
-    expect(
-      (session as unknown as { pendingProviderSwitch: unknown })
-        .pendingProviderSwitch,
-    ).toEqual({ provider: "grok", model: "private-grok-model" });
+    expect(session.pendingProviderSwitch).toEqual({ provider: "openai-compatible", model: "private-model" });
   });
 
-  it("accepts an explicitly qualified private provider model", async () => {
-    const session = stubSession({ provider: "grok", model: "grok-4" });
-
-    const res = await modelCommand.execute(
-      mkctx(session, "openai:private-openai-model"),
-    );
-
-    expect(res.kind).toBe("text");
-    expect(
-      (session as unknown as { pendingProviderSwitch: unknown })
-        .pendingProviderSwitch,
-    ).toEqual({ provider: "openai", model: "private-openai-model" });
+  it("refuses a stale picker selection before staging", async () => {
+    const session = stubSession({ provider: "deepseek", model: "deepseek-flash", reasoningEffort: "high" });
+    const stage = vi.fn();
+    expect(await applyModelSwitch(session, "deepseek-flsh", "deepseek", { stage }))
+      .toMatchObject({ applied: false, model: "deepseek-flash", summary: expect.stringContaining("did you mean 'deepseek-flash'") });
+    expect(stage).not.toHaveBeenCalled();
+    expect(session.pendingProviderSwitch).toBeNull();
   });
 
   it("surfaces ambiguous configured models without staging a switch", async () => {
@@ -510,13 +516,13 @@ describe("modelCommand", () => {
   it("does not let provider-qualified model chrome overwrite pending provider", async () => {
     const session = stubSession({
       provider: "grok",
-      model: "grok-4",
+      model: "grok-4.6",
       activeTurn: null,
     });
     const setModel = vi.fn();
     let appState: unknown = {
-      mainLoopModel: "grok-4",
-      mainLoopModelForSession: "grok-4",
+      mainLoopModel: "grok-4.6",
+      mainLoopModelForSession: "grok-4.6",
     };
     const setAppState = vi.fn((updater: (prev: unknown) => unknown) => {
       appState = updater(appState);
@@ -541,22 +547,22 @@ describe("modelCommand", () => {
   });
 
   it("stages a same-provider command once while updating cosmetic chrome", async () => {
-    const session = stubSession({ provider: "grok", model: "grok-4" });
+    const session = stubSession({ provider: "grok", model: "grok-4.6" });
     const stage = vi.spyOn(session, "setPendingProviderSwitch");
     const setModel = vi.fn();
 
     const result = await modelCommand.execute(
-      mkctx(session, "grok-4-fast", { setModel }),
+      mkctx(session, "grok-4.7", { setModel }),
     );
 
     expect(result.kind).toBe("text");
     expect(stage).toHaveBeenCalledTimes(1);
     expect(stage).toHaveBeenCalledWith({
       provider: "grok",
-      model: "grok-4-fast",
+      model: "grok-4.7",
     });
     expect(setModel).toHaveBeenCalledOnce();
-    expect(setModel).toHaveBeenCalledWith("grok-4-fast");
+    expect(setModel).toHaveBeenCalledWith("grok-4.7");
   });
 
   it.each([
@@ -590,14 +596,14 @@ describe("modelCommand", () => {
   });
 
   it("returns an authoritative daemon rejection without updating chrome", async () => {
-    const session = stubSession({ provider: "grok", model: "grok-4" });
+    const session = stubSession({ provider: "grok", model: "grok-4.6" });
     const summary =
       'Model switch to "gpt-5" blocked: history incompatible with target model';
     Object.assign(session, {
       applyProviderModelSelection: vi.fn(async () => ({
         applied: false,
         provider: "grok",
-        model: "grok-4",
+        model: "grok-4.6",
         summary,
       })),
     });
@@ -617,11 +623,11 @@ describe("modelCommand", () => {
     const abortTerminal = vi.fn();
     const session = stubSession({
       provider: "grok",
-      model: "grok-4",
+      model: "grok-4.6",
       activeTurn: { turnId: "t1" },
       abortTerminal,
     });
-    const res = await modelCommand.execute(mkctx(session, "grok-4-fast"));
+    const res = await modelCommand.execute(mkctx(session, "grok-4.7"));
     expect(res.kind).toBe("text");
     if (res.kind === "text") {
       expect(res.text).toMatch(/staged/);
@@ -633,7 +639,7 @@ describe("modelCommand", () => {
         pendingProviderSwitch: { provider: string; model: string } | null;
       }
     ).pendingProviderSwitch;
-    expect(pending).toEqual({ provider: "grok", model: "grok-4-fast" });
+    expect(pending).toEqual({ provider: "grok", model: "grok-4.7" });
   });
 
   it("blocks the switch when the target model is incompatible with current history", async () => {
@@ -692,32 +698,32 @@ describe("modelCommand", () => {
   it("applyModelSwitch does not invoke abortTerminal when no turn is active", async () => {
     const abortTerminal = vi.fn();
     const session = stubSession({ abortTerminal });
-    await applyModelSwitch(session, "grok-4-fast");
+    await applyModelSwitch(session, "grok-4.7");
     expect(abortTerminal).not.toHaveBeenCalled();
   });
 
   it.each(["model", "provider"] as const)("replaces an accepted pending model when switching back via %s before another turn", async (kind) => {
     const session = stubSession({
-      provider: "grok", model: "grok-4",
-      pendingProviderSwitch: { provider: "grok", model: "grok-4-fast" },
+      provider: "grok", model: "grok-4.6",
+      pendingProviderSwitch: { provider: "grok", model: "grok-4.7" },
     });
     const outcome = kind === "model"
-      ? await applyModelSwitch(session, "grok-4", "grok")
-      : await applyProviderSwitch(session, "grok", "grok-4");
-    expect(outcome).toMatchObject({ applied: true, provider: "grok", model: "grok-4" });
-    expect(session.pendingProviderSwitch).toEqual({ provider: "grok", model: "grok-4" });
+      ? await applyModelSwitch(session, "grok-4.6", "grok")
+      : await applyProviderSwitch(session, "grok", "grok-4.6");
+    expect(outcome).toMatchObject({ applied: true, provider: "grok", model: "grok-4.6" });
+    expect(session.pendingProviderSwitch).toEqual({ provider: "grok", model: "grok-4.6" });
   });
 
   it.each(["model", "provider"] as const)("does not restage an already accepted pending pair via %s", async (kind) => {
     const session = stubSession({
-      provider: "grok", model: "grok-4",
-      pendingProviderSwitch: { provider: "grok", model: "grok-4-fast" },
+      provider: "grok", model: "grok-4.6",
+      pendingProviderSwitch: { provider: "grok", model: "grok-4.7" },
     });
     const stage = vi.fn();
     const outcome = kind === "model"
-      ? await applyModelSwitch(session, "grok-4-fast", "grok", { stage })
-      : await applyProviderSwitch(session, "grok", "grok-4-fast", { stage });
-    expect(outcome).toMatchObject({ applied: false, provider: "grok", model: "grok-4-fast" });
+      ? await applyModelSwitch(session, "grok-4.7", "grok", { stage })
+      : await applyProviderSwitch(session, "grok", "grok-4.7", { stage });
+    expect(outcome).toMatchObject({ applied: false, provider: "grok", model: "grok-4.7" });
     expect(stage).not.toHaveBeenCalled();
   });
 
@@ -1004,7 +1010,7 @@ describe("modelCommand", () => {
       mkctx(
         stubSession({
           provider: "grok",
-          model: "grok-4",
+          model: "grok-4.6",
           configStore,
           providerServiceSelection: {
             provider: "openai",
@@ -1032,7 +1038,7 @@ describe("modelCommand", () => {
       mkctx(
         stubSession({
           provider: "grok",
-          model: "grok-4",
+          model: "grok-4.6",
           providerServiceSelection: { provider: "openai" },
         }),
         "",
@@ -1043,7 +1049,7 @@ describe("modelCommand", () => {
     );
 
     expect(snapshot.provider).toBe("grok");
-    expect(snapshot.currentModel).toBe("grok-4");
+    expect(snapshot.currentModel).toBe("grok-4.6");
   });
 
   it("shows the complete pair staged for the next turn", () => {
@@ -1051,7 +1057,7 @@ describe("modelCommand", () => {
       mkctx(
         stubSession({
           provider: "grok",
-          model: "grok-4",
+          model: "grok-4.6",
           pendingProviderSwitch: { provider: "openai", model: "gpt-5" },
         }),
       ),

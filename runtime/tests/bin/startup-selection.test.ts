@@ -454,3 +454,18 @@ describe("canonical startup ConfigStore layers", () => {
     }
   });
 });
+
+
+describe("startup catalog admission", () => {
+  it("rejects a mistyped launch model with a suggestion", () => {
+    expect(() => resolveCanonicalStartupSelection({ config: {
+      ...defaultConfig(), model_provider: "deepseek", model: "deepseek-flsh",
+    } })).toThrow(/did you mean 'deepseek-flash'/u);
+  });
+
+  it("accepts custom launch models on an open endpoint", () => {
+    expect(resolveCanonicalStartupSelection({ config: {
+      ...defaultConfig(), model_provider: "openai-compatible", model: "private-model",
+    } })).toMatchObject({ provider: "openai-compatible", model: "private-model" });
+  });
+});
