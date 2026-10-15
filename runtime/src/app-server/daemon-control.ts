@@ -8,6 +8,7 @@ import { resolveAgenCDaemonHome, resolveAgenCDaemonPidPath, resolveAgenCDaemonSo
 export { resolveAgenCDaemonHome, resolveAgenCDaemonPidPath, resolveAgenCDaemonSocketPath, resolveAgenCDaemonCookiePath, AGENC_DAEMON_PID_FILENAME, AGENC_DAEMON_COOKIE_FILENAME } from "./daemon-discovery.js";
 /** Canonical daemon lifecycle/control surface. Foreground runtime loads only on run. */
 import { agenCProvisionalAdmissionMessage, observeAgenCSpawnedChildExit, AGENC_DAEMON_PROVISIONAL_ENV } from "./daemon-provisional-admission.js";
+import { findLaunchdDaemonJob, kickstartLaunchdDaemonJob, nodeLaunchdDaemonJobDeps } from "./daemon-launchd-service.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
@@ -317,6 +318,13 @@ export interface AgenCDaemonCliIo {
 }
 
 
+export interface AgenCLaunchdDaemonJobHandle {
+  readonly label: string;
+  /** Run the job now: the pid launchd reports, or why it could not. */
+  kickstart(): { readonly pid: number } | { readonly error: string };
+}
+
+
 export interface AgenCDaemonCliHost {
   readonly env: NodeJS.ProcessEnv;
   readonly userHome: string;
@@ -330,6 +338,11 @@ export interface AgenCDaemonCliHost {
     "runtimeVersion" | "commit" | "buildTime"
   > | null;
   spawnDetachedDaemon(env: NodeJS.ProcessEnv): number;
+  /**
+   * macOS: the loaded user launchd job (install.sh or brew services) that runs
+   * this home's daemon. Starts go through it instead of a detached child.
+   */
+  launchdDaemonJob?(env: NodeJS.ProcessEnv): AgenCLaunchdDaemonJobHandle | null;
   /** Private admission capability; present only on this exact provisional child. */
   admitProvisionalDaemon?(pid: number): Promise<boolean>;
   /** Exact child capability retained only for this detached start invocation. */
@@ -1295,6 +1308,8 @@ export async function startAgenCDaemon(
     | { readonly kind: "provisional-fallback" }
     | { readonly kind: "pending"; readonly pid: number }
     | { readonly kind: "spawned"; readonly pid: number }
+    | { readonly kind: "launchd-started"; readonly pid: number; readonly label: string }
+    | { readonly kind: "launchd-failed"; readonly message: string }
   > => {
     let existingPid = await readAgenCDaemonPid(pidPath);
     const runtimeInfoPath = resolveAgenCDaemonRuntimeInfoPath(dirname(pidPath));
@@ -1485,6 +1500,23 @@ export async function startAgenCDaemon(
         binding: { kind: "legacy", process: untracked.process },
       };
     }
+    const launchdJob = host.launchdDaemonJob?.(host.env) ?? null;
+    if (launchdJob !== null) {
+      // A launchd job with KeepAlive owns this home's daemon. A detached
+      // child here would hold the singleton while launchd respawned its own
+      // copy, which refuses and exits, every few seconds for as long as the
+      // child lives. Let the job start; its foreground admission publishes
+      // the pid once this lock is released.
+      if (options.provisionalStart !== undefined) return { kind: "provisional-fallback" };
+      const started = launchdJob.kickstart();
+      if ("error" in started) {
+        return {
+          kind: "launchd-failed",
+          message: `launchd could not start ${launchdJob.label}: ${started.error}`,
+        };
+      }
+      return { kind: "launchd-started", pid: started.pid, label: launchdJob.label };
+    }
     const childPid = host.spawnDetachedDaemon({
       ...userRuntimeEnvironment(host.env),
       AGENC_DAEMON_RUN: "1",
@@ -1567,9 +1599,24 @@ export async function startAgenCDaemon(
     io.stderr.write(`agenc: refusing daemon start: ${decision.message}\n`);
     return 1;
   }
+  if (decision.kind === "launchd-failed") {
+    io.stderr.write(`agenc: ${decision.message}\n`);
+    return 1;
+  }
+  let targetPid = decision.pid;
+  if (decision.kind === "launchd-started") {
+    // Callers, including the TUI autostart, read the pid file next.
+    const published = await waitForLaunchdDaemonPublication(host, io, pidPath, decision.pid);
+    if (published === null) {
+      io.stderr.write(
+        `agenc: launchd started ${decision.label} (pid ${decision.pid}), but no daemon published its pid before timeout\n`,
+      );
+      return 1;
+    }
+    targetPid = published;
+  }
   if (options.deferDaemonReadyWaitToCaller === true) return 0;
 
-  const targetPid = decision.pid;
   const waitForReady =
     options.waitForDaemonReady ?? defaultWaitForAgenCDaemonReady;
   let ready = await waitForReady(host, false);
@@ -1637,7 +1684,11 @@ export async function startAgenCDaemon(
     }
     return 1;
   }
-  if (decision.kind === "pending" || decision.kind === "spawned") {
+  if (
+    decision.kind === "pending" ||
+    decision.kind === "spawned" ||
+    decision.kind === "launchd-started"
+  ) {
     try {
       // Socket listen precedes the foreground child's sidecar/final-pid
       // commit. Wait through its lifecycle transaction before authenticating
@@ -1710,9 +1761,53 @@ export async function startAgenCDaemon(
   io.stdout.write(
     decision.kind === "spawned"
       ? `AgenC daemon started (pid ${targetPid})\n`
-      : `AgenC daemon already running (pid ${targetPid})\n`,
+      : decision.kind === "launchd-started"
+        ? `AgenC daemon started by launchd ${decision.label} (pid ${targetPid})\n`
+        : `AgenC daemon already running (pid ${targetPid})\n`,
   );
   return 0;
+}
+
+
+/**
+ * Wait for the daemon a launchd kickstart started to publish its pid. With no
+ * detached parent to publish a provisional pid, it writes daemon.pid only at
+ * readiness, which a large home can take minutes to reach. Past the readiness
+ * budget, keep waiting while its startup log advances, as a detached start
+ * does. Another daemon may win admission first; its live pid is just as good.
+ */
+async function waitForLaunchdDaemonPublication(
+  host: AgenCDaemonCliHost,
+  io: AgenCDaemonCliIo,
+  pidPath: string,
+  launchedPid: number,
+): Promise<number | null> {
+  const startedAt = Date.now();
+  const budgetMs = resolveAgenCDaemonReadyTimeoutMs(host.env);
+  const maxWaitMs = Math.max(budgetMs, resolveAgenCDaemonStartMaxWaitMs(host.env));
+  let launchedExitedAt: number | null = null;
+  let reportedSlowStart = false;
+  while (Date.now() - startedAt < maxWaitMs) {
+    const published = await readAgenCDaemonPid(pidPath);
+    if (published !== null && host.isPidRunning(published)) return published;
+    if (!host.isPidRunning(launchedPid)) {
+      // A launch that lost admission exits; the winner publishes right after.
+      launchedExitedAt ??= Date.now();
+      if (Date.now() - launchedExitedAt > 2_000) return null;
+    } else if (Date.now() - startedAt > budgetMs) {
+      const ageMs = daemonStartupLogAgeMs(host);
+      if (ageMs === undefined || ageMs > budgetMs) return null;
+      if (!reportedSlowStart) {
+        reportedSlowStart = true;
+        io.stderr.write(
+          `agenc: daemon process (pid ${launchedPid}) is still starting; its ` +
+            `startup log advanced ${Math.round(ageMs / 1000)} s ago, waiting\n`,
+        );
+      }
+    }
+    await host.sleep(DEFAULT_DAEMON_READY_POLL_MS * 4);
+  }
+  return null;
 }
 
 
@@ -3191,6 +3286,17 @@ export function createNodeDaemonCliHost(
     pid: process.pid,
     platform: process.platform,
     ...(startupGuardReceiver === undefined ? {} : { startupGuardReceiver }),
+    ...(process.platform === "darwin"
+      ? {
+          launchdDaemonJob: (env: NodeJS.ProcessEnv) => {
+            const deps = nodeLaunchdDaemonJobDeps();
+            const job = findLaunchdDaemonJob(resolveAgenCDaemonHome(env, userHome), deps);
+            return job === null
+              ? null
+              : { label: job.label, kickstart: () => kickstartLaunchdDaemonJob(job, deps) };
+          },
+        }
+      : {}),
     spawnDetachedDaemon: (env) => {
       const daemonHome = resolveAgenCDaemonHome(env, userHome);
       // The child works from its home, never from this caller's directory,
