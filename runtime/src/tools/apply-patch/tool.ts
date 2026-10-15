@@ -192,7 +192,7 @@ export function createApplyPatchTool(config: ApplyPatchToolConfig): Tool {
       if (!patch) return { code: "invalid_patch", message: "input must be a non-empty string" };
       try {
         const hunks = parsePatch(patch).hunks;
-        return unreadFilePreflight(args, hunks.flatMap(hunk => pathsForHunk(hunk).map(target => target.path)), config.cwd);
+        return unreadFilePreflight(args, hunks.flatMap(hunk => pathsForHunk(hunk).map(target => target.path)), config.cwd, allowedPaths);
       } catch (error) {
         return { code: "invalid_patch", message: error instanceof Error ? error.message : String(error) };
       }

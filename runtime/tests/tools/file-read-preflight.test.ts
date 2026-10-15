@@ -109,12 +109,10 @@ test.each(["Edit", "MultiEdit", "Write", "apply_patch"])("%s keeps its execute-t
   expect(result.content).toContain(join(root, "a.txt"));
   expect(await readFile(join(root, "a.txt"), "utf8")).toBe("old\n");
 });
-test("an unread file outside the closure roots is rejected before a widening approval", async () => {
+test("an unread file outside the closure roots defers to permission arbitration", () => {
   const { args } = toolCase("Edit");
   const tool = createFileEditTool({ allowedPaths: [join(root, "subdir")] });
-  const { result, resolver } = await dispatch(tool, { ...args, file_path: join(root, "a.txt") }, "model");
-  expect(result.isError).toBe(true);
-  expect(resolver.request).not.toHaveBeenCalled();
+  expect(tool.preflight?.(withSignedSessionId({ ...args, file_path: join(root, "a.txt") }, sessionId))).toBeNull();
 });
 test("model-supplied session identity cannot borrow another session's read", async () => {
   recordSessionRead("other", join(root, "a.txt"), { content: "old\n", timestamp: Date.now(), viewKind: "full" });

@@ -334,7 +334,7 @@ export function createFileWriteTool(config: FileWriteToolConfig = {}): Tool {
     preflight(args) {
       const filePath = asNonEmptyString(args.file_path);
       if (!filePath) return { code: "invalid_write", message: "file_path must be a non-empty string" };
-      return unreadFilePreflight(args, [filePath], allowedPaths[0] ?? process.cwd());
+      return unreadFilePreflight(args, [filePath], allowedPaths[0] ?? process.cwd(), allowedPaths);
     },
     checkPermissions(input, context) {
       const args = input as FileWriteToolInput;
