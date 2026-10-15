@@ -80,13 +80,27 @@ describe("Browser tool when no browser executable can be resolved", () => {
     expect(result.effectDisposition?.disposition).not.toBe("confirmed_no_effect");
   });
 
-  it("does not claim no effect when the browser launch itself failed", async () => {
+  it("reports no effect when launch fails before a page action and cleanup succeeds", async () => {
     seam.launches.mockRejectedValueOnce(new Error("injected launch failure"));
 
     const result = await navigateWith(managerFor(process.execPath));
 
     expect(result.isError).toBe(true);
     expect(seam.launches).toHaveBeenCalledOnce();
+    expect(result.effectDisposition).toMatchObject({
+      disposition: "confirmed_no_effect",
+      evidenceKind: "boundary_not_crossed",
+      evidenceRef: "tool:Browser:launch-before-page-action",
+    });
+  });
+
+  it("keeps a launch failure unknown if stopping its proxy fails", async () => {
+    seam.launches.mockRejectedValueOnce(new Error("injected launch failure"));
+    seam.stops.mockRejectedValueOnce(new Error("injected proxy cleanup failure"));
+
+    const result = await navigateWith(managerFor(process.execPath));
+
+    expect(result.content).toContain("browser launch cleanup failed");
     expect(result.effectDisposition?.disposition).not.toBe("confirmed_no_effect");
   });
 
