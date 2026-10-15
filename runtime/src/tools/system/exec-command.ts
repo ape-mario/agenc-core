@@ -1,7 +1,5 @@
-import { constants as fsConstants, existsSync, realpathSync, statSync } from "node:fs";
-import type { Dirent, Stats } from "node:fs";
-import { lstat, open, readdir } from "node:fs/promises";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
 
 import type { Tool, ToolExecutionInjectedArgs, ToolPreflightFailure, ToolResult } from "../types.js";
 import { safeStringify } from "../types.js";
@@ -15,7 +13,8 @@ import {
   shellWorkspaceMutationPermission,
 } from "./shell-mutation-permission.js";
 import { preflightShellWorkspaceWritePolicy } from "./shell-preflight.js";
-import { recordSessionRead, resolveSessionId, safePathAllowingSessionPlanFile } from "./filesystem.js";
+import { recordSessionRead, resolveSessionId } from "./filesystem.js";
+import { rememberPrintedOutput, stableWorkspaceText } from "./printed-read-proof.js";
 import type { BashToolConfig } from "./types.js";
 import { UnifiedExecError } from "../../unified-exec/types.js";
 import { UnifiedExecProcessManager } from "../../unified-exec/process-manager.js";
@@ -90,7 +89,6 @@ const PLAIN_INTERACTIVE_SHELL_RE =
  */
 export const LIGHT_DEFAULT_EXEC_YIELD_TIME_MS = 30_000;
 
-const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
 const PATH_ARG = /^[A-Za-z0-9_./@+-]+$/u;
 
 /**
@@ -338,65 +336,6 @@ function numberedRun(stdout: string, lines: readonly string[]): { readonly start
   return best;
 }
 
-/** Largest file the optional read proof will snapshot. */
-const READ_PROOF_MAX_BYTES = 2 * 1024 * 1024;
-
-/**
- * One snapshot bound to the opened object: nonblocking and without following a swapped-in symlink,
- * so a path replaced by a FIFO or device after the command cannot hold the finished exec waiting;
- * only a bounded regular file is read.
- */
-async function regularFileSnapshot(path: string) {
-  const handle = await open(path, fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0) | (fsConstants.O_NOFOLLOW ?? 0));
-  try {
-    const stats = await handle.stat();
-    if (!stats.isFile() || stats.size === 0 || stats.size > READ_PROOF_MAX_BYTES) return undefined;
-    // Read at most the stat size plus one byte, so a file that grows after the stat is never read
-    // past the bound; any extra byte rejects the snapshot.
-    const buffer = Buffer.alloc(stats.size + 1);
-    let filled = 0;
-    while (filled < buffer.length) {
-      const { bytesRead } = await handle.read(buffer, filled, buffer.length - filled, filled);
-      if (bytesRead === 0) break;
-      filled += bytesRead;
-    }
-    if (filled !== stats.size) return undefined;
-    return { bytes: buffer.subarray(0, filled), stats };
-  } finally {
-    await handle.close();
-  }
-}
-
-/**
- * Current text of a workspace file from two snapshots that must agree on bytes, size, mtime, ctime,
- * inode and device, so the recorded mtime belongs to bytes that held across the window; a later
- * change shows as a newer mtime, which the gate refuses as stale.
- */
-async function stableWorkspaceText(
-  path: string,
-  allowedPaths: readonly string[],
-  args: Record<string, unknown>,
-): Promise<{ readonly canonical: string; readonly text: string; readonly mtimeMs: number } | undefined> {
-  const safe = await safePathAllowingSessionPlanFile(path, allowedPaths, args);
-  if (!safe.safe) return undefined;
-  try {
-    const first = await regularFileSnapshot(safe.resolved);
-    if (first === undefined) return undefined;
-    const second = await regularFileSnapshot(safe.resolved);
-    if (
-      second === undefined || !first.bytes.equals(second.bytes) || first.bytes.length !== first.stats.size ||
-      first.stats.size !== second.stats.size || first.stats.mtimeMs !== second.stats.mtimeMs ||
-      first.stats.ctimeMs !== second.stats.ctimeMs || first.stats.ino !== second.stats.ino ||
-      first.stats.dev !== second.stats.dev || first.bytes.includes(0)
-    ) return undefined;
-    // Strict decoding: distinct invalid byte sequences would otherwise compare equal as U+FFFD.
-    const text = STRICT_UTF8.decode(first.bytes);
-    if (text.includes("�")) return undefined;
-    return { canonical: safe.resolved, text, mtimeMs: first.stats.mtimeMs };
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * Light records the reads a model makes through the shell for the read-before-write gate: a `cat`
@@ -459,265 +398,6 @@ export async function recordShellReads(params: {
         ? { content: lines.join("\n"), timestamp: file.mtimeMs, viewKind: "full", rawContent: file.text }
         : { content: shown, timestamp: file.mtimeMs, viewKind: "partial", readOffset: step.start, readLimit: step.end - step.start + 1 });
     }
-  }
-}
-/** Bounds for {@link recordPrintedFileReads}: candidate files, glob matches and checked output. */
-const PRINTED_READ_MAX_CANDIDATES = 32;
-const PRINTED_READ_MAX_GLOB_MATCHES = 64;
-/** Files and directories one named directory may add: a loop over `find dir -type f` names no file. */
-const PRINTED_READ_MAX_DIRECTORY_FILES = 64;
-const PRINTED_READ_MAX_DIRECTORY_VISITS = 64;
-const PRINTED_READ_DIRECTORY_DEPTH = 4;
-const PRINTED_READ_MAX_OUTPUT_CHARS = 4 * 1024 * 1024;
-/** Shorter text could appear in output by coincidence (an echo, a test name), so it proves nothing. */
-const PRINTED_READ_MIN_BYTES = 64;
-/**
- * The largest model-facing exec result that reaches the model unchanged. The tool-result pipeline
- * caps or offloads a result above its effective cap (tools/execution.ts computeEffectiveMaxResultBytes),
- * which never drops below MIN_TOOL_RESULT_BYTES; exec_command declares no lower per-tool cap.
- */
-export const PRINTED_READ_MAX_VISIBLE_BYTES = 16_000;
-/** C0 controls other than tab, newline and carriage return; a later display filter may drop them. */
-const PRINTED_READ_CONTROL = /[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
-const PRINTED_READ_GLOB = /[*?[]/u;
-
-/**
- * The command's words outside quotes. A word with any quoted part is dropped: text a command prints
- * from a quoted argument (`printf '...; cat a.js'`) never names a file it read.
- */
-function unquotedWords(cmd: string): string[] {
-  const words: string[] = [];
-  let word = "";
-  let tainted = false;
-  const end = (): void => {
-    if (word.length > 0 && !tainted && word.length <= 1024) words.push(word);
-    word = "";
-    tainted = false;
-  };
-  for (let i = 0; i < cmd.length; i += 1) {
-    const ch = cmd[i]!;
-    if (ch === "'" || ch === "\"" || ch === "`") {
-      const close = cmd.indexOf(ch, i + 1);
-      if (close < 0) return words;
-      tainted = true;
-      i = close;
-    } else if (ch === "\\") {
-      tainted = true;
-      i += 1;
-    } else if (/[\s;&|()<>]/u.test(ch)) {
-      end();
-    } else {
-      word += ch;
-    }
-  }
-  end();
-  return words;
-}
-
-/** Whether `needle` occurs in `haystack` starting at the start of a line. */
-function includesAtLineStart(haystack: string, needle: string): boolean {
-  for (let at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + 1)) {
-    if (at === 0 || haystack[at - 1] === "\n") return true;
-  }
-  return false;
-}
-
-/** `cat -n` rendering of a whole file: six-column right-aligned number, a tab, the line. */
-function catNumbered(text: string): string {
-  const lines = text.split("\n");
-  if (lines.at(-1) === "") lines.pop();
-  return lines.map((line, index) => `${String(index + 1).padStart(6, " ")}\t${line}`).join("\n");
-}
-
-function globSegmentPattern(segment: string): RegExp | undefined {
-  let source = "";
-  for (let i = 0; i < segment.length; i += 1) {
-    const ch = segment[i]!;
-    if (ch === "*") {
-      source += "[^/]*";
-      while (segment[i + 1] === "*") i += 1;
-    } else if (ch === "?") {
-      source += "[^/]";
-    } else if (ch === "[") {
-      const close = segment.indexOf("]", i + 2);
-      if (close < 0) return undefined;
-      const body = segment.slice(i + 1, close).replace(/^!/u, "^").replace(/\\/gu, "\\\\");
-      source += `[${body}]`;
-      i = close;
-    } else {
-      source += ch.replace(/[.+^${}()|\\]/gu, "\\$&");
-    }
-  }
-  try {
-    return new RegExp(`^${source}$`, "u");
-  } catch {
-    return undefined;
-  }
-}
-
-function insideAnyRoot(path: string, roots: readonly string[]): boolean {
-  return roots.some((root) => {
-    const tail = relative(root, path);
-    return tail === "" || (tail !== ".." && !tail.startsWith(`..${sep}`) && !isAbsolute(tail));
-  });
-}
-
-/** Expand a glob word the way sh does without globstar (`**` acts as `*`), inside the roots only. */
-async function expandWorkspaceGlob(word: string, base: string, roots: readonly string[]): Promise<string[]> {
-  let dirs = [isAbsolute(word) ? "/" : base];
-  const segments = word.split("/").filter((segment, index) => segment.length > 0 || index === 0);
-  for (const segment of segments) {
-    if (segment.length === 0) continue;
-    const next: string[] = [];
-    if (!PRINTED_READ_GLOB.test(segment)) {
-      for (const dir of dirs) next.push(join(dir, segment));
-    } else {
-      const pattern = globSegmentPattern(segment);
-      if (pattern === undefined) return [];
-      for (const dir of dirs) {
-        if (!insideAnyRoot(dir, roots)) continue;
-        let names: string[];
-        try {
-          names = await readdir(dir);
-        } catch {
-          continue;
-        }
-        for (const name of names.sort()) {
-          if (name.startsWith(".") && !segment.startsWith(".")) continue;
-          if (pattern.test(name)) next.push(join(dir, name));
-          if (next.length >= PRINTED_READ_MAX_GLOB_MATCHES) break;
-        }
-      }
-    }
-    dirs = next;
-    if (dirs.length === 0) return [];
-  }
-  return dirs;
-}
-
-/**
- * Regular files under `dir`, breadth first in name order, at most {@link PRINTED_READ_DIRECTORY_DEPTH}
- * levels deep, skipping hidden entries and node_modules and never leaving the roots.
- */
-async function filesUnderDirectory(dir: string, roots: readonly string[], limit: number): Promise<string[]> {
-  const files: string[] = [];
-  let level = [dir];
-  let visits = 0;
-  for (let depth = 0; depth < PRINTED_READ_DIRECTORY_DEPTH && level.length > 0; depth += 1) {
-    const next: string[] = [];
-    for (const current of level) {
-      if (visits >= PRINTED_READ_MAX_DIRECTORY_VISITS || !insideAnyRoot(current, roots)) continue;
-      visits += 1;
-      let entries: Dirent[];
-      try {
-        entries = await readdir(current, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-      for (const entry of entries) {
-        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
-        if (entry.isFile()) {
-          files.push(join(current, entry.name));
-          if (files.length >= limit) return files;
-        } else if (entry.isDirectory()) {
-          next.push(join(current, entry.name));
-        }
-      }
-    }
-    level = next;
-  }
-  return files;
-}
-
-/**
- * Standard sessions count a workspace file as read when the command printed its exact current
- * text, raw or as `cat -n` prints it, from the start of a line, whatever shell construct printed it
- * (a `for` loop over a glob or over `find`, a `cd` chain, `cat -n`). The model has then seen the current text, which is what the read-before-write
- * gate asks for; without this, a file read with the shell had its first edit refused and the model
- * paid a FileRead round trip and a resent edit. Candidates are the workspace files the command names
- * outside quotes (path words, globs expanded in the working directory and in every `cd` target) and
- * the files under a directory it names; a file found only through its directory also needs its path
- * or name in the output, as the header a printing loop writes before each file. A file shorter than
- * 64 bytes never counts, since its text can appear by coincidence. Only a shell
- * that exited on its own, untruncated and with no live session, is checked; snapshots and their bounds
- * are the ones {@link recordShellReads} uses. Light keeps its stricter parser of executed read steps.
- */
-export async function recordPrintedFileReads(params: {
-  readonly cmd: string;
-  readonly output: ExecCommandToolOutput;
-  /** The exact text exec_command returns to the model for this call. */
-  readonly visible: string;
-  readonly cwd: string;
-  readonly allowedPaths: readonly string[];
-  readonly args: Record<string, unknown>;
-}): Promise<void> {
-  const { output, visible } = params;
-  // A head-and-tail cut (max_output_tokens, explicit or default) sets truncated; a later cap or offload
-  // never touches a result this small. Either way the model would not see the whole file.
-  if (output.exitCode === null || output.truncated || output.timedOut || output.session_id !== undefined) return;
-  if (output.stdout.length === 0 || visible.length > PRINTED_READ_MAX_OUTPUT_CHARS) return;
-  if (Buffer.byteLength(visible, "utf8") > PRINTED_READ_MAX_VISIBLE_BYTES) return;
-  const sessionId = resolveSessionId(params.args);
-  if (sessionId === undefined) return;
-  const roots = params.allowedPaths.map((root) => resolve(root));
-  const words = unquotedWords(params.cmd);
-  const bases = [resolve(params.cwd)];
-  words.forEach((word, index) => {
-    const target = words[index + 1];
-    if (word === "cd" && target !== undefined && !target.includes("$") && !PRINTED_READ_GLOB.test(target)) {
-      const dir = resolve(params.cwd, target);
-      if (!bases.includes(dir)) bases.push(dir);
-    }
-  });
-  const candidates = new Set<string>();
-  const directoryFiles = new Set<string>();
-  for (const word of words) {
-    if (candidates.size >= PRINTED_READ_MAX_CANDIDATES) break;
-    if (word.startsWith("-") || word.includes("$") || word.includes("=")) continue;
-    for (const base of isAbsolute(word) ? [bases[0]!] : bases) {
-      if (PRINTED_READ_GLOB.test(word)) {
-        for (const path of await expandWorkspaceGlob(word, base, roots)) {
-          if (candidates.size >= PRINTED_READ_MAX_CANDIDATES) break;
-          if (insideAnyRoot(path, roots)) candidates.add(path);
-        }
-        continue;
-      }
-      const path = resolve(base, word);
-      if (!insideAnyRoot(path, roots)) continue;
-      let entry: Stats | undefined;
-      try {
-        entry = await lstat(path);
-      } catch {
-        entry = undefined;
-      }
-      if (entry?.isFile() === true) {
-        candidates.add(path);
-      } else if (entry?.isDirectory() === true && directoryFiles.size < PRINTED_READ_MAX_DIRECTORY_FILES) {
-        const room = PRINTED_READ_MAX_DIRECTORY_FILES - directoryFiles.size;
-        for (const file of await filesUnderDirectory(path, roots, room)) directoryFiles.add(file);
-      }
-    }
-  }
-  const shown = visible.replace(/\r\n/gu, "\n");
-  for (const file of directoryFiles) {
-    if (candidates.has(file)) continue;
-    const named = shown.includes(file) || shown.includes(basename(file)) ||
-      bases.some((base) => shown.includes(relative(base, file)));
-    if (named) candidates.add(file);
-  }
-  for (const path of candidates) {
-    const file = await stableWorkspaceText(path, params.allowedPaths, params.args);
-    if (file === undefined || Buffer.byteLength(file.text.trim(), "utf8") < PRINTED_READ_MIN_BYTES) continue;
-    if (PRINTED_READ_CONTROL.test(file.text)) continue;
-    const text = file.text.replace(/\r\n/gu, "\n");
-    if (!includesAtLineStart(shown, text) && !includesAtLineStart(shown, catNumbered(text))) continue;
-    recordSessionRead(sessionId, file.canonical, {
-      content: file.text.split(/\r?\n/u).join("\n"),
-      timestamp: file.mtimeMs,
-      viewKind: "full",
-      rawContent: file.text,
-    });
   }
 }
 const MCP_TOOL_NAME_RE = /\bmcp\.[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+\b/u;
@@ -1612,12 +1292,11 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
         }
         const execContent = formatUnifiedExecToolContent(output, config?.lightMode === true);
         if (config?.lightMode !== true && !detach && tty !== true) {
-          await recordPrintedFileReads({
+          rememberPrintedOutput({
             cmd,
             output,
             visible: execContent,
             cwd: effectiveWorkdir ?? config?.cwd ?? process.cwd(),
-            allowedPaths: config?.allowedPaths ?? (config?.cwd !== undefined ? [config.cwd] : []),
             args: args as Record<string, unknown>,
           });
         }
