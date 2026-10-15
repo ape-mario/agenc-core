@@ -316,7 +316,16 @@ describe("dispatchSlashCommand", () => {
     );
     expect(out.result).toEqual({
       kind: "error",
-      message: "Unknown command: /does-not-exist",
+      message: "Unknown command: /does-not-exist. Run /help to see available commands.",
+    });
+  });
+
+  it("points a mistyped command to the available command help", async () => {
+    const out = await dispatchSlashCommand(
+      { name: "hepl", argsRaw: "", isMcp: false }, stubCtx(), registry,
+    );
+    expect(out.result).toEqual({
+      kind: "error", message: "Unknown command: /hepl. Run /help to see available commands.",
     });
   });
 
@@ -360,7 +369,7 @@ describe("dispatchSlashCommand", () => {
 
     expect(out.result).toEqual({
       kind: "error",
-      message: "Unknown command: /review-pr",
+      message: "Unknown command: /review-pr. Run /help to see available commands.",
     });
     expect(out.trace.name).toBe("review-pr");
   });
@@ -391,7 +400,7 @@ describe("dispatchSlashCommand", () => {
 
     expect(out.result).toEqual({
       kind: "error",
-      message: "Unknown command: /hidden",
+      message: "Unknown command: /hidden. Run /help to see available commands.",
     });
     expect(resolveSkill).not.toHaveBeenCalled();
   });

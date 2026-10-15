@@ -668,7 +668,7 @@ describe("AgenC command surface compatibility", () => {
 
     expect(outcome.result).toEqual({
       kind: "error",
-      message: "Unknown command: /project-skill",
+      message: "Unknown command: /project-skill. Run /help to see available commands.",
     });
   });
 
