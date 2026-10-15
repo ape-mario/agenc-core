@@ -316,6 +316,12 @@ export class ModelMetadataResolver {
       return this.finalize(params, live, "live_endpoint", false);
     }
 
+    // A failed proxy refresh does not require public catalog lookups for a
+    // DeepSeek model whose limits are already registered locally.
+    if (normalizeMetadataProviderIdentity(params.provider) === "deepseek" && hasAnyMetadata(builtIn)) {
+      return this.finalize(params, builtIn, "built_in_heuristic", false);
+    }
+
     const openrouter = await this.resolveOpenRouterMetadata(params);
     if (hasAnyMetadata(openrouter)) {
       return this.finalize(params, openrouter, "openrouter_registry", false);
