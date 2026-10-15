@@ -2303,6 +2303,34 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     }); } finally { fullscreenProbe.fullscreen = false; }
   });
 
+  test("keeps a daemon startup rejection visible and retries the restored draft", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    resetShellSurfaceProbe();
+    const failure = "Cannot start daemon session: protected directory chain permits untrusted mutation: /private/home. Fix the cause, run agenc daemon start in another shell, then press Enter to retry.";
+    const session = {
+      ...createSession(),
+      submit: vi.fn(async (_message: string, _options?: unknown) => {
+        if (session.submit.mock.calls.length <= 2) throw new Error(failure);
+      }),
+    };
+    const helpers = { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() };
+    await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
+      const send = () => (providerProbe.promptProps.at(-1)!.onSubmit as (value: string, submitHelpers: typeof helpers) => Promise<void>)("retry after repair", helpers);
+      await send();
+      await vi.waitFor(() => expect(providerProbe.promptProps.at(-1)).toMatchObject({ input: "retry after repair", draftRestoreRevision: 1, isLoading: false }));
+      await new Promise(resolve => setTimeout(resolve, 3200));
+      // Inspect the live tool surface after the old three-second timeout.
+      const surface = providerProbe.messageProps.at(-1)?.toolJSX as { jsx?: React.ReactElement<{ children: React.ReactElement<{ children: string }> }> } | null;
+      expect(surface?.jsx?.props.children.props.children).toContain("agenc daemon start");
+      await send();
+      await vi.waitFor(() => expect(providerProbe.promptProps.at(-1)).toMatchObject({ input: "retry after repair", draftRestoreRevision: 2, isLoading: false }));
+      await send();
+      await vi.waitFor(() => expect(providerProbe.promptProps.at(-1)).toMatchObject({ input: "", isLoading: false }));
+      expect(session.submit).toHaveBeenCalledTimes(3);
+      expect(session.submit.mock.calls[2]).toEqual(session.submit.mock.calls[0]);
+    });
+  });
+
   test("restores a rejected draft without resetting the cursor, also when a busy retry is refused", async () => {
     const { AgenCTuiApp } = await import("./App.js");
     resetShellSurfaceProbe();

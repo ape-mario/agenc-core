@@ -1809,6 +1809,12 @@ async function createDeferredDaemonPromptTuiSession(params: {
             ? { permissionMode: pendingPermissionMode }
             : {}),
           metadata: { mode: "tui" },
+        }).catch((error: unknown) => {
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(
+            `Cannot start daemon session: ${reason}. Fix the cause, run agenc daemon start in another shell, then press Enter to retry.`,
+            { cause: error },
+          );
         });
         startedAgentId = started.agentId;
         if (deferredSessionClosed) {

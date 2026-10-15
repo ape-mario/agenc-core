@@ -187,7 +187,7 @@ const daemonAutostartFailedNotice: StatusNoticeDefinition = {
   type: 'error',
   isActive: context => Boolean(context.daemonStatus.autostartFailure),
   render: context => {
-    return `AgenC daemon autostart failed: ${context.daemonStatus.autostartFailure}. Background agents and reconnectable sessions are unavailable. · agenc daemon start`;
+    return `AgenC daemon autostart failed: ${context.daemonStatus.autostartFailure}. Fix the cause, run agenc daemon start in another shell, then press Enter to retry.`;
   }
 };
 const jetbrainsPluginNotice: StatusNoticeDefinition = {
