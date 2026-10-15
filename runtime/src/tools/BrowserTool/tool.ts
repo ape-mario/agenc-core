@@ -577,8 +577,8 @@ export function createBrowserTool(
         const result = errorResult(`Browser action failed: ${message}`);
         const noEffect = readEffectBoundaryNotCrossed(err, new Date().toISOString());
         if (noEffect !== undefined) {
-          // The manager branded this error: no browser was launched and the
-          // attempt's proxy is stopped, so the action provably had no effect.
+          // The manager proved no page action started and launch cleanup
+          // completed, or refused the action before touching a page.
           return {
             ...result,
             effectDisposition: {
