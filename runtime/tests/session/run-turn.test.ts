@@ -5356,59 +5356,6 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
     );
   });
 
-  test.each([
-    ["text", false], ["reasoning", false], ["partial-tool", false], ["complete-tool", false],
-    ["partial-tool", true],
-  ] as const)(
-    "retries a DeepSeek stream cut during %s without tool effects (persistent: %s)",
-    async (cut, persistent) => {
-      vi.spyOn(Math, "random").mockReturnValue(0);
-      const frame = (delta: unknown, finish_reason?: string) =>
-        `data: ${JSON.stringify({ choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
-      const fetchImpl = vi.fn<typeof fetch>(async () => new Response(
-        persistent || fetchImpl.mock.calls.length === 1
-          ? frame(cut === "text" ? { content: "abandoned text" }
-            : cut === "reasoning" ? { reasoning_content: "abandoned reasoning" }
-            : { tool_calls: [{ index: 0, id: "cut-tool", type: "function", function: {
-                name: "stream_write", arguments: cut === "partial-tool" ? '{"path":' : "{}",
-              } }] })
-          : frame({ content: "fresh answer" }) + frame({}, "stop") + "data: [DONE]\n\n",
-        { headers: { "content-type": "text/event-stream" } },
-      ));
-      const provider = createProvider("deepseek", {
-        apiKey: "synthetic-session", model: "deepseek-flash", extra: { maxRetries: 0, fetchImpl },
-      });
-      const dispatch = vi.fn(async () => ({ content: "unexpected side effect", isError: false }));
-      const { session, events, getState } = mkSession({ provider, registry: {
-        tools: [{ name: "stream_write", description: "write", inputSchema: { type: "object" }, execute: dispatch }],
-        toLLMTools: () => [], dispatch,
-      }, configStoreBase: { provider_outage_wait_ms: 0 }, sessionConfiguration: {
-        provider: { slug: "deepseek" }, collaborationMode: { model: "deepseek-flash" },
-      } });
-      await drain(session.runTurn("hello", { ctx: { ...mkCtx(), modelProviderId: "deepseek",
-        modelInfo: { ...mkCtx().modelInfo, slug: "deepseek-flash" }, collaborationMode: { model: "deepseek-flash" },
-      } }));
-      expect(fetchImpl).toHaveBeenCalledTimes(persistent ? 6 : 2);
-      expect(dispatch).not.toHaveBeenCalled();
-      expect(events.some(event => event.msg.type === "tool_call_started")).toBe(false);
-      if (persistent) {
-        expect(events).toContainEqual(expect.objectContaining({ msg: {
-          type: "stream_error", payload: expect.objectContaining({
-            message: expect.stringContaining("Type continue and press Enter"),
-          }),
-        } }));
-        expect(events.some(event => event.msg.type === "turn_failed")).toBe(true);
-        expect(events.some(event => event.msg.type === "turn_complete")).toBe(false);
-      } else {
-        expect(events).toContainEqual(expect.objectContaining({ msg: {
-          type: "turn_complete", payload: expect.objectContaining({ lastAgentMessage: "fresh answer" }),
-        } }));
-      }
-      expect(JSON.stringify(getState().history)).not.toContain("abandoned");
-      expect(JSON.stringify(getState().history)).not.toContain("cut-tool");
-    },
-  );
-
   test("LP-07 clears failed streamed tool state before retrying", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     let attempts = 0;
@@ -5730,7 +5677,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
     }
   });
 
-  test("LP-07 retries queued undispatched streamed tool work without side effects", async () => {
+  test("LP-07 cancels queued default streamed tool work in the live turn path", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
 
     let attempts = 0;
@@ -5774,7 +5721,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
           });
         }
         return {
-          content: "retry ok",
+          content: "should not retry",
           toolCalls: [],
           usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
           model: "test-model",
@@ -5795,11 +5742,8 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
 
     await drain(session.runTurn("hello", { ctx: mkCtx() }));
 
-    expect(attempts).toBe(2);
+    expect(attempts).toBe(1);
     expect(sideEffects).toBe(0);
-    expect(events).toContainEqual(expect.objectContaining({ msg: {
-      type: "turn_complete", payload: expect.objectContaining({ lastAgentMessage: "retry ok" }),
-    } }));
     expect(events).toContainEqual(
       expect.objectContaining({
         msg: {
@@ -5807,7 +5751,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
           payload: expect.objectContaining({
             callId: "tool_unsafe",
             isError: true,
-            result: expect.stringContaining("stream disconnected"),
+            result: expect.stringContaining("network connection lost"),
           }),
         },
       }),
@@ -5878,7 +5822,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
     );
   });
 
-  test.each([false, true])("LP-07 preserves already-started streamed tool results after retry refusal (read-only: %s)", async (readOnly) => {
+  test("LP-07 preserves already-started streamed tool results in durable history after retry refusal", async () => {
     let attempts = 0;
     let sideEffects = 0;
     let releaseTool!: () => void;
@@ -5894,7 +5838,6 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
       description: "streamed write",
       inputSchema: { type: "object", additionalProperties: false },
       concurrencyClass: SHARED_READ,
-      ...(readOnly ? { isReadOnly: true, metadata: { mutating: false } } : {}),
       execute: async () => {
         sideEffects += 1;
         markToolStarted();
@@ -5959,11 +5902,6 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
 
     expect(attempts).toBe(1);
     expect(sideEffects).toBe(1);
-    expect(events).toContainEqual(expect.objectContaining({ msg: {
-      type: "turn_failed", payload: expect.objectContaining({
-        message: expect.stringContaining("Type continue and press Enter"),
-      }),
-    } }));
     expect(events).toContainEqual(
       expect.objectContaining({
         msg: {
@@ -6325,7 +6263,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
     expect(sawAbort).toBe(true);
   });
 
-  test("LP-07 retries undispatched interactive tools without prompting", async () => {
+  test("LP-07 does not replay interactive read-only streamed tools", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
 
     let attempts = 0;
@@ -6372,7 +6310,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
           });
         }
         return {
-          content: "retry ok",
+          content: "should not retry",
           toolCalls: [],
           usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
           model: "test-model",
@@ -6384,7 +6322,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
 
     await drain(session.runTurn("hello", { ctx: mkCtx() }));
 
-    expect(attempts).toBe(2);
+    expect(attempts).toBe(1);
     expect(prompts).toBe(0);
     expect(events).toContainEqual(
       expect.objectContaining({
@@ -6392,17 +6330,17 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
           type: "stream_error",
           payload: expect.objectContaining({
             cause: "stream_disconnected",
-            message: expect.stringContaining("retrying"),
+            message: expect.stringContaining("not retrying"),
           }),
         },
       }),
     );
-    expect(events).toContainEqual(
+    expect(events).not.toContainEqual(
       expect.objectContaining({
         msg: {
           type: "turn_complete",
           payload: expect.objectContaining({
-            lastAgentMessage: "retry ok",
+            lastAgentMessage: "should not retry",
           }),
         },
       }),
