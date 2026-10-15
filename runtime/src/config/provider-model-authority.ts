@@ -123,6 +123,16 @@ function explicitQualification(model: string):
   });
 }
 
+/**
+ * Split a `provider:model` value when its prefix names a built-in provider.
+ * Undefined for a bare model id, so callers compare like with like.
+ */
+export function providerQualifiedModel(model: string):
+  | { readonly provider: ProviderSlug; readonly model: string }
+  | undefined {
+  return explicitQualification(model);
+}
+
 function requireSelectionValue(
   value: string | undefined,
   field: "provider" | "model",
