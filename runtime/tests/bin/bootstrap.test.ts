@@ -4905,6 +4905,41 @@ describe("warm daemon auxiliary setup ceiling", () => {
 describe("bootstrap private endpoint metadata reuse", () => {
   afterEach(() => { vi.restoreAllMocks(); _resetAgentRolesForTesting(); });
 
+  it.each([
+    ["https://api.deepseek.com/v1", 0],
+    ["http://localhost:8888/v1", 1],
+  ])("does not duplicate catalogued DeepSeek discovery at %s", async (base, count) => {
+    const home = await mkdtemp(join(tmpdir(), "agenc-deepseek-metadata-home-"));
+    const workspace = await mkdtemp(join(tmpdir(), "agenc-deepseek-metadata-project-"));
+    const { OpenAIProvider } = await import("../llm/providers/openai/adapter.js");
+    const { markCapabilityDrift } = await import("../llm/capabilities.js");
+    markCapabilityDrift({ provider: "deepseek", model: "deepseek-flash" });
+    const healthChecks = vi.spyOn(OpenAIProvider.prototype, "healthCheck");
+    const transport = vi.fn<typeof fetch>().mockImplementation(async () => jsonResponse({
+      data: [{ id: "deepseek-flash", context_window: 1_048_576 }],
+    }));
+    vi.spyOn(Session.prototype, "startMcpManager").mockResolvedValue(undefined);
+    let shutdown: (() => Promise<void>) | undefined;
+    try {
+      const boot = await bootstrapLocalRuntimeSession({
+        env: { AGENC_HOME: home, AGENC_WORKSPACE: workspace, HOME: home, SHELL: "/bin/sh",
+          AGENC_PROVIDER: "deepseek", AGENC_MODEL: "deepseek-flash",
+          DEEPSEEK_API_KEY: "test-key", DEEPSEEK_BASE_URL: base },
+        fetchImpl: transport,
+        argv: ["node", "agenc"],
+      });
+      shutdown = boot.shutdown;
+      expect(boot.modelInfo.contextWindow).toBe(1_048_576);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(healthChecks).not.toHaveBeenCalled();
+      expect(transport).toHaveBeenCalledTimes(count);
+    } finally {
+      await shutdown?.();
+      await rm(home, { recursive: true, force: true });
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
   it("shares only default transport discovery across fresh projects, preserves model limits, and rotates accounts/endpoints", async () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-metadata-home-"));
     const projects: string[] = [];
