@@ -184,6 +184,7 @@ export async function runProjectTrustPreflightForTui(
   const review = await reviewProjectTrust({
     projectRoot,
     config: configStore.current(),
+    agencHome,
   });
   const digestAfter = projectConfigDigestSync(projectRoot);
   const location = sensitiveTrustLocation(projectRoot, env);
