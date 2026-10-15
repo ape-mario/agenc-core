@@ -367,8 +367,9 @@ export function createWaitAgentTool(opts: MultiAgentV2Options): Tool {
     if (!callerIsCurrent()) {
       return agentValidationError("invalid-runtime-identity: calling agent session is no longer live");
     }
-    const timedOut = !mailboxChanged;
-    const updates = timedOut ? [] : [...recoveredUpdates, ...drainMailboxUpdates(session)];
+    const interrupted = !mailboxChanged && abortSignal?.aborted === true;
+    const timedOut = !mailboxChanged && !interrupted;
+    const updates = mailboxChanged ? [...recoveredUpdates, ...drainMailboxUpdates(session)] : [];
     emit(session, {
       type: "collab_waiting_end",
       payload: {
@@ -376,11 +377,12 @@ export function createWaitAgentTool(opts: MultiAgentV2Options): Tool {
         callId: waitCallId,
         statuses: {},
         timedOut,
+        ...(interrupted ? { interrupted: true } : {}),
         agentStatuses: [],
         ...(updates.length > 0 ? { mailboxUpdates: updates } : {}),
       },
     });
-    if (timedOut && abortSignal?.aborted === true) {
+    if (interrupted) {
       // The turn was stopped while waiting: return now so the stop lands now,
       // not at the deadline, and start no timeout streak over it.
       waitTimeoutStreaks.delete(session);

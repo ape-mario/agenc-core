@@ -1543,6 +1543,7 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
     },
     {
       timedOut: isBoolean,
+      interrupted: isBoolean,
       agentStatuses: arrayOf(isCollabAgentStatusEntry),
     },
   ),

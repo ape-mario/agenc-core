@@ -1011,6 +1011,7 @@ export interface CollabWaitingEndEvent {
   readonly senderThreadId: string;
   readonly callId: string;
   readonly timedOut?: boolean;
+  readonly interrupted?: boolean;
   readonly agentStatuses?: ReadonlyArray<CollabAgentStatusEntry>;
   readonly statuses: Readonly<Record<string, AgentStatus>>;
 }

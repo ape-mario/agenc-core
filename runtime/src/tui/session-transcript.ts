@@ -2996,8 +2996,9 @@ export function adaptTranscriptEvents(
         if (callId === null) break;
         openTools.delete(callId);
         const details: string[] = [];
-        const timedOut = payload.timedOut === true || payload.timed_out === true;
-        let finalState: CollabAgentMessageState = timedOut ? "info" : "success";
+        const interrupted = payload.interrupted === true;
+        const timedOut = !interrupted && (payload.timedOut === true || payload.timed_out === true);
+        let finalState: CollabAgentMessageState = timedOut || interrupted ? "info" : "success";
         const noteStatus = (status: unknown): void => {
           if (collabStatusState(status) === "error") finalState = "error";
         };
@@ -3026,10 +3027,10 @@ export function adaptTranscriptEvents(
         details.push(...collabMailboxUpdateDetails(payload.mailboxUpdates));
         out.push(
           makeCollabAgentMessage(
-            timedOut ? "Wait call timed out" : "Finished waiting",
+            interrupted ? "Wait interrupted" : timedOut ? "Wait call timed out" : "Finished waiting",
             details.length > 0
               ? details
-              : [timedOut ? "Agents may still be running" : "No agents completed yet"],
+              : [interrupted ? "Waiting stopped before a result arrived" : timedOut ? "Agents may still be running" : "No agents completed yet"],
             finalState,
             nextUuid(),
           ),
