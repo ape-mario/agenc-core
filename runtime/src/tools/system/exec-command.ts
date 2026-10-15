@@ -466,6 +466,14 @@ const PRINTED_READ_MAX_GLOB_MATCHES = 64;
 const PRINTED_READ_MAX_OUTPUT_CHARS = 4 * 1024 * 1024;
 /** Shorter text could appear in output by coincidence (an echo, a test name), so it proves nothing. */
 const PRINTED_READ_MIN_BYTES = 64;
+/**
+ * The largest model-facing exec result that reaches the model unchanged. The tool-result pipeline
+ * caps or offloads a result above its effective cap (tools/execution.ts computeEffectiveMaxResultBytes),
+ * which never drops below MIN_TOOL_RESULT_BYTES; exec_command declares no lower per-tool cap.
+ */
+export const PRINTED_READ_MAX_VISIBLE_BYTES = 16_000;
+/** C0 controls other than tab, newline and carriage return; a later display filter may drop them. */
+const PRINTED_READ_CONTROL = /[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
 const PRINTED_READ_GLOB = /[*?[]/u;
 
 /**
@@ -596,14 +604,18 @@ async function expandWorkspaceGlob(word: string, base: string, roots: readonly s
 export async function recordPrintedFileReads(params: {
   readonly cmd: string;
   readonly output: ExecCommandToolOutput;
+  /** The exact text exec_command returns to the model for this call. */
+  readonly visible: string;
   readonly cwd: string;
   readonly allowedPaths: readonly string[];
   readonly args: Record<string, unknown>;
 }): Promise<void> {
-  const { output } = params;
+  const { output, visible } = params;
+  // A head-and-tail cut (max_output_tokens, explicit or default) sets truncated; a later cap or offload
+  // never touches a result this small. Either way the model would not see the whole file.
   if (output.exitCode === null || output.truncated || output.timedOut || output.session_id !== undefined) return;
-  const stdout = output.stdout;
-  if (stdout.length === 0 || stdout.length > PRINTED_READ_MAX_OUTPUT_CHARS) return;
+  if (output.stdout.length === 0 || visible.length > PRINTED_READ_MAX_OUTPUT_CHARS) return;
+  if (Buffer.byteLength(visible, "utf8") > PRINTED_READ_MAX_VISIBLE_BYTES) return;
   const sessionId = resolveSessionId(params.args);
   if (sessionId === undefined) return;
   const roots = params.allowedPaths.map((root) => resolve(root));
@@ -630,10 +642,11 @@ export async function recordPrintedFileReads(params: {
       }
     }
   }
-  const shown = stdout.replace(/\r\n/gu, "\n");
+  const shown = visible.replace(/\r\n/gu, "\n");
   for (const path of candidates) {
     const file = await stableWorkspaceText(path, params.allowedPaths, params.args);
     if (file === undefined || Buffer.byteLength(file.text.trim(), "utf8") < PRINTED_READ_MIN_BYTES) continue;
+    if (PRINTED_READ_CONTROL.test(file.text)) continue;
     const text = file.text.replace(/\r\n/gu, "\n");
     if (!includesAtLineStart(shown, text) && !includesAtLineStart(shown, catNumbered(text))) continue;
     recordSessionRead(sessionId, file.canonical, {
@@ -1503,14 +1516,6 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
             allowedPaths: config.allowedPaths ?? (config.cwd !== undefined ? [config.cwd] : []),
             args: args as Record<string, unknown>,
           });
-        } else if (config?.lightMode !== true && !detach && tty !== true) {
-          await recordPrintedFileReads({
-            cmd,
-            output,
-            cwd: effectiveWorkdir ?? config?.cwd ?? process.cwd(),
-            allowedPaths: config?.allowedPaths ?? (config?.cwd !== undefined ? [config.cwd] : []),
-            args: args as Record<string, unknown>,
-          });
         }
         // exitCode === null has these sub-cases. The reliable discriminator
         // is `process_id !== undefined` (or `detached` with a pid):
@@ -1543,6 +1548,16 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
           notifyExecSessionDiscovery(args, config?.onSessionYielded);
         }
         const execContent = formatUnifiedExecToolContent(output, config?.lightMode === true);
+        if (config?.lightMode !== true && !detach && tty !== true) {
+          await recordPrintedFileReads({
+            cmd,
+            output,
+            visible: execContent,
+            cwd: effectiveWorkdir ?? config?.cwd ?? process.cwd(),
+            allowedPaths: config?.allowedPaths ?? (config?.cwd !== undefined ? [config.cwd] : []),
+            args: args as Record<string, unknown>,
+          });
+        }
         const runtimeContext = readToolRuntimeContext(args);
         const denial = execSandboxDenialNotice({
           output: execContent,
