@@ -1,3 +1,4 @@
+import { DegenerateTextDetector } from "../llm/degenerate-text.js";
 import { completeReasoningCapSample, type ReasoningCapSample } from "../session/reasoning-cap-policy.js";
 /**
  * Phase 2 — Stream Model.
@@ -1112,11 +1113,16 @@ export async function streamModel(
   const thinkingDisplays = new Map<string, ThinkingDisplayState>();
   const providerName = session.services.provider.name;
   const progressTracker = new StreamProgressTracker();
+  const degenerateGuardEnabled = session.services.configStore?.current?.()?.stream_degenerate_guard !== false;
+  let visibleDegeneration = degenerateGuardEnabled ? new DegenerateTextDetector() : undefined;
+  const thinkingDegeneration = degenerateGuardEnabled ? new DegenerateTextDetector() : undefined;
+  const summaryDegeneration = degenerateGuardEnabled ? new DegenerateTextDetector() : undefined;
   let progressError: StreamProgressError | undefined;
   let reasoningTimer: ReturnType<typeof setTimeout> | undefined;
-  const stopForProgress = (reason: "stream_loop" | "stream_no_progress"): void => {
+  const stopForProgress = (reason: "stream_loop" | "stream_no_progress" | "stream_degenerate"): void => {
     if (scoped.signal.aborted) return;
     progressError = new StreamProgressError(providerName, reason);
+    if (reason === "stream_degenerate") resetCanonicalAssistantOutput();
     try {
       session.emit({
         id: session.nextInternalSubId(),
@@ -1180,6 +1186,17 @@ export async function streamModel(
     if (session.budgetTracker) {
       session.budgetTracker.addEmitted(estimateChunkTokens(chunk), "estimate");
       session.budgetTracker.sampleMidStream();
+    }
+
+    // Watch billed model text independently per channel, before rendering or
+    // dispatching tools from this chunk. Tool JSON is deliberately excluded.
+    // resetBuffer replaces answer text, so snapshots must not be appended.
+    if (chunk.resetBuffer && degenerateGuardEnabled) visibleDegeneration = new DegenerateTextDetector();
+    if (visibleDegeneration?.observe(chunk.content ?? "") ||
+      thinkingDegeneration?.observe(chunk.thinkingDelta?.delta ?? "") ||
+      summaryDegeneration?.observe(chunk.reasoningSummaryDelta?.delta ?? "")) {
+      stopForProgress("stream_degenerate");
+      return;
     }
 
     // Incremental assistant_message_delta emission for renderers. The

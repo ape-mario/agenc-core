@@ -1323,7 +1323,7 @@ async function runSamplingRequest(
           // when that retry fails for a different transient reason.
           if (stallRetryStarted) return false;
           const progressStop = isStreamProgressStop(err);
-          const blockedReason = interruptedStreamRetryBlockReason(state, session);
+          const blockedReason = interruptedStreamRetryBlockReason(state, session, err);
           if (blockedReason !== null) {
             retryBlocked = true;
             suppressInterruptedStreamToolHistory(state);

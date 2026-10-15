@@ -681,6 +681,7 @@ const ROOT_FIELD_VALIDATORS = {
   completion_gate: validateCompletionGate,
   goal: validateGoal,
   compaction: validateCompaction,
+  stream_degenerate_guard: fieldValidator("stream_degenerate_guard", optionalBoolean),
   stream_watchdog_timeout_ms: fieldValidator("stream_watchdog_timeout_ms", optionalNonNegativeInteger),
   provider_outage_wait_ms: fieldValidator("provider_outage_wait_ms", optionalNonNegativeInteger),
   provider_outage_retry_ms: fieldValidator("provider_outage_retry_ms", optionalPositiveInteger),
