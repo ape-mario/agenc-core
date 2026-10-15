@@ -1,4 +1,5 @@
-import { parseVeniceModels, type VeniceModel } from "./registry/venice-models.js";
+import { parseVeniceModels, veniceModelCosts, type VeniceModel } from "./registry/venice-models.js";
+import { recordPublishedModelCosts } from "./registry/published-model-costs.js";
 import { EndpointMetadataCache, type EndpointMetadataScope } from "./endpoint-metadata-cache.js";
 import {
   readProviderConfig,
@@ -415,6 +416,9 @@ export class ModelMetadataResolver {
     if (response !== this.veniceResponse) {
       this.veniceResponse = response;
       this.veniceModels = parseVeniceModels(response);
+      // Venice's prices are the price of record for its models (see
+      // published-model-costs): admission and the cost sidecar read them.
+      recordPublishedModelCosts("venice", veniceModelCosts(this.veniceModels));
     }
     return this.veniceModels;
   }

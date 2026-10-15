@@ -315,9 +315,43 @@ describe('v2 primitives', () => {
 
     expect(output).toContain('item-18')
     expect(output).toContain('▌')
-    expect(output).toContain('scroll 16-22/30')
+    // 12 rows: 7 for the popup chrome and column headers, 5 for the list.
+    expect(output).toContain('scroll 17-21/30')
     expect(output).not.toContain('item-00')
     expect(output).not.toContain('item-29')
+  })
+
+  it('keeps the column headers and every windowed row on screen while a long list scrolls', async () => {
+    const rows = Array.from({ length: 30 }, (_, index) => ({
+      status: 'available',
+      name: `item-${String(index).padStart(2, '0')}`,
+    }))
+
+    const output = await renderToString(
+      <MenuModal
+        title="models"
+        count={`${rows.length}`}
+        columns={[12, 12]}
+        headers={['status', 'name']}
+        items={rows}
+        activeIndex={18}
+        footer={[{ keyName: 'enter', label: 'use' }]}
+        renderRow={row => [
+          <Text key="status">{row.status}</Text>,
+          <Text key="name">{row.name}</Text>,
+        ]}
+      />,
+      { columns: 100, rows: 20 },
+    )
+
+    expect(output).toMatch(/status\s+name/)
+    expect(output).toContain('scroll 13-25/30')
+    for (let index = 12; index <= 24; index += 1) {
+      expect(output).toContain(`item-${String(index).padStart(2, '0')}`)
+    }
+    expect(output).not.toContain('item-11')
+    expect(output).not.toContain('item-25')
+    expect(output.trimEnd().split('\n')).toHaveLength(20)
   })
 })
 

@@ -30,6 +30,31 @@ function price(value: unknown): number | undefined {
   return typeof usd === "number" && Number.isFinite(usd) && usd >= 0 ? usd / 1000 : undefined;
 }
 
+/**
+ * One model's published price (`model_spec.pricing`). `extended` holds the
+ * rates for a request above `context_token_threshold` input tokens. The
+ * `cache_write` price is not used: AgenC asks Venice for no prompt caching and
+ * Chat Completions cannot report cache writes, so pricing them would charge
+ * every uncached input token at the write rate.
+ */
+function veniceCost(pricing: Record<string, unknown> | null | undefined): ModelCostEntry | undefined {
+  const inputUsdPer1K = price(pricing?.input);
+  const outputUsdPer1K = price(pricing?.output);
+  if (inputUsdPer1K === undefined || outputUsdPer1K === undefined) return undefined;
+  const cachedInputUsdPer1K = price(pricing?.cache_input);
+  const extended = asRecord(pricing?.extended);
+  const aboveInputTokens = positiveInteger(extended?.context_token_threshold);
+  const longContextRates = aboveInputTokens === undefined ? undefined : veniceCost(extended);
+  return Object.freeze({
+    inputUsdPer1K,
+    outputUsdPer1K,
+    ...(cachedInputUsdPer1K === undefined ? {} : { cachedInputUsdPer1K, cachedInputIncludedInInputTokens: true }),
+    ...(aboveInputTokens === undefined || longContextRates === undefined ? {} : {
+      longContext: Object.freeze({ aboveInputTokens, rates: longContextRates }),
+    }),
+  });
+}
+
 /** Parse only online text models explicitly advertising function calling. */
 export function parseVeniceModels(payload: unknown): readonly VeniceModel[] {
   const data = asRecord(payload)?.data;
@@ -45,10 +70,7 @@ export function parseVeniceModels(payload: unknown): readonly VeniceModel[] {
       ? caps.reasoningEffortOptions.filter((value): value is ReasoningEffort => typeof value === "string" && EFFORTS.includes(value))
       : [];
     const defaultReasoningLevel = supportedReasoningLevels.find(value => value === caps.defaultReasoningEffort);
-    const pricing = asRecord(spec.pricing);
-    const inputUsdPer1K = price(pricing?.input);
-    const outputUsdPer1K = price(pricing?.output);
-    const cachedInputUsdPer1K = price(pricing?.cache_input);
+    const cost = veniceCost(asRecord(spec.pricing));
     const privacy = spec.privacy === "private" || spec.privacy === "anonymized" ? spec.privacy : undefined;
     models.set(row.id, Object.freeze({
       model: row.id,
@@ -64,15 +86,16 @@ export function parseVeniceModels(payload: unknown): readonly VeniceModel[] {
       functionCallingDefault: Array.isArray(spec.traits) && spec.traits.includes("function_calling_default"),
       ...(privacy === undefined ? {} : { privacy }),
       ...(privacy === "private" ? { zeroDataRetention: true as const } : {}),
-      ...(inputUsdPer1K === undefined || outputUsdPer1K === undefined ? {} : {
-        cost: Object.freeze({ inputUsdPer1K, outputUsdPer1K,
-          ...(cachedInputUsdPer1K === undefined ? {} : { cachedInputUsdPer1K, cachedInputIncludedInInputTokens: true }),
-        }),
-      }),
+      ...(cost === undefined ? {} : { cost }),
     }));
   }
   // Put Venice's function-calling default first in selection menus.
   return Object.freeze([...models.values()].sort((a, b) => Number(b.functionCallingDefault) - Number(a.functionCallingDefault)));
+}
+
+/** Each listed model's published price, keyed by model ID (see published-model-costs). */
+export function veniceModelCosts(models: readonly VeniceModel[]): ReadonlyMap<string, ModelCostEntry> {
+  return new Map(models.flatMap(model => model.cost === undefined ? [] : [[model.model, model.cost] as const]));
 }
 
 /** Small offline snapshot from the public /models response on 2026-10-15. */

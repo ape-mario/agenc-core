@@ -37,14 +37,29 @@ export class VeniceProvider extends OpenAIProvider {
     this.#metadata = new ModelMetadataResolver({ fetchImpl, env: { VENICE_API_KEY: config.apiKey } });
   }
 
-  async #discover(model: string): Promise<void> {
+  async #refresh(): Promise<readonly VeniceModel[] | undefined> {
     const discovered = await this.#metadata.discoverVeniceModels(this.#catalogConfig);
     this.#models = discovered ?? VENICE_MODELS;
+    return discovered;
+  }
+
+  async #discover(model: string): Promise<void> {
+    const discovered = await this.#refresh();
     // Selection accepts any Venice ID (its catalog is this live list), so a
     // mistyped one stops here, before any request.
     if (discovered && !discovered.some(entry => entry.model === model)) {
       throw new LLMProviderError("venice", `${model} is not an online Venice text model that supports function calling.`);
     }
+  }
+
+  /**
+   * Admission reserves before the request: read Venice's list first, so the
+   * reservation uses this model's published price. An unlisted model is
+   * refused by chat() and chatStream(), not here.
+   */
+  override async getExecutionProfile(options?: LLMChatOptions) {
+    await this.#refresh();
+    return super.getExecutionProfile(options);
   }
 
   override async chat(messages: LLMMessage[], options?: LLMChatOptions) {

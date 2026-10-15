@@ -541,7 +541,10 @@ function useSessionSpendLabel(): string {
   }, [hasUsageContext]);
   // No usage reported yet: show nothing rather than a placeholder.
   if (usage === null) return '';
-  if (usage !== undefined) return `${usage.hasUnknownCost ? '≥' : ''}${formatUsdCost(usage.costUsd)}${usage.costEstimated ? ' est.' : ''}`;
+  // An estimated call was priced at the registry ceiling because its model
+  // has no known price: that figure is not a cost, so say so instead.
+  if (usage?.costEstimated === true) return 'price unknown';
+  if (usage !== undefined) return `${usage.hasUnknownCost ? '≥' : ''}${formatUsdCost(usage.costUsd)}`;
   return spend;
 }
 
