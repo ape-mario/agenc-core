@@ -123,3 +123,19 @@ test("model-supplied session identity cannot borrow another session's read", asy
   expect(result.isError).toBe(true);
   expect(resolver.request).not.toHaveBeenCalled();
 });
+
+test.skipIf(process.platform === "win32")("preflight preserves distinct POSIX Unicode file identities", async () => {
+  const composed = "caf\u00e9.txt";
+  const decomposed = "cafe\u0301.txt";
+  await writeFile(join(root, composed), "old\n");
+  await writeFile(join(root, decomposed), "old\n");
+  await read(composed);
+  const { tool, args } = toolCase("Edit");
+  const unread = await dispatch(tool, { ...args, file_path: decomposed }, "model");
+  expect(unread.result.isError).toBe(true);
+  expect(unread.resolver.request).not.toHaveBeenCalled();
+  await read(decomposed);
+  const allowed = await dispatch(tool, { ...args, file_path: decomposed }, "model");
+  expect(allowed.resolver.request).toHaveBeenCalledOnce();
+  expect(allowed.result.isError).toBeFalsy();
+});
