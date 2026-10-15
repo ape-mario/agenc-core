@@ -531,7 +531,7 @@ names; `[]` denotes an array entry. Open maps accept keys at the indicated
 | `autonomous_mode` | Boolean autonomous runtime mode. |
 | `coordinator_mode` | Boolean coordinator-only main-session behavior. |
 | `defer_rare_tools` | Load rarely needed built-in tools (delegation, process, web, rare tools) through `system.searchTools` instead of sending them with every request. Unset: on for standard sessions, off for Light. `AGENC_DEFER_RARE_TOOLS` in the session environment overrides it. |
-| `lean_system_prompt` | Use the lean static head of the system prompt. Unset: on for OpenAI, Grok and DeepSeek sessions. `AGENC_LEAN_SYSTEM_PROMPT` in the session environment overrides it. |
+| `lean_system_prompt` | Use the lean static head of the system prompt. Unset: on for OpenAI and Grok sessions. `AGENC_LEAN_SYSTEM_PROMPT` in the session environment overrides it. |
 | `stream_degenerate_guard` | Stop disordered short-vocabulary model output; default `true`. Set `false` for intentional random text. A stopped partial is marked unreliable; one automatic retry is allowed only before streamed tool work. |
 | `stream_watchdog_timeout_ms` | Non-negative inter-chunk idle timeout; default `600000`, `0` disables. |
 | `provider_outage_wait_ms` | Non-negative total time a turn keeps waiting for a provider outage to end once the reconnect ladder is spent; default `1800000` (30 minutes), `0` ends the turn as soon as the ladder is exhausted. |

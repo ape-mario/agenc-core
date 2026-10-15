@@ -24,11 +24,12 @@ export const LEAN_SYSTEM_PROMPT_ENV = "AGENC_LEAN_SYSTEM_PROMPT";
 /**
  * Providers whose sessions get the lean head unless the switch says
  * otherwise. Measured on GPT-6 Luna (OpenAI) and Grok 4.6, which bill most
- * prompt tokens uncached, and on DeepSeek, where the head rides on every
- * request of a session and its size shows in latency and total tokens even
- * though cached input is cheap.
+ * prompt tokens uncached. DeepSeek keeps the standard head: on qb's ten
+ * general tasks (two runs a side) the lean head cut tokens but took more
+ * calls, output and wall time than the standard head, mostly on the
+ * open-ended tasks (long, nodefix).
  */
-export const LEAN_DEFAULT_PROVIDERS: ReadonlySet<string> = new Set(["openai", "grok", "deepseek"]);
+export const LEAN_DEFAULT_PROVIDERS: ReadonlySet<string> = new Set(["openai", "grok"]);
 
 export function leanSystemPromptEnabled(
   env: Readonly<Record<string, string | undefined>>,
