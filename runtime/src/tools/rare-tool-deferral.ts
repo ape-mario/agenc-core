@@ -13,10 +13,10 @@
  * - the process tools: they only act on a session exec_command left running,
  *   so they load by themselves when exec_command returns a live session_id.
  *
- * On by default in standard sessions; `AGENC_DEFER_RARE_TOOLS=0` in the
- * session's environment advertises every tool again. Light sessions keep their
- * own initial tool set and only defer these with an explicit
- * `AGENC_DEFER_RARE_TOOLS=1`.
+ * On by default in standard sessions; `defer_rare_tools = false` in
+ * config.toml, or `AGENC_DEFER_RARE_TOOLS=0` in the session's environment
+ * (which wins), advertises every tool again. Light sessions keep their own
+ * initial tool set and only defer these when asked explicitly.
  *
  * @module
  */
@@ -93,11 +93,16 @@ const STANDARD_DEFERRED_TOOL_NAMES: ReadonlySet<string> = new Set([
  */
 export function rareToolDeferralEnabled(
   env: Readonly<Record<string, string | undefined>>,
-  options: { readonly lightMode?: boolean } = {},
+  options: {
+    readonly lightMode?: boolean;
+    /** config.toml `defer_rare_tools`; the session environment overrides it. */
+    readonly configured?: boolean;
+  } = {},
 ): boolean {
   const value = env[DEFER_RARE_TOOLS_ENV];
   if (isEnvDefinedFalsy(value)) return false;
   if (isEnvTruthy(value)) return true;
+  if (typeof options.configured === "boolean") return options.configured;
   return options.lightMode !== true;
 }
 

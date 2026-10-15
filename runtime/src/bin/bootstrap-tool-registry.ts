@@ -30,6 +30,8 @@ export interface BootstrapToolRegistryOptions {
     BuildToolRegistryOptions,
     "workspaceRoot" | "modelFacingTools"
   >;
+  /** config.toml `defer_rare_tools`; the session environment overrides it. */
+  readonly configuredDeferRareTools?: boolean;
 }
 
 export function buildBootstrapToolRegistry(
@@ -83,6 +85,9 @@ export function buildBootstrapToolRegistry(
     // session. An explicit toolRegistryOptions value below still wins.
     deferRareTools: rareToolDeferralEnabled(options.environment ?? {}, {
       lightMode: options.toolRegistryOptions?.lightMode === true,
+      ...(options.configuredDeferRareTools !== undefined
+        ? { configured: options.configuredDeferRareTools }
+        : {}),
     }),
     mcpToolsProvider: options.mcpManager,
     workflowController: buildWorkflowToolController({
