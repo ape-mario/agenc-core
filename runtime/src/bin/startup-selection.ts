@@ -113,6 +113,8 @@ export function resolveCanonicalStartupSelection(params: {
   readonly config: AgenCConfig;
   /** The same scoped provider environment used to create this session. */
   readonly env: Readonly<Record<string, string | undefined>>;
+  /** A model typed at CLI ingress. Omit for saved, profile, or restored selections. */
+  readonly explicitModel?: string;
   readonly profileName?: string;
 }): StartupSelection {
   const config = params.config;
@@ -136,7 +138,11 @@ export function resolveCanonicalStartupSelection(params: {
       "canonical startup config must contain a provider/model pair",
     );
   }
-  assertModelCatalogSelection(config, provider, canonicalModel, params.env);
+  // Saved models may outlive a curated catalog entry or arrive before Core
+  // learns about them. Preserve main's startup behavior for those selections.
+  if (params.explicitModel !== undefined) {
+    assertModelCatalogSelection(config, provider, canonicalModel, params.env);
+  }
   if (!isModelAllowed(provider, canonicalModel, config)) {
     throw new ModelNotAllowedError(canonicalModel);
   }

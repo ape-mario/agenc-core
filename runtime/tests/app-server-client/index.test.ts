@@ -603,7 +603,7 @@ describe("app-server-client daemon helpers", () => {
           bypassPermissionsWorkspace: workspace,
           bypassPermissionsConsentWorkspace: workspace,
           provider: "grok",
-          model: "grok-4.7",
+          model: "grok-live-model",
           profile: "live",
           reasoningEffort,
           modelVerbosity: "low",
@@ -620,11 +620,11 @@ describe("app-server-client daemon helpers", () => {
         isBypassPermissionsModeAvailable: true,
         bypassPermissionsAcceptedIn: [workspace],
       });
-      expect(context.model).toBe("grok-4.7");
+      expect(context.model).toBe("grok-live-model");
       expect(context.baseSession.sessionConfiguration).toMatchObject({
         provider: { slug: "grok" },
         collaborationMode: {
-          model: "grok-4.7",
+          model: "grok-live-model",
           reasoningEffort,
         },
         modelVerbosity: "low",
