@@ -839,8 +839,7 @@ export class BrowserManager {
       }
       if (err instanceof BrowserExecutableError) {
         // Resolution failed before the profile directory or any browser process
-        // existed, and this attempt's loopback proxy is already stopped. Only this
-        // branded error proves no effect; a launch or CDP failure stays unknown.
+        // existed, and this attempt's loopback proxy is already stopped.
         markEffectBoundaryNotCrossed(err, {
           evidenceRef: "tool:Browser:launch-executable-not-found",
           evidenceMaterial: JSON.stringify({
@@ -849,6 +848,22 @@ export class BrowserManager {
             proxyStopped: true,
             code: err.code,
             message: err.message,
+          }),
+        });
+      } else if (!(err instanceof BrowserLaunchCleanupError)) {
+        // launchBrowser returns only after Browser.getVersion succeeds. No
+        // target or page action can be dispatched from this launch attempt
+        // before then. Its child tree and the manager's proxy/profile cleanup
+        // are proven stopped, so a launch or handshake failure has no effect.
+        // Incomplete cleanup must retain its unknown outcome and ownership.
+        const error = toError(err);
+        throw markEffectBoundaryNotCrossed(error, {
+          evidenceRef: "tool:Browser:launch-before-page-action",
+          evidenceMaterial: JSON.stringify({
+            stage: "launch_setup",
+            pageActionDispatched: false,
+            cleanupComplete: true,
+            message: error.message,
           }),
         });
       }
