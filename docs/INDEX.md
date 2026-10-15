@@ -99,7 +99,7 @@ history; the linked pages below are current product truth.
 
 | Doc | Summary |
 | --- | --- |
-| [releases/0.19.2.md](releases/0.19.2.md) | AgenC 0.19.2: on macOS `agenc daemon restart` keeps launchd as the daemon's owner, and the home-folder trust card no longer lists your own settings |
+| [releases/0.19.2.md](releases/0.19.2.md) | AgenC 0.19.2: on macOS `agenc daemon restart` keeps launchd as the daemon's owner, the home-folder trust card no longer lists your own settings, and the Windows installer finishes again, including in Windows PowerShell 5.1 |
 | [releases/0.19.1.md](releases/0.19.1.md) | AgenC 0.19.1: no task token cap by default, and sessions started in the home folder load and save configuration |
 | [releases/0.19.0.md](releases/0.19.0.md) | AgenC 0.19.0: bypass fast mode, session sandbox reuse, fewer automatic WAL checkpoints, and task budget controls |
 | [releases/0.18.0.md](releases/0.18.0.md) | AgenC 0.18.0: the `/goal` session goal with independent verification, removal of the embedded editor and workbench, four new providers, and compaction that degrades instead of ending the turn |
