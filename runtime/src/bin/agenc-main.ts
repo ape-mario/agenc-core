@@ -3511,8 +3511,17 @@ export async function bootTUIEntry(
             ? { permissionMode: idlePermissionMode }
             : {}),
         });
-        const boot = await loadBootTUI();
+        // Provision the daemon session while the TUI boots and the user types
+        // the first prompt (the workspace is already trusted), except when
+        // first-run onboarding may still choose the provider and model that
+        // session must start with. The daemon does that work in parallel with
+        // the TUI loading and rendering.
+        void prewarmDeferredTuiSession(deferred, {
+          agencHome: configStore.agencHome,
+          env: sessionEnv,
+        });
         try {
+          const boot = await loadBootTUI();
           const handle = await boot({
             session: deferred.session,
             model,
@@ -3523,13 +3532,6 @@ export async function bootTUIEntry(
               : {}),
           });
           activeInkUnmount = handle.unmount;
-          // Provision the daemon session while the user types the first
-          // prompt, except when first-run onboarding may still choose the
-          // provider and model that session must start with.
-          void prewarmDeferredTuiSession(deferred, {
-            agencHome: configStore.agencHome,
-            env: sessionEnv,
-          });
           await handle.waitUntilExit();
         } finally {
           activeInkUnmount = null;
