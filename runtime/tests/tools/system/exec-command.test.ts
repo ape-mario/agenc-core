@@ -435,7 +435,7 @@ describe("exec_command tool", () => {
         payload: { kind: "function", arguments: "{}" },
         turn: {
           subId: "turn-network-proxy",
-          config: { sandboxAllowLocalBinding: true },
+          sandboxAllowLocalBinding: true,
           cwd: root,
           agencLinuxSandboxExe: "/bin/true",
           networkSandboxPolicy: {
