@@ -77,6 +77,7 @@ import { setIsRemoteMode } from "../bootstrap/state.js";
 import { isRecord } from "../utils/record.js";
 import type { AgenCTuiBridgeSession } from "../tui/daemon-session.js";
 import { createWorkflowApprovalControls, type WorkflowApprovalControls } from "../tui/workflow-approval-controls.js";
+import { UNUSED_TUI_PREWARM_STOP_REASON } from "../app-server/agent-stop-reasons.js";
 import { oneShotCLI as runDaemonOneShotCLI, type AgenCDaemonCliDeps, startupImageMessagesFromInputs, startupContentFromInputs, validateAgencHome, stopDaemonAgentBestEffort, type OneShotDeadlineBackstopGlobal, startupPermissionMode } from "./daemon-one-shot-cli.js";
 export { parseStreamJsonPrompt, validateAgencHome, oneShotFinalMessageRemainder, type PrintModeGoal, parsePrintModeGoal } from "./daemon-one-shot-cli.js";
 
@@ -1245,6 +1246,9 @@ async function createDeferredDaemonPromptTuiSession(params: {
   let speculativeSession: TuiSessionShape | null = null;
   let speculativeStale = false;
   const speculativeDiscards = new Set<Promise<void>>();
+  // Unused speculative agents whose stop no daemon has taken yet (the daemon
+  // was restarting). Retried on the next daemon session and at close.
+  const pendingRetirements = new Set<string>();
   let daemonClient: Awaited<
     ReturnType<typeof createConnectedAgenCJsonLineDaemonTuiClient>
   > | null = null;
@@ -1848,6 +1852,16 @@ async function createDeferredDaemonPromptTuiSession(params: {
           env: params.env,
         });
         daemonClient = startupClient;
+        if (speculative) {
+          // Subscribed before the session's own listeners, so a dropped
+          // connection retires the unused session before it can report.
+          const client = startupClient;
+          client.subscribeToConnectionState?.((state) => {
+            if (state.status !== "connected") {
+              retireSpeculativeSessionAfterGap(client);
+            }
+          });
+        }
         if (deferredSessionClosed) {
           throw new Error("Deferred TUI session is already closed.");
         }
@@ -1897,6 +1911,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
         liveAgentId = started.agentId;
         liveSessionAwaitingFirstTurn = deferInitialTurn;
         liveSessionStartupDeferred = deferInitialTurn;
+        if (speculative) speculativeSession = liveSession;
         if (deferredSessionClosed) {
           throw new Error("Deferred TUI session is already closed.");
         }
@@ -1920,24 +1935,35 @@ async function createDeferredDaemonPromptTuiSession(params: {
         queuedInputBytes -= submittedInputBytes;
         inFlightQueuedInputs = null;
         for (const subscriber of subscribers) {
-          const unsubscribe = liveSession.subscribeToEvents?.(subscriber);
+          const unsubscribe = subscribeLiveEvents(liveSession, subscriber);
           if (unsubscribe !== undefined) {
             liveUnsubscribers.set(subscriber, unsubscribe);
           }
         }
         attachLiveMcpSurfaceSubscribers(liveSession);
+        // Unused speculative agents a restarting daemon could not take yet.
+        if (pendingRetirements.size > 0) {
+          void flushPendingRetirements(startupClient);
+        }
         return liveSession;
       } catch (error) {
         inFlightQueuedInputs = null;
         for (const unsubscribe of liveUnsubscribers.values()) unsubscribe();
         liveUnsubscribers.clear();
         clearLiveMcpSurfaceSubscriptions();
+        if (speculative && speculativeSession === liveSession) {
+          speculativeSession = null;
+        }
         liveSession = null;
         liveAgentId = null;
         liveSessionAwaitingFirstTurn = false;
         liveSessionStartupDeferred = false;
         if (daemonClient === startupClient) daemonClient = null;
-        if (startedAgentId !== null) {
+        if (startedAgentId !== null && speculative) {
+          // Nobody waits on a speculative startup's cleanup: the first prompt
+          // must not, and close() collects it.
+          trackSpeculativeCleanup(retireUnusedAgent(startedAgentId, startupClient));
+        } else if (startedAgentId !== null) {
           await stopDaemonAgentBestEffort({
             deps: params.deps,
             daemonClient: startupClient,
@@ -1964,6 +1990,97 @@ async function createDeferredDaemonPromptTuiSession(params: {
   const awaitSpeculativeStartup = async (): Promise<void> => {
     const pending = speculativeStartup;
     if (pending !== null) await pending;
+  };
+
+  /** Speculative cleanup runs in the background; close() still waits for it. */
+  const trackSpeculativeCleanup = (cleanup: Promise<void>): void => {
+    speculativeDiscards.add(cleanup);
+    void cleanup.finally(() => speculativeDiscards.delete(cleanup));
+  };
+
+  /**
+   * Stop an unused speculative agent with the reason that also archives its
+   * untouched thread. A daemon that cannot take the stop now (it is
+   * restarting) gets it again on the next daemon session or at close.
+   */
+  const retireUnusedAgent = async (
+    agentId: string,
+    client?: ConnectedDaemonTuiClient | null,
+  ): Promise<void> => {
+    pendingRetirements.add(agentId);
+    const stop = { agentId, reason: UNUSED_TUI_PREWARM_STOP_REASON };
+    try {
+      if (client !== undefined && client !== null) {
+        try {
+          await client.request("agent.stop", stop);
+          pendingRetirements.delete(agentId);
+          return;
+        } catch (error) {
+          if (isDaemonSessionGoneError(error)) {
+            pendingRetirements.delete(agentId);
+            return;
+          }
+          /* fall through to a fresh connection */
+        }
+      }
+      await params.deps.stopPromptAgent({ ...stop, env: params.env });
+      pendingRetirements.delete(agentId);
+    } catch (error) {
+      // Nothing is left to retire once the daemon no longer knows the agent
+      // or its thread; any other failure keeps it pending.
+      if (isDaemonSessionGoneError(error)) pendingRetirements.delete(agentId);
+    }
+  };
+
+  const flushPendingRetirements = async (
+    client?: ConnectedDaemonTuiClient | null,
+  ): Promise<void> => {
+    await Promise.all(
+      [...pendingRetirements].map((agentId) => retireUnusedAgent(agentId, client)),
+    );
+  };
+
+  /**
+   * Forward a live session's events to a TUI subscriber. An unused
+   * speculative session's daemon-connection notices stay hidden: before the
+   * first prompt a daemon restart is as invisible as it is without one.
+   */
+  const subscribeLiveEvents = (
+    live: TuiSessionShape,
+    subscriber: (event: unknown) => void,
+  ): (() => void) | undefined =>
+    live.subscribeToEvents?.((event) => {
+      if (
+        live === speculativeSession &&
+        speculativeSessionUnused() &&
+        isDaemonConnectionNotice(event)
+      ) {
+        return;
+      }
+      subscriber(event);
+    });
+
+  /**
+   * The daemon connection under the unused speculative session dropped (a
+   * daemon restart, for one). Detach at once, so the TUI hears nothing from
+   * this session and its client stops reconnecting, then retire the agent and
+   * its untouched thread. The first prompt creates its session on demand, as
+   * it would have without the speculative one.
+   */
+  const retireSpeculativeSessionAfterGap = (
+    client: ConnectedDaemonTuiClient,
+  ): void => {
+    if (
+      deferredSessionClosed ||
+      daemonClient !== client ||
+      !speculativeSessionUnused()
+    ) {
+      return;
+    }
+    const agentId = liveAgentId;
+    speculativeSession = null;
+    void detachLiveSession();
+    if (agentId !== null) trackSpeculativeCleanup(retireUnusedAgent(agentId));
   };
 
   /**
@@ -1995,23 +2112,13 @@ async function createDeferredDaemonPromptTuiSession(params: {
     daemonClient = null;
     speculativeSession = null;
     const detached = detachLiveSession();
-    const discard = (async () => {
+    trackSpeculativeCleanup((async () => {
       await detached;
-      if (agentId !== null) {
-        await stopDaemonAgentBestEffort({
-          deps: params.deps,
-          daemonClient: client,
-          env: params.env,
-          agentId,
-          reason: "tui_closed_before_submit",
-        });
-      }
+      if (agentId !== null) await retireUnusedAgent(agentId, client);
       await client?.close().catch(() => {
         /* best effort */
       });
-    })();
-    speculativeDiscards.add(discard);
-    void discard.finally(() => speculativeDiscards.delete(discard));
+    })());
   };
 
   const prewarm = (): void => {
@@ -2032,8 +2139,12 @@ async function createDeferredDaemonPromptTuiSession(params: {
         // Invisible: the first prompt starts its session as before.
         return;
       }
-      speculativeSession = created;
-      if (speculativeStale && speculativeSessionUnused()) {
+      if (
+        created !== null &&
+        speculativeStale &&
+        created === speculativeSession &&
+        speculativeSessionUnused()
+      ) {
         discardSpeculativeSession();
       }
     })();
@@ -2639,7 +2750,9 @@ async function createDeferredDaemonPromptTuiSession(params: {
               })
             : { kind: "prompt" as const, content: message };
         if (firstMessage.kind === "handled") return;
-        const submissionSession = liveSession;
+        // From here the session carries the user's prompt: it is no longer
+        // speculative, and its daemon notices reach the TUI as usual.
+        const submissionSession = claimLiveSession(liveSession);
         try {
           await submitToDeferredFirstTurn(
             firstMessage.content,
@@ -2912,7 +3025,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
       subscribers.add(cb);
       try {
         if (liveSession !== null) {
-          const unsubscribe = liveSession.subscribeToEvents?.(cb);
+          const unsubscribe = subscribeLiveEvents(liveSession, cb);
           if (unsubscribe !== undefined) liveUnsubscribers.set(cb, unsubscribe);
         }
       } catch (error) {
@@ -2954,7 +3067,9 @@ async function createDeferredDaemonPromptTuiSession(params: {
           /* late startup performs its own agent/client cleanup */
         });
       }
-      if (liveSessionStartupDeferred && liveAgentId !== null) {
+      if (speculativeSessionUnused() && liveAgentId !== null) {
+        await retireUnusedAgent(liveAgentId, daemonClient);
+      } else if (liveSessionStartupDeferred && liveAgentId !== null) {
         await stopDaemonAgentBestEffort({
           deps: params.deps,
           daemonClient,
@@ -2966,6 +3081,8 @@ async function createDeferredDaemonPromptTuiSession(params: {
         });
       }
       await detachLiveSession();
+      // Unused speculative agents a restarting daemon could not take yet.
+      await flushPendingRetirements();
       const pendingControlClient = daemonControlClientPromise;
       if (pendingControlClient !== null) {
         await pendingControlClient.catch(() => {
@@ -2999,6 +3116,26 @@ export const __createDeferredDaemonPromptTuiSessionForTest =
 function isLocalSlashCommandInput(message: string): boolean {
   const trimmed = message.trimStart();
   return trimmed.startsWith("/") && !/[\r\n]/.test(message);
+}
+
+
+/**
+ * A daemon session's report that its daemon connection dropped, is coming
+ * back, or could not bring the session back after a restart.
+ */
+function isDaemonConnectionNotice(event: unknown): boolean {
+  if (!isRecord(event)) return false;
+  if (
+    typeof event.id === "string" &&
+    event.id.startsWith("daemon-runtime-settings-authority-failed-")
+  ) {
+    return true;
+  }
+  return (
+    event.type === "warning" &&
+    isRecord(event.payload) &&
+    event.payload.cause === "daemon_connection_state"
+  );
 }
 
 

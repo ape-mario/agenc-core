@@ -42,6 +42,8 @@ import {
 } from "../state/runtime-settings-snapshot.js";
 
 import { AsyncLock } from "../utils/async-lock.js";
+import { isRecord } from "../utils/record.js";
+import { UNUSED_TUI_PREWARM_STOP_REASON } from "./agent-stop-reasons.js";
 import {
   captureRecoverableCommandEnvironment,
   captureRecoverableSessionEnvironment,
@@ -275,6 +277,61 @@ export class AgenCDaemonAgentLifecycleError extends Error {
     this.name = "AgenCDaemonAgentLifecycleError";
     this.code = code;
   }
+}
+
+/** An untouched rollout is a few KB; anything larger is never treated as one. */
+const MAX_UNTOUCHED_ROLLOUT_BYTES = 1024 * 1024;
+
+/** Canonical events that mean someone used the session. */
+const SESSION_INPUT_EVENT_TYPES = new Set([
+  "message_submission",
+  "user_message",
+  "turn_started",
+]);
+
+/**
+ * Whether a canonical rollout records no input: only the session header and
+ * events, none of them a submission, a user message or a turn. A larger file,
+ * an unreadable one, an unparsable line or any other record kind counts as
+ * input, so only a provably untouched thread qualifies.
+ */
+export function canonicalRolloutHoldsNoInput(rolloutPath: string): boolean {
+  let raw: string;
+  try {
+    const fd = openSync(rolloutPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+    try {
+      const size = fstatSync(fd).size;
+      if (size > MAX_UNTOUCHED_ROLLOUT_BYTES) return false;
+      const bytes = Buffer.alloc(size);
+      let offset = 0;
+      while (offset < size) {
+        const read = readSync(fd, bytes, offset, size - offset, offset);
+        if (read === 0) break;
+        offset += read;
+      }
+      raw = bytes.subarray(0, offset).toString("utf8");
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return false;
+  }
+  for (const line of raw.split("\n")) {
+    if (line.trim().length === 0) continue;
+    let record: unknown;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      return false;
+    }
+    if (!isRecord(record)) return false;
+    if (record.type === "session_meta") continue;
+    if (record.type !== "event_msg" || !isRecord(record.payload)) return false;
+    const msg = record.payload.msg;
+    if (!isRecord(msg) || typeof msg.type !== "string") return false;
+    if (SESSION_INPUT_EVENT_TYPES.has(msg.type)) return false;
+  }
+  return true;
 }
 
 async function startNewBackgroundAgent(
@@ -2067,7 +2124,9 @@ export class AgenCDaemonAgentManager {
     const reason = normalizeNonEmpty(params.reason) ?? "agent.stop";
     const pending = this.#agentStopTasks.get(agentId);
     if (pending !== undefined) return pending.result;
-    const task = this.#stopAgentOnce(agentId, reason);
+    const task = reason === UNUSED_TUI_PREWARM_STOP_REASON
+      ? this.#stopUnusedTuiPrewarm(agentId, reason)
+      : this.#stopAgentOnce(agentId, reason);
     const operation = { result: task };
     this.#agentStopTasks.set(agentId, operation);
     try {
@@ -2077,6 +2136,60 @@ export class AgenCDaemonAgentManager {
         this.#agentStopTasks.delete(agentId);
       }
     }
+  }
+
+  /**
+   * Stop a session the TUI created while its user typed and then never used,
+   * and archive its canonical thread when the thread holds no input: an
+   * untouched TUI leaves no session to list, resume or continue. A daemon
+   * that restarted without restoring the agent still archives the thread.
+   */
+  async #stopUnusedTuiPrewarm(
+    agentId: string,
+    reason: string,
+  ): Promise<AgentStopResult> {
+    let stopped: AgentStopResult | undefined;
+    let notFound: unknown;
+    try {
+      stopped = await this.#stopAgentOnce(agentId, reason);
+    } catch (error) {
+      if (
+        !(error instanceof AgenCDaemonAgentLifecycleError) ||
+        error.code !== "AGENT_NOT_FOUND"
+      ) {
+        throw error;
+      }
+      notFound = error;
+    }
+    const archived = this.#archiveUntouchedThread(agentId);
+    if (stopped !== undefined) return stopped;
+    if (archived) return { agentId, stopped: false };
+    throw notFound;
+  }
+
+  /** Archive a root thread whose canonical rollout records no input. */
+  #archiveUntouchedThread(threadId: string): boolean {
+    const store = this.#threadStore;
+    if (store === undefined) return false;
+    let thread: StoredThread;
+    try {
+      thread = store.readThread({
+        threadId,
+        includeArchived: false,
+        includeHistory: false,
+      });
+    } catch (error) {
+      if (error instanceof ThreadNotFoundError) return false;
+      throw error;
+    }
+    if (
+      thread.rolloutPath === undefined ||
+      !canonicalRolloutHoldsNoInput(thread.rolloutPath)
+    ) {
+      return false;
+    }
+    store.archiveThread({ threadId });
+    return true;
   }
 
   async #stopAgentOnce(agentId: string, reason: string): Promise<AgentStopResult> {
