@@ -918,7 +918,13 @@ function PromptInput({
       setCoordinatorTaskIndex(minCoordinatorIndex);
     }
   }, [coordinatorTaskCount, coordinatorTaskIndex, minCoordinatorIndex]);
-  const [isPasting, setIsPasting] = useState(false);
+  const [isPasting, setIsPastingState] = useState(false);
+  const isPastingRef = useRef(false);
+  const deferredSubmitGestureRef = useRef(false);
+  const setIsPasting = useCallback((next: boolean) => {
+    isPastingRef.current = next;
+    setIsPastingState(next);
+  }, []);
   const [isExternalEditorActive, setIsExternalEditorActive] = useState(false);
   const externalEditorActiveRef = useRef(false);
   const [showQuickOpen, setShowQuickOpen] = useState(false);
@@ -2464,6 +2470,9 @@ function PromptInput({
   // keys in one stdin chunk before the toast's render has caught up.
   useInputCapture(
     (input, key) => {
+      if (key.escape || (key.ctrl && input === "c")) {
+        deferredSubmitGestureRef.current = false;
+      }
       if (input !== "c" || !key.ctrl || !modeSwitcherVisibleRef.current) return false;
       dismissModeSwitcherToast();
       clearSharedDoublePressState("app:interrupt");
@@ -2765,25 +2774,35 @@ function PromptInput({
   // routing, while Autocomplete's higher-priority Enter binding owns suggestion
   // confirmation whenever the picker is active.
   const keybindingContext = useOptionalKeybindingContext();
+  const submitCurrentInput = useCallback(() => {
+    if (isPastingRef.current) {
+      deferredSubmitGestureRef.current = true;
+      return;
+    }
+    dismissModeSwitcherToast();
+    const currentInput = lastInternalInputRef.current;
+    const offset = cursorOffsetRef.current;
+    if (currentInput[offset - 1] === "\\") {
+      pushToBuffer(currentInput, offset, pastedContentsRef.current);
+      trackAndSetInput(`${currentInput.slice(0, offset - 1)}\n${currentInput.slice(offset)}`);
+      setCurrentCursorOffset(offset);
+      return;
+    }
+    void onSubmit(currentInput);
+  }, [onSubmit, trackAndSetInput, setCurrentCursorOffset, pushToBuffer, dismissModeSwitcherToast]);
+  useEffect(() => {
+    if (isPastingRef.current || !deferredSubmitGestureRef.current || !promptKeyboardActive) return;
+    deferredSubmitGestureRef.current = false;
+    submitCurrentInput();
+  }, [isPasting, input, pastedContents, promptKeyboardActive, submitCurrentInput]);
   useEffect(() => {
     if (!keybindingContext || !promptKeyboardActive) return;
     return keybindingContext.registerHandler({
       action: "chat:submit",
       context: "Chat",
-      handler: () => {
-        dismissModeSwitcherToast();
-        const currentInput = lastInternalInputRef.current;
-        const offset = cursorOffsetRef.current;
-        if (currentInput[offset - 1] === "\\") {
-          pushToBuffer(currentInput, offset, pastedContentsRef.current);
-          trackAndSetInput(`${currentInput.slice(0, offset - 1)}\n${currentInput.slice(offset)}`);
-          setCurrentCursorOffset(offset);
-          return;
-        }
-        void onSubmit(currentInput);
-      },
+      handler: submitCurrentInput,
     });
-  }, [keybindingContext, promptKeyboardActive, onSubmit, trackAndSetInput, setCurrentCursorOffset, pushToBuffer, dismissModeSwitcherToast]);
+  }, [keybindingContext, promptKeyboardActive, submitCurrentInput]);
 
   // Chat context keybindings for editing shortcuts
   // Note: history:previous/history:next are NOT handled here. They are passed as

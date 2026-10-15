@@ -1190,6 +1190,40 @@ describe("PromptInput render surface", () => {
     }
   });
 
+  test("retains the intercepted submit gesture until a pending paste updates the draft", async () => {
+    const onSubmit = vi.fn(async () => {});
+    const rendered = await renderPromptInput({ input: "", onSubmit });
+    try {
+      const props = await waitForPromptInputProps();
+      (props.onIsPastingChange as (value: boolean) => void)(true);
+      const gesture = harness.keybindingRegistrations.find(item => item.action === "chat:submit")?.handler as () => void;
+      gesture();
+      gesture();
+      expect(onSubmit).not.toHaveBeenCalled();
+      (props.onPaste as (value: string) => void)("fresh draft");
+      (props.onIsPastingChange as (value: boolean) => void)(false);
+      await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledExactlyOnceWith(
+        "fresh draft", expect.anything(), undefined, expect.anything(),
+      ));
+    } finally { await rendered.dispose(); }
+  });
+
+  test("replays pasted backslash plus Enter as a newline gesture", async () => {
+    const onSubmit = vi.fn(async () => {});
+    const onInputChange = vi.fn();
+    const rendered = await renderPromptInput({ input: "", onSubmit, onInputChange });
+    try {
+      const props = await waitForPromptInputProps();
+      (props.onIsPastingChange as (value: boolean) => void)(true);
+      const gesture = harness.keybindingRegistrations.find(item => item.action === "chat:submit")?.handler as () => void;
+      gesture();
+      (props.onPaste as (value: string) => void)("text\\");
+      (props.onIsPastingChange as (value: boolean) => void)(false);
+      await vi.waitFor(() => expect(onInputChange).toHaveBeenLastCalledWith("text\n"));
+      expect(onSubmit).not.toHaveBeenCalled();
+    } finally { await rendered.dispose(); }
+  });
+
   test("preserves the live draft cursor across an approval overlay unmount", async () => {
     const input = "unsent draft stays editable";
     const composerCursorRef = { current: null as { input: string; offset: number } | null };
