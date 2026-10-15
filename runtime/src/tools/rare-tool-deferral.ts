@@ -41,12 +41,16 @@ export const RARE_DEFERRED_TOOLS: ReadonlyArray<readonly [name: string, purpose:
 
 /**
  * Built-in tools a standard session starts without: each costs schema bytes on
- * every request and one search call on first use. Edit covers MultiEdit's job
- * one replacement at a time; exec_command and Grep cover Orient's. Skill stays:
+ * every request and one search call on first use. On the race task GPT-6 Luna
+ * spent 4 of 10 calls on responses that only updated TodoWrite, whatever the
+ * prompt said, so the plan tool loads when long work needs it. Edit covers
+ * MultiEdit's job one replacement at a time; exec_command and Grep cover
+ * Orient's. Skill stays:
  * the skill listing names skills in every session, and a deferred Skill cost a
  * search call each time the model went for a listed skill.
  */
 export const STANDARD_ON_DEMAND_TOOLS: ReadonlyArray<readonly [name: string, purpose: string]> = [
+  ["TodoWrite", "a visible plan for long work with many steps"],
   ["MultiEdit", "several replacements in one file in one call"],
   ["Orient", "rank the files most relevant to a question in a large repository"],
   ["web_fetch", "fetch a web page"],

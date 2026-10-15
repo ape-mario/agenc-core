@@ -288,7 +288,8 @@ export function getUsingYourToolsSection(
   const hasFileWrite = hasTool("Write");
   const hasGlob = hasTool("Glob");
   const hasGrep = hasTool("Grep");
-  const hasTodoWrite = hasTool("TodoWrite");
+  // A deferred TodoWrite loads with its own description when long work needs it.
+  const hasTodoWrite = hasTool("TodoWrite") && !deferredTools.has("TodoWrite");
   const hasMcpTool =
     enabledTools.has("system.searchTools") ||
     [...enabledTools].some((name) => name.startsWith("mcp."));
