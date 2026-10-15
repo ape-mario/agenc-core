@@ -1610,6 +1610,7 @@ export async function oneShotCLI(
     const startup = resolveCanonicalStartupSelection({
       config,
       env: sessionEnv,
+      ...(startupCliFlags.model !== undefined ? { explicitModel: startupCliFlags.model } : {}),
       ...(profileName !== undefined ? { profileName } : {}),
     });
     const resolvedStartupImages =

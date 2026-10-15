@@ -219,3 +219,37 @@ it("qv honors an invocation-scoped custom endpoint during startup model validati
   expect(code).toBe(0);
   expect(f.call).toHaveBeenCalledWith("agent.create", expect.objectContaining({ model: "private-deployment" }), expect.anything());
 });
+
+
+it.each([false, true])("starts an uncatalogued saved model without an explicit model flag (profile=%s)", async profile => {
+  const f = invocationFixture("saved-model");
+  writeFileSync(join(f.context.env.AGENC_HOME!, "config.toml"),
+    'config_version = 2\nmodel_provider = "deepseek"\n' +
+    (profile ? 'model = "deepseek-flash"\n[profiles.legacy]\n' : '') +
+    'model = "retired-deepseek-model"\n');
+  const context = { ...f.context, argv: [...f.context.argv.slice(0, -1), ...(profile ? ["--profile", "legacy"] : []), "saved-model"] };
+  expect(await oneShotCLI("saved-model", [], undefined, undefined, f.overrides, context)).toBe(0);
+  expect(f.output().stderr).not.toContain("unknown model");
+  expect(f.call).toHaveBeenCalledWith("agent.create", expect.objectContaining({ model: "retired-deepseek-model" }), expect.anything());
+});
+
+it.each(["deepseek-flsh", "deepseek:deepseek-flsh"])("refuses an explicit launch typo %s before agent creation", async model => {
+  const f = invocationFixture("explicit-typo");
+  const context = { ...f.context, argv: [...f.context.argv.slice(0, -1), "--provider", "deepseek", "--model", model, "explicit-typo"] };
+  expect(await oneShotCLI("explicit-typo", [], undefined, undefined, f.overrides, context)).toBe(1);
+  expect(f.output().stderr).toContain("did you mean 'deepseek-flash'?");
+  expect(f.call).not.toHaveBeenCalled();
+});
+
+it("accepts an explicit private launch model at the invocation-scoped endpoint", async () => {
+  vi.stubEnv("OPENAI_BASE_URL", "");
+  const f = invocationFixture("explicit-custom");
+  f.context.env.OPENAI_BASE_URL = "http://localhost:8765/v1";
+  const context = {
+    ...f.context,
+    argv: [...f.context.argv.slice(0, -1), "--provider", "openai", "--model", "private-deployment", "explicit-custom"],
+  };
+  expect(await oneShotCLI("explicit-custom", [], undefined, undefined, f.overrides, context)).toBe(0);
+  expect(f.output().stderr).not.toContain("unknown model");
+  expect(f.call).toHaveBeenCalledWith("agent.create", expect.objectContaining({ model: "private-deployment" }), expect.anything());
+});

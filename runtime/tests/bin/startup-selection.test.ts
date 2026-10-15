@@ -464,13 +464,13 @@ describe("canonical startup ConfigStore layers", () => {
 
 describe("startup catalog admission", () => {
   it("rejects a mistyped launch model with a suggestion", () => {
-    expect(() => resolveCanonicalStartupSelection({ env: {}, config: {
+    expect(() => resolveCanonicalStartupSelection({ env: {}, explicitModel: "deepseek-flsh", config: {
       ...defaultConfig(), model_provider: "deepseek", model: "deepseek-flsh",
     } })).toThrow(/did you mean 'deepseek-flash'/u);
   });
 
   it("accepts custom launch models on an open endpoint", () => {
-    expect(resolveCanonicalStartupSelection({ env: {}, config: {
+    expect(resolveCanonicalStartupSelection({ env: {}, explicitModel: "private-model", config: {
       ...defaultConfig(), model_provider: "openai-compatible", model: "private-model",
     } })).toMatchObject({ provider: "openai-compatible", model: "private-model" });
   });
@@ -483,6 +483,7 @@ describe("startup endpoint environment authority", () => {
     try {
       expect(resolveCanonicalStartupSelection({
         config: { ...defaultConfig(), model_provider: "openai", model: "private-deployment" },
+        explicitModel: "private-deployment",
         env: { OPENAI_BASE_URL: "http://localhost:8765/v1" },
       })).toMatchObject({ provider: "openai", model: "private-deployment" });
     } finally {
@@ -495,10 +496,29 @@ describe("startup endpoint environment authority", () => {
     try {
       expect(() => resolveCanonicalStartupSelection({
         config: { ...defaultConfig(), model_provider: "openai", model: "gpt-5-typo" },
+        explicitModel: "gpt-5-typo",
         env: {},
       })).toThrow(/unknown model.*did you mean/u);
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+
+describe("saved startup model compatibility", () => {
+  it.each([undefined, "legacy"])("accepts an uncatalogued saved model with profile %s", profileName => {
+    expect(resolveCanonicalStartupSelection({
+      config: { ...defaultConfig(), model_provider: "deepseek", model: "retired-deepseek-model" },
+      env: {},
+      ...(profileName === undefined ? {} : { profileName }),
+    })).toMatchObject({ provider: "deepseek", model: "retired-deepseek-model" });
+  });
+
+  it("still enforces managed policy for a saved model", () => {
+    expect(() => resolveCanonicalStartupSelection({
+      config: { ...defaultConfig(), model_provider: "deepseek", model: "retired-deepseek-model", availableModels: ["deepseek-flash"] },
+      env: {},
+    })).toThrow(/managed availableModels policy/u);
   });
 });

@@ -3160,7 +3160,7 @@ export async function bootTUIEntry(
             ? { provider: startupCliFlags.provider }
             : {}),
           ...(startupCliFlags.model !== undefined
-            ? { model: startupCliFlags.model }
+            ? { model: startupCliFlags.model, explicitModel: startupCliFlags.model }
             : {}),
           ...(startupCliFlags.profile !== undefined
             ? { profile: startupCliFlags.profile }
@@ -3260,6 +3260,7 @@ export async function bootTUIEntry(
       const startup = resolveCanonicalStartupSelection({
         config,
         env: sessionEnv,
+        ...(startupCliFlags.model !== undefined ? { explicitModel: startupCliFlags.model } : {}),
         ...(profileName !== undefined ? { profileName } : {}),
       });
       const initialContent = startupContentFromInputs(

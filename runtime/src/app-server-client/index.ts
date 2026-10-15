@@ -332,6 +332,8 @@ export interface AgenCDaemonOnlyTuiContextOptions {
   /** Immutable daemon-owned role authority, separate from execution cwd. */
   readonly roleWorkspace?: Pick<AgentRoleWorkspace, "id" | "cwd">;
   readonly model?: string;
+  /** User-typed --model value, separate from a restored selection. */
+  readonly explicitModel?: string;
   readonly provider?: string;
   readonly profile?: string;
   readonly configPath?: string;
@@ -794,6 +796,9 @@ async function createBoundAgenCDaemonOnlyTuiContext(
   const startup = resolveCanonicalStartupSelection({
     config: effectiveConfig,
     env: providerEnvironment,
+    ...(options.explicitModel !== undefined
+      ? { explicitModel: options.explicitModel }
+      : {}),
     ...(profileName !== undefined ? { profileName } : {}),
   });
   const skillsServices = createLocalSkillsServices({
