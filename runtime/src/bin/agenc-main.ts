@@ -1180,6 +1180,14 @@ async function handleLocalTuiSlashCommand(params: {
 }
 
 
+/**
+ * The objective a speculatively provisioned TUI session carries until its
+ * first prompt: the daemon's label for an interactive session that has not
+ * been messaged yet (the desktop app creates its sessions the same way). The
+ * rollout's canonical objective is still whatever the user types first.
+ */
+const SPECULATIVE_TUI_SESSION_LABEL = "Interactive session";
+
 async function createDeferredDaemonPromptTuiSession(params: {
   readonly baseSession: unknown;
   readonly deps: AgenCDaemonCliDeps;
@@ -1200,6 +1208,11 @@ async function createDeferredDaemonPromptTuiSession(params: {
   readonly initialNotice?: string;
 }): Promise<{
   readonly session: unknown;
+  /**
+   * Create the turn-deferred daemon session in the background while the user
+   * types, so the first prompt starts its turn at once. Safe to skip.
+   */
+  readonly prewarm: () => void;
   readonly close: () => Promise<void>;
 }> {
   const configStore = requireTuiSessionConfigStore(params.baseSession);
@@ -1223,6 +1236,15 @@ async function createDeferredDaemonPromptTuiSession(params: {
   // lifecycle hooks, so the TUI must continue owning daemon teardown.
   let liveSessionAwaitingFirstTurn = false;
   let liveSessionStartupDeferred = false;
+  // Speculative provisioning (`prewarm`): while the user types the first
+  // prompt, create the turn-deferred daemon session that prompt would
+  // otherwise create after Enter. Every other entry point waits for it
+  // first, so it is either the session they would have used or, when it
+  // fails or a staged change outdates it, invisible.
+  let speculativeStartup: Promise<void> | null = null;
+  let speculativeSession: TuiSessionShape | null = null;
+  let speculativeStale = false;
+  const speculativeDiscards = new Set<Promise<void>>();
   let daemonClient: Awaited<
     ReturnType<typeof createConnectedAgenCJsonLineDaemonTuiClient>
   > | null = null;
@@ -1702,7 +1724,9 @@ async function createDeferredDaemonPromptTuiSession(params: {
     firstMessage: string,
     firstSubmitOptions?: SessionSubmitOptions,
     deferInitialTurn = false,
+    speculative = false,
   ): Promise<TuiSessionShape | null> => {
+    if (!speculative) await awaitSpeculativeStartup();
     if (deferredSessionClosed) {
       throw new Error("Deferred TUI session is already closed.");
     }
@@ -1760,7 +1784,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
         return null;
       }
       const prompt = deferInitialTurn
-        ? "AgenC Editor workspace"
+        ? (speculative ? SPECULATIVE_TUI_SESSION_LABEL : "AgenC Editor workspace")
         : preparedFirstMessage.trim().length > 0
           ? preparedFirstMessage
           : "Multimodal AgenC startup";
@@ -1936,6 +1960,89 @@ async function createDeferredDaemonPromptTuiSession(params: {
     }
   };
 
+  /** The barrier every entry point passes before it reads the live session. */
+  const awaitSpeculativeStartup = async (): Promise<void> => {
+    const pending = speculativeStartup;
+    if (pending !== null) await pending;
+  };
+
+  /**
+   * Any other use (a shell command, rule edit or goal) makes the speculative
+   * session the ordinary turn-deferred session that use would have created.
+   */
+  const claimLiveSession = (
+    live: TuiSessionShape | null,
+  ): TuiSessionShape | null => {
+    if (live !== null && live === speculativeSession) speculativeSession = null;
+    return live;
+  };
+
+  /** The speculative session exists and no first prompt has used it. */
+  const speculativeSessionUnused = (): boolean =>
+    speculativeSession !== null &&
+    liveSession === speculativeSession &&
+    liveSessionAwaitingFirstTurn &&
+    liveSessionStartupDeferred;
+
+  /**
+   * Return to the cold state a staged startup change expects: detach now,
+   * then stop the unused agent with the reason a TUI closed before its first
+   * prompt uses. The next prompt creates its session as it would have.
+   */
+  const discardSpeculativeSession = (): void => {
+    const agentId = liveAgentId;
+    const client = daemonClient;
+    daemonClient = null;
+    speculativeSession = null;
+    const detached = detachLiveSession();
+    const discard = (async () => {
+      await detached;
+      if (agentId !== null) {
+        await stopDaemonAgentBestEffort({
+          deps: params.deps,
+          daemonClient: client,
+          env: params.env,
+          agentId,
+          reason: "tui_closed_before_submit",
+        });
+      }
+      await client?.close().catch(() => {
+        /* best effort */
+      });
+    })();
+    speculativeDiscards.add(discard);
+    void discard.finally(() => speculativeDiscards.delete(discard));
+  };
+
+  const prewarm = (): void => {
+    if (
+      deferredSessionClosed ||
+      liveSession !== null ||
+      liveSessionPromise !== null ||
+      speculativeStartup !== null
+    ) {
+      return;
+    }
+    speculativeStale = false;
+    const startup = (async () => {
+      let created: TuiSessionShape | null;
+      try {
+        created = await ensureLiveSession("", undefined, true, true);
+      } catch {
+        // Invisible: the first prompt starts its session as before.
+        return;
+      }
+      speculativeSession = created;
+      if (speculativeStale && speculativeSessionUnused()) {
+        discardSpeculativeSession();
+      }
+    })();
+    speculativeStartup = startup;
+    void startup.finally(() => {
+      if (speculativeStartup === startup) speculativeStartup = null;
+    });
+  };
+
   const submitToDeferredFirstTurn = async (
     message: string,
     opts?: SessionSubmitOptions,
@@ -2078,6 +2185,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
     // state before then; it intentionally replaces any bootstrap manager.
     services: deferredServices,
     useSessionProviderKey: async (provider, apiKey) => {
+      await awaitSpeculativeStartup();
       if (deferredSessionClosed || liveSessionPromise !== null) {
         throw new Error("Wait for session startup to finish, then try again.");
       }
@@ -2112,6 +2220,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
         (goalParams.action === "set"
           ? await ensureLiveSession("", undefined, true)
           : null);
+      if (goalParams.action === "set") claimLiveSession(live);
       if (live === null) return { ok: false, message: "No goal is set." };
       if (typeof live.updateDaemonSessionGoal !== "function") {
         throw new Error("This daemon session does not support /goal.");
@@ -2150,8 +2259,9 @@ async function createDeferredDaemonPromptTuiSession(params: {
     // ambiguous transport failure is never replayed against a new session.
     executeShellCommand: async (shellParams) => {
       shellParams.signal?.throwIfAborted();
-      const live =
-        liveSession ?? (await ensureLiveSession("", undefined, true));
+      const live = claimLiveSession(
+        liveSession ?? (await ensureLiveSession("", undefined, true)),
+      );
       const execute = live?.executeShellCommand;
       if (live === null || typeof execute !== "function") {
         throw new Error(
@@ -2285,6 +2395,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
       return live.extendCompactionRollbackRetention(retentionParams);
     },
     applyProviderModelSelection: async (selection) => {
+      await awaitSpeculativeStartup();
       const live = liveSession as TuiSessionShape | null;
       if (live !== null) {
         if (typeof live.applyProviderModelSelection !== "function") {
@@ -2308,6 +2419,13 @@ async function createDeferredDaemonPromptTuiSession(params: {
     // Once a live daemon session exists every caller must use the awaited
     // authority above so rejection and disconnects cannot be hidden.
     setPendingProviderSwitch: (pending) => {
+      // A synchronous staging site cannot wait for speculative startup. The
+      // staged choice is for a session that does not exist yet, so retire
+      // the unused speculative one (now, or when its startup lands).
+      if (pending !== null) {
+        if (speculativeStartup !== null) speculativeStale = true;
+        else if (speculativeSessionUnused()) discardSpeculativeSession();
+      }
       const live = liveSession as TuiSessionShape | null;
       if (live !== null) {
         throw new Error(
@@ -2325,6 +2443,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
     // synthetic SessionSetPermissionModeResult so `/permissions mode` and
     // `/plan` report honest success instead of throwing / silently faking.
     setDaemonPermissionMode: async (mode) => {
+      await awaitSpeculativeStartup();
       // A cold rule edit or shell command may already have dispatched startup
       // with the old mode. Wait for that session and commit through its live
       // authority; staging now would be overwritten by the attach snapshot.
@@ -2387,7 +2506,9 @@ async function createDeferredDaemonPromptTuiSession(params: {
     // Create a turn-free session for a cold edit, so no first model turn can
     // start before the daemon has acknowledged its permission rules.
     mutateDaemonPermissionRule: async (ruleParams) => {
-      const live = liveSession ?? (await ensureLiveSession("", undefined, true));
+      const live = claimLiveSession(
+        liveSession ?? (await ensureLiveSession("", undefined, true)),
+      );
       if (typeof live?.mutateDaemonPermissionRule !== "function") {
         throw new Error("Permission-rule editing is not supported by this daemon session.");
       }
@@ -2433,6 +2554,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
     // session. Before the first turn, stage the profile and reload only the
     // daemon-global snapshot used by Editor prediction.
     applyDaemonConfig: async (configParams) => {
+      await awaitSpeculativeStartup();
       if (liveSession === null) {
         if (configParams.profile !== undefined) {
           pendingProfile = configParams.profile;
@@ -2482,6 +2604,10 @@ async function createDeferredDaemonPromptTuiSession(params: {
           : null),
     },
     submit: async (message, opts) => {
+      if (deferredSessionClosed) {
+        throw new Error("Deferred TUI session is already closed.");
+      }
+      await awaitSpeculativeStartup();
       if (deferredSessionClosed) {
         throw new Error("Deferred TUI session is already closed.");
       }
@@ -2817,8 +2943,11 @@ async function createDeferredDaemonPromptTuiSession(params: {
 
   return {
     session,
+    prewarm,
     close: async () => {
       deferredSessionClosed = true;
+      await awaitSpeculativeStartup();
+      await Promise.all(speculativeDiscards);
       const pendingLiveSession = liveSessionPromise;
       if (pendingLiveSession !== null) {
         await pendingLiveSession.catch(() => {
@@ -3050,6 +3179,33 @@ async function resumeColdDaemonSession(params: {
 }
 
 
+async function prewarmDeferredTuiSession(
+  deferred: { readonly prewarm: () => void },
+  context: { readonly agencHome: string; readonly env: NodeJS.ProcessEnv },
+): Promise<void> {
+  // Only an interactive terminal has a user still typing the first prompt;
+  // driven input arrives at once and takes the cold path unchanged.
+  if (process.stdin.isTTY !== true) return;
+  try {
+    const { shouldShowFirstRunOnboarding } = await import(
+      "../onboarding/projectOnboardingState.js"
+    );
+    if (
+      shouldShowFirstRunOnboarding({
+        agencHome: context.agencHome,
+        env: context.env,
+        hasInitialPrompt: false,
+        isInteractive: process.stdin.isTTY === true,
+      })
+    ) {
+      return;
+    }
+    deferred.prewarm();
+  } catch {
+    // Provisioning ahead of the first prompt is an optimization only.
+  }
+}
+
 /** Boot the TUI, preserving argv prompts and any pre-Ink typed draft text. */
 export async function bootTUIEntry(
   args: BootTUIEntryArgs,
@@ -3230,6 +3386,13 @@ export async function bootTUIEntry(
               : {}),
           });
           activeInkUnmount = handle.unmount;
+          // Provision the daemon session while the user types the first
+          // prompt, except when first-run onboarding may still choose the
+          // provider and model that session must start with.
+          void prewarmDeferredTuiSession(deferred, {
+            agencHome: configStore.agencHome,
+            env: sessionEnv,
+          });
           await handle.waitUntilExit();
         } finally {
           activeInkUnmount = null;
