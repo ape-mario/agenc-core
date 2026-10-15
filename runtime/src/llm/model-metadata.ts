@@ -662,6 +662,9 @@ export function hasDynamicProviderModelCatalog(
   provider: string,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
+  // Venice's IDs come from its /models list; the bundled snapshot is only the
+  // offline fallback, so an ID missing from it is not a typo.
+  if (normalizeMetadataProviderIdentity(provider) === "venice") return true;
   return shouldPreferDynamicMetadata({ config, provider, model: "" }, env);
 }
 

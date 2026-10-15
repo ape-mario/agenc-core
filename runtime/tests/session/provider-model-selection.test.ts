@@ -97,13 +97,25 @@ describe("model catalog admission", () => {
     },
   );
 
-  test.each(["venice", "grok", "openai", "anthropic"])(
+  test.each(["grok", "openai", "anthropic"])(
     "rejects unknown names on %s", (provider) => {
       expect(() => resolveProviderModelSelection({}, current, {
         model_provider: provider, model: "xyz",
       }, {})).toThrow(/unknown model .*did you mean/iu);
     },
   );
+
+  // Venice's list is its live /models answer (128 tool-capable models on
+  // 2026-10-15), not the 3-model offline snapshot; Venice itself refuses an
+  // ID it does not serve before the first request.
+  test.each([
+    [{ model_provider: "venice", model: "deepseek-v4-flash" }, "deepseek-v4-flash"],
+    [{ model: "venice:claude-opus-5-5" }, "claude-opus-5-5"],
+    [{ model_provider: "venice", model: "qwen3-5-397b-a17b" }, "qwen3-5-397b-a17b"],
+  ] as const)("accepts a live Venice model the bundled snapshot lacks: %o", (layer, model) => {
+    expect(resolveProviderModelSelection({}, current, layer, {}))
+      .toMatchObject({ provider: "venice", model });
+  });
 
   test.each(["ollama", "lmstudio", "openai-compatible", "openrouter"])(
     "accepts a custom name on open provider %s", (provider) => {

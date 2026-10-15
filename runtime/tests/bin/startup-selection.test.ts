@@ -474,6 +474,12 @@ describe("startup catalog admission", () => {
       ...defaultConfig(), model_provider: "openai-compatible", model: "private-model",
     } })).toMatchObject({ provider: "openai-compatible", model: "private-model" });
   });
+
+  it("accepts a live Venice model the bundled snapshot lacks (--model venice:claude-opus-5-5)", () => {
+    expect(resolveCanonicalStartupSelection({ env: {}, explicitModel: "venice:claude-opus-5-5", config: {
+      ...defaultConfig(), model_provider: "venice", model: "claude-opus-5-5",
+    } })).toMatchObject({ provider: "venice", model: "claude-opus-5-5" });
+  });
 });
 
 

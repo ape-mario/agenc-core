@@ -18,6 +18,7 @@ import { readCommandConfig, requireCommandConfigStore } from "./config-context.j
 import { readBuiltInSessionSelection } from "../session/provider-model-selection.js";
 import { createProviderCommandAccessOverlay } from "./provider-command-access.js";
 import type { SlashCommandContext } from "./types.js";
+import { readVeniceMenuModels } from "./venice-menu-models.js";
 
 export type ModelRowStatus =
   | "current"
@@ -245,7 +246,11 @@ function readModelMenuSnapshotFromStorage(ctx: SlashCommandContext): ModelMenuSn
   const currentModel = sessionSelection.model;
   const configuredModel =
     config !== undefined ? configuredModelForProvider(config, provider) : undefined;
-  const catalog = buildProviderModelCatalog(config);
+  // Venice's own list replaces its bundled snapshot once the menu has read it.
+  const veniceModels = readVeniceMenuModels(ctx);
+  const catalog = veniceModels === undefined
+    ? buildProviderModelCatalog(config)
+    : { ...buildProviderModelCatalog(config), venice: veniceModels.map(entry => entry.model) };
   const accessOverlay = createProviderCommandAccessOverlay(ctx);
   const accessFor = (catalogProvider: ProviderSlug, model: string) =>
     accessOverlay.inspect({ provider: catalogProvider, model });

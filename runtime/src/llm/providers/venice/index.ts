@@ -40,8 +40,10 @@ export class VeniceProvider extends OpenAIProvider {
   async #discover(model: string): Promise<void> {
     const discovered = await this.#metadata.discoverVeniceModels(this.#catalogConfig);
     this.#models = discovered ?? VENICE_MODELS;
+    // Selection accepts any Venice ID (its catalog is this live list), so a
+    // mistyped one stops here, before any request.
     if (discovered && !discovered.some(entry => entry.model === model)) {
-      throw new LLMProviderError("venice", "Select an online text model that supports function calling.");
+      throw new LLMProviderError("venice", `${model} is not an online Venice text model that supports function calling.`);
     }
   }
 

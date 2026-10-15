@@ -15,6 +15,7 @@ import {
 } from "./provider-command-access.js";
 import { readBuiltInSessionSelection } from "../session/provider-model-selection.js";
 import type { SlashCommandContext } from "./types.js";
+import { readVeniceMenuModels } from "./venice-menu-models.js";
 
 type ProviderRowStatus = "current" | "configured" | "default";
 export type ProviderAuthState = "managed" | "ready" | "missing" | "optional";
@@ -250,8 +251,12 @@ export function readProviderMenuSnapshot(ctx: SlashCommandContext): ProviderMenu
   const currentProvider = sessionSelection.provider;
   const currentModel = sessionSelection.model;
   const modelCatalog = buildProviderModelCatalog(config);
-  const veniceModels = ctx.session.services?.modelsManager?.tryListModels()
-    ?.filter(entry => entry.provider === "venice");
+  // The TUI has no models manager (the session runs in the daemon), so the
+  // list the menu read from Venice comes first.
+  const veniceModels = readVeniceMenuModels(ctx)
+    ?.map(entry => ({ slug: entry.model, isDefault: entry.functionCallingDefault })) ??
+    ctx.session.services?.modelsManager?.tryListModels()
+      ?.filter(entry => entry.provider === "venice");
 
   const unsortedRows = listBuiltInProviderInfo().map((info): ProviderMenuRow => {
     const provider = info.id;

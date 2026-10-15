@@ -1041,8 +1041,15 @@ Authenticated `GET /models` discovery offers online text models with
 `availableContextTokens` and `maxCompletionTokens` for limits, and maps
 reasoning, supported effort levels, vision, and USD pricing per million
 tokens. Core stores rates per thousand tokens. The active Venice session's
-model picker and cost sidecar use discovered facts. A small static catalog
-supports offline listing when discovery is unavailable.
+cost sidecar uses discovered facts.
+
+The `/providers` and `/model` screens read this list with the key the session
+uses: `VENICE_API_KEY`, a key just entered in the screen, or the saved key.
+They read it again after a key is saved or replaced. When the list cannot be
+read, they show a small bundled catalog and say so. Any ID from the live list
+can be selected, in the screens, with `/model venice:<id>`, or with
+`--model venice:<id>`. An ID that Venice does not list is refused before the
+first request.
 
 The `function_calling_default` trait selects the discovered provider default.
 The offline fallback is `zai-org-glm-5-2`. Explicit model selections and

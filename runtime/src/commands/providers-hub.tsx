@@ -38,11 +38,23 @@ import {
   type ProvidersHubSnapshot,
 } from "./providers-hub-snapshot.js";
 import type { SlashCommandContext } from "./types.js";
+import {
+  loadVeniceMenuModels,
+  readVeniceMenuModels,
+  VENICE_MODEL_LIST_UNAVAILABLE_NOTE,
+} from "./venice-menu-models.js";
 
 export type ProvidersHubServices = {
   readonly reload: () => ProvidersHubSnapshot;
   readonly probeLocal: () => Promise<ReadonlySet<ProviderSlug>>;
   readonly modelsFor: (provider: ProviderSlug) => readonly ProvidersHubModelRow[];
+  /**
+   * Ask a provider that publishes its own model list (Venice) for it; once it
+   * settles, `modelsFor` returns that list. Null when there is nothing to wait
+   * for: a fixed list, or one read moments ago. `note` says why the bundled
+   * list stays.
+   */
+  readonly refreshModels?: (provider: ProviderSlug) => Promise<{ readonly note?: string }> | null;
   readonly connect: (provider: ProviderSlug, apiKey: string) => Promise<ProvidersHubActionResult>;
   readonly choose: (provider: ProviderSlug, model: string) => Promise<ProvidersHubActionResult>;
   readonly forget: (provider: ProviderSlug) => ProvidersHubActionResult;
@@ -75,6 +87,19 @@ type View =
   | { readonly kind: "info"; readonly row: ProvidersHubRow };
 
 type Notice = { readonly text: string; readonly failed: boolean } | null;
+
+/** A provider's own model list being read, or why the bundled one stays. */
+type ModelsLoad = {
+  readonly provider: ProviderSlug;
+  readonly loading: boolean;
+  readonly note?: string;
+} | null;
+
+/** Which entry the cursor is on, so it stays there when the list changes. */
+function entryIdentity(entry: ModelEntry | undefined): string | undefined {
+  if (entry === undefined) return undefined;
+  return entry.kind === "model" ? `model:${entry.row.model}` : entry.kind;
+}
 
 function dotColor(row: ProvidersHubRow): "success" | "error" | "inactive" {
   if (row.connection === "error") return "error";
@@ -156,12 +181,18 @@ function ModelsView({
   activeIndex,
   busy,
   notice,
+  loading = false,
+  note,
 }: {
   readonly row: ProvidersHubRow;
   readonly entries: readonly ModelEntry[];
   readonly activeIndex: number;
   readonly busy: boolean;
   readonly notice: Notice;
+  /** The provider's own model list is being read. */
+  readonly loading?: boolean;
+  /** Why the bundled model list is shown. */
+  readonly note?: string;
 }): React.ReactNode {
   const models = entries.filter((entry) => entry.kind === "model").length;
   return (
@@ -169,9 +200,12 @@ function ModelsView({
       title={row.name}
       count={`${models} ${models === 1 ? "model" : "models"}`}
       summary={row.status}
-      headerRight={busy ? "working" : undefined}
+      headerRight={busy ? "working" : loading ? "loading models" : undefined}
       closeHint="esc to go back"
       hint={notice?.text}
+      {...(note === undefined ? {} : {
+        detail: <ThemedText color="warning" wrap="wrap">{note}</ThemedText>,
+      })}
       columns={[3, 44, 20]}
       headers={["", "model", ""]}
       items={entries}
@@ -385,6 +419,54 @@ export function ProvidersHubView({
       ? { kind: "list" }
       : { kind: "models", row, entries: modelEntries(row, services.modelsFor(row.provider)) };
   });
+  const [modelsLoad, setModelsLoad] = React.useState<ModelsLoad>(null);
+  // A model list that arrives later applies to the screen shown then.
+  const viewRef = React.useRef(view);
+  viewRef.current = view;
+  const modelIndexRef = React.useRef(modelIndex);
+  modelIndexRef.current = modelIndex;
+  const loadGeneration = React.useRef(0);
+  const mounted = React.useRef(true);
+  React.useEffect(() => () => {
+    mounted.current = false;
+  }, []);
+
+  /** Read a provider's own model list, then show it in place of the bundled one. */
+  const refreshModels = React.useCallback(
+    (row: ProvidersHubRow) => {
+      const generation = ++loadGeneration.current;
+      const pending = services.refreshModels?.(row.provider) ?? null;
+      if (pending === null) {
+        setModelsLoad(null);
+        return;
+      }
+      setModelsLoad({ provider: row.provider, loading: true });
+      void pending.then(
+        (result) => result,
+        (): { readonly note?: string } => ({}),
+      ).then((result) => {
+        if (!mounted.current || generation !== loadGeneration.current) return;
+        setModelsLoad({
+          provider: row.provider,
+          loading: false,
+          ...(result.note === undefined ? {} : { note: result.note }),
+        });
+        const current = viewRef.current;
+        if (current.kind !== "models" || current.row.provider !== row.provider) return;
+        const entries = modelEntries(current.row, services.modelsFor(row.provider));
+        const active = entryIdentity(current.entries[modelIndexRef.current]);
+        setView({ ...current, entries });
+        setModelIndex(Math.max(0, entries.findIndex((entry) => entryIdentity(entry) === active)));
+      });
+    },
+    [services],
+  );
+
+  React.useEffect(() => {
+    // `/model` opens straight on the current provider's models.
+    const opened = viewRef.current;
+    if (opened.kind === "models") refreshModels(opened.row);
+  }, [refreshModels]);
 
   const shown = React.useMemo(() => {
     const base = probed === null ? snapshot : withLocalProbe(snapshot, probed);
@@ -412,9 +494,14 @@ export function ProvidersHubView({
       const current = entries.findIndex((entry) => entry.kind === "model" && entry.row.current);
       setModelIndex(Math.max(0, current));
       setNotice(message === undefined ? null : { text: message, failed: false });
-      setView({ kind: "models", row, entries });
+      const next: View = { kind: "models", row, entries };
+      viewRef.current = next;
+      modelIndexRef.current = Math.max(0, current);
+      setView(next);
+      // Also after a key is saved or replaced: the list is read with that key.
+      refreshModels(row);
     },
-    [services],
+    [services, refreshModels],
   );
 
   /** Re-read the snapshot and return this provider's fresh row. */
@@ -575,16 +662,19 @@ export function ProvidersHubView({
         setView({ kind: "list" });
         return;
       }
+      // A provider's own list can replace the entries while this view is
+      // open, a moment before this handler sees them: use what is on screen.
+      const onScreen = viewRef.current.kind === "models" ? viewRef.current.entries : view.entries;
       if (key.upArrow) {
-        setModelIndex((index) => previousMenuIndex(index, view.entries.length));
+        setModelIndex((index) => previousMenuIndex(index, onScreen.length));
         return;
       }
       if (key.downArrow) {
-        setModelIndex((index) => nextMenuIndex(index, view.entries.length));
+        setModelIndex((index) => nextMenuIndex(index, onScreen.length));
         return;
       }
       if (!key.return) return;
-      const entry = view.entries[modelIndex];
+      const entry = onScreen[modelIndexRef.current];
       if (entry === undefined) return;
       if (entry.kind === "replace-key") {
         setKeyValue("");
@@ -626,8 +716,12 @@ export function ProvidersHubView({
         const updated = next.rows.find((candidate) => candidate.provider === view.row.provider);
         setNotice({ text: result.message, failed: !result.ok });
         if (updated !== undefined) {
-          setView({ kind: "models", row: updated, entries: modelEntries(updated, services.modelsFor(updated.provider)) });
+          const models: View = { kind: "models", row: updated, entries: modelEntries(updated, services.modelsFor(updated.provider)) };
+          viewRef.current = models;
+          modelIndexRef.current = 0;
+          setView(models);
           setModelIndex(0);
+          refreshModels(updated);
         }
         return;
       }
@@ -694,6 +788,7 @@ export function ProvidersHubView({
   }
   if (view.kind === "signin") return <SignInView row={view.row} progress={view.progress} />;
   if (view.kind === "models") {
+    const load = modelsLoad?.provider === view.row.provider ? modelsLoad : null;
     return (
       <ModelsView
         row={view.row}
@@ -701,6 +796,8 @@ export function ProvidersHubView({
         activeIndex={modelIndex}
         busy={busy}
         notice={notice}
+        loading={load?.loading === true}
+        {...(load?.note === undefined ? {} : { note: load.note })}
       />
     );
   }
@@ -763,6 +860,14 @@ function servicesFor(ctx: SlashCommandContext): ProvidersHubServices {
       return new Set(running);
     },
     modelsFor: (provider) => readProvidersHubModels(ctx, provider),
+    refreshModels: (provider) => provider !== "venice" || readVeniceMenuModels(ctx) !== undefined
+      ? null
+      : loadVeniceMenuModels(ctx).then(
+          (result) => result.source === "bundled" && result.reason === "unavailable"
+            ? { note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }
+            : {},
+          () => ({ note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }),
+        ),
     connect: (provider, apiKey) => connectProviderWithKey(ctx, provider, apiKey),
     choose: (provider, model) => chooseProviderModel(ctx, provider, model),
     forget: (provider) => forgetProviderKey(ctx, provider),
