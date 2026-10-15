@@ -631,7 +631,7 @@ optional `headers`), `github` (`repo`, optional `ref`, `path`, `sparsePaths`),
 | `sandbox.network.allowManagedDomainsOnly` | Use only managed allowed-domain inputs. |
 | `sandbox.network.allowUnixSockets` | Allowed Unix-socket path string array. |
 | `sandbox.network.allowAllUnixSockets` | Boolean opt-out from Unix-socket blocking. |
-| `sandbox.network.allowLocalBinding` | Allow local listening sockets. On Linux with restricted networking, requires bubblewrap and keeps servers inside a private loopback network namespace. Host access and external networking remain blocked. Default: off. |
+| `sandbox.network.allowLocalBinding` | Allow local listening sockets. On Linux with restricted networking, requires bubblewrap and keeps servers inside a private loopback network namespace. Host access and external networking remain blocked. On Linux, start and test the server in the same command; a separate tool call can use a different network namespace and cannot reach that listener. Default: off. |
 | `sandbox.network.httpProxyPort` | HTTP proxy TCP port, integer `1..65535`. |
 | `sandbox.network.socksProxyPort` | SOCKS proxy TCP port, integer `1..65535`. |
 | `sandbox.filesystem` | Filesystem-policy block. Unknown fields are rejected. |
