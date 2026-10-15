@@ -3,6 +3,9 @@
  * authoritatively, or the side-effecting call is journaled as an unknown outcome and fences every later tool in
  * the session (Terminal-Bench 4.0, DeepSeek nextjs-performance, 2026-09-14). Adapted from Codex's review fixture.
  */
+import { chmodSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const seam = vi.hoisted(() => ({
@@ -175,4 +178,49 @@ describe("Browser tool when no browser executable can be resolved", () => {
       await disposeSandboxExecutionBroker(broker);
     }
   });
+
+  it.skipIf(process.platform === "win32")(
+    "refuses a snap inside AgenC's Linux sandbox before any launch, with no effect",
+    async () => {
+      const root = mkdtempSync(join(tmpdir(), "agenc-browser-snap-"));
+      // snapd's layout: the app is a link to the `snap` launcher.
+      const launcher = join(root, "snap");
+      writeFileSync(launcher, "\u007fELF snapd launcher");
+      chmodSync(launcher, 0o755);
+      const snapChromium = join(root, "chromium");
+      symlinkSync(launcher, snapChromium);
+      const sandbox = new SandboxExecutionBroker({ mode: "workspace_write", cwd: root });
+      const manager = new BrowserManager({
+        policy: { executablePath: snapChromium, headless: true, noSandbox: false, allowPrivateNetwork: false, navigationTimeoutMs: 1000 },
+        sandboxExecutionBroker: sandbox,
+      });
+      const tool = createBrowserTool({ manager });
+      const args: Record<string, unknown> = { action: "navigate", url: "http://127.0.0.1:3000/" };
+      attachSandboxExecutionBroker(args, sandbox, "browser");
+      // The snap rule is Linux only; the host running this test may be macOS.
+      const host = Object.getOwnPropertyDescriptor(process, "platform");
+      if (host === undefined) throw new Error("process.platform descriptor is unavailable");
+      try {
+        Object.defineProperty(process, "platform", { ...host, value: "linux" });
+        const result = await tool.execute(args);
+        Object.defineProperty(process, "platform", host);
+
+        expect(result.isError).toBe(true);
+        expect(result.content).toContain(
+          `${snapChromium} is a snap package. Snap packages cannot start inside AgenC's sandbox.`,
+        );
+        expect(seam.launches).not.toHaveBeenCalled();
+        expect(seam.stops).toHaveBeenCalledOnce();
+        expect(result.effectDisposition).toMatchObject({
+          disposition: "confirmed_no_effect",
+          evidenceKind: "boundary_not_crossed",
+          evidenceRef: "tool:Browser:launch-executable-not-found",
+        });
+      } finally {
+        Object.defineProperty(process, "platform", host);
+        await disposeSandboxExecutionBroker(sandbox);
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 });

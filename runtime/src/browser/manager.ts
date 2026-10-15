@@ -788,6 +788,9 @@ export class BrowserManager {
     try {
       const executablePath = resolveBrowserExecutable(
         this.#options.policy.executablePath,
+        process.env,
+        // A required sandbox confines the browser too; on Linux a snap cannot start there.
+        { insideAgencSandbox: this.#options.sandboxExecutionBroker?.required === true },
       );
       const userDataDir = this.#ensureProfileDir();
       launched = await launchBrowser({

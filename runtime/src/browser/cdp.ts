@@ -22,6 +22,7 @@ import {
 } from "../sandbox/execution-broker.js";
 import { scrubEnvForChildProcess } from "../unified-exec/scrub-env.js";
 import { terminateProcessTreeAndWait } from "../utils/supervisedProcess.js";
+import { SNAP_IN_SANDBOX_HINT } from "./executable.js";
 
 const NUL = "\0";
 const DEFAULT_COMMAND_TIMEOUT_MS = 30_000;
@@ -589,6 +590,14 @@ export async function launchBrowser(
 const CHROMIUM_OWN_SANDBOX_ABORT =
   /SUID sandbox helper binary was found, but is not configured correctly|No usable sandbox!/;
 
+/**
+ * What snap printed on Ubuntu 26.04 when a snap browser that detection did not
+ * recognize reached AgenC's Linux sandbox: the `snap` launcher parsing
+ * Chromium's flags as its own, or `snap run` failing to create its scope.
+ */
+const SNAP_LAUNCH_FAILURE =
+  /error: unknown flag `|internal error, please report: running "[^"]*" failed/;
+
 /** How the browser process ended before CDP connected, when it did. */
 export interface LaunchExit {
   readonly code: number | null;
@@ -621,7 +630,7 @@ const CRASH_SIGNALS = new Set<NodeJS.Signals>([
  * it ended, and whether it ran inside AgenC's Linux sandbox. Outside it,
  * turning Chromium's sandbox off would leave the browser with no sandbox at
  * all. A browser killed by a signal crashed: the wrapper script advice does
- * not apply to it.
+ * not apply to it. A snap that slipped past detection is named as one.
  */
 export function launchFailureHint(
   stderrTail: string,
@@ -629,6 +638,9 @@ export function launchFailureHint(
   exit?: LaunchExit,
   platform: NodeJS.Platform = process.platform,
 ): string {
+  if (insideAgencLinuxSandbox && SNAP_LAUNCH_FAILURE.test(stderrTail)) {
+    return SNAP_IN_SANDBOX_HINT;
+  }
   if (CHROMIUM_OWN_SANDBOX_ABORT.test(stderrTail)) {
     return insideAgencLinuxSandbox
       ? "Chromium's own sandbox cannot start inside AgenC's sandbox on this system. Set [browser] no_sandbox = true to run it under AgenC's sandbox alone."
