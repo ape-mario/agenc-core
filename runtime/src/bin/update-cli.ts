@@ -1690,9 +1690,11 @@ function syncRuntimeTree(path: string): void {
   if (!metadata.isFile()) {
     throw new Error(`runtime staging tree contains an unsupported entry: ${path}`);
   }
+  // fsyncSync is FlushFileBuffers on Windows, which needs write access; a
+  // read-only handle fails with EPERM there.
   const descriptor = openSync(
     path,
-    fsConstants.O_RDONLY |
+    (process.platform === "win32" ? fsConstants.O_RDWR : fsConstants.O_RDONLY) |
       (fsConstants.O_NOFOLLOW ?? 0) |
       (fsConstants.O_NONBLOCK ?? 0),
   );
@@ -1910,6 +1912,13 @@ export async function resolveTrustedSystemTar(
     USERPROFILE: powershellRoot,
     WINDIR: systemRoot,
   };
+  // `-Command` appends any argument after it to the command text, so `$args`
+  // stayed empty, -LiteralPath got $null and the check failed on every
+  // Windows host. The path travels in the environment and the script as
+  // -EncodedCommand.
+  const authenticodeScript =
+    "$s=Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $env:AGENC_AUTHENTICODE_PATH;" +
+    "if($s.Status -ne 'Valid' -or $s.SignerCertificate.Subject -notmatch 'Microsoft'){exit 51}";
   const signature = await runProcess(
     powershell,
     [
@@ -1918,15 +1927,13 @@ export async function resolveTrustedSystemTar(
       "-NonInteractive",
       "-ExecutionPolicy",
       "Bypass",
-      "-Command",
-      "$s=Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $args[0];" +
-        "if($s.Status -ne 'Valid' -or $s.SignerCertificate.Subject -notmatch 'Microsoft'){exit 51}",
-      tarPath,
+      "-EncodedCommand",
+      Buffer.from(authenticodeScript, "utf16le").toString("base64"),
     ],
     {
       cwd: powershellRoot,
       encoding: "utf8",
-      env: toolEnv,
+      env: { ...toolEnv, AGENC_AUTHENTICODE_PATH: tarPath },
       maxBuffer: 1024 * 1024,
       stdio: ["ignore", "pipe", "pipe"],
       timeout: timeoutMs,

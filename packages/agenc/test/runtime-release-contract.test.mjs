@@ -221,7 +221,8 @@ test("consumer GitHub CLI pins exactly mirror the reviewed release toolchain", (
     ["linux-arm64", "linuxArm64", "gh_2.96.0_linux_arm64/bin/gh"],
     ["darwin-x64", "macosX64", "gh_2.96.0_macOS_amd64/bin/gh"],
     ["darwin-arm64", "macosArm64", "gh_2.96.0_macOS_arm64/bin/gh"],
-    ["win-x64", "windowsX64", "gh_2.96.0_windows_amd64/bin/gh.exe"],
+    // The real Windows zip holds LICENSE and bin/gh.exe at its root.
+    ["win-x64", "windowsX64", "bin/gh.exe"],
   ]) {
     assert.deepEqual(PINNED_GITHUB_CLI_ARTIFACTS[consumerKey], {
       ...toolchain.githubCli[toolchainKey],
