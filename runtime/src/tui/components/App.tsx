@@ -2557,6 +2557,17 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     [appStateStore],
   );
   const submissionTerminalEvents = useMemo(createSubmissionTerminalEvents, [props.session]);
+  // Chrome that mounts after startup (the git line returns with the composer
+  // after every approval) listens through this shell's one long-lived
+  // subscription. A late daemon replay subscription is refused once the
+  // session passes the replay capacity (DaemonEventReplayGapError).
+  const liveSessionEvents = useMemo(() => {
+    if (typeof props.session.subscribeToEvents === "function") return submissionTerminalEvents;
+    const eventLog = props.session.eventLog;
+    return eventLog === undefined ? undefined : {
+      subscribeToEvents: (cb: (event: unknown) => void) => eventLog.subscribe(event => cb(event)),
+    };
+  }, [props.session, submissionTerminalEvents]);
   useEffect(() => {
     const subscribe = props.session.subscribeToEvents;
     if (typeof subscribe !== "function") return;
@@ -5060,7 +5071,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           {queuedCommands.length} queued · {queuedCommandInputText(queuedCommands[queuedCommands.length - 1]!)}
         </Text>
       ) : null}
-      {showPromptInput ? <GitStatusChrome session={props.session} /> : null}
+      {showPromptInput ? <GitStatusChrome session={props.session} events={liveSessionEvents} /> : null}
       {promptInputElement}
       {reviewNeeded ? <Text color="warning">review needed · prompts wait for tool outcome review</Text> : null}
     </Box>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box } from '../ink.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { useGitStatus, type GitStatusSession } from '../hooks/useGitStatus.js';
+import { useGitStatus, type GitStatusEvents, type GitStatusSession } from '../hooks/useGitStatus.js';
 import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
 import { selectAgenCTuiGlyphs } from '../glyphs.js';
 import type { GitStatus } from '../git-status.js';
@@ -35,10 +35,14 @@ export function GitStatusLine({ status, columns }: { status: GitStatus | null; c
   );
 }
 
-export function GitStatusChrome({ session }: { session: GitStatusSession }): React.ReactNode {
+export function GitStatusChrome({ session, events }: {
+  session: GitStatusSession;
+  /** The shell's live event fan-out. Never the session's own daemon replay subscription. */
+  events?: GitStatusEvents;
+}): React.ReactNode {
   const { columns } = useTerminalSize();
   const enabled = useAppStateMaybeOutsideOfProvider(state => state.settings.tui?.gitStatusEnabled) !== false;
   const cwd = session.cwd ?? session.sessionConfiguration?.cwd ?? process.cwd();
-  const status = useGitStatus(cwd, enabled, session);
+  const status = useGitStatus(cwd, enabled, events);
   return <GitStatusLine status={status} columns={columns} />;
 }

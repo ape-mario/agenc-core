@@ -12,7 +12,8 @@ import { FullscreenModeProvider } from '../../../src/tui/context/fullscreenModeC
 import { StatusTurnBusyContext } from '../../../src/tui/context/statusEffortContext.js';
 import TerminalFocusContext from '../../../src/tui/ink/components/TerminalFocusContext.js';
 import { probeGitStatus, type GitStatus } from '../../../src/tui/git-status.js';
-import type { GitStatusSession } from '../../../src/tui/hooks/useGitStatus.js';
+import type { GitStatusEvents, GitStatusSession } from '../../../src/tui/hooks/useGitStatus.js';
+import { DaemonEventReplay, DaemonEventReplayGapError } from '../../../src/tui/daemon-event-replay.js';
 
 vi.mock('../../../src/tui/git-status.js', () => ({ probeGitStatus: vi.fn() }));
 const probe = vi.mocked(probeGitStatus);
@@ -27,19 +28,18 @@ async function mount() {
   const root = await createRoot({ patchConsole: false, stdout: stdout as unknown as NodeJS.WriteStream, stdin: stdin as unknown as NodeJS.ReadStream });
   const store = createStore(getDefaultAppState());
   const listeners = new Set<(event: unknown) => void>();
-  const logListeners = new Set<(event: unknown) => void>();
-  const session: GitStatusSession = {
-    cwd: '/session/repo',
+  // The shell's live fan-out: the only event source the chrome may use.
+  const events: GitStatusEvents = {
     subscribeToEvents(cb) { listeners.add(cb); return () => { listeners.delete(cb); }; },
-    eventLog: { subscribe(cb) { logListeners.add(cb); return () => { logListeners.delete(cb); }; } },
   };
-  const render = (busy = false, focused = true, text = 'composer', currentSession = session) => root.render(
+  const session: GitStatusSession = { cwd: '/session/repo' };
+  const render = (busy = false, focused = true, text = 'composer', currentSession = session, shown = true) => root.render(
     <AppStoreContext.Provider value={store}>
       <TerminalFocusContext.Provider value={{ isTerminalFocused: focused, terminalFocusState: focused ? 'focused' : 'blurred' }}>
         <StatusTurnBusyContext value={busy}>
           <FullscreenModeProvider enabled>
             <FullscreenLayout scrollable={<Text>transcript</Text>} bottom={<>
-              <GitStatusChrome session={currentSession} /><Text>{text}</Text>
+              {shown ? <GitStatusChrome session={currentSession} events={events} /> : null}<Text>{text}</Text>
             </>} />
           </FullscreenModeProvider>
         </StatusTurnBusyContext>
@@ -51,7 +51,7 @@ async function mount() {
     const start = output.lastIndexOf('\x1b[?2026h', end);
     return stripAnsi(output.slice(start, end));
   };
-  return { render, frame, store, session, listeners, logListeners,
+  return { render, frame, store, session, listeners,
     emit(event: unknown) { for (const cb of listeners) cb(event); },
     close() { root.unmount(); stdin.end(); stdout.end(); },
   };
@@ -107,7 +107,7 @@ describe('live git composer chrome', () => {
       await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(2));
       app.emit({ msg: { type: 'exec_command_end' } });
       await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(3));
-      for (const cb of app.logListeners) cb({ type: 'tool_result' });
+      app.emit({ type: 'tool_result' });
       await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(4));
       app.render(true); await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(5));
       app.render(false); await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(6));
@@ -138,11 +138,33 @@ describe('live git composer chrome', () => {
       await vi.waitFor(() => expect(app.frame()).not.toContain('unique-branch'));
       app.store.setState(state => ({ ...state, settings: { ...state.settings, tui: { ...state.settings.tui, gitStatusEnabled: false } } }));
       await vi.waitFor(() => expect(app.listeners.size).toBe(0));
-      expect(app.logListeners.size).toBe(0);
       app.emit({ type: 'tool_call_completed' });
       expect(probe).toHaveBeenCalledTimes(2);
     } finally { app.close(); }
     expect(app.listeners.size).toBe(0);
-    expect(app.logListeners.size).toBe(0);
+  });
+
+  it('remounts after an approval without a new daemon replay subscription past its capacity', async () => {
+    probe.mockResolvedValue(clean);
+    // A long task: the session's replay already refuses new subscribers.
+    const replay = new DaemonEventReplay(3);
+    for (let i = 0; i < 5; i++) replay.publish({ type: 'agent_message_delta' });
+    expect(() => replay.subscribe(() => {})).toThrow(DaemonEventReplayGapError);
+    const app = await mount();
+    const session = { ...app.session, subscribeToEvents: (cb: (event: unknown) => void) => replay.subscribe(cb) };
+    try {
+      app.render(false, true, 'composer', session);
+      await vi.waitFor(() => expect(app.frame()).toContain('unique-branch'));
+      // An approval card hides the composer and its chrome, then both return.
+      app.render(false, true, 'approval card', session, false);
+      await vi.waitFor(() => expect(app.frame()).not.toContain('unique-branch'));
+      expect(app.listeners.size).toBe(0);
+      app.render(false, true, 'composer again', session, true);
+      await vi.waitFor(() => expect(app.frame()).toContain('unique-branch'));
+      expect(app.listeners.size).toBe(1);
+      const calls = probe.mock.calls.length;
+      app.emit({ type: 'tool_call_completed' });
+      await vi.waitFor(() => expect(probe.mock.calls.length).toBeGreaterThan(calls));
+    } finally { app.close(); }
   });
 });
