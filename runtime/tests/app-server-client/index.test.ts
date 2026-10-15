@@ -1251,7 +1251,7 @@ describe("app-server-client daemon helpers", () => {
       await expect(run("/settings")).resolves.toMatchObject({
         result: {
           kind: "error",
-          message: "Unknown command: /settings",
+          message: "Unknown command: /settings. Run /help to see available commands.",
         },
       });
       await expect(run("/provider grok")).resolves.toMatchObject({
