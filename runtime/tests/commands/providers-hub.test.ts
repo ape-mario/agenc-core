@@ -252,13 +252,13 @@ describe("providers screen actions", () => {
     const reload = vi.fn(async () => ({}));
     const ctx = ctxFor({ home, environment, provider: "grok", model: "grok-4", reload });
 
-    const result = await chooseProviderModel(ctx, "grok", "grok-4-fast");
+    const result = await chooseProviderModel(ctx, "grok", "grok-4.7");
 
-    expect(result).toEqual({ ok: true, message: "Using xAI Grok · grok-4-fast, saved as the default." });
-    expect(ctx.session.pendingProviderSwitch).toEqual({ provider: "grok", model: "grok-4-fast" });
+    expect(result).toEqual({ ok: true, message: "Using xAI Grok · grok-4.7, saved as the default." });
+    expect(ctx.session.pendingProviderSwitch).toEqual({ provider: "grok", model: "grok-4.7" });
     const saved = readFileSync(home.configTomlPath, "utf8");
     expect(saved).toMatch(/^"?model_provider"? = "grok"$/mu);
-    expect(saved).toMatch(/^"?model"? = "grok-4-fast"$/mu);
+    expect(saved).toMatch(/^"?model"? = "grok-4.7"$/mu);
     expect(reload).toHaveBeenCalledTimes(1);
   });
 

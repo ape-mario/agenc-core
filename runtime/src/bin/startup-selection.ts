@@ -1,3 +1,4 @@
+import { assertModelCatalogSelection } from "../llm/model-catalog-selection.js";
 import { resolve as resolvePath } from "node:path";
 
 import { ModelMetadataResolver, type ModelMetadataResolverOptions } from "../llm/model-metadata.js";
@@ -133,6 +134,7 @@ export function resolveCanonicalStartupSelection(params: {
       "canonical startup config must contain a provider/model pair",
     );
   }
+  assertModelCatalogSelection(config, provider, canonicalModel);
   if (!isModelAllowed(provider, canonicalModel, config)) {
     throw new ModelNotAllowedError(canonicalModel);
   }

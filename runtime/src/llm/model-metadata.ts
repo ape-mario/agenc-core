@@ -650,6 +650,15 @@ function conservativeFallbackValues(): ModelMetadataValues {
   };
 }
 
+/** Whether endpoint discovery, rather than Core's fixed catalog, owns model IDs. */
+export function hasDynamicProviderModelCatalog(
+  config: AgenCConfig,
+  provider: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return shouldPreferDynamicMetadata({ config, provider, model: "" }, env);
+}
+
 function shouldPreferDynamicMetadata(
   params: LookupParams,
   env: Readonly<Record<string, string | undefined>>,
