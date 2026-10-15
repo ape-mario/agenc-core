@@ -34,6 +34,8 @@ import {
   type SessionConfiguration,
   type SessionForTurn,
 } from "./turn-context.js";
+import { runtimeSandboxForExec } from "../../src/tools/system/exec-command.js";
+import { attachToolRuntimeContext } from "../../src/tools/runtimes/context.js";
 import type { LLMProvider } from "../llm/types.js";
 import { defaultConfig, type AgenCConfig } from "../../src/config/schema.js";
 import { resolveProfile } from "../../src/config/profiles.js";
@@ -888,4 +890,28 @@ describe("configured response detail reaches provider requests", () => {
       expect(JSON.stringify(result.wire)).toContain("Concise: keep every user-facing message short.");
     }
   });
+});
+
+
+test("projects the local binding authority onto the real turn consumed by command tools", () => {
+  const config = { ...mkConfig(), agencLinuxSandboxExe: "/bin/true" };
+  for (const allowLocalBinding of [undefined, false, true]) {
+    const sessionConfiguration = sessionConfigurationFromAgenCConfig({
+      config: { ...defaultConfig(), sandbox: { network: { allowLocalBinding } } },
+      workspaceRoot: "/tmp", model: "test-model",
+    });
+    const turn = buildTurnContext({
+      conversationId: "local-binding-config", subId: "local-binding-turn", config,
+      modelInfo: mkModelInfo(), provider: mkProvider(), sessionConfiguration,
+    });
+    expect(turn.sandboxAllowLocalBinding).toBe(allowLocalBinding === true ? true : undefined);
+    expect(turn.config).not.toHaveProperty("sandboxAllowLocalBinding");
+    const args = {};
+    attachToolRuntimeContext(args, {
+      callId: "local-binding-config", toolName: "exec_command",
+      sandboxMode: "workspace_write", requestedSandboxMode: "workspace_write", approvalPolicy: "on_request",
+      invocation: { turn, session: { services: { runtimeOptions: { sessionTempRoot: "/tmp" } } } },
+    } as never);
+    expect(runtimeSandboxForExec(args, "/tmp")?.network?.allowLocalBinding).toBe(allowLocalBinding === true ? true : undefined);
+  }
 });
