@@ -1602,6 +1602,9 @@ export function ApprovalCard({
   // are summary, command, facts, the action legend and the confirm row (5). The
   // note is the one optional row — drop it before it can push the action out.
   const popupBodyRows = popupMaxHeight - 6
+  // Three short rows keep every decision visible when the terminal leaves
+  // too little room for the summary, descriptions and keyboard legend.
+  const compactActions = !requireTypedConfirmation && popupBodyRows < 6
   const showNote = note !== undefined && note.length > 0 && popupBodyRows >= 6
   // When the slot is extremely tight, drop the secondary facts grid so the
   // primary action legend + confirm row are never the ones clipped away.
@@ -1657,16 +1660,18 @@ export function ApprovalCard({
       }
     >
       <Box flexDirection="column" paddingX={1} flexShrink={0}>
-        {typingWaiting ? (
+        {typingWaiting && !compactActions ? (
           <ThemedText color="text2" wrap="truncate-end">
             {requireTypedConfirmation
               ? `Card is waiting. Type ${typedConfirmationTarget}, then press Enter after a pause.`
               : 'Card is waiting. Press 1, 2 or 3.'}
           </ThemedText>
         ) : null}
-        <ThemedText color="text2" wrap="truncate-end">
-          {approvalSummary}
-        </ThemedText>
+        {!compactActions ? (
+          <ThemedText color="text2" wrap="truncate-end">
+            {approvalSummary}
+          </ThemedText>
+        ) : null}
         {requireTypedConfirmation ? (
           <Box flexDirection="column" flexShrink={0}>
             <ThemedText color="inactive" wrap="truncate-end">
@@ -1700,15 +1705,17 @@ export function ApprovalCard({
               const selected = index === (selectedIndex ?? 0)
               const marker = selected ? '❯ ' : '  '
               const rowText = `${marker}${index + 1}  ${action.label}`
-              const detailText = `  ${action.suffix}`
+              const detailText = compactActions
+                ? (index === 2 ? ' · esc cancel' : '')
+                : `  ${action.suffix}`
               return (
                 <Box key={action.label}>
                   {selected ? (
-                    <ThemedText color="agenc" bold={true}>
+                    <ThemedText color="agenc" bold={true} wrap="truncate-end">
                       {`${rowText}${detailText}`}
                     </ThemedText>
                   ) : (
-                    <ThemedText color="text2">
+                    <ThemedText color="text2" wrap="truncate-end">
                       {rowText}
                       <ThemedText color="inactive">{detailText}</ThemedText>
                     </ThemedText>
@@ -1718,7 +1725,7 @@ export function ApprovalCard({
             })}
           </ThemedBox>
         )}
-        {!requireTypedConfirmation ? (
+        {!requireTypedConfirmation && !compactActions ? (
           <Box marginTop={1} marginBottom={1} flexShrink={0}>
             <ThemedText color="inactive" wrap="truncate-end">
               1·2·3 choose   ↑↓ move   ⏎ confirm   esc cancel{diffPreview !== undefined ? '   ctrl+w d full diff' : ''}
