@@ -1,6 +1,6 @@
 /**
  * The lean static head keeps the standard head's product knowledge and safety
- * rules as plain descriptions. OpenAI and Grok sessions get it by default;
+ * rules as plain descriptions. OpenAI, Grok and DeepSeek sessions get it by default;
  * AGENC_LEAN_SYSTEM_PROMPT=1 selects it everywhere and =0 keeps the standard
  * head everywhere.
  */
@@ -44,9 +44,9 @@ function ctx(): TurnContext {
 
 const MEMORY_INSTRUCTIONS = "# auto memory\n\nYou have persistent, file-based memory directories.";
 
-// DeepSeek keeps the standard head unless the switch selects the lean one, so
+// Anthropic keeps the standard head unless the switch selects the lean one, so
 // the comparisons below start from the standard head.
-async function assemble(env: Record<string, string>, nonInteractive = false, provider = "deepseek") {
+async function assemble(env: Record<string, string>, nonInteractive = false, provider = "anthropic") {
   return assembleSystemPrompt({
     session: { services: { providerEnvironment: env, runtimeOptions: { nonInteractive } } },
     ctx: ctx(),
@@ -58,16 +58,20 @@ async function assemble(env: Record<string, string>, nonInteractive = false, pro
 }
 
 describe("lean system prompt", () => {
-  test("is the default for OpenAI and Grok sessions, not for DeepSeek", async () => {
+  test("is the default for OpenAI, Grok and DeepSeek sessions, not for others", async () => {
     expect(leanSystemPromptEnabled({}, "openai")).toBe(true);
     expect(leanSystemPromptEnabled({}, "grok")).toBe(true);
-    expect(leanSystemPromptEnabled({}, "deepseek")).toBe(false);
+    expect(leanSystemPromptEnabled({}, "deepseek")).toBe(true);
+    expect(leanSystemPromptEnabled({}, "anthropic")).toBe(false);
     expect(leanSystemPromptEnabled({}, undefined)).toBe(false);
-    expect(leanSystemPromptEnabled({ [LEAN_SYSTEM_PROMPT_ENV]: "1" }, "deepseek")).toBe(true);
+    expect(leanSystemPromptEnabled({ [LEAN_SYSTEM_PROMPT_ENV]: "1" }, "anthropic")).toBe(true);
     expect(leanSystemPromptEnabled({ [LEAN_SYSTEM_PROMPT_ENV]: "0" }, "grok")).toBe(false);
+    expect(leanSystemPromptEnabled({ [LEAN_SYSTEM_PROMPT_ENV]: "0" }, "deepseek")).toBe(false);
     const grok = await assemble({}, false, "grok");
+    const deepseek = await assemble({}, false, "deepseek");
     const lean = await assemble({ [LEAN_SYSTEM_PROMPT_ENV]: "1" });
     expect(grok.staticPrefix).toBe(lean.staticPrefix);
+    expect(deepseek.staticPrefix).toBe(lean.staticPrefix);
     const grokOff = await assemble({ [LEAN_SYSTEM_PROMPT_ENV]: "0" }, false, "grok");
     expect(grokOff.staticPrefix).toContain("IMPORTANT: Go straight to the point.");
   });
@@ -93,8 +97,8 @@ describe("lean system prompt", () => {
     const standard = (await assemble({})).staticPrefix;
     expect(await headFor("grok", {})).toBe(lean);
     expect(await headFor("grok", { [LEAN_SYSTEM_PROMPT_ENV]: "0" })).toBe(standard);
-    expect(await headFor("deepseek", {})).toBe(standard);
-    expect(await headFor("deepseek", { [LEAN_SYSTEM_PROMPT_ENV]: "1" })).toBe(lean);
+    expect(await headFor("deepseek", {})).toBe(lean);
+    expect(await headFor("deepseek", { [LEAN_SYSTEM_PROMPT_ENV]: "0" })).toBe(standard);
   });
 
   test("leaves the standard head unchanged when the switch is off", async () => {

@@ -69,7 +69,7 @@ export function createListProcessesTool(config?: ListProcessesToolConfig): Tool 
   return {
     name: "list_processes",
     description:
-      "List the background sessions this conversation started with exec_command (those that returned a session_id) with their status: running, stopping, completed, failed, or killed. Use it to find which of your sessions are still live before stopping them with kill_process, for example after kill_process reported terminated=false for a session that had already exited. Scoped to this conversation: it never shows another conversation's processes and never scans the process table.",
+      "List the background sessions exec_command started in this conversation (those that returned a session_id) with their status: running, stopping, completed, failed or killed. Only this conversation's sessions; it never scans the process table.",
     metadata: {
       family: "terminal",
       source: "builtin",
@@ -91,7 +91,7 @@ export function createListProcessesTool(config?: ListProcessesToolConfig): Tool 
           type: "string",
           enum: ["live", "all"],
           description:
-            "live (default): sessions still running or stopping. all: also include exited sessions whose final output has not been collected yet.",
+            "live (default): running or stopping. all: also exited sessions whose output was not collected.",
         },
       },
       additionalProperties: false,

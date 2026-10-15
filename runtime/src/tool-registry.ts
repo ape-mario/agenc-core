@@ -48,7 +48,10 @@ import {
 import { SYSTEM_SEARCH_TOOLS_NAME } from "./tools/system/tool-search-name.js";
 import {
   isRareDeferredTool,
+  isStandardDeferredTool,
+  PROCESS_SESSION_TOOLS,
   rareToolPointer,
+  withDeferredCompanions,
 } from "./tools/rare-tool-deferral.js";
 import { createBashTool } from "./tools/system/bash.js";
 import { registerBuiltinTool } from "./tools/builtin-provenance.js";
@@ -175,6 +178,12 @@ export interface ToolRegistry {
   ): Promise<ToolDispatchResult>;
   getDiscoveredToolNames?(): ReadonlySet<string>;
   discoverToolNames?(toolNames: readonly string[]): void;
+  /**
+   * Catalog tools a request does not carry until system.searchTools (or the
+   * runtime) loads them, whether or not they have been loaded since. Fixed for
+   * the session, so prompt text derived from it stays byte-stable.
+   */
+  getDeferredToolNames?(): ReadonlySet<string>;
   /**
    * The session's fixed tool allowlist, when it has one. Tools outside it were
    * never built, so they are in neither `tools` nor dispatch; routers use this
@@ -707,8 +716,12 @@ export function buildToolRegistry(
     options.unifiedExecManager ??
     new UnifiedExecProcessManager({ cwd: options.workspaceRoot });
   const discoveredToolNames = new Set<string>();
+  // Standard sessions defer the tools most sessions never call (see
+  // tools/rare-tool-deferral.ts); Light keeps its own initial tool set.
+  const deferRareTools = options.deferRareTools === true;
+  const standardDeferral = deferRareTools && options.lightMode !== true;
   const markDiscovered = (toolNames: readonly string[]): void => {
-    for (const name of toolNames) {
+    for (const name of standardDeferral ? withDeferredCompanions(toolNames) : toolNames) {
       if (typeof name === "string" && name.trim().length > 0) {
         discoveredToolNames.add(name);
       }
@@ -755,7 +768,9 @@ export function buildToolRegistry(
       unifiedExecManager,
       ...(options.lightMode === true
         ? { onSessionYielded: () => markDiscovered(["write_stdin"]) }
-        : {}),
+        : standardDeferral
+          ? { onSessionYielded: () => markDiscovered(PROCESS_SESSION_TOOLS) }
+          : {}),
       ...(options.bashExecObserver !== undefined
         ? { execObserver: options.bashExecObserver }
         : {}),
@@ -1261,10 +1276,27 @@ export function buildToolRegistry(
     return buildRouter().getSpecs();
   }
 
-  const deferRareTools = options.deferRareTools === true;
   function isDeferredSpec(spec: ConfiguredToolSpec): boolean {
     return spec.deferred === true ||
-      (deferRareTools && isRareDeferredTool(spec.tool.name));
+      (deferRareTools && (standardDeferral
+        // A policy without system.searchTools (coordinator mode, for one)
+        // could never load them, so they stay advertised there.
+        ? isStandardDeferredTool(spec.tool.name) && searchToolAvailable()
+        : isRareDeferredTool(spec.tool.name)));
+  }
+
+  // Called for every spec while a request's tool list is built, so the answer
+  // is kept per router instead of rebuilding the router inputs each time.
+  const searchAvailability = new WeakMap<ToolRouter, boolean>();
+  function searchToolAvailable(): boolean {
+    const router = routerMemo?.router ?? buildRouter();
+    let available = searchAvailability.get(router);
+    if (available === undefined) {
+      available = router.getSpecs()
+        .some((spec) => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME && spec.unavailable !== true);
+      searchAvailability.set(router, available);
+    }
+    return available;
   }
 
   function visibleSpecs(router?: ToolRouter): readonly ConfiguredToolSpec[] {
@@ -1364,10 +1396,25 @@ export function buildToolRegistry(
     });
   }
 
+  /**
+   * The tools every request starts with keep their order; a deferred tool
+   * joins at the end once loaded, in load order. A loaded tool never moves the
+   * tools before it, so the cached prompt prefix up to them stays valid.
+   */
+  function loadOrderedSpecs(visible: readonly ConfiguredToolSpec[]): readonly ConfiguredToolSpec[] {
+    const initial = visible.filter((spec) => !isDeferredSpec(spec));
+    if (initial.length === visible.length) return visible;
+    const loaded = new Map(visible.filter((spec) => isDeferredSpec(spec)).map((spec) => [spec.tool.name, spec]));
+    return [...initial, ...[...discoveredToolNames].flatMap((name) => {
+      const spec = loaded.get(name);
+      return spec === undefined ? [] : [spec];
+    })];
+  }
+
   let presentationMemo: { router: ToolRouter; discovered: readonly string[];
     provider: string | undefined; tools: LLMTool[] } | undefined;
   function buildPresentedTools(router: ToolRouter): LLMTool[] {
-      const visible = visibleSpecs(router);
+      const visible = standardDeferral ? loadOrderedSpecs(visibleSpecs(router)) : visibleSpecs(router);
       const leanExec = visible.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME) &&
         !discoveredToolNames.has("exec_command");
       const tools = visible.map((spec) => {
@@ -1377,8 +1424,10 @@ export function buildToolRegistry(
       });
       if (!deferRareTools) return tools;
       const pointer = rareToolPointer(new Set(router.getSpecs()
-        .filter(spec => spec.unavailable !== true && isRareDeferredTool(spec.tool.name))
-        .map(spec => spec.tool.name)));
+        .filter(spec => spec.unavailable !== true && (standardDeferral
+          ? isStandardDeferredTool(spec.tool.name)
+          : isRareDeferredTool(spec.tool.name)))
+        .map(spec => spec.tool.name)), { standard: standardDeferral });
       return pointer === undefined ? tools : tools.map(tool => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME
         ? { ...tool, function: { ...tool.function, description: `${tool.function.description ?? ""}\n\n${pointer}`.trim() } }
         : tool);
@@ -1404,6 +1453,11 @@ export function buildToolRegistry(
     },
     getDiscoveredToolNames(): ReadonlySet<string> {
       return discoveredToolNames;
+    },
+    getDeferredToolNames(): ReadonlySet<string> {
+      return new Set(allSpecs()
+        .filter((spec) => spec.unavailable !== true && isDeferredSpec(spec))
+        .map((spec) => spec.tool.name));
     },
     getUnavailableToolNames(): ReadonlySet<string> {
       return new Set(

@@ -1050,7 +1050,7 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
   return {
     name: "exec_command",
     description:
-      "Run a shell command in the current AgenC workspace and return captured stdout/stderr. Use this for inspection, tests, builds, and other terminal work. Use Edit or Write for source-file edits; delete or rename workspace files here with rm or mv. Never use this to print commentary, placeholders, or reminders to yourself; call the relevant tool directly instead.\n\nLong-running commands: set a short yield_time_ms to run in the BACKGROUND — when the command outlives the yield window the result carries a session_id and the process keeps running. Poll for more output with write_stdin(session_id, chars='') and stop it with kill_process(session_id). Prefer this over trailing '&' (a shell-backgrounded child has no session_id, so its output is unrecoverable).\n\nServices: every process a command leaves behind (a trailing '&', nohup, setsid, a daemon that forks) is stopped when the command returns, and a process kept alive with yield_time_ms is stopped when the session ends. To start a web server, database, sshd, or other daemon that must keep running afterwards, set detach: true (needs the danger-full-access sandbox); the result carries its pid and log file.",
+      "Run a shell command in the workspace and return its stdout and stderr: inspection, tests, builds and other terminal work. Change source files with Edit, MultiEdit or Write; rm and mv are fine here for deleting or renaming. Call tools directly; never run a command just to print notes or placeholders.\n\nA command still running after yield_time_ms returns a session_id and keeps running in the background: write_stdin polls it (chars='') or sends input, and kill_process stops it. A trailing '&' loses the output, and every process a command leaves behind is stopped when it returns. A server or other service that must outlive the command and the session needs detach: true (danger-full-access sandbox only); the result carries its pid and log file.",
     metadata: {
       family: "terminal",
       source: "builtin",
@@ -1101,52 +1101,52 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
         cmd: {
           type: "string",
           description:
-            "Shell command to execute. MCP tool names such as mcp.server.tool are not shell commands; call those tools directly. Do not use echo/printf placeholders like \"I need to call the MCP tool\".",
+            "Shell command. MCP tools (mcp.<server>.<tool>) are tool calls, not commands.",
         },
         workdir: {
           type: "string",
-          description: "Working directory. Defaults to the AgenC workspace root.",
+          description: "Working directory; defaults to the workspace root.",
         },
         timeoutMs: {
           type: "number",
           description:
-            "Optional hard command timeout in milliseconds. Prefer yield_time_ms for long-running commands you want to keep alive.",
+            "Hard timeout in ms. To keep a long command alive use yield_time_ms instead.",
         },
         yield_time_ms: {
           type: "number",
           description:
-            "How long to wait for output before returning. If the process is still running, AgenC returns a session_id for write_stdin.",
+            "How long to wait for output before returning; a process still running then returns a session_id.",
         },
         max_output_tokens: {
           type: "number",
           description:
-            "Maximum output tokens to return. Long output is truncated head/tail.",
+            "Output token cap; longer output keeps its head and tail.",
         },
         login: {
           type: "boolean",
           description:
-            "Run the command through a login shell where supported.",
+            "Run through a login shell where supported.",
         },
         tty: {
           type: "boolean",
           description:
-            "Allocate an interactive PTY. Required for persistent shells and write_stdin. Unavailable inside a contained tool operation; use tty=false with non-interactive flags, or ask the user to run it with the app's Run button.",
+            "Allocate a PTY, needed for interactive programs and write_stdin input. Unavailable inside a contained tool operation: use non-interactive flags, or ask the user to run it with the app's Run button.",
         },
         shell: {
           type: "string",
           description:
-            "Shell executable to run the command through. Defaults to the user's shell.",
+            "Shell executable; defaults to the user's shell.",
         },
         detach: {
           type: "boolean",
           description:
-            "Start the command as a detached service: its own session, stdout/stderr to a log file, never stopped by AgenC, so it survives this command returning and the session ending. Waits yield_time_ms (default 2000) for an early exit, then returns pid and log path. Only under the danger-full-access sandbox (--dangerously-bypass-approvals-and-sandbox); not with tty.",
+            "Start a detached service with its own session and a log file; AgenC never stops it, so it outlives the command and the session. Waits yield_time_ms (default 2000) for an early exit, then returns the pid and log path. Only under the danger-full-access sandbox (--dangerously-bypass-approvals-and-sandbox); not with tty.",
         },
         ...SANDBOX_PERMISSION_INPUT_PROPERTIES,
         prefix_rule: {
           type: "array",
           items: { type: "string" },
-          description: "Approval-cache command prefix rule, when applicable.",
+          description: "Command prefix to cache the approval for.",
         },
       },
       required: ["cmd"],

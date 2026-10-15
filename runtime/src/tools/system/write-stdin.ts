@@ -99,7 +99,7 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
   return {
     name: "write_stdin",
     description:
-      "Interact with a live exec_command session by session_id. Pass chars='' to poll for more output from ANY still-running session (background commands included — tty not required). Sending non-empty input requires the session to have been started with tty=true.",
+      "Poll or write to a session exec_command left running, by session_id. chars='' polls any running session for new output; sending input needs a session started with tty=true.",
     metadata: {
       family: "terminal",
       source: "builtin",
@@ -143,13 +143,11 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
       properties: {
         session_id: {
           type: "number",
-          description:
-            "The session_id returned by exec_command for a still-running process.",
+          description: "session_id from exec_command.",
         },
         chars: {
           type: "string",
-          description:
-            "Characters to write. Include newlines for shell commands. Use an empty string to poll output.",
+          description: "Input to send, with newlines for shell commands; empty to poll.",
         },
         yield_time_ms: {
           type: "number",
@@ -163,7 +161,7 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
         sandbox_permissions: {
           ...SANDBOX_PERMISSION_INPUT_PROPERTIES.sandbox_permissions,
           description:
-            "Sandbox escalation mode. A session started by exec_command with sandbox_permissions runs in that sandbox; pass the same value here to reach it.",
+            "The sandbox_permissions value the session was started with, to reach it.",
         },
       },
       required: ["session_id"],

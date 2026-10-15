@@ -466,6 +466,9 @@ describe("model-facing tools", () => {
     const registry = buildBootstrapToolRegistry({
       workspaceRoot: process.cwd(),
       agencHome: join(tmpdir(), "agenc-tools-test"),
+      // The visible-surface checks below cover every tool; the default
+      // standard deferral is covered by tests/tools/rare-tool-deferral.test.ts.
+      environment: { AGENC_DEFER_RARE_TOOLS: "0" },
       mcpManager: fakeMcpManager() as never,
       csvAgentJobsRepositories: UNUSED_CSV_AGENT_JOBS_REPOSITORIES,
       getSession: () => null,
@@ -706,25 +709,29 @@ describe("model-facing tools", () => {
     }
   });
 
-  it("exposes LSP in the default visible surface with per-op backing documented", () => {
-    const registry = buildBootstrapToolRegistry({
+  it("offers LSP through tool search by default, with per-op backing documented", () => {
+    const build = (environment: Record<string, string>) => buildBootstrapToolRegistry({
       workspaceRoot: process.cwd(),
       agencHome: join(tmpdir(), "agenc-tools-test"),
+      environment,
       mcpManager: fakeMcpManager() as never,
       csvAgentJobsRepositories: UNUSED_CSV_AGENT_JOBS_REPOSITORIES,
       getSession: () => null,
       emitWarning: () => {},
     });
+    const registry = build({});
 
-    // Not deferred: diagnostics must be reachable without a prior
-    // tool-search discovery round-trip.
+    // A standard session loads it with system.searchTools, whose description
+    // names it; with AGENC_DEFER_RARE_TOOLS=0 it is advertised up front.
     const lsp = registry.tools.find((tool) => tool.name === "LSP")!;
     expect(lsp.metadata?.deferred).toBe(false);
     expect(lsp.isReadOnly).toBe(true);
-    const visibleNames = registry
-      .toLLMTools()
-      .map((tool) => tool.function.name);
-    expect(visibleNames).toContain("LSP");
+    const llmTools = registry.toLLMTools();
+    expect(llmTools.map((tool) => tool.function.name)).not.toContain("LSP");
+    expect(llmTools.find((tool) => tool.function.name === "system.searchTools")?.function.description)
+      .toContain("LSP (language-server definitions and references)");
+    expect(build({ AGENC_DEFER_RARE_TOOLS: "0" }).toLLMTools().map((tool) => tool.function.name))
+      .toContain("LSP");
 
     // The description must let the model calibrate trust per operation:
     // diagnostics is language-server-backed, the navigation ops come from
@@ -830,12 +837,12 @@ describe("model-facing tools", () => {
         registry.tools.find((tool) => tool.name === name)?.metadata?.deferred,
       ).toBe(true);
     }
-    // Row subagents spawned by a CSV job must call this without a discovery
-    // step, so it stays in the default catalog.
-    expect(visibleBefore).toContain("report_agent_job_result");
-    // The orchestration tools a coding turn does use stay visible.
+    // Row subagents spawned by a CSV job call this without a discovery step.
+    // A standard session defers it and loads it with the job (and with
+    // select:spawn_agents_on_csv); the delegation tools load with spawn_agent.
+    expect(visibleBefore).not.toContain("report_agent_job_result");
     for (const name of ["spawn_agent", "wait_agent", "close_agent", "list_agents"]) {
-      expect(visibleBefore).toContain(name);
+      expect(visibleBefore).not.toContain(name);
     }
 
     const result = await registry.dispatch({
@@ -849,6 +856,7 @@ describe("model-facing tools", () => {
       .toLLMTools()
       .map((tool) => tool.function.name);
     expect(visibleAfter).toContain("spawn_agents_on_csv");
+    expect(visibleAfter).toContain("report_agent_job_result");
     // The loaded description tells the model where the companion tools are.
     const loaded = registry
       .toLLMTools()

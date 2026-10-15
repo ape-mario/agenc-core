@@ -10,6 +10,8 @@ import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
 import { SYSTEM_SEARCH_TOOLS_NAME } from "./system/tool-search-name.js";
 import {
   DEFER_RARE_TOOLS_ENV,
+  DELEGATION_COMPANION_TOOLS,
+  PROCESS_SESSION_TOOLS,
   RARE_DEFERRED_TOOLS,
   rareToolDeferralEnabled,
 } from "../../src/tools/rare-tool-deferral.js";
@@ -29,13 +31,17 @@ function fakeTool(name: string): Tool {
   } as unknown as Tool;
 }
 
-function registry(deferRareTools?: boolean) {
+function registry(deferRareTools?: boolean, lightMode?: boolean) {
   return buildToolRegistry({
     workspaceRoot: "/tmp",
     requireAdmission: false,
     sandboxExecutionBroker: explicitDangerBroker,
-    extraTools: [fakeTool("VerifyPlanExecution"), fakeTool("SendUserMessage"), fakeTool("ImagineImage")],
+    extraTools: [
+      fakeTool("VerifyPlanExecution"), fakeTool("SendUserMessage"), fakeTool("ImagineImage"),
+      fakeTool("spawn_agent"), ...DELEGATION_COMPANION_TOOLS.map(fakeTool),
+    ],
     ...(deferRareTools !== undefined ? { deferRareTools } : {}),
+    ...(lightMode !== undefined ? { lightMode } : {}),
   });
 }
 
@@ -59,8 +65,17 @@ describe("deferred rare tools", () => {
     expect(advertised(tools)).toContain("exec_command");
     const search = tools.toLLMTools().find((tool) => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME);
     expect(search?.function.description).toContain(
-      "Deferred tools you can load with select: ImagineImage (generate or edit images), VerifyPlanExecution (compare progress with an approved plan), SendUserMessage (send the user a progress note).",
+      "Deferred tools you can load with select: MultiEdit (several replacements in one file in one call), Orient (rank the files most relevant to a question in a large repository), ImagineImage (generate or edit images), VerifyPlanExecution (compare progress with an approved plan), SendUserMessage (send the user a progress note).",
     );
+    expect(search?.function.description).toContain(
+      "To hand a self-contained task to a helper agent, load spawn_agent with select:spawn_agent; it loads wait_agent, send_message, assign_task, close_agent, list_agents with it.",
+    );
+    expect(search?.function.description).toContain(
+      "write_stdin, kill_process, list_processes load by themselves when exec_command leaves a session running.",
+    );
+    for (const name of ["spawn_agent", ...DELEGATION_COMPANION_TOOLS, ...PROCESS_SESSION_TOOLS, "MultiEdit"]) {
+      expect(advertised(tools)).not.toContain(name);
+    }
     // Tools that are not registered are not named.
     expect(search?.function.description).not.toContain("XSearch");
 
@@ -83,8 +98,66 @@ describe("deferred rare tools", () => {
     } finally {
       vi.unstubAllEnvs();
     }
-    expect(rareToolDeferralEnabled({})).toBe(false);
+    // Unset: on for standard sessions, off for Light; the switch decides both.
+    expect(rareToolDeferralEnabled({})).toBe(true);
+    expect(rareToolDeferralEnabled({}, { lightMode: true })).toBe(false);
+    expect(rareToolDeferralEnabled({ [DEFER_RARE_TOOLS_ENV]: "0" })).toBe(false);
     expect(rareToolDeferralEnabled({ [DEFER_RARE_TOOLS_ENV]: "1" })).toBe(true);
+    expect(rareToolDeferralEnabled({ [DEFER_RARE_TOOLS_ENV]: "1" }, { lightMode: true })).toBe(true);
+  });
+});
+
+describe("standard deferral", () => {
+  test("select:spawn_agent loads the delegation tools, appended after the initial tools in load order", async () => {
+    const tools = registry(true);
+    const before = advertised(tools);
+    await tools.dispatch({
+      id: "load-spawn",
+      name: SYSTEM_SEARCH_TOOLS_NAME,
+      arguments: JSON.stringify({ select: "spawn_agent" }),
+    });
+    const after = advertised(tools);
+    // The tools the session started with keep their order; the loaded ones follow.
+    expect(after.slice(0, before.length)).toEqual(before);
+    expect(after.slice(before.length)).toEqual(["spawn_agent", ...DELEGATION_COMPANION_TOOLS]);
+    await tools.dispatch({
+      id: "load-image",
+      name: SYSTEM_SEARCH_TOOLS_NAME,
+      arguments: JSON.stringify({ select: "ImagineImage" }),
+    });
+    expect(advertised(tools).slice(0, after.length)).toEqual(after);
+    expect(advertised(tools).at(-1)).toBe("ImagineImage");
+  });
+
+  test("names the deferred tools as fixed for the session", () => {
+    const tools = registry(true);
+    const deferred = tools.getDeferredToolNames?.() ?? new Set<string>();
+    for (const name of ["spawn_agent", ...DELEGATION_COMPANION_TOOLS, ...PROCESS_SESSION_TOOLS, "ImagineImage"]) {
+      expect(deferred.has(name), name).toBe(true);
+    }
+    expect(deferred.has("exec_command")).toBe(false);
+    expect(registry(false).getDeferredToolNames?.().has("spawn_agent")).toBe(false);
+  });
+
+  test("Light keeps its own tool set and pointer", () => {
+    const light = registry(true, true);
+    const search = light.toLLMTools().find((tool) => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME);
+    expect(search?.function.description).not.toContain("spawn_agent");
+    expect(search?.function.description).not.toContain("load by themselves");
+  });
+
+  test("a policy without system.searchTools keeps every tool advertised", () => {
+    const tools = buildToolRegistry({
+      workspaceRoot: "/tmp",
+      requireAdmission: false,
+      sandboxExecutionBroker: explicitDangerBroker,
+      extraTools: [fakeTool("spawn_agent"), ...DELEGATION_COMPANION_TOOLS.map(fakeTool)],
+      deferRareTools: true,
+      toolsConfig: { disabled_tools: [SYSTEM_SEARCH_TOOLS_NAME] },
+    });
+    const names = advertised(tools);
+    expect(names).not.toContain(SYSTEM_SEARCH_TOOLS_NAME);
+    expect(names).toEqual(expect.arrayContaining(["spawn_agent", "wait_agent", "write_stdin"]));
   });
 });
 
@@ -131,16 +204,20 @@ describe("the session switch reaches a session's tools", () => {
         },
       );
 
-    // The rare tools this session advertises without the switch (the image
+    // The rare tools this session advertises with the switch off (the image
     // and video tools, for example, are unavailable without an xAI key).
-    const standard = await toolsWith({});
-    const rare = RARE_DEFERRED_TOOLS.map(([name]) => name).filter((name) => standard.advertised.includes(name));
+    const off = await toolsWith({ [DEFER_RARE_TOOLS_ENV]: "0" });
+    const rare = RARE_DEFERRED_TOOLS.map(([name]) => name).filter((name) => off.advertised.includes(name));
     expect(rare.length).toBeGreaterThan(0);
-    expect(standard.searchDescription).not.toContain("Deferred tools you can load");
+    expect(off.advertised).toEqual(expect.arrayContaining(["spawn_agent", "wait_agent", "write_stdin"]));
+    expect(off.searchDescription).not.toContain("Deferred tools you can load");
 
-    const deferred = await toolsWith({ [DEFER_RARE_TOOLS_ENV]: "1" });
-    for (const name of rare) expect(deferred.advertised).not.toContain(name);
+    // Unset is on for a standard session.
+    const deferred = await toolsWith({});
+    for (const name of [...rare, "spawn_agent", "wait_agent", "write_stdin", "kill_process"]) {
+      expect(deferred.advertised).not.toContain(name);
+    }
     expect(deferred.searchDescription).toContain("Deferred tools you can load with select:");
-    for (const name of rare) expect(deferred.searchDescription).toContain(name);
+    for (const name of [...rare, "spawn_agent"]) expect(deferred.searchDescription).toContain(name);
   });
 });

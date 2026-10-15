@@ -46,6 +46,7 @@ import { registerChildApprovalSession, revokeChildApprovalSession } from "./chil
 import { bindLiveAgentSession } from "./live-session.js";
 import { createInertMcpManager } from "../mcp-client/inert-manager.js";
 import { assembleBaseInstructionsForModel } from "../prompts/system-prompt.js";
+import { PROCESS_SESSION_TOOLS } from "../tools/rare-tool-deferral.js";
 import { usesLocalToolProfile } from "../llm/wire/capability-gating.js";
 import { createChildAbortController } from "../utils/abortController.js";
 import type {
@@ -2337,6 +2338,11 @@ export function buildFilteredRegistry(
       if (toolCatalogScope.has(name)) discoveredToolNames.add(name);
     }
   };
+  // A live exec session makes its process tools callable: Light children only
+  // poll it, other children follow the standard deferral of all three.
+  const execSessionToolNames: readonly string[] = opts.lightMode === true
+    ? ["write_stdin"]
+    : PROCESS_SESSION_TOOLS;
   const localSearch = opts.lightMode === true ? createToolSearchTool({
     allowedPaths: [],
     persistenceRootDir: "",
@@ -2370,7 +2376,7 @@ export function buildFilteredRegistry(
       const wrapped = wrapToolForChild(tool, {
         ...opts,
         toolCatalogScope,
-        onExecSessionYielded: () => discoverToolNames(["write_stdin"]),
+        onExecSessionYielded: () => discoverToolNames(execSessionToolNames),
         ...(searchTools !== undefined ? { searchTools } : {}),
       });
       const sessionSurface = (wrapped as Tool & {
@@ -2522,7 +2528,7 @@ export function buildFilteredRegistry(
         const prepared = await prepareChildToolCall(baseTool, parsedArgs, {
           ...opts,
           toolCatalogScope,
-          onExecSessionYielded: () => discoverToolNames(["write_stdin"]),
+          onExecSessionYielded: () => discoverToolNames(execSessionToolNames),
           ...(binding.policy !== undefined ? { childToolPolicy: binding.policy } : {}),
         });
         if ("result" in prepared) return prepared.result;
