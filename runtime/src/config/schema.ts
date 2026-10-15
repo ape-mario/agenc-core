@@ -994,8 +994,8 @@ export interface AgenCConfig {
    */
   readonly defer_rare_tools?: boolean;
   /**
-   * Use the lean static head of the system prompt. Unset: on for OpenAI, Grok
-   * and DeepSeek. The session's AGENC_LEAN_SYSTEM_PROMPT overrides it.
+   * Use the lean static head of the system prompt. Unset: on for OpenAI and
+   * Grok. The session's AGENC_LEAN_SYSTEM_PROMPT overrides it.
    */
   readonly lean_system_prompt?: boolean;
   readonly stream_watchdog_timeout_ms?: number;

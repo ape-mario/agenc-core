@@ -25,6 +25,7 @@ describe("payload switch config keys", () => {
     expect(leanSystemPromptEnabled({}, "anthropic", true)).toBe(true);
     expect(leanSystemPromptEnabled({ AGENC_LEAN_SYSTEM_PROMPT: "1" }, "anthropic", false)).toBe(true);
     expect(leanSystemPromptEnabled({ AGENC_LEAN_SYSTEM_PROMPT: "0" }, "deepseek", true)).toBe(false);
-    expect(leanSystemPromptEnabled({}, "deepseek")).toBe(true);
+    expect(leanSystemPromptEnabled({}, "deepseek")).toBe(false);
+    expect(leanSystemPromptEnabled({}, "openai")).toBe(true);
   });
 });

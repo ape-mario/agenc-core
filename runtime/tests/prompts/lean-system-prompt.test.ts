@@ -1,6 +1,6 @@
 /**
  * The lean static head keeps the standard head's product knowledge and safety
- * rules as plain descriptions. OpenAI, Grok and DeepSeek sessions get it by default;
+ * rules as plain descriptions. OpenAI and Grok sessions get it by default;
  * AGENC_LEAN_SYSTEM_PROMPT=1 selects it everywhere and =0 keeps the standard
  * head everywhere.
  */
@@ -58,10 +58,10 @@ async function assemble(env: Record<string, string>, nonInteractive = false, pro
 }
 
 describe("lean system prompt", () => {
-  test("is the default for OpenAI, Grok and DeepSeek sessions, not for others", async () => {
+  test("is the default for OpenAI and Grok sessions, not for DeepSeek or others", async () => {
     expect(leanSystemPromptEnabled({}, "openai")).toBe(true);
     expect(leanSystemPromptEnabled({}, "grok")).toBe(true);
-    expect(leanSystemPromptEnabled({}, "deepseek")).toBe(true);
+    expect(leanSystemPromptEnabled({}, "deepseek")).toBe(false);
     expect(leanSystemPromptEnabled({}, "anthropic")).toBe(false);
     expect(leanSystemPromptEnabled({}, undefined)).toBe(false);
     expect(leanSystemPromptEnabled({ [LEAN_SYSTEM_PROMPT_ENV]: "1" }, "anthropic")).toBe(true);
@@ -71,7 +71,7 @@ describe("lean system prompt", () => {
     const deepseek = await assemble({}, false, "deepseek");
     const lean = await assemble({ [LEAN_SYSTEM_PROMPT_ENV]: "1" });
     expect(grok.staticPrefix).toBe(lean.staticPrefix);
-    expect(deepseek.staticPrefix).toBe(lean.staticPrefix);
+    expect(deepseek.staticPrefix).not.toBe(lean.staticPrefix);
     const grokOff = await assemble({ [LEAN_SYSTEM_PROMPT_ENV]: "0" }, false, "grok");
     expect(grokOff.staticPrefix).toContain("IMPORTANT: Go straight to the point.");
   });
@@ -97,8 +97,8 @@ describe("lean system prompt", () => {
     const standard = (await assemble({})).staticPrefix;
     expect(await headFor("grok", {})).toBe(lean);
     expect(await headFor("grok", { [LEAN_SYSTEM_PROMPT_ENV]: "0" })).toBe(standard);
-    expect(await headFor("deepseek", {})).toBe(lean);
-    expect(await headFor("deepseek", { [LEAN_SYSTEM_PROMPT_ENV]: "0" })).toBe(standard);
+    expect(await headFor("deepseek", {})).toBe(standard);
+    expect(await headFor("deepseek", { [LEAN_SYSTEM_PROMPT_ENV]: "1" })).toBe(lean);
   });
 
   test("leaves the standard head unchanged when the switch is off", async () => {
