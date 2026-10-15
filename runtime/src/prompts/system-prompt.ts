@@ -434,7 +434,7 @@ export function getDeferredAgentToolSection(): string {
   return joinSection("# Subagents", [
     `spawn_agent hands a self-contained task to a helper agent. It is not in your function list until you load it: call system.searchTools with select:spawn_agent, which also loads wait_agent, send_message, assign_task, close_agent and list_agents.`,
     `Delegate when the user asks for it or the active Goal or workflow requires it, once the approvals and conditions in the full request are met. Then load spawn_agent and spawn the requested child before doing its work yourself; if delegation is unavailable or refused, say so instead of silently doing the work. Quoted examples and programming terms such as worker threads, child processes or React children props do not authorize delegation.`,
-    `Without such a requirement, keep the step you are blocked on local and delegate only bounded side tasks that can run while you work. A task you can finish directly with your own tools needs no helper.`,
+    `Without such a requirement, keep the step you are blocked on local and delegate only bounded side tasks that can run while you work. A task you can finish directly with your own tools needs no helper, and you run its checks yourself.`,
     `A helper starts in your working directory without this conversation unless you set fork_turns, so give it the goal, the files it owns, the constraints and how to verify, with paths relative to that directory. Parallel helpers that edit files need disjoint write sets and isolation: "worktree".`,
     `Call wait_agent only when your next step needs the result, review what comes back before you integrate it, and do not redo delegated work.`,
   ]);

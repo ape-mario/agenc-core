@@ -131,6 +131,9 @@ describe("lean system prompt", () => {
       "isolation: \"worktree\"",
       "file_path:line_number",
       "Report results as they are",
+      // Every response is a full round trip that resends the whole context,
+      // so batching independent reads and commands is the main call saver.
+      "Put independent tool calls in one response",
       // Targeted lines for quirks seen in eval transcripts: DeepSeek calling a
       // "Read" tool that does not exist, and asking what to build next after
       // finishing a step of a scripted session.
