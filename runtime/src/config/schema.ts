@@ -987,6 +987,17 @@ export interface AgenCConfig {
   readonly compaction?: CompactionConfig;
   /** Stop disordered short-vocabulary model streams; false opts out. */
   readonly stream_degenerate_guard?: boolean;
+  /**
+   * Load rarely needed built-in tools through system.searchTools instead of
+   * sending them with every request. Unset: on for standard sessions, off for
+   * Light. The session's AGENC_DEFER_RARE_TOOLS overrides it.
+   */
+  readonly defer_rare_tools?: boolean;
+  /**
+   * Use the lean static head of the system prompt. Unset: on for OpenAI, Grok
+   * and DeepSeek. The session's AGENC_LEAN_SYSTEM_PROMPT overrides it.
+   */
+  readonly lean_system_prompt?: boolean;
   readonly stream_watchdog_timeout_ms?: number;
   readonly provider_outage_wait_ms?: number;
   readonly provider_outage_retry_ms?: number;
@@ -1137,6 +1148,8 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "agent",
   "agents",
   "stream_degenerate_guard",
+  "defer_rare_tools",
+  "lean_system_prompt",
   "stream_watchdog_timeout_ms",
   "provider_outage_wait_ms",
   "provider_outage_retry_ms",

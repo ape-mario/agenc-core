@@ -9,8 +9,9 @@
  * with the standard head unchanged.
  *
  * Sessions on the providers in LEAN_DEFAULT_PROVIDERS get it by default.
- * `AGENC_LEAN_SYSTEM_PROMPT=1` selects it for every provider and `=0` keeps
- * the standard head everywhere.
+ * config.toml `lean_system_prompt = true` selects it for every provider and
+ * `false` keeps the standard head everywhere; `AGENC_LEAN_SYSTEM_PROMPT=1` or
+ * `=0` in the session environment overrides the config.
  *
  * @module
  */
@@ -32,10 +33,13 @@ export const LEAN_DEFAULT_PROVIDERS: ReadonlySet<string> = new Set(["openai", "g
 export function leanSystemPromptEnabled(
   env: Readonly<Record<string, string | undefined>>,
   provider: string | undefined,
+  /** config.toml `lean_system_prompt`; the session environment overrides it. */
+  configured?: boolean,
 ): boolean {
   const value = env[LEAN_SYSTEM_PROMPT_ENV];
   if (isEnvDefinedFalsy(value)) return false;
   if (isEnvTruthy(value)) return true;
+  if (typeof configured === "boolean") return configured;
   return provider !== undefined && LEAN_DEFAULT_PROVIDERS.has(provider.trim().toLowerCase());
 }
 

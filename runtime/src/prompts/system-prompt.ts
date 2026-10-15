@@ -801,6 +801,16 @@ Do not narrate each step, list every file you read, or explain routine actions. 
 // Main assembly entry point
 // ─────────────────────────────────────────────────────────────────────
 
+/** config.toml `lean_system_prompt`, when the session carries a config store. */
+function readConfiguredLeanSystemPrompt(session: SystemPromptSessionSnapshot): boolean | undefined {
+  try {
+    const value = session.services?.configStore?.current().lean_system_prompt;
+    return typeof value === "boolean" ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface SystemPromptSessionSnapshot {
   readonly providerService?: { current(): { readonly provider: string; readonly model: string } };
   readonly services?: {
@@ -1256,7 +1266,11 @@ export async function assembleSystemPrompt(
   // The lean head keeps the same product knowledge and safety rules as plain
   // descriptions; its default depends on the provider
   // (prompts/lean-system-prompt.ts).
-  const lean = leanSystemPromptEnabled(promptEnvironment, envInfoInputs.provider);
+  const lean = leanSystemPromptEnabled(
+    promptEnvironment,
+    envInfoInputs.provider,
+    readConfiguredLeanSystemPrompt(session),
+  );
   const staticSections: Array<string | null> = light
     ? [
         lightBudgetWorkflow(opts.outputStyle != null, lightEditsWithApplyPatch(envInfoInputs.provider)),

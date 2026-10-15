@@ -1365,6 +1365,9 @@ async function bootstrapLocalRuntimeSessionScoped(
     workspaceRoot,
     agencHome,
     environment: providerEnvironment,
+    ...(startup.config.defer_rare_tools !== undefined
+      ? { configuredDeferRareTools: startup.config.defer_rare_tools }
+      : {}),
     mcpManager,
     getSession: () => sessionRef,
     roleCatalog,
