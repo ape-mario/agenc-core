@@ -82,11 +82,11 @@ describe("turn-scoped durability", () => {
       const release = store.deferSyncsForTurn();
       expect(turnDurabilityOpen("conv-turn")).toBe(true);
       expect(store.append(event("execution_admission"), { durable: true })).toBe(true);
-      expect(store.append(event("effect_intent"), { durable: true })).toBe(true);
+      expect(store.append(event("session_usage"), { durable: true })).toBe(true);
       expect(store.append(event("turn_checkpoint"), { durable: true })).toBe(true);
 
       // On disk, in order, before anything that follows the step...
-      expect(linesOf(store).slice(-3)).toEqual(["execution_admission", "effect_intent", "turn_checkpoint"]);
+      expect(linesOf(store).slice(-3)).toEqual(["execution_admission", "session_usage", "turn_checkpoint"]);
       // ...and nothing waited on fsync.
       expect(fsyncs.length).toBe(before);
 
@@ -102,7 +102,7 @@ describe("turn-scoped durability", () => {
     const { store, fsyncs } = openStore();
     try {
       const release = store.deferSyncsForTurn();
-      store.append(event("effect_result"), { durable: true });
+      store.append(event("turn_checkpoint"), { durable: true });
       const before = fsyncs.length;
       store.append(event("turn_complete"), { durable: true });
       expect(fsyncs.length).toBe(before + 1);
@@ -114,14 +114,24 @@ describe("turn-scoped durability", () => {
     }
   });
 
-  it("keeps fsync for lifecycle and compaction records inside a turn", () => {
+  it("keeps fsync inside a turn for records another store commits a reference to", () => {
     const { store, fsyncs } = openStore();
     try {
       const release = store.deferSyncsForTurn();
-      const before = fsyncs.length;
-      store.append(event("context_compacted"), { durable: true });
-      store.append(event("run_terminal"), { durable: true });
-      expect(fsyncs.length).toBe(before + 2);
+      // Projected into SQLite as already fsync-committed, read across sessions,
+      // or ordering other files against the journal: these stay write-ahead.
+      const synced = [
+        "effect_intent", "effect_result", "effect_unknown_outcome", "effect_review_resolved",
+        "run_startup_activated", "run_runtime_settings_changed", "run_terminal",
+        "subagent_task_admitted", "subagent_turn_outcome", "artifact_committed",
+        "permission_decision", "context_compacted",
+      ];
+      for (const type of synced) {
+        store.append(event("turn_checkpoint"), { durable: true });
+        const before = fsyncs.length;
+        store.append(event(type), { durable: true });
+        expect({ type, fsyncs: fsyncs.length - before }).toEqual({ type, fsyncs: 1 });
+      }
       release("sync");
     } finally {
       store.close();
@@ -133,7 +143,7 @@ describe("turn-scoped durability", () => {
     try {
       const before = fsyncs.length;
       store.append(event("execution_admission"), { durable: true });
-      store.append(event("permission_decision"), { durable: true });
+      store.append(event("turn_checkpoint"), { durable: true });
       expect(fsyncs.length).toBe(before + 2);
     } finally {
       store.close();
@@ -149,7 +159,7 @@ describe("turn-scoped durability", () => {
       store.append(event("execution_admission"), { durable: true });
       vi.advanceTimersByTime(DEFERRED_SYNC_INTERVAL_MS - 1);
       expect(background).toHaveLength(0);
-      store.append(event("effect_intent"), { durable: true });
+      store.append(event("session_usage"), { durable: true });
       vi.advanceTimersByTime(1);
       expect(background).toHaveLength(1);
       background.shift()!();
@@ -157,7 +167,7 @@ describe("turn-scoped durability", () => {
       vi.advanceTimersByTime(DEFERRED_SYNC_INTERVAL_MS * 3);
       expect(background).toHaveLength(0);
 
-      store.append(event("effect_result"), { durable: true });
+      store.append(event("turn_checkpoint"), { durable: true });
       vi.advanceTimersByTime(DEFERRED_SYNC_INTERVAL_MS);
       expect(background).toHaveLength(1);
       background.shift()!();

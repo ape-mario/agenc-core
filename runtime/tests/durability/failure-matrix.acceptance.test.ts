@@ -1,10 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
+  truncateSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -165,9 +168,10 @@ async function waitForMarker(
 async function crashAt(
   failpoint: M4DurabilityFailpoint,
   stateDirectory: string,
+  extraEnv: NodeJS.ProcessEnv = {},
 ): Promise<void> {
   const marker = join(stateDirectory, "failpoint-reached.json");
-  const env = cleanChildEnvironment();
+  const env = { ...cleanChildEnvironment(), ...extraEnv };
   env.AGENC_TEST_DURABILITY_FAILPOINT = failpoint;
   env.AGENC_TEST_DURABILITY_FAILPOINT_TOKEN = FAILPOINT_TOKEN;
   env.AGENC_TEST_DURABILITY_FAILPOINT_MARKER = marker;
@@ -632,3 +636,208 @@ describe.sequential("M4 SIGKILL crash/restart acceptance matrix", () => {
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// Power loss inside a turn (turn-scoped durability).
+//
+// A SIGKILL keeps the page cache, so the matrix above never shows what an OS
+// crash or power loss does to writes that were not fsynced. These cases run
+// the same operations inside a turn scope, log the journal size at every
+// fsync, cut the journal back to its last synced byte (SQLite keeps every
+// commit), and require recovery to reach the same boundary as a process crash:
+// every record another store references must still be in the journal.
+// ---------------------------------------------------------------------------
+
+const POWER_LOSS_LOG_ENV = "AGENC_TEST_TURN_POWER_LOSS_LOG";
+
+function readSyncLog(log: string): Array<{ path: string; size: number }> {
+  if (!existsSync(log)) return [];
+  return readFileSync(log, "utf8")
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as { path: string; size: number });
+}
+
+/** Cut each logged journal back to its last fsynced byte; returns the bytes dropped. */
+function cutJournalsToLastSync(log: string): number {
+  const synced = new Map<string, number>();
+  for (const entry of readSyncLog(log)) {
+    synced.set(entry.path, Math.max(synced.get(entry.path) ?? 0, entry.size));
+  }
+  let dropped = 0;
+  for (const [path, size] of synced) {
+    const current = statSync(path).size;
+    expect(current).toBeGreaterThanOrEqual(size);
+    dropped += current - size;
+    truncateSync(path, size);
+  }
+  return dropped;
+}
+
+const TURN_STEP_FAILPOINTS = M4_DURABILITY_FAILPOINTS.filter(
+  (failpoint) =>
+    failpoint === "after_admission_sqlite_commit_before_canonical_append" ||
+    failpoint.includes("reservation_commit") ||
+    failpoint.includes("model_response_commit") ||
+    failpoint.includes("tool_"),
+);
+
+describe.sequential("M4 power loss inside a turn: the journal keeps only fsynced bytes", () => {
+  it.each(TURN_STEP_FAILPOINTS)(
+    "%s recovers to the same boundary as a process crash",
+    { timeout: 120_000 },
+    async (failpoint) => {
+      const stateDirectory = mkdtempSync(
+        join(tmpdir(), `agenc-m4-power-${TURN_STEP_FAILPOINTS.indexOf(failpoint)}-`),
+      );
+      directories.push(stateDirectory);
+      const log = join(stateDirectory, "synced.jsonl");
+      await crashAt(failpoint, stateDirectory, { [POWER_LOSS_LOG_ENV]: log });
+      expect(readSyncLog(log).length).toBeGreaterThan(0);
+      cutJournalsToLastSync(log);
+      const report = await recoverAfter(failpoint, stateDirectory);
+      verifyBoundary(failpoint, report);
+    },
+  );
+});
+
+interface StepsRecoveryReport {
+  readonly canonicalEventCounts: Readonly<Record<string, number>>;
+  readonly duplicateEventIds: number;
+  readonly sequencesIncrease: boolean;
+  readonly effects: ReadonlyArray<{
+    readonly stepId: string;
+    readonly outcome: string | null;
+    readonly reviewStatus: string | null;
+  }>;
+  readonly effectsWithoutJournalIntent: number;
+  readonly pendingEffectReviews: number;
+  readonly unsettledIntents: number;
+  readonly toolPhysicalAttempts: number;
+  readonly reservations: Readonly<Record<string, number>>;
+  readonly secondRecovery: {
+    readonly requeuedJobIds: readonly string[];
+    readonly heldUnknownReservationIds: readonly string[];
+    readonly cancelledExpiredJobIds: readonly string[];
+    readonly detachedQueuedJobIds: readonly string[];
+  };
+}
+
+async function runStepsChild(stateDirectory: string, log: string): Promise<void> {
+  const child = spawn(
+    process.execPath,
+    ["--loader", NODE_TEST_LOADER, "--import", TSX_IMPORT, FIXTURE, "steps", "after_tool_ack_commit", stateDirectory],
+    {
+      cwd: dirname(dirname(dirname(dirname(FIXTURE)))),
+      env: { ...cleanChildEnvironment(), [POWER_LOSS_LOG_ENV]: log },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  const result = await collectChild(child);
+  expect(
+    result,
+    `steps child output:\nstdout=${result.stdout}\nstderr=${result.stderr}`,
+  ).toMatchObject({ code: null, signal: "SIGKILL" });
+}
+
+async function recoverStepsChild(stateDirectory: string): Promise<StepsRecoveryReport> {
+  const child = spawn(
+    process.execPath,
+    ["--loader", NODE_TEST_LOADER, "--import", TSX_IMPORT, FIXTURE, "recover-steps", "after_tool_ack_commit", stateDirectory],
+    {
+      cwd: dirname(dirname(dirname(dirname(FIXTURE)))),
+      env: cleanChildEnvironment(),
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  const result = await collectChild(child);
+  expect(
+    result,
+    `steps recovery output:\nstdout=${result.stdout}\nstderr=${result.stderr}`,
+  ).toMatchObject({ code: 0, signal: null });
+  const lines = result.stdout.split("\n").map((line) => line.trim()).filter(Boolean);
+  expect(lines).toHaveLength(1);
+  return JSON.parse(lines[0]!) as StepsRecoveryReport;
+}
+
+/** Put an image back in place: recovery state holds absolute journal paths. */
+function restoreImage(stateDirectory: string, image: string): void {
+  for (const name of ["home", "workspace", "physical"]) {
+    rmSync(join(stateDirectory, name), { recursive: true, force: true });
+    const source = join(image, name);
+    if (existsSync(source)) cpSync(source, join(stateDirectory, name), { recursive: true });
+  }
+}
+
+function expectConsistentRecovery(report: StepsRecoveryReport): void {
+  expect(report.duplicateEventIds).toBe(0);
+  expect(report.sequencesIncrease).toBe(true);
+  // SQLite never holds an effect the journal lost.
+  expect(report.effectsWithoutJournalIntent).toBe(0);
+  expect(report.unsettledIntents).toBe(0);
+  expect(report.secondRecovery).toMatchObject({
+    requeuedJobIds: [],
+    heldUnknownReservationIds: [],
+    cancelledExpiredJobIds: [],
+    detachedQueuedJobIds: [],
+  });
+}
+
+describe.sequential("M4 kernel-panic images of a multi-step turn", () => {
+  it(
+    "recovers every image cut to its last fsynced byte to a consistent point",
+    { timeout: 240_000 },
+    async () => {
+      const stateDirectory = mkdtempSync(join(tmpdir(), "agenc-m4-steps-"));
+      directories.push(stateDirectory);
+      const log = join(stateDirectory, "synced.jsonl");
+      await runStepsChild(stateDirectory, log);
+      // F: the daemon died inside step 4's side effect. Save that state as an
+      // image too (restoreImage copies its second argument into its first).
+      const finalImage = join(stateDirectory, "images", "F");
+      restoreImage(finalImage, stateDirectory);
+      const journal = JSON.parse(
+        readFileSync(join(stateDirectory, "journal.json"), "utf8"),
+      ) as { rolloutPath: string };
+      const finalSynced = readSyncLog(log)
+        .filter((entry) => entry.path === journal.rolloutPath)
+        .reduce((max, entry) => Math.max(max, entry.size), 0);
+
+      // Between steps (P1..P3): every effect so far committed, nothing to review.
+      for (const step of [1, 2, 3]) {
+        const image = join(stateDirectory, "images", `P${step}`);
+        const meta = JSON.parse(readFileSync(join(image, "journal.json"), "utf8")) as {
+          rolloutPath: string;
+          syncedSize: number;
+          size: number;
+        };
+        restoreImage(stateDirectory, image);
+        expect(meta.size).toBeGreaterThanOrEqual(meta.syncedSize);
+        truncateSync(meta.rolloutPath, meta.syncedSize);
+        const report = await recoverStepsChild(stateDirectory);
+        expectConsistentRecovery(report);
+        expect(report.effects).toHaveLength(step);
+        expect(report.effects.every((effect) => effect.outcome === "committed")).toBe(true);
+        expect(report.pendingEffectReviews).toBe(0);
+      }
+
+      // F after a process crash (control) and after a power loss: the side
+      // effect in flight is uncertain and waits for review; it is never re-run.
+      for (const cut of [false, true]) {
+        restoreImage(stateDirectory, finalImage);
+        if (cut) {
+          expect(statSync(journal.rolloutPath).size).toBeGreaterThan(finalSynced);
+          truncateSync(journal.rolloutPath, finalSynced);
+        }
+        const report = await recoverStepsChild(stateDirectory);
+        expectConsistentRecovery(report);
+        expect(report.effects).toHaveLength(4);
+        expect(report.effects.filter((effect) => effect.outcome === "committed")).toHaveLength(3);
+        expect(report.effects.filter((effect) => effect.outcome === "unknown_outcome")).toHaveLength(1);
+        expect(report.pendingEffectReviews).toBe(1);
+        expect(report.toolPhysicalAttempts).toBe(4);
+      }
+    },
+  );
+});
+
