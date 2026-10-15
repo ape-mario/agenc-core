@@ -1,3 +1,5 @@
+import { StartupResumeCwdPermissionError } from "../state/startup-resume-cwd.js";
+import { armDaemonExitWatchdog } from "./daemon-exit-watchdog.js";
 import { refreshEndpointMetadata } from "../llm/endpoint-metadata-cache.js";
 /**
  * AgenC daemon foreground runtime: the daemon process itself (startup state
@@ -382,6 +384,9 @@ export async function runAgenCDaemonForeground(
           .acknowledgeAfterCleanup(foregroundCompleted && releaseOk)
           .catch(() => {});
       }
+      // Only this process can arm its own final exit guard. Embedded hosts
+      // return to their owner instead. All durable cleanup has finished here.
+      if (host.pid === process.pid) await armDaemonExitWatchdog();
     }
   }
 }
@@ -1956,6 +1961,11 @@ async function removeOwnedForegroundDaemonMetadata(params: {
   readonly pidPath: string;
   readonly runtimeInfoPath: string;
 }): Promise<void> {
+  // A process can hang inside Node's native exit after its JS cleanup. Keep
+  // its identity visible until it actually dies. Stop/restart and the next
+  // admission remove stale metadata after proving process exit. Embedded
+  // hosts finish their lifecycle here without terminating this process.
+  if (params.expected.pid === process.pid) return;
   const runtimeInfoPathExists = existsSync(params.runtimeInfoPath);
   const recorded = daemonInstanceIdentityFromRuntimeInfo(
     readDaemonRuntimeInfo(params.runtimeInfoPath),
@@ -3219,6 +3229,7 @@ async function publishRecoveredAgentRun(
     report,
     run,
     runtimeRestore.available,
+    runtimeRestore.unavailableReason,
   );
   let restoredSessionId: string | undefined;
   try {
@@ -3320,6 +3331,7 @@ function recoveryMetadataForRun(
   report: DaemonStartupRecoveryReport,
   run: RecoveredAgentRun,
   runtimeAvailable: boolean,
+  unavailableReason?: string,
 ): JsonObject {
   const canonicalSource = run.resumeSource;
   const runtimeOptions = runtimeOptionsForRecoveredRun(run);
@@ -3350,6 +3362,7 @@ function recoveryMetadataForRun(
       runStatus: run.status,
       runnable: runtimeAvailable,
       runtimeRestore: runtimeAvailable ? "available" : "unavailable",
+      ...(unavailableReason !== undefined ? { runtimeRestoreReason: unavailableReason } : {}),
       toolRecoveryMode: "category_policy",
       ...(run.createdByClient !== undefined
         ? { createdByClient: run.createdByClient }
@@ -3380,6 +3393,7 @@ export async function restoreRecoveredAgentRuntime(
 ): Promise<{
   readonly available: boolean;
   readonly restoreAttemptId?: string;
+  readonly unavailableReason?: string;
 }> {
   const resumeSource = run.resumeSource;
   // Workflow stages own their child adoption and checkpoint resume. Generic
@@ -3431,7 +3445,11 @@ export async function restoreRecoveredAgentRuntime(
   const initialMessages = recoveredInitialMessages(run.latestSnapshot, runtimeOptions.lightMode === true);
   const replayToolCalls = recoveredReplayToolCalls(run.latestSnapshot);
   const restoreAttemptId = randomUUID();
-  let outcome: { readonly available: boolean; readonly restoreAttemptId?: string };
+  let outcome: {
+    readonly available: boolean;
+    readonly restoreAttemptId?: string;
+    readonly unavailableReason?: string;
+  };
   try {
     // Recovery retained only the canonical rollout. A protected or remote
     // workspace must never be opened on the startup readiness path.
@@ -3507,8 +3525,13 @@ export async function restoreRecoveredAgentRuntime(
     outcome = restored
       ? { available: true, restoreAttemptId }
       : { available: false };
-  } catch {
-    outcome = { available: false };
+  } catch (error) {
+    outcome = {
+      available: false,
+      ...(error instanceof StartupResumeCwdPermissionError
+        ? { unavailableReason: error.message }
+        : {}),
+    };
   }
   // The catch above takes every failure, so the source is always closed here.
   // A caller that handles close errors keeps the restore's outcome; without a

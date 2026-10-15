@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import childProcess from "node:child_process";
+import * as startupResumeCwd from "../../src/state/startup-resume-cwd.js";
 import { syncBuiltinESMExports } from "node:module";
 import fsPromises from "node:fs/promises";
 import { once } from "node:events";
@@ -6825,7 +6827,7 @@ snapshot_max_bytes = 64
       return outcome === marker;
     }
 
-    it.each(["timeout", "shutdown"] as const)("publishes readiness and restores other sessions while one workspace never responds (%s)", async (settlement) => {
+    it.each(["timeout", "shutdown", "probe"] as const)("publishes readiness and restores other sessions while one workspace never responds (%s)", async (settlement) => {
       const agencHome = await tempAgencHome();
       const blockedCwd = await fsPromises.realpath(
         await mkdtemp(join(tmpdir(), "agenc-blocked-workspace-")),
@@ -6843,6 +6845,19 @@ snapshot_max_bytes = 64
         runId: "run-healthy-workspace",
         sessionId: "session-healthy-workspace",
       });
+      const originalPin = startupResumeCwd.openStartupResumeCwd;
+      const originalSpawn = childProcess.spawn;
+      let blockedProbe: ReturnType<typeof spawn> | undefined;
+      const probeSpawn = settlement === "probe" ? vi.spyOn(childProcess, "spawn").mockImplementation((...args: Parameters<typeof spawn>) => {
+        if (args[0] === "/bin/sh" && args[1]?.at(-1) === blockedCwd) {
+          blockedProbe = originalSpawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+          return blockedProbe;
+        }
+        return Reflect.apply(originalSpawn, childProcess, args);
+      }) : undefined;
+      const pin = settlement === "probe" ? vi.spyOn(startupResumeCwd, "openStartupResumeCwd").mockImplementation((cwd, options) => originalPin(cwd, {
+        ...options, platformForTestingOnly: "darwin", timeoutMs: 2_000,
+      })) : undefined;
       const originalLstatSync = fs.lstatSync;
       const synchronousWorkspaceAccess = vi.fn();
       const syncStat = vi.spyOn(fs, "lstatSync").mockImplementation((...args) => {
@@ -6882,7 +6897,7 @@ snapshot_max_bytes = 64
         await expect(client.request("agent.list", {})).resolves.toMatchObject({
           agents: [expect.objectContaining({ agentId: "run-healthy-workspace" })],
         });
-        if (settlement === "timeout") {
+        if (settlement !== "shutdown") {
           // A request naming the blocked session is released by its deadline.
           await expect(client.request("session.attach", {
             sessionId: "session-blocked-workspace", clientId: "client-blocked",
@@ -6901,10 +6916,24 @@ snapshot_max_bytes = 64
             ]),
           });
           expect(restoreAgent).toHaveBeenCalledOnce();
+          if (settlement === "probe") {
+            await vi.waitFor(() => expect(blockedProbe?.signalCode).toBe("SIGKILL"));
+            expect(blockedStat.mock.calls.some(([path]) => path === blockedCwd)).toBe(false);
+            const result = await client.request("agent.list", {});
+            expect(result).toMatchObject({ agents: expect.arrayContaining([expect.objectContaining({
+              agentId: "run-blocked-workspace",
+              metadata: expect.objectContaining({ recovery: expect.objectContaining({
+                runtimeRestore: "unavailable",
+                runtimeRestoreReason: "macOS is asking for permission to open the folder; answer the dialog, then resume the session",
+              }) }),
+            })]) });
+          }
         }
       } finally {
         signalProcess.emit("SIGTERM");
         await expect(running).resolves.toBe(0);
+        pin?.mockRestore();
+        probeSpawn?.mockRestore();
         blockedStat.mockRestore();
         syncStat.mockRestore();
         syncBuiltinESMExports();
