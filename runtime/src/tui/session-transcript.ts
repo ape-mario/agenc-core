@@ -2663,7 +2663,14 @@ export function adaptTranscriptEvents(
         // tool start (and collaboration input cells are deliberately hidden),
         // so settle it explicitly instead of reporting reordering or losing
         // the retry notice behind collaboration-row suppression.
-        const truncatedArguments = truncatedToolArgumentsError(payload.result);
+        // Result data may contain the same fields. Only the runtime's error
+        // completion without a durable start represents an unexecuted handoff.
+        // Collaboration starts live in suppressedToolResults, not openTools.
+        const truncatedArguments = event.type === "tool_call_completed" &&
+          payload.isError === true && !openTools.has(callId) &&
+          !suppressedToolResults.has(callId)
+          ? truncatedToolArgumentsError(payload.result)
+          : null;
         if (truncatedArguments !== null) {
           if (!settledToolCallIds.has(callId)) {
             out.push(makeSystemMessage(truncatedArguments, "warning", nextUuid()));
