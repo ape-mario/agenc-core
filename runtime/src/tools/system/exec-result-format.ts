@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import type { ExecCommandToolOutput } from "../../unified-exec/types.js";
 
 /**
@@ -35,7 +36,10 @@ export function formatUnifiedExecToolContent(
   // immediately. The metadata footer stays for log/debug value but no
   // longer leads.
   const sections: string[] = [];
-  sections.push(output.output);
+  // Strip whole terminal sequences before the untrusted-data sanitizer replaces
+  // their control bytes. Otherwise color output becomes literal " [32m" text
+  // repeated in every later prompt. Raw output and structured results stay intact.
+  sections.push(stripVTControlCharacters(output.output));
 
   const footerLines: string[] = [];
   if (output.command_outcome !== undefined) {
