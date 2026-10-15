@@ -135,6 +135,51 @@ test("an Edit after a printed read passes the read-before-write gate", async () 
   expect(applied.isError).not.toBe(true);
 });
 
+const MONEY_TEST = "import { test } from 'node:test';\nimport { toCents } from '../src/money.js';\ntest('cents', () => {});\n";
+
+test("a loop over find in a named directory records each printed file the output names", async () => {
+  // qb nodefix on DeepSeek: the sources came from `$(find src test -type f)`, so no word names a file.
+  await mkdir(join(root, "src"));
+  await mkdir(join(root, "test"));
+  await writeFile(join(root, "src", "money.js"), MONEY, "utf8");
+  await writeFile(join(root, "test", "money.test.js"), MONEY_TEST, "utf8");
+  await record(
+    'cat README.md && ls -R src test && for f in $(find src test -type f); do echo "--- $f ---"; cat "$f"; done',
+    finished(`src:\nmoney.js\n\ntest:\nmoney.test.js\n--- src/money.js ---\n${MONEY}--- test/money.test.js ---\n${MONEY_TEST}`),
+  );
+  expect(getSessionReadSnapshot(session, join(root, "src", "money.js"))).toMatchObject({ viewKind: "full", rawContent: MONEY });
+  expect(hasSessionRead(session, join(root, "test", "money.test.js"))).toBe(true);
+});
+
+test("a file found through its directory needs its name in the output", async () => {
+  await mkdir(join(root, "src"));
+  await writeFile(join(root, "src", "money.js"), MONEY, "utf8");
+  // The text is printed, but nothing says which file it came from.
+  await record("find src -type f -exec cat {} +", finished(MONEY));
+  expect(getSessionReadSnapshot(session, join(root, "src", "money.js"))).toBeUndefined();
+});
+
+test("a file named without a dot or a slash is checked like any other", async () => {
+  const makefile = "test:\n\tnode --test\n\nlint:\n\tnode scripts/lint.mjs --strict --max-warnings 0\n";
+  await writeFile(join(root, "Makefile"), makefile, "utf8");
+  await record("cat Makefile", finished(makefile));
+  expect(hasSessionRead(session, join(root, "Makefile"))).toBe(true);
+});
+
+test("a named directory outside the workspace adds nothing", async () => {
+  const outside = await realpath(await mkdtemp(join(tmpdir(), "agenc-printed-outside-dir-")));
+  try {
+    await writeFile(join(outside, "notes.js"), MONEY, "utf8");
+    await record(
+      `for f in $(find ${outside} -type f); do echo "--- $f ---"; cat "$f"; done`,
+      finished(`--- ${join(outside, "notes.js")} ---\n${MONEY}`),
+    );
+    expect(getSessionReadSnapshot(session, join(outside, "notes.js"))).toBeUndefined();
+  } finally {
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
 // The read must be what the model receives. Real exec_command runs, so the head-and-tail cut and the
 // returned text are the production ones.
 async function execStandard(cmd: string, extra: Record<string, unknown> = {}) {

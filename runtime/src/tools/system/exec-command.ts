@@ -1,6 +1,7 @@
 import { constants as fsConstants, existsSync, realpathSync, statSync } from "node:fs";
-import { open, readdir } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import type { Dirent, Stats } from "node:fs";
+import { lstat, open, readdir } from "node:fs/promises";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type { Tool, ToolExecutionInjectedArgs, ToolPreflightFailure, ToolResult } from "../types.js";
 import { safeStringify } from "../types.js";
@@ -463,6 +464,10 @@ export async function recordShellReads(params: {
 /** Bounds for {@link recordPrintedFileReads}: candidate files, glob matches and checked output. */
 const PRINTED_READ_MAX_CANDIDATES = 32;
 const PRINTED_READ_MAX_GLOB_MATCHES = 64;
+/** Files and directories one named directory may add: a loop over `find dir -type f` names no file. */
+const PRINTED_READ_MAX_DIRECTORY_FILES = 64;
+const PRINTED_READ_MAX_DIRECTORY_VISITS = 64;
+const PRINTED_READ_DIRECTORY_DEPTH = 4;
 const PRINTED_READ_MAX_OUTPUT_CHARS = 4 * 1024 * 1024;
 /** Shorter text could appear in output by coincidence (an echo, a test name), so it proves nothing. */
 const PRINTED_READ_MIN_BYTES = 64;
@@ -591,13 +596,50 @@ async function expandWorkspaceGlob(word: string, base: string, roots: readonly s
 }
 
 /**
+ * Regular files under `dir`, breadth first in name order, at most {@link PRINTED_READ_DIRECTORY_DEPTH}
+ * levels deep, skipping hidden entries and node_modules and never leaving the roots.
+ */
+async function filesUnderDirectory(dir: string, roots: readonly string[], limit: number): Promise<string[]> {
+  const files: string[] = [];
+  let level = [dir];
+  let visits = 0;
+  for (let depth = 0; depth < PRINTED_READ_DIRECTORY_DEPTH && level.length > 0; depth += 1) {
+    const next: string[] = [];
+    for (const current of level) {
+      if (visits >= PRINTED_READ_MAX_DIRECTORY_VISITS || !insideAnyRoot(current, roots)) continue;
+      visits += 1;
+      let entries: Dirent[];
+      try {
+        entries = await readdir(current, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      for (const entry of entries) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+        if (entry.isFile()) {
+          files.push(join(current, entry.name));
+          if (files.length >= limit) return files;
+        } else if (entry.isDirectory()) {
+          next.push(join(current, entry.name));
+        }
+      }
+    }
+    level = next;
+  }
+  return files;
+}
+
+/**
  * Standard sessions count a workspace file as read when the command printed its exact current
  * text, raw or as `cat -n` prints it, from the start of a line, whatever shell construct printed it
- * (a `for` loop over a glob, a `cd` chain, `cat -n`). The model has then seen the current text, which is what the read-before-write
+ * (a `for` loop over a glob or over `find`, a `cd` chain, `cat -n`). The model has then seen the current text, which is what the read-before-write
  * gate asks for; without this, a file read with the shell had its first edit refused and the model
  * paid a FileRead round trip and a resent edit. Candidates are the workspace files the command names
- * outside quotes (path words, globs expanded in the working directory and in every `cd` target), and
- * a file shorter than 64 bytes never counts, since its text can appear by coincidence. Only a shell
+ * outside quotes (path words, globs expanded in the working directory and in every `cd` target) and
+ * the files under a directory it names; a file found only through its directory also needs its path
+ * or name in the output, as the header a printing loop writes before each file. A file shorter than
+ * 64 bytes never counts, since its text can appear by coincidence. Only a shell
  * that exited on its own, untruncated and with no live session, is checked; snapshots and their bounds
  * are the ones {@link recordShellReads} uses. Light keeps its stricter parser of executed read steps.
  */
@@ -629,20 +671,41 @@ export async function recordPrintedFileReads(params: {
     }
   });
   const candidates = new Set<string>();
+  const directoryFiles = new Set<string>();
   for (const word of words) {
     if (candidates.size >= PRINTED_READ_MAX_CANDIDATES) break;
-    if (word.startsWith("-") || word.includes("$") || word.includes("=") || !/[./]/u.test(word)) continue;
+    if (word.startsWith("-") || word.includes("$") || word.includes("=")) continue;
     for (const base of isAbsolute(word) ? [bases[0]!] : bases) {
-      const paths = PRINTED_READ_GLOB.test(word)
-        ? await expandWorkspaceGlob(word, base, roots)
-        : [resolve(base, word)];
-      for (const path of paths) {
-        if (candidates.size >= PRINTED_READ_MAX_CANDIDATES) break;
-        if (insideAnyRoot(path, roots)) candidates.add(path);
+      if (PRINTED_READ_GLOB.test(word)) {
+        for (const path of await expandWorkspaceGlob(word, base, roots)) {
+          if (candidates.size >= PRINTED_READ_MAX_CANDIDATES) break;
+          if (insideAnyRoot(path, roots)) candidates.add(path);
+        }
+        continue;
+      }
+      const path = resolve(base, word);
+      if (!insideAnyRoot(path, roots)) continue;
+      let entry: Stats | undefined;
+      try {
+        entry = await lstat(path);
+      } catch {
+        entry = undefined;
+      }
+      if (entry?.isFile() === true) {
+        candidates.add(path);
+      } else if (entry?.isDirectory() === true && directoryFiles.size < PRINTED_READ_MAX_DIRECTORY_FILES) {
+        const room = PRINTED_READ_MAX_DIRECTORY_FILES - directoryFiles.size;
+        for (const file of await filesUnderDirectory(path, roots, room)) directoryFiles.add(file);
       }
     }
   }
   const shown = visible.replace(/\r\n/gu, "\n");
+  for (const file of directoryFiles) {
+    if (candidates.has(file)) continue;
+    const named = shown.includes(file) || shown.includes(basename(file)) ||
+      bases.some((base) => shown.includes(relative(base, file)));
+    if (named) candidates.add(file);
+  }
   for (const path of candidates) {
     const file = await stableWorkspaceText(path, params.allowedPaths, params.args);
     if (file === undefined || Buffer.byteLength(file.text.trim(), "utf8") < PRINTED_READ_MIN_BYTES) continue;
