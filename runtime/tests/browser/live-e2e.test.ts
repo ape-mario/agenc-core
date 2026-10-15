@@ -54,6 +54,9 @@ describe.skipIf(!LIVE)("Browser tool live e2e", () => {
   const manager = new BrowserManager({
     agencHome: fixtureRoot,
     policy: {
+      ...(process.env.AGENC_BROWSER_EXECUTABLE
+        ? { executablePath: process.env.AGENC_BROWSER_EXECUTABLE }
+        : {}),
       headless: true,
       allowPrivateNetwork: true,
       noSandbox: process.env.AGENC_BROWSER_NO_SANDBOX === "1",
