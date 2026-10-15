@@ -32,6 +32,12 @@ export class DegenerateTextDetector {
       counts.set(word, (counts.get(word) ?? 0) + 1);
       if (counts.size > 16) return false;
     }
+    // Changing numeric facts are useful progress, even with terse labels.
+    // Preserve numeric vocabulary rather than collapsing every value to a word gap.
+    const numbers = new Set(this.tail.match(/\d+(?:\.\d+)?/g) ?? []);
+    if (numbers.size > 16) return false;
+    const digitChars = (this.tail.match(/\d/g) ?? []).length;
+    if (digitChars / this.tail.length >= 0.10) return false;
     const topFour = [...counts.values()].sort((a, b) => b - a).slice(0, 4).reduce((a, b) => a + b, 0);
     if (topFour / words.length < 0.95) return false;
     // Repeated lines, regular tables and periodic prose compress much more
