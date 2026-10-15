@@ -843,7 +843,11 @@ export interface BrowserConfig {
   readonly allow_private_network?: boolean;
   /** Dedicated profile dir; defaults beneath the canonical AgenC home. */
   readonly profile_dir?: string;
-  /** Pass Chromium `--no-sandbox` (default false; needed in some containers). */
+  /**
+   * Pass Chromium `--no-sandbox` outside AgenC's sandbox (default false;
+   * needed in some containers). Inside AgenC's sandbox Chromium's own sandbox
+   * cannot start, so the browser always runs with it off there.
+   */
   readonly no_sandbox?: boolean;
   /** Navigation timeout in ms (default 30000). */
   readonly navigation_timeout_ms?: number;

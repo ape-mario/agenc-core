@@ -140,6 +140,11 @@ export interface SandboxTransformRequest {
   readonly isWsl1?: boolean;
   /** Opt-in GPU compute inside the sandbox (macOS seatbelt only for now). */
   readonly allowGpu?: boolean;
+  /**
+   * The command launches Chromium for the Browser tool. Under macOS seatbelt
+   * the profile adds the rules Chromium needs to start.
+   */
+  readonly chromiumBrowser?: boolean;
 }
 
 export type WindowsSandboxLevel = "disabled" | "low" | "medium" | "high";

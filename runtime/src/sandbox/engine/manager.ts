@@ -37,7 +37,7 @@ import {
   allowNetworkForProxy,
   createLinuxSandboxCommandArgsForPermissionProfile,
 } from "./landlock.js";
-import { createSeatbeltCommandArgs } from "./seatbelt.js";
+import { chromiumBundleIdentifier, createSeatbeltCommandArgs } from "./seatbelt.js";
 import { isWsl1 } from "./bwrap.js";
 import {
   NETWORK_DISABLED,
@@ -120,6 +120,13 @@ export class SandboxManager {
             network: request.network,
             extraAllowUnixSockets: [],
             ...(request.allowGpu === true ? { allowGpu: true } : {}),
+            ...(request.chromiumBrowser === true
+              ? {
+                  chromiumBrowser: {
+                    bundleIdentifier: chromiumBundleIdentifier(request.command.program),
+                  },
+                }
+              : {}),
           }),
         ];
         break;

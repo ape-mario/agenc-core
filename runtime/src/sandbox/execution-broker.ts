@@ -2069,10 +2069,20 @@ export function transformSandboxedCommand(params: SandboxSpawnCommand & {
         "sandbox isolation was required but no platform sandbox is available",
       );
     }
+    // Chromium's own sandbox cannot start inside AgenC's: macOS refuses to
+    // initialize a second sandbox (forbidden-sandbox-reinit), and the Linux
+    // sandbox has neither the setuid helper nor nested user namespaces. A
+    // browser launched inside AgenC's sandbox runs with --no-sandbox, and
+    // AgenC's sandbox is the one that confines it.
+    const sandboxedBrowser = params.browserCdp === true &&
+      (sandbox === "macos_seatbelt" || sandbox === "linux_seccomp");
+    const commandArgs = sandboxedBrowser && !params.args.includes("--no-sandbox")
+      ? ["--no-sandbox", ...params.args]
+      : params.args;
     const transformed = sandboxManager.transform({
       command: {
         program: params.program,
-        args: params.args,
+        args: commandArgs,
         cwd: params.cwd,
         env: params.env,
         ...(params.cwdCapability !== undefined ? { cwdCapability: params.cwdCapability } : {}),
@@ -2105,6 +2115,7 @@ export function transformSandboxedCommand(params: SandboxSpawnCommand & {
       windowsSandboxPrivateDesktop:
         params.runtimeSandbox.windowsSandboxPrivateDesktop ?? false,
       ...(params.runtimeSandbox.allowGpu === true ? { allowGpu: true } : {}),
+      ...(params.browserCdp === true ? { chromiumBrowser: true } : {}),
     });
     const [program, ...args] = transformed.command;
     const browserCdpOverStdio = params.browserCdp === true && sandbox === "linux_seccomp";
