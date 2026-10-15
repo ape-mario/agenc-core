@@ -21,6 +21,7 @@ import { renderUntrustedWorkspaceData } from "../untrusted-workspace-content.js"
 import { formatContextPressureReminder } from "../../utils/messages.js";
 import { sanitizeSystemReminderContent } from "./system-reminder-sanitizer.js";
 import type { Attachment } from "./types.js";
+import { relevantMemoryFingerprint } from "./relevant-memory-fingerprint.js";
 
 /**
  * Convert a list of attachments into the corresponding `LLMMessage[]`,
@@ -49,7 +50,13 @@ function renderAttachment(attachment: Attachment): LLMMessage | null {
     }
     case "relevant_memories": {
       if (attachment.memories.length === 0) return null;
-      return userContextMessage(renderRelevantMemoriesAttachment(attachment));
+      return {
+        ...userContextMessage(renderRelevantMemoriesAttachment(attachment)),
+        runtimeOnly: {
+          mergeBoundary: "user_context",
+          relevantMemoryFingerprints: attachment.memories.map(relevantMemoryFingerprint),
+        },
+      };
     }
     case "plan_mode": {
       // Plan-mode prose for the per-turn pulse. The producer gates

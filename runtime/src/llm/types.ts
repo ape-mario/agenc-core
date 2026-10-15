@@ -123,6 +123,8 @@ export interface LLMMessage {
     /** Durable response-item identity retained across compaction replay. */
     readonly responseItemId?: string;
     readonly mergeBoundary?: "user_context";
+    /** Exact relevant-memory versions already present in a retained attachment. */
+    readonly relevantMemoryFingerprints?: readonly string[];
     readonly permissionModeReminder?: "plan" | "plan_exit" | "auto" | "auto_exit";
     readonly excludeFromDurableHistory?: true;
     /**
