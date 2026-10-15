@@ -870,7 +870,7 @@ export function createFileEditTool(config: FileEditToolConfig): Tool {
     preflight(args) {
       const validated = validateInputs(args);
       if ("error" in validated) return { code: "invalid_edit", message: validated.error };
-      return unreadFilePreflight(args, [validated.file_path], config.allowedPaths[0] ?? process.cwd());
+      return unreadFilePreflight(args, [validated.file_path], config.allowedPaths[0] ?? process.cwd(), config.allowedPaths);
     },
     checkPermissions(input, context) {
       const args = input as EditArgs;
@@ -1234,7 +1234,7 @@ export function createFileMultiEditTool(config: FileEditToolConfig): Tool {
     preflight(args) {
       const validated = validateMultiEditInputs(args);
       if ("error" in validated) return { code: "invalid_edit", message: validated.error };
-      return unreadFilePreflight(args, [validated.file_path], config.allowedPaths[0] ?? process.cwd());
+      return unreadFilePreflight(args, [validated.file_path], config.allowedPaths[0] ?? process.cwd(), config.allowedPaths);
     },
     checkPermissions(input, context) {
       const args = input as MultiEditArgs;
