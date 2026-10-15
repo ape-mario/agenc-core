@@ -104,6 +104,27 @@ describe("Venice built-in provider", () => {
     expect(entry.capabilities).toMatchObject({ supportsExtendedThinking: true, supportsToolUse: true });
   });
 
+  test("prices every listed model from model_spec.pricing, including the long-context tier", () => {
+    const models = new Map(parseVeniceModels(fixture).map(model => [model.model, model]));
+    // Every tool-capable model in the 2026-10-15 list publishes a price.
+    expect([...models.values()].every(model => model.cost !== undefined)).toBe(true);
+    expect(models.get("deepseek-v4-flash")?.cost).toEqual({
+      inputUsdPer1K: 0.138 / 1000, outputUsdPer1K: 0.275 / 1000,
+      cachedInputUsdPer1K: 0.028 / 1000, cachedInputIncludedInInputTokens: true,
+    });
+    expect(models.get("qwen3-5-397b-a17b")?.cost).toEqual({ inputUsdPer1K: 0.75 / 1000, outputUsdPer1K: 4.5 / 1000 });
+    // `extended` is the rate above context_token_threshold input tokens.
+    expect(models.get("grok-4-5")?.cost?.longContext).toEqual({
+      aboveInputTokens: 200_000,
+      rates: { inputUsdPer1K: 4.53 / 1000, outputUsdPer1K: 13.6 / 1000, cachedInputUsdPer1K: 0.68 / 1000, cachedInputIncludedInInputTokens: true },
+    });
+    // No prompt caching is requested from Venice, so no cache write is priced.
+    expect(models.get("claude-opus-5-5")?.cost).toEqual({
+      inputUsdPer1K: 4 / 1000, outputUsdPer1K: 20 / 1000,
+      cachedInputUsdPer1K: 0.2 / 1000, cachedInputIncludedInInputTokens: true,
+    });
+  });
+
   test("discovers the default trait instead of pinning the current model", async () => {
     const changed = structuredClone(fixture);
     for (const model of changed.data) model.model_spec.traits = [];

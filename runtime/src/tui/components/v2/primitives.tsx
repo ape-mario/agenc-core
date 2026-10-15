@@ -1931,8 +1931,10 @@ export function MenuModal<T>({
     ? Math.max(1, Math.trunc(viewport.rows))
     : 24
   const rowHeight = Math.max(1, rowMinHeight)
-  // Leave room for the description below the list on short terminals.
-  const chromeRows = (omitTopBorder ? 1 : 2) + 3 + (detail ? 4 : 0)
+  // Rows the list cannot use: the popup's top and bottom border, its title and
+  // the rule under it, the column headers, and the footer with the rule above
+  // it. Leave room for the description below the list on short terminals.
+  const chromeRows = (omitTopBorder ? 6 : 7) + (detail ? 4 : 0)
   const maxVisibleItems = Math.max(
     1,
     Math.floor(Math.max(1, viewportRows - chromeRows) / rowHeight),
@@ -1972,7 +1974,8 @@ export function MenuModal<T>({
           width={resolvedListWidth}
           overflow="hidden"
         >
-          <Box flexDirection="row" paddingX={paddingX} gap={columnGap}>
+          {/* The column headers stay put while a long list scrolls. */}
+          <Box flexDirection="row" paddingX={paddingX} gap={columnGap} flexShrink={0}>
             <Box width={2} flexShrink={0} />
             {headers.map((header, index) => (
               // Same fixed cell as the rows below, so headers line up with their

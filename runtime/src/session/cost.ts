@@ -31,6 +31,7 @@ import type { Sidecar } from "./sidecar.js";
 import { normalizeProviderMetadataIdentity } from "../provider-identity.js";
 import { parseClaudeModelId } from "../utils/model/claudeModelId.js";
 import { OPENROUTER_PRICING } from "../llm/registry/openrouter-pricing.js";
+import { publishedModelCost } from "../llm/registry/published-model-costs.js";
 import {
   AGENC_DEEPSEEK_V41_GENERATION,
   AGENC_DEEPSEEK_V41_MODEL,
@@ -1445,6 +1446,14 @@ export function resolveModelCostEntry(
   usage: Pick<ModelUsage, "model" | "provider">,
   registry: Readonly<Record<string, ModelCostEntry>>,
 ): { readonly key: string; readonly entry: ModelCostEntry } | null {
+  // A price published with the provider's live model list (Venice) is the
+  // price of record for that provider's model, whatever registry is passed.
+  const provider = normalizeProviderMetadataIdentity(usage.provider);
+  if (provider !== undefined) {
+    const model = usage.model.startsWith(`${provider}:`) ? usage.model.slice(provider.length + 1) : usage.model;
+    const published = publishedModelCost(provider, model);
+    if (published !== undefined) return { key: `${provider}:${model}`, entry: published };
+  }
   for (const key of costLookupKeys(usage.model, usage.provider, registry)) {
     const entry = registry[key];
     if (entry) return { key, entry };
@@ -1638,7 +1647,11 @@ function costLookupKeys(
   const collapsesToLocalZero = registry[canonical]?.localZeroCost === true;
   const foreignProvider =
     normalizedProvider !== undefined && normalizedProvider !== canonical;
-  if (!(collapsesToLocalZero && foreignProvider)) {
+  // Venice sells many vendors' models at its own published prices: a bare ID
+  // that names another provider's model (deepseek-v4-flash) must not borrow
+  // that provider's price. Without a Venice price the model is unpriced.
+  const ownPricesOnly = normalizedProvider === "venice";
+  if (!(collapsesToLocalZero && foreignProvider) && !ownPricesOnly) {
     keys.push(model);
     if (canonical !== model) keys.push(canonical);
   }

@@ -1040,8 +1040,15 @@ Authenticated `GET /models` discovery offers online text models with
 `model_spec.capabilities.supportsFunctionCalling = true`. It uses
 `availableContextTokens` and `maxCompletionTokens` for limits, and maps
 reasoning, supported effort levels, vision, and USD pricing per million
-tokens. Core stores rates per thousand tokens. The active Venice session's
-cost sidecar uses discovered facts.
+tokens. Core stores rates per thousand tokens.
+
+Each model's price comes from that list: `input`, `output`, `cache_input`, and
+the `extended` rates above `context_token_threshold` input tokens. Budget
+admission reserves and charges at it, and the cost sidecar and the status line
+show it. AgenC asks Venice for no prompt caching, so the `cache_write` price
+is not used. A Venice model ID never takes another provider's price for the
+same name. When the list gives a model no price, admission reserves the
+conservative ceiling and the status line says `price unknown`.
 
 The `/providers` and `/model` screens read this list with the key the session
 uses: `VENICE_API_KEY`, a key just entered in the screen, or the saved key.
