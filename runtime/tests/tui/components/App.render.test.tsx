@@ -31,6 +31,7 @@ import {
   dismissLedgerVerification,
   getLedgerVerificationSnapshot,
 } from "../../services/Ledger/ledgerVerification.js";
+import { codingLedgerPrompts } from "../../services/Ledger/ledgerPromptCases.js";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../remoteAuthSessionContext.fixture.js";
 
 // Keep shell smoke frames independent of the checkout and async git redraws.
@@ -1568,6 +1569,20 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     } finally {
       dismissLedgerVerification();
     }
+  });
+
+  test.each(codingLedgerPrompts)("submits coding prompt without reading Ledger status: %s", async (prompt) => {
+    const { AgenCTuiApp } = await import("./App.js");
+    const session = { ...createSession(), submit: vi.fn(async () => {}) } satisfies AgenCBridgeSession;
+    resetShellSurfaceProbe();
+    await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
+      await providerProbe.promptSubmits.at(-1)!(prompt, {
+        clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn(),
+      });
+      expect(session.submit).toHaveBeenCalled();
+      expect(ledgerStatusProbe.refresh).not.toHaveBeenCalled();
+      expect(getLedgerVerificationSnapshot().phase).toBe("idle");
+    });
   });
 
   test("parses MCP primitive field edge cases", async () => {

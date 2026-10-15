@@ -232,6 +232,7 @@ import {
   beginLedgerVerification,
   getLedgerVerificationSnapshot,
   isLedgerAuthenticityRequest,
+  isLedgerDeviceRequest,
   markLedgerVerificationFailed,
   markLedgerVerified,
   markLedgerVerifying,
@@ -3481,15 +3482,13 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         await runLocalControlCommand(localControl);
         return;
       }
-      // On-demand Ledger status read: mentioning "ledger" refreshes the bottom
-      // connection indicator (no background polling — this is the only read).
-      if (/\bledger\b/i.test(text_0)) {
+      // Hardware features must stay out of ordinary coding/accounting turns.
+      // Explicit slash commands perform their own reads in ledgerCommand.
+      if (isLedgerDeviceRequest(text_0)) {
         void refreshLedgerStatus();
         if (isLedgerAuthenticityRequest(text_0)) {
           beginLedgerVerification({
-            source: /^\/(?:ledger|wallet)\s+genuine-check\b/i.test(text_0)
-              ? "slash"
-              : "prompt",
+            source: "prompt",
             transcriptStartIndex: transcriptMessagesRef.current.length,
             model: getLedgerStatusSnapshot().model,
           });
