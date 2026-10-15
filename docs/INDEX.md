@@ -3,7 +3,7 @@
 Canonical map of docs under `docs/`. Product overview and install entry:
 [`../README.md`](../README.md).
 
-Version in tree: **runtime / launcher 0.19.4**; embedding SDK
+Version in tree: **runtime / launcher 0.19.5**; embedding SDK
 **0.3.0**. Default provider **grok**; fresh-config session and direct-provider
 default **grok-4.6**. Managed OpenRouter's paid default remains
 **`x-ai/grok-4.5`** (see [providers.md](reference/providers.md)).
@@ -99,6 +99,7 @@ history; the linked pages below are current product truth.
 
 | Doc | Summary |
 | --- | --- |
+| [releases/0.19.5.md](releases/0.19.5.md) | AgenC 0.19.5: git status above the input, Venice AI as a provider, and input, paste and session fixes |
 | [releases/0.19.4.md](releases/0.19.4.md) | AgenC 0.19.4: the daemon stops and restarts while macOS waits for folder permission, and snap browsers are skipped inside the Linux sandbox |
 | [releases/0.19.3.md](releases/0.19.3.md) | AgenC 0.19.3: the Browser tool starts Chrome on macOS, an unknown tool outcome shows a review card and keeps your prompts, and the daemon no longer hangs at startup on a session folder |
 | [releases/0.19.2.md](releases/0.19.2.md) | AgenC 0.19.2: on macOS `agenc daemon restart` keeps launchd as the daemon's owner, the home-folder trust card no longer lists your own settings, and the Windows installer finishes again, including in Windows PowerShell 5.1 |
@@ -138,7 +139,7 @@ Tracked in the repo (safe for GitHub clones):
 
 | Path | Summary |
 | --- | --- |
-| [`../README.md`](../README.md) | Product README (0.19.4) |
+| [`../README.md`](../README.md) | Product README (0.19.5) |
 | [`../packages/agenc-sdk/README.md`](../packages/agenc-sdk/README.md) | SDK package readme |
 | [`../runtime/eval/README.md`](../runtime/eval/README.md) | Agent-eval harness notes |
 | [`../runtime/src/tui/README.md`](../runtime/src/tui/README.md) | TUI architecture (Ink fork, themes) |
