@@ -530,6 +530,7 @@ names; `[]` denotes an array entry. Open maps accept keys at the indicated
 | `max_budget_usd` | Positive shared cost cap for the session and its child agents. |
 | `autonomous_mode` | Boolean autonomous runtime mode. |
 | `coordinator_mode` | Boolean coordinator-only main-session behavior. |
+| `stream_degenerate_guard` | Stop disordered short-vocabulary model output; default `true`. Set `false` for intentional random text. A stopped partial is marked unreliable; one automatic retry is allowed only before streamed tool work. |
 | `stream_watchdog_timeout_ms` | Non-negative inter-chunk idle timeout; default `600000`, `0` disables. |
 | `provider_outage_wait_ms` | Non-negative total time a turn keeps waiting for a provider outage to end once the reconnect ladder is spent; default `1800000` (30 minutes), `0` ends the turn as soon as the ladder is exhausted. |
 | `provider_outage_retry_ms` | Positive first slow-retry delay during a provider outage, doubling up to ten times this value; default `30000`. |

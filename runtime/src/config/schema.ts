@@ -985,6 +985,8 @@ export interface AgenCConfig {
   readonly completion_gate?: CompletionGateConfig;
   readonly goal?: GoalConfig;
   readonly compaction?: CompactionConfig;
+  /** Stop disordered short-vocabulary model streams; false opts out. */
+  readonly stream_degenerate_guard?: boolean;
   readonly stream_watchdog_timeout_ms?: number;
   readonly provider_outage_wait_ms?: number;
   readonly provider_outage_retry_ms?: number;
@@ -1134,6 +1136,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "pluginTrustMessage",
   "agent",
   "agents",
+  "stream_degenerate_guard",
   "stream_watchdog_timeout_ms",
   "provider_outage_wait_ms",
   "provider_outage_retry_ms",
@@ -1222,6 +1225,7 @@ export function defaultConfig(): AgenCConfig {
       "pyproject.toml",
     ]) as readonly string[],
     project_doc_max_bytes: 32_768,
+    stream_degenerate_guard: true,
     // Ten-minute stream-idle deadline by default (see
     // DEFAULT_STREAM_WATCHDOG_TIMEOUT_MS). A half-open socket or a stalled
     // provider stream otherwise hangs the turn until the user cancels;

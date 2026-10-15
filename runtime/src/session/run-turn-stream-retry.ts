@@ -70,6 +70,7 @@ const TRANSIENT_NETWORK_ERROR_CODES: ReadonlySet<string> = new Set([
 
 function streamRetryFailureLabel(cause: unknown): string {
   if (cause instanceof StreamProgressError) {
+    if (cause.reason === "stream_degenerate") return "degenerate model output";
     return cause.reason === "stream_loop" ? "repetitive reasoning" : "no model progress";
   }
   if (cause instanceof Error && cause.message.startsWith("stream_idle")) {
@@ -235,7 +236,19 @@ function snapshotStartedInterruptedTools(state: TurnState): void {
 function interruptedStreamRetryBlockReason(
   state: TurnState,
   session: Session,
+  error?: unknown,
 ): string | null {
+  const cause = streamRetryErrorCause(error);
+  // A degenerate sample must never replay even a read-only tool. Block as
+  // soon as a call is registered, before dispatch certainty is available.
+  if (cause instanceof StreamProgressError && cause.reason === "stream_degenerate") {
+    const executor = state.streamingToolExecutor as {
+      getToolStates?: () => readonly unknown[];
+    } | null;
+    if (state.toolUseBlocks.length > 0 || (executor?.getToolStates?.().length ?? 0) > 0 || state.toolResults.length > 0) {
+      return "not retrying degenerate output after streamed tool work; retry manually";
+    }
+  }
   if (state.toolUseBlocks.length === 0) return null;
   const executor = state.streamingToolExecutor as {
     getToolStates?: () => ReadonlyArray<{
