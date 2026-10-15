@@ -120,6 +120,26 @@ describe("saved provider keys", () => {
 });
 
 describe("providers screen snapshot", () => {
+  it("uses the discovered Venice trait default in the provider picker", () => {
+    const { home, environment } = tempHome();
+    const ctx = ctxFor({ home, environment });
+    Object.assign(ctx.session.services, { modelsManager: {
+      tryListModels: () => [{ provider: "venice", slug: "fresh-tool-model", isDefault: true }],
+    } });
+    expect(readProvidersHubSnapshot(ctx).rows.find(row => row.provider === "venice"))
+      .toMatchObject({ model: "fresh-tool-model" });
+  });
+  it("lists Venice and saves its own BYOK credential", () => {
+    const { home, environment } = tempHome();
+    const ctx = ctxFor({ home, environment });
+    expect(readProvidersHubSnapshot(ctx).rows.find(row => row.provider === "venice"))
+      .toMatchObject({ name: "Venice AI", connection: "not-set", envLabel: "VENICE_API_KEY" });
+    saveProviderKey(home, "venice", "fake-venice-stored-key");
+    expect(readProvidersHubSnapshot(ctx).rows.find(row => row.provider === "venice"))
+      .toMatchObject({ connection: "connected", keySaved: true });
+    expect(readLocalByokCredential(home, "venice")?.apiKey).toBe("fake-venice-stored-key");
+    expect(JSON.stringify(readProvidersHubSnapshot(ctx))).not.toContain("fake-venice-stored-key");
+  });
   it("puts the current provider first, then connected ones, with one plain status each", () => {
     const { home, environment } = tempHome();
     saveProviderKey(home, "deepseek", "sk-deepseek");

@@ -243,6 +243,10 @@ function resolveExplicitPair(
     return Object.freeze({ provider, model: projectedModel });
   }
 
+  // Venice's discovered catalog can serve bare IDs also owned by native
+  // providers. The explicit provider/model pair remains the routing authority.
+  if (provider === "venice") return Object.freeze({ provider, model: projectedModel });
+
   try {
     const resolved = resolveModelDisambiguated(projectedModel, catalog);
     if (resolved.provider !== provider) {

@@ -20,6 +20,7 @@ import {
   type HistoryCompatResult,
 } from "./model.js";
 import type { ProviderModelSelectionOutcome } from "../contracts/provider-model-selection.js";
+import { configuredModelForProvider } from "../config/resolve-model.js";
 import { readCommandConfig } from "./config-context.js";
 import { providerMenuFallback, readProviderMenuSnapshot } from "./provider-menu-snapshot.js";
 import {
@@ -332,8 +333,12 @@ export const providerCommand: SlashCommand = {
         return { kind: "text", text: providerMenuFallback(readProviderMenuSnapshot(ctx)) };
       }
       const [targetProvider = "", ...modelParts] = trimmed.split(/\s+/);
-      const targetModel =
+      let targetModel =
         modelParts.length > 0 ? modelParts.join(" ").trim() : undefined;
+      if (targetProvider === "venice" && targetModel === undefined &&
+          configuredModelForProvider(readCommandConfig(ctx) ?? {}, "venice") === undefined) {
+        targetModel = await ctx.session.services?.modelsManager?.getProviderDefaultModel?.("venice");
+      }
       let selection = resolveProviderCommandSelection(
         ctx,
         targetProvider,

@@ -147,7 +147,7 @@ the Grok 4.6 default and capability change.
 they run only through the Grok Build CLI ACP path. See
 [grok-oauth.md](../grok-oauth.md#composer-models-acp).
 
-## Built-in providers (24)
+## Built-in providers (25)
 
 | Slug | Display name | Default model | Default base URL | Ordered credential env aliases | Ordered endpoint env aliases | Onboarding access |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -158,6 +158,7 @@ they run only through the Grok Build CLI ACP path. See
 | `lmstudio` | LM Studio | `gpt-4o-mini` | `http://localhost:1234/v1` | `LMSTUDIO_API_KEY` (optional) | `LMSTUDIO_BASE_URL` | `local` |
 | `openai-compatible` | OpenAI-compatible | `local-model` | `http://localhost:8000/v1` | `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_API_KEY` | `OPENAI_COMPATIBLE_BASE_URL`, `OPENAI_BASE_URL`, `OPENAI_API_BASE` | `local` |
 | `openrouter` | OpenRouter | `x-ai/grok-4.5` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `OPENROUTER_BASE_URL` | `api-key` |
+| `venice` | Venice AI | `zai-org-glm-5-2` (offline fallback) | `https://api.venice.ai/api/v1` | `VENICE_API_KEY` | `VENICE_BASE_URL` | `api-key` |
 | `groq` | Groq | `openai/gpt-oss-120b` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` | `GROQ_BASE_URL` | `api-key` |
 | `deepseek` | DeepSeek | `deepseek-v4-flash` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` | `DEEPSEEK_BASE_URL` | `api-key` |
 | `meta` | Meta | `muse-wonder-1.0` | `https://api.meta.ai/v1` | `MODEL_API_KEY` | `META_BASE_URL` | `api-key` |
@@ -1018,3 +1019,54 @@ implementation remains unchanged. OpenRouter, Google Cloud and Foundry
 registration are also outside this release. See the
 [Anthropic model reference](anthropic-models.md) for cache prices, thinking,
 tokenizer and migration details.
+
+
+## Venice AI
+
+Select `venice` with `agenc --provider venice` or `/provider venice`.
+Use `VENICE_API_KEY` or save a key in the `/providers` screen. Venice has its
+own BYOK credential record. It never reads `OPENAI_COMPATIBLE_API_KEY` or
+`OPENAI_API_KEY`. `agenc providers` reports missing or present credentials.
+
+Venice uses streaming OpenAI-compatible Chat Completions at
+`https://api.venice.ai/api/v1`. Every request sets
+`venice_parameters.include_venice_system_prompt = false`,
+`enable_web_search = "off"`, `enable_web_scraping = false`,
+`enable_web_citations = false`, and `enable_x_search = false`.
+AgenC supplies the system prompt and tools. Reasoning arrives separately in
+`reasoning_content` and stays out of the visible answer.
+
+Authenticated `GET /models` discovery offers online text models with
+`model_spec.capabilities.supportsFunctionCalling = true`. It uses
+`availableContextTokens` and `maxCompletionTokens` for limits, and maps
+reasoning, supported effort levels, vision, and USD pricing per million
+tokens. Core stores rates per thousand tokens. The active Venice session's
+model picker and cost sidecar use discovered facts. A small static catalog
+supports offline listing when discovery is unavailable.
+
+The `function_calling_default` trait selects the discovered provider default.
+The offline fallback is `zai-org-glm-5-2`. Explicit model selections and
+`providers.venice.default_model` stay pinned. To pin a selection:
+
+```toml
+model_provider = "venice"
+model = "zai-org-glm-5-2"
+```
+
+Venice documents `model_spec.privacy = "private"` as zero data retention
+infrastructure. Core sets the model's `zeroDataRetention` fact only for that
+value. `anonymized` hides the caller's identity but leaves retention unknown.
+This is model metadata, not an extra request routing preference.
+
+HTTP 401 maps to authentication failure. HTTP 429 maps to rate limiting.
+Venice's `x-ratelimit-reset-requests` is a Unix timestamp;
+`x-ratelimit-reset-tokens` is a delay in seconds. The adapter converts these
+to Core's retry timing and respects a standard `Retry-After` header.
+
+Sources: [Chat Completions](https://docs.venice.ai/api-reference/endpoint/chat/completions),
+[models](https://docs.venice.ai/api-reference/endpoint/models/list),
+[pricing](https://docs.venice.ai/overview/pricing),
+[reasoning](https://docs.venice.ai/guides/features/reasoning-models),
+[privacy](https://docs.venice.ai/overview/privacy),
+[errors](https://docs.venice.ai/api-reference/error-codes), and
+[rate limits](https://docs.venice.ai/api-reference/rate-limiting).

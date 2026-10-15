@@ -1,3 +1,4 @@
+import { VENICE_MODELS } from "../llm/registry/venice-models.js";
 /**
  * Cost sidecar — session cost tracking + formatting.
  *
@@ -990,6 +991,7 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
     ...copilotCostAliases("gpt-6-luna", [0.1, 0.5, 0.01, 0.125], [0.2, 0.75, 0.02, 0.25]),
     ...copilotCostAliases("claude-opus-5.5", [4, 20, 0.2, 5]),
     // Groq published per-token prices, checked 2026-09-29.
+    ...Object.fromEntries(VENICE_MODELS.flatMap(model => model.cost ? [[`venice:${model.model}`, model.cost]] : [])),
     // https://console.groq.com/docs/models
     // Retired shared Llama and enterprise-preview MiniMax prices are unknown.
     "groq:openai/gpt-oss-120b": { inputUsdPer1K: 0.00015, outputUsdPer1K: 0.0006 },
