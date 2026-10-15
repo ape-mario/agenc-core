@@ -776,6 +776,43 @@ describe("automatic project trust in the preflight", () => {
       );
     });
   });
+
+  it("does not show the user's own config as repository settings in the home folder", async () => {
+    // A real install: HOME is the workspace and the AgenC home is HOME/.agenc.
+    const userHome = await mkdtemp(join(tmpdir(), "agenc-trust-user-home-"));
+    const agencHome = join(userHome, ".agenc");
+    await mkdir(agencHome);
+    await writeFile(
+      join(agencHome, "config.toml"),
+      'config_version = 2\nmodel = "grok-4.6"\nreasoning_effort = "high"\n',
+      "utf8",
+    );
+    const env = { ...makeEnv(agencHome, userHome), HOME: userHome };
+    const tty = makeTtyStdio();
+    const renderPrompt = vi.fn(async () => true);
+    try {
+      await expect(
+        runProjectTrustPreflightForTui({
+          env,
+          argv: ["node", "agenc"],
+          cwd: userHome,
+          stdin: tty.stdin,
+          stdout: tty.stdout,
+          stderr: tty.stderr,
+          renderPrompt,
+          markSessionTrusted: async () => undefined,
+        }),
+      ).resolves.toMatchObject({ accepted: true, prompted: true });
+      expect(renderPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          location: "home",
+          review: { repoItems: [], userItems: [] },
+        }),
+      );
+    } finally {
+      await rm(userHome, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("resolveAttachTargetTrustRoot", () => {

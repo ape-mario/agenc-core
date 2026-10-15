@@ -1314,6 +1314,15 @@ function isSameDirectory(left: string, right: string): boolean {
   }
 }
 
+/**
+ * True when a workspace's `.agenc` folder is the AgenC home itself, as in a
+ * session started in the home folder. That folder holds the user's own
+ * config, never repository settings.
+ */
+export function workspaceConfigDirIsAgenCHome(projectRoot: string, agencHome: string): boolean {
+  return isSameDirectory(join(projectRoot, ".agenc"), agencHome);
+}
+
 async function loadLayeredConfigInternal(
   options: LayeredConfigRepositoryOptions,
   includeWorkspaceLayers: boolean,
@@ -1432,7 +1441,7 @@ async function loadLayeredConfigInternal(
   // The AgenC home is never repository configuration: such a root has no
   // project or local layer. Every other path collision still fails closed.
   const workspaceLayersAreAgenCHome =
-    includeWorkspaceLayers && isSameDirectory(join(projectRoot, ".agenc"), home.path);
+    includeWorkspaceLayers && workspaceConfigDirIsAgenCHome(projectRoot, home.path);
   const project = includeWorkspaceLayers && !workspaceLayersAreAgenCHome
     ? await readStrictConfigLayer(
         join(projectRoot, ...PROJECT_CONFIG_RELATIVE_PATH),
