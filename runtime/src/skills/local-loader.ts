@@ -2781,7 +2781,7 @@ const BUNDLED_SKILLS: readonly BundledSkillDefinition[] = [
   },
   {
     name: "verify",
-    description: "Plan and run a concrete verification pass for CLI, server, or UI changes.",
+    description: "Plan and run a concrete verification pass for CLI, server, or UI changes that the project's own tests do not cover.",
     argumentHint: "[thing to verify]",
     files: VERIFY_FILES,
     getPrompt: (args) => `# Verify

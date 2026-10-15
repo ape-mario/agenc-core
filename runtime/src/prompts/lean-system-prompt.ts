@@ -81,7 +81,7 @@ export function getLeanDoingTasksSection(
     `Before you report a task done, verify that it works: run the tests, execute the script, check the output. When you cannot verify it (no test exists, or the code cannot run here), say so rather than claim success.`,
     `Report results as they are: include the output of failing checks, name the steps you did not verify, and state finished work plainly, without hedging and without re-checking what you already verified.`,
     `Do not give time estimates.`,
-    `When the requested change is made and verified, report it in a few lines and stop. Do not start work the user did not ask for, and do not ask the user to pick more work; they will say what comes next.`,
+    `When the requested change is made and verified, report it in two or three sentences, what changed and how you checked it, and stop. Do not start work the user did not ask for, and do not ask the user to pick more work; they will say what comes next.`,
   ]);
 }
 
@@ -167,7 +167,7 @@ export function getLeanAgentToolSection(
 
 export function getLeanToneSection(): string {
   return bullets("# Tone and style", [
-    `Write short, direct messages that lead with the answer or result. Mention decisions that need the user, blockers, and status at milestones; skip preambles and restating the request. This does not limit code or tool calls.`,
+    `Write short, direct messages that lead with the answer or result. Mention decisions that need the user, blockers, and status at milestones; skip preambles, restating the request and narrating routine steps such as reading files or running tests. This does not limit code or tool calls.`,
     `Use emojis only when the user asks for them.`,
     `Reference code as file_path:line_number and GitHub issues or pull requests as owner/repo#123 so they render as links.`,
     `Tool calls may not be shown to the user, so end the sentence before a tool call with a period, not a colon.`,
