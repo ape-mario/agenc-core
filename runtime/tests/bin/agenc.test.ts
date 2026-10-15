@@ -4560,6 +4560,28 @@ describe("main() smoke", () => {
         "attach-time provider openai disagrees with live daemon provider grok",
       );
       expect(daemon.createTuiContext).toHaveBeenCalledOnce();
+      const attachWithModel = (clientId: string, model: string) =>
+        attachAgentTuiEntry({
+          agentId: "agent_bare_attach",
+          clientId,
+          env: {
+            AGENC_HOME: tmpHome,
+            AGENC_WORKSPACE: tmpCwd,
+            HOME: tmpHome,
+          },
+          startupCliFlags: { model },
+        });
+      await expect(attachWithModel("client_qualified_provider", "openai:gpt-6.1-sol")).rejects.toThrow(
+        "attach-time provider openai disagrees with live daemon provider grok",
+      );
+      await expect(attachWithModel("client_qualified_model", "grok:grok-4.2")).rejects.toThrow(
+        "attach-time model grok-4.2 disagrees with live daemon model grok-4.3",
+      );
+      expect(daemon.createTuiContext).toHaveBeenCalledOnce();
+      // Rerunning the same `--model provider:id` command with --continue
+      // names the live session's model and attaches.
+      await expect(attachWithModel("client_qualified_same", "grok:grok-4.3")).resolves.toBe(0);
+      expect(daemon.createTuiContext).toHaveBeenCalledTimes(2);
     } finally {
       vi.doUnmock("../tui/main.js");
       for (const key of Object.keys(process.env)) {

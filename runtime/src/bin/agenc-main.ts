@@ -36,6 +36,7 @@ import { captureSecureStorageIngress } from "../utils/secureStorage/home.js";
 import { logForDebugging } from "../utils/debug.js";
 import { recentOomSnapshotNotice, startHeapWatchdog } from "../services/heapWatchdog/heapWatchdog.js";
 import type { AgenCConfig } from "../config/schema.js";
+import { providerQualifiedModel } from "../config/provider-model-authority.js";
 import type { PreparedTurnRuntimeInputs, RunSingleTurnOpts } from "./local-turn-runtime.js";
 import { clearSystemPromptSections } from "../prompts/sections.js";
 import { resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, type ResolvedResumeSession } from "./resume-session.js";
@@ -3477,20 +3478,27 @@ export async function attachAgentTuiEntry(
       }
       const liveSettings = attachment.runtimeSettings;
       const requestedPermissionMode = startupPermissionMode(startupCliFlags);
+      // `--model provider:id` names the same session model as the bare id the
+      // daemon reports; compare the provider and the model separately.
+      const qualifiedModel = startupCliFlags.model === undefined
+        ? undefined
+        : providerQualifiedModel(startupCliFlags.model);
+      const requestedProvider = startupCliFlags.provider ?? qualifiedModel?.provider;
+      const requestedModel = qualifiedModel?.model ?? startupCliFlags.model;
       if (
-        startupCliFlags.provider !== undefined &&
-        startupCliFlags.provider !== liveSettings.provider
+        requestedProvider !== undefined &&
+        requestedProvider !== liveSettings.provider
       ) {
         throw new Error(
-          `attach-time provider ${startupCliFlags.provider} disagrees with live daemon provider ${liveSettings.provider}`,
+          `attach-time provider ${requestedProvider} disagrees with live daemon provider ${liveSettings.provider}`,
         );
       }
       if (
-        startupCliFlags.model !== undefined &&
-        startupCliFlags.model !== liveSettings.model
+        requestedModel !== undefined &&
+        requestedModel !== liveSettings.model
       ) {
         throw new Error(
-          `attach-time model ${startupCliFlags.model} disagrees with live daemon model ${liveSettings.model}`,
+          `attach-time model ${requestedModel} disagrees with live daemon model ${liveSettings.model}`,
         );
       }
       if (
