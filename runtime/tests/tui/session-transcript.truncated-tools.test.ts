@@ -27,4 +27,46 @@ describe("output-limited tool handoffs", () => {
     expect(transcript.streamingToolUses).toEqual([]);
     expect(transcript.inProgressToolUseIDs.size).toBe(0);
   });
+
+  test.each([
+    ["tool_call_started", "tool_call_completed", false],
+    ["mcp_tool_call_begin", "mcp_tool_call_end", false],
+    ["tool_call_started", "tool_call_completed", true],
+    ["mcp_tool_call_begin", "mcp_tool_call_end", true],
+  ])("preserves started %s / %s result data when isError=%s", (startType, endType, isError) => {
+    const returnedData = JSON.stringify({
+      code: "tool_arguments_truncated", executed: false,
+      error: "This is the tool's returned data", data: "keep this result",
+    });
+    const transcript = adaptTranscriptEvents([
+      { type: startType, payload: { callId: "ordinary", toolName: "mcp.example", arguments: {} } },
+      { type: endType, payload: { callId: "ordinary", toolName: "mcp.example", result: returnedData, isError } },
+    ]);
+    expect(transcript.messages.some(message => message.type === "system" &&
+      message.content === "This is the tool's returned data")).toBe(false);
+    expect(JSON.stringify(transcript.messages)).toContain("keep this result");
+    expect(transcript.messages).toHaveLength(2);
+    expect(transcript.inProgressToolUseIDs.size).toBe(0);
+  });
+
+  test("preserves unmatched successful data resembling a truncation failure", () => {
+    const returnedData = { code: "tool_arguments_truncated", executed: false,
+      error: "Returned data", data: "keep unmatched result" };
+    const transcript = adaptTranscriptEvents([
+      { type: "tool_call_completed", payload: { callId: "ordinary", result: JSON.stringify(returnedData), isError: false } },
+    ]);
+    expect(transcript.messages.some(message => message.type === "system" &&
+      message.content === "Returned data")).toBe(false);
+    expect(JSON.stringify(transcript.messages)).toContain("keep unmatched result");
+  });
+
+  test("keeps completed collaboration calls on their normal lifecycle path", () => {
+    const transcript = adaptTranscriptEvents([
+      { type: "tool_call_started", payload: { callId: "started", toolName: "spawn_agent", arguments: {} } },
+      { type: "tool_call_completed", payload: { callId: "started", toolName: "spawn_agent", result, isError: true } },
+    ]);
+    expect(transcript.messages).toEqual([]);
+    expect(transcript.inProgressToolUseIDs.size).toBe(0);
+  });
+
 });
