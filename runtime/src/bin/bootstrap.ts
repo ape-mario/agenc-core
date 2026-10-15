@@ -23,6 +23,7 @@ import { endpointMetadataForTransport } from "../llm/endpoint-metadata-cache.js"
 import { readLocalByokCredential } from "../auth/native-credentials.js";
 import { SHARED_PUBLIC_MODEL_CATALOGS } from "../llm/model-metadata.js";
 import { StaticModelsManager } from "../llm/models-manager.js";
+import { resolveModelCatalogMetadata } from "../llm/registry/model-catalog.js";
 import { createManagedFeatures } from "../llm/registry/features.js";
 import {
   markCapabilityDrift,
@@ -1514,8 +1515,15 @@ async function bootstrapLocalRuntimeSessionScoped(
     overrides: providerSettings?.capabilityOverrides,
   });
   const providerHealthCheck = provider.healthCheck;
+  // GET /models tests reachability, not the registered model's capabilities.
+  // Catalogued DeepSeek models already refresh custom-endpoint metadata in the
+  // background; another health GET duplicates that work. Actual chat errors
+  // still report capability drift, and explicit health checks remain available.
+  const cataloguedDeepSeek = resolvedProvider === "deepseek" &&
+    resolveModelCatalogMetadata({ provider: resolvedProvider, model }) !== undefined;
   if (
     !hasManagedCredential &&
+    !cataloguedDeepSeek &&
     shouldProbeCapabilityEntry(capabilityEntry) &&
     typeof providerHealthCheck === "function"
   ) {
