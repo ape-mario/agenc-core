@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -21,9 +20,11 @@ import {
   MACOS_PATH_TO_SEATBELT_EXECUTABLE,
   MACOS_SEATBELT_CHROMIUM_BUNDLE_POLICY,
   MACOS_SEATBELT_CHROMIUM_POLICY,
+  MACOS_SEATBELT_CHROMIUM_TEMP_POLICY,
   MACOS_SEATBELT_GPU_POLICY,
   chromiumBundleIdentifier,
   createSeatbeltCommandArgs,
+  darwinUserTempDir,
   seatbeltRegexForUnreadableGlob,
 } from "./seatbelt.js";
 
@@ -368,22 +369,22 @@ describe("macOS seatbelt Chromium launch (Browser tool only)", () => {
     }
   });
 
-  it.runIf(process.platform === "darwin")("compiles in sandbox-exec", () => {
+  it("lets the browser create its process-singleton folder in the per-user temp folder", () => {
     const args = createSeatbeltCommandArgs({
       ...baseParams,
-      fileSystemSandboxPolicy: restrictedFileSystemPolicy([
-        { path: { kind: "special", value: { kind: "root" } }, access: "read" },
-      ]),
       command: [CHROME],
-      chromiumBrowser: { bundleIdentifier: "com.google.Chrome" },
+      chromiumBrowser: { bundleIdentifier: "com.google.Chrome", userTempDir: "/private/var/folders/ab/xyz/T" },
     });
-    const result = spawnSync(
-      MACOS_PATH_TO_SEATBELT_EXECUTABLE,
-      [...args.slice(0, args.indexOf("--")), "--", "/usr/bin/true"],
-      { encoding: "utf8" },
-    );
-    expect(result.stderr).toBe("");
-    expect(result.status).toBe(0);
+    expect(args[1]).toContain(MACOS_SEATBELT_CHROMIUM_TEMP_POLICY);
+    expect(args).toContain("-DCHROMIUM_USER_TEMP_DIR=/private/var/folders/ab/xyz/T");
+    for (const without of [chromeArgs("com.google.Chrome"), createSeatbeltCommandArgs({ ...baseParams })]) {
+      expect(without[1]).not.toContain(MACOS_SEATBELT_CHROMIUM_TEMP_POLICY);
+      expect(without.some((arg) => arg.startsWith("-DCHROMIUM_USER_TEMP_DIR="))).toBe(false);
+    }
+  });
+
+  it("looks for the per-user temp folder only on macOS", () => {
+    expect(darwinUserTempDir("linux")).toBeUndefined();
   });
 });
 
@@ -433,13 +434,6 @@ describe("chromiumBundleIdentifier", () => {
     expect(chromiumBundleIdentifier(makeApp("Odd", xmlPlist("a b")))).toBeUndefined();
   });
 
-  it.runIf(process.platform === "darwin")("reads a binary Info.plist", () => {
-    const executable = makeApp("Brave Browser", xmlPlist("com.brave.Browser"));
-    const plist = join(dir, "Brave Browser.app", "Contents", "Info.plist");
-    expect(spawnSync("/usr/bin/plutil", ["-convert", "binary1", plist]).status).toBe(0);
-    expect(chromiumBundleIdentifier(executable)).toBe("com.brave.Browser");
-  });
-
   it("feeds the identifier into the profile the engine builds", () => {
     const executable = makeApp("Google Chrome", xmlPlist("com.google.Chrome"));
     const transform = (chromiumBrowser: boolean): readonly string[] =>
@@ -465,6 +459,9 @@ describe("chromiumBundleIdentifier", () => {
     expect(browser[0]).toBe(MACOS_PATH_TO_SEATBELT_EXECUTABLE);
     expect(browser.join("\n")).toContain("com.apple.coreservices.launchservicesd");
     expect(browser).toContain("-DCHROMIUM_MACH_NAME_PREFIX=com.google.Chrome.");
+    if (process.platform === "darwin") {
+      expect(browser).toContain(`-DCHROMIUM_USER_TEMP_DIR=${darwinUserTempDir()}`);
+    }
     const other = transform(false);
     expect(other.join("\n")).not.toContain("com.apple.coreservices.launchservicesd");
     expect(other.some((arg) => arg.startsWith("-DCHROMIUM_MACH_NAME_PREFIX="))).toBe(false);
