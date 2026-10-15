@@ -1,15 +1,12 @@
 import {
   closeSync,
-  constants as fsConstants,
   existsSync,
   fstatSync,
-  lstatSync,
-  openSync,
   opendirSync,
-  realpathSync,
   statSync,
 } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { basename, dirname, join, sep } from "node:path";
+import { openStartupResumeCwd, type StartupResumeCwd } from "./startup-resume-cwd.js";
 
 import type {
   EffectBoundary,
@@ -73,8 +70,9 @@ import { cancelAgentRunTree } from "./run-cancellation.js";
 const DEFAULT_MAX_STARTUP_RUNS = 4_096;
 const DEFAULT_MAX_ROLLOUT_FILES_PER_RUN = 32;
 /**
- * Each retained startup source owns two handles until the restore loop adopts
- * or closes it: one append-capable rollout fd and one pinned cwd directory fd.
+ * Each retained startup source owns an append-capable rollout fd until the
+ * restore loop adopts or closes it. The cwd is pinned asynchronously only
+ * when that session is restored, after daemon readiness.
  * Keep the aggregate staging cost well below ordinary per-process fd limits,
  * including the descriptors temporarily needed by the strict scanner.
  */
@@ -167,12 +165,15 @@ export interface StartupRunResumeSource {
   readonly activeRuntimeSettingsEventId?: string;
   readonly legacyPermissionMode?: "plan";
   readonly rolloutLease: ResumeRolloutDescriptorLease;
-  readonly cwdIdentity: { readonly dev: string; readonly ino: string };
-  readonly cwdFd: number;
+  /** Pin workspace authority after readiness, with a per-session deadline. */
+  prepareCwd(options?: {
+    readonly signal?: AbortSignal;
+    readonly timeoutMs?: number;
+  }): Promise<StartupResumeCwd>;
   close(): void;
 }
 
-/** Shared lifetime budget for exact startup resume descriptor pairs. */
+/** Shared lifetime budget for retained rollout and eventual cwd descriptors. */
 export class StartupResumeSourceBudget {
   #retainedSources = 0;
 
@@ -973,15 +974,11 @@ function createStartupRunResumeSource(
     budgetReleased = true;
     releaseBudget();
   };
-  let cwdProof:
-    | {
-        readonly fd: number;
-        readonly identity: { readonly dev: string; readonly ino: string };
-      }
-    | undefined;
+  let cwdProof: StartupResumeCwd | undefined;
+  let preparingCwd: Promise<StartupResumeCwd> | undefined;
+  const closeController = new AbortController();
   let rolloutFd: number | undefined;
   try {
-    cwdProof = openStartupResumeCwd(metadata.cwd, afterCwdOpenForTestingOnly);
     rolloutFd = prepared.openAppendDescriptor(lifecycle.sourceIndex);
     const rolloutStats = fstatSync(rolloutFd, { bigint: true });
     if (
@@ -1002,7 +999,6 @@ function createStartupRunResumeSource(
       rolloutFd,
     );
     rolloutFd = undefined;
-    let openCwdFd: number | undefined = cwdProof.fd;
     return Object.freeze({
       runId,
       sessionId: source.sessionId,
@@ -1032,9 +1028,33 @@ function createStartupRunResumeSource(
         ? { legacyPermissionMode: lifecycle.legacyPermissionMode }
         : {}),
       rolloutLease,
-      cwdIdentity: cwdProof.identity,
-      cwdFd: cwdProof.fd,
+      prepareCwd: (options: {
+        readonly signal?: AbortSignal;
+        readonly timeoutMs?: number;
+      } = {}) => {
+        closeController.signal.throwIfAborted();
+        preparingCwd ??= openStartupResumeCwd(metadata.cwd, {
+          ...options,
+          signal:
+            options.signal === undefined
+              ? closeController.signal
+              : AbortSignal.any([closeController.signal, options.signal]),
+          ...(afterCwdOpenForTestingOnly !== undefined
+            ? { afterOpenForTestingOnly: afterCwdOpenForTestingOnly }
+            : {}),
+        }).then((proof) => {
+          // close() can run while the filesystem operation is in flight.
+          if (closeController.signal.aborted) {
+            closeSync(proof.fd);
+            closeController.signal.throwIfAborted();
+          }
+          cwdProof = proof;
+          return proof;
+        });
+        return preparingCwd;
+      },
       close: () => {
+        closeController.abort(new Error("startup resume source closed"));
         const closeErrors: unknown[] = [];
         try {
           try {
@@ -1042,9 +1062,9 @@ function createStartupRunResumeSource(
           } catch (error) {
             closeErrors.push(error);
           }
-          if (openCwdFd !== undefined) {
-            const closing = openCwdFd;
-            openCwdFd = undefined;
+          if (cwdProof !== undefined) {
+            const closing = cwdProof.fd;
+            cwdProof = undefined;
             try {
               closeSync(closing);
             } catch (error) {
@@ -1071,13 +1091,6 @@ function createStartupRunResumeSource(
         closeErrors.push(closeError);
       }
     }
-    if (cwdProof !== undefined) {
-      try {
-        closeSync(cwdProof.fd);
-      } catch (closeError) {
-        closeErrors.push(closeError);
-      }
-    }
     releaseBudgetOnce();
     if (closeErrors.length > 0) {
       throw new AggregateError(
@@ -1086,67 +1099,6 @@ function createStartupRunResumeSource(
         { cause: error },
       );
     }
-    throw error;
-  }
-}
-
-function openStartupResumeCwd(
-  cwd: string,
-  afterOpenForTestingOnly?: (cwd: string) => void,
-): {
-  readonly fd: number;
-  readonly identity: { readonly dev: string; readonly ino: string };
-} {
-  if (!isAbsolute(cwd) || resolve(cwd) !== cwd) {
-    throw new Error(
-      "canonical startup resume cwd is not absolute and normalized",
-    );
-  }
-  const before = lstatSync(cwd, { bigint: true });
-  if (
-    !before.isDirectory() ||
-    before.isSymbolicLink() ||
-    !hasSupportedFileIdentity(before) ||
-    realpathSync(cwd) !== cwd
-  ) {
-    throw new Error(
-      "canonical startup resume cwd is not a supported non-symlink directory",
-    );
-  }
-  const noFollow =
-    (fsConstants as typeof fsConstants & { readonly O_NOFOLLOW?: number })
-      .O_NOFOLLOW ?? 0;
-  const directoryOnly =
-    (fsConstants as typeof fsConstants & { readonly O_DIRECTORY?: number })
-      .O_DIRECTORY ?? 0;
-  const fd = openSync(cwd, fsConstants.O_RDONLY | noFollow | directoryOnly);
-  try {
-    const opened = fstatSync(fd, { bigint: true });
-    afterOpenForTestingOnly?.(cwd);
-    const after = lstatSync(cwd, { bigint: true });
-    if (
-      !opened.isDirectory() ||
-      !after.isDirectory() ||
-      after.isSymbolicLink() ||
-      !hasSupportedFileIdentity(opened) ||
-      !hasSupportedFileIdentity(after) ||
-      opened.dev !== before.dev ||
-      opened.ino !== before.ino ||
-      opened.dev !== after.dev ||
-      opened.ino !== after.ino ||
-      realpathSync(cwd) !== cwd
-    ) {
-      throw new Error("canonical startup resume cwd changed while pinned");
-    }
-    return {
-      fd,
-      identity: {
-        dev: opened.dev.toString(10),
-        ino: opened.ino.toString(10),
-      },
-    };
-  } catch (error) {
-    closeSync(fd);
     throw error;
   }
 }

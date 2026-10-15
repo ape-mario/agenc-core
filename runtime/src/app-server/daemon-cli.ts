@@ -3433,6 +3433,11 @@ export async function restoreRecoveredAgentRuntime(
   const restoreAttemptId = randomUUID();
   let outcome: { readonly available: boolean; readonly restoreAttemptId?: string };
   try {
+    // Recovery retained only the canonical rollout. A protected or remote
+    // workspace must never be opened on the startup readiness path.
+    const cwd = await resumeSource.prepareCwd({
+      ...(options.signal !== undefined ? { signal: options.signal } : {}),
+    });
     const restored = await runner.restoreAgent({
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
       agentId: run.id,
@@ -3440,8 +3445,8 @@ export async function restoreRecoveredAgentRuntime(
       cwd: resumeSource.cwd,
       resumeRolloutPath: resumeSource.rolloutPath,
       resumeRolloutLease: resumeSource.rolloutLease,
-      resumeCwdIdentity: resumeSource.cwdIdentity,
-      resumeCwdFd: resumeSource.cwdFd,
+      resumeCwdIdentity: cwd.identity,
+      resumeCwdFd: cwd.fd,
       explicitColdResume: true,
       restoreAttemptId,
       runtimeOptions,
