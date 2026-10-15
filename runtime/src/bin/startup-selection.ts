@@ -111,6 +111,8 @@ export function resolvedStartupProfileName(
  */
 export function resolveCanonicalStartupSelection(params: {
   readonly config: AgenCConfig;
+  /** The same scoped provider environment used to create this session. */
+  readonly env: Readonly<Record<string, string | undefined>>;
   readonly profileName?: string;
 }): StartupSelection {
   const config = params.config;
@@ -134,7 +136,7 @@ export function resolveCanonicalStartupSelection(params: {
       "canonical startup config must contain a provider/model pair",
     );
   }
-  assertModelCatalogSelection(config, provider, canonicalModel);
+  assertModelCatalogSelection(config, provider, canonicalModel, params.env);
   if (!isModelAllowed(provider, canonicalModel, config)) {
     throw new ModelNotAllowedError(canonicalModel);
   }
@@ -170,6 +172,7 @@ export async function resolveDiscoveredStartupDefault(
   if (!model || model === startup.model) return startup;
   return resolveCanonicalStartupSelection({
     config: { ...startup.config, model },
+    env: metadata.env ?? process.env,
     ...(startup.profileName === undefined ? {} : { profileName: startup.profileName }),
   });
 }

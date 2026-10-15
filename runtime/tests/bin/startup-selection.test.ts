@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { defaultConfig } from "../config/schema.js";
 import { ConfigStore } from "../config/store.js";
@@ -15,6 +15,7 @@ import {
 describe("resolveCanonicalStartupSelection", () => {
   it("reads the canonical top-level model without provider fallback", () => {
     const resolved = resolveCanonicalStartupSelection({
+      env: {},
       config: {
         ...defaultConfig(),
         model: "grok-build-0.1",
@@ -29,6 +30,7 @@ describe("resolveCanonicalStartupSelection", () => {
 
   it("reads the complete built-in default pair", () => {
     const resolved = resolveCanonicalStartupSelection({
+      env: {},
       config: defaultConfig(),
     });
 
@@ -39,6 +41,7 @@ describe("resolveCanonicalStartupSelection", () => {
   it("does not infer a missing half of the canonical pair", () => {
     expect(() =>
       resolveCanonicalStartupSelection({
+        env: {},
         config: { model: "gpt-5" },
       })
     ).toThrow(/must contain a provider\/model pair/u);
@@ -47,6 +50,7 @@ describe("resolveCanonicalStartupSelection", () => {
   it("rejects a startup model denied by managed availableModels policy", () => {
     expect(() =>
       resolveCanonicalStartupSelection({
+        env: {},
         config: {
           ...defaultConfig(),
           model_provider: "openai",
@@ -59,6 +63,7 @@ describe("resolveCanonicalStartupSelection", () => {
 
   it("accepts and provider-localizes an allowed qualified GitHub model", () => {
     const resolved = resolveCanonicalStartupSelection({
+      env: {},
       config: {
         ...defaultConfig(),
         model_provider: "github",
@@ -413,6 +418,7 @@ describe("canonical startup ConfigStore layers", () => {
 
       const first = await store.reload();
       const selection = resolveCanonicalStartupSelection({
+        env,
         config: first,
         profileName: cli.profile,
       });
@@ -458,14 +464,41 @@ describe("canonical startup ConfigStore layers", () => {
 
 describe("startup catalog admission", () => {
   it("rejects a mistyped launch model with a suggestion", () => {
-    expect(() => resolveCanonicalStartupSelection({ config: {
+    expect(() => resolveCanonicalStartupSelection({ env: {}, config: {
       ...defaultConfig(), model_provider: "deepseek", model: "deepseek-flsh",
     } })).toThrow(/did you mean 'deepseek-flash'/u);
   });
 
   it("accepts custom launch models on an open endpoint", () => {
-    expect(resolveCanonicalStartupSelection({ config: {
+    expect(resolveCanonicalStartupSelection({ env: {}, config: {
       ...defaultConfig(), model_provider: "openai-compatible", model: "private-model",
     } })).toMatchObject({ provider: "openai-compatible", model: "private-model" });
+  });
+});
+
+
+describe("startup endpoint environment authority", () => {
+  it("accepts a private model at an invocation-only endpoint", () => {
+    vi.stubEnv("OPENAI_BASE_URL", "");
+    try {
+      expect(resolveCanonicalStartupSelection({
+        config: { ...defaultConfig(), model_provider: "openai", model: "private-deployment" },
+        env: { OPENAI_BASE_URL: "http://localhost:8765/v1" },
+      })).toMatchObject({ provider: "openai", model: "private-deployment" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("refuses fixed-catalog typos when only the process has a custom endpoint", () => {
+    vi.stubEnv("OPENAI_BASE_URL", "http://localhost:8765/v1");
+    try {
+      expect(() => resolveCanonicalStartupSelection({
+        config: { ...defaultConfig(), model_provider: "openai", model: "gpt-5-typo" },
+        env: {},
+      })).toThrow(/unknown model.*did you mean/u);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

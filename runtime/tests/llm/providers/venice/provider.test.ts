@@ -126,9 +126,10 @@ describe("Venice built-in provider", () => {
       for (const explicit of [false, true]) {
         for (const repeatProviderInEnv of [false, true]) {
         writeFileSync(join(home, "config.toml"), 'config_version = 2\nmodel_provider = "venice"\n' + (explicit ? 'model = "zai-org-glm-5-2"\n' : '') + `[providers.venice]\nbase_url = "${baseURL}"\n`);
-        const store = new ConfigStore({ home, cwd: home, env: { AGENC_HOME: home, ...(repeatProviderInEnv ? { AGENC_PROVIDER: "venice" } : {}) } });
+        const env = { AGENC_HOME: home, ...(repeatProviderInEnv ? { AGENC_PROVIDER: "venice" } : {}) };
+        const store = new ConfigStore({ home, cwd: home, env });
         await store.reload();
-        const startup = resolveCanonicalStartupSelection({ config: store.current() });
+        const startup = resolveCanonicalStartupSelection({ config: store.current(), env });
         const selected = await resolveDiscoveredStartupDefault(startup, store.modelSelectionSource(), { fetchImpl: fetch, env: { VENICE_API_KEY: key } });
         expect(selected.model).toBe(explicit ? "zai-org-glm-5-2" : target.id);
         }

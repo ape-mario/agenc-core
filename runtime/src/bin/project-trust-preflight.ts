@@ -150,6 +150,7 @@ export async function runProjectTrustPreflightForTui(
   const profileName = resolvedStartupProfileName(startupCliFlags, env);
   const startup = resolveCanonicalStartupSelection({
     config,
+    env,
     ...(profileName !== undefined ? { profileName } : {}),
   });
   // ConfigStore's repository discovery is the sole project-root authority.

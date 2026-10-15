@@ -68,9 +68,9 @@ it("refuses trust before connecting or creating a session", async () => {
 
 it("loads continuation only for the existing resume selector and forwards its exact prepared inputs", async () => {
   const selector = { kind: "latest" as const };
-  expect(await oneShotCLI("next turn", [], { permissionMode: "plan", model: "explicit-model" }, selector)).toBe(23);
+  expect(await oneShotCLI("next turn", [], { permissionMode: "plan", model: "grok-4.7" }, selector)).toBe(23);
   expect(mocks.continuation).toHaveBeenCalledWith(expect.objectContaining({
-    continueSession: selector, prompt: "next turn", initialContent: "next turn", permissionMode: "plan", model: "explicit-model",
+    continueSession: selector, prompt: "next turn", initialContent: "next turn", permissionMode: "plan", model: "grok-4.7",
     runtimeOptions: expect.objectContaining({ relaxedOneShot: false }),
   }));
   expect(mocks.connect).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ it("loads continuation only for the existing resume selector and forwards its ex
 function invocationFixture(label: string, format = "text", autoComplete = true) {
   const callerHome = join(home, label), callerCwd = join(callerHome, "repo");
   mkdirSync(callerCwd, { recursive: true });
-  writeFileSync(join(callerHome, "config.toml"), `config_version = 2\nmodel = "model-${label}"\nmodel_provider = "deepseek"\n`);
+  writeFileSync(join(callerHome, "config.toml"), `config_version = 2\nmodel = "model-${label}"\nmodel_provider = "openai-compatible"\n`);
   const input = Object.assign(new PassThrough(), { isTTY: false });
   const output = Object.assign(new PassThrough(), { isTTY: false });
   const errors = Object.assign(new PassThrough(), { isTTY: false });
@@ -206,4 +206,16 @@ it.each([false, true])("prints the budget explanation once when terminal text is
   expect(writes.join("")).toContain(summary);
   const stderr = vi.mocked(process.stderr.write).mock.calls.map(([chunk]) => String(chunk)).join("");
   expect(stderr).not.toContain("Partial result: stopped at the task budget.");
+});
+
+
+it("qv honors an invocation-scoped custom endpoint during startup model validation", async () => {
+  vi.stubEnv("OPENAI_BASE_URL", "");
+  const f = invocationFixture("custom-startup-env");
+  writeFileSync(join(f.context.env.AGENC_HOME!, "config.toml"), 'config_version = 2\nmodel = "private-deployment"\nmodel_provider = "openai"\n');
+  f.context.env.OPENAI_BASE_URL = "http://localhost:8765/v1";
+  const code = await f.run();
+  expect(f.output().stderr).not.toContain("unknown model");
+  expect(code).toBe(0);
+  expect(f.call).toHaveBeenCalledWith("agent.create", expect.objectContaining({ model: "private-deployment" }), expect.anything());
 });
