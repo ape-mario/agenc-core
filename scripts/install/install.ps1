@@ -63,6 +63,36 @@ $script:OfficialProvenanceReceiptBase64 = ""
 function Write-Log([string]$msg) { Write-Host "agenc-install: $msg" }
 function Fail([string]$msg) { throw "agenc-install: ERROR: $msg" }
 
+# Windows PowerShell 5.1 and PowerShell before 7.3 pass each argument to a native program
+# without escaping its embedded double quotes, so an inline Node script loses its string
+# quotes. There, and only there, escape them the way the Windows command-line parser reads
+# them back; newer PowerShell escapes arguments itself.
+$EscapeNativeQuotes = ($null -eq (Get-Variable PSNativeCommandArgumentPassing -ValueOnly -ErrorAction SilentlyContinue)) -or
+  ($PSNativeCommandArgumentPassing -eq "Legacy")
+function ConvertTo-NativeArgument([string]$Value) {
+  if (-not $EscapeNativeQuotes) { return $Value }
+  # Legacy passing also drops an empty argument, which shifts every positional argument after it.
+  if ($Value -eq "") { return '""' }
+  $escaped = [regex]::Replace($Value, '(\\*)"', { param($m) $m.Groups[1].Value + $m.Groups[1].Value + '\"' })
+  # Legacy passing quotes an argument that has whitespace; keep that closing quote a delimiter.
+  if ($escaped -match '\s') {
+    $escaped = [regex]::Replace($escaped, '(\\+)$', { param($m) $m.Groups[1].Value + $m.Groups[1].Value })
+  }
+  return $escaped
+}
+function ConvertTo-NativeArguments([object[]]$Values) {
+  , @($Values | ForEach-Object { ConvertTo-NativeArgument ([string]$_) })
+}
+# Windows PowerShell's Set-Acl also writes the audit section, which needs a privilege a normal user
+# lacks. There, persist only the owner and access rules this installer sets.
+function Set-PrivateDirectoryAcl([string]$Path, [System.Security.AccessControl.DirectorySecurity]$Acl) {
+  if ($PSVersionTable.PSEdition -eq "Desktop") {
+    (Get-Item -LiteralPath $Path -Force).SetAccessControl($Acl)
+  } else {
+    Set-Acl -LiteralPath $Path -AclObject $Acl
+  }
+}
+
 function Copy-PinnedBootstrapHttps(
   [string]$Url,
   [string]$Destination,
@@ -73,7 +103,7 @@ function Copy-PinnedBootstrapHttps(
       $uri.UserInfo -or $uri.Fragment) {
     Fail "Node.js bootstrap URL must be canonical HTTPS"
   }
-  [void][System.Reflection.Assembly]::Load("System.Net.Http")
+  Add-Type -AssemblyName System.Net.Http
   # The total deadline scales with the pinned byte count so slow links can
   # finish, mirroring the bounded-fetch contract: minimum sustained rate
   # 128 KiB/s plus 30s grace, never below 120s, test overrides only shorten.
@@ -135,7 +165,7 @@ function Copy-PinnedBootstrapHttps(
       [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead,
       $deadline.Token
     ).GetAwaiter().GetResult()
-    $response.EnsureSuccessStatusCode()
+    $null = $response.EnsureSuccessStatusCode()
     if ($response.RequestMessage.RequestUri.Scheme -cne "https") {
       Fail "Node.js bootstrap redirect left HTTPS"
     }
@@ -505,7 +535,8 @@ function Copy-InstallerResource(
   [string]$ExactBytes,
   [string]$TrustMode
 ) {
-  $BoundedFetch | & node - $Url $Destination ([string]$MaximumBytes) $ExactBytes $TrustMode
+  $fetchArgs = ConvertTo-NativeArguments @($Url, $Destination, [string]$MaximumBytes, $ExactBytes, $TrustMode)
+  $BoundedFetch | & node - @fetchArgs
   if ($LASTEXITCODE -ne 0) { Fail "bounded download failed: $Url" }
 }
 
@@ -540,8 +571,8 @@ function Confirm-OfficialRuntimeProvenance(
   $ghArchive = Join-Path $Work $ghFile
   $ghRoot = Join-Path $Work "gh-verify"
   $ghConfigRoot = Join-Path $Work "gh-config"
-  $ghDirectory = "gh_${ghVersion}_windows_amd64"
-  $ghBinary = Join-Path $ghRoot "$ghDirectory/bin/gh.exe"
+  # The Windows zip holds LICENSE and bin/gh.exe at its root, with no versioned folder.
+  $ghBinary = Join-Path $ghRoot "bin/gh.exe"
   $bundle = Join-Path $Work "runtime.sigstore.json"
   $buildBundle = Join-Path $Work "runtime.build.sigstore.json"
   $hasBuildProvenance = -not [string]::IsNullOrEmpty($BuildProvenanceUrl)
@@ -564,7 +595,7 @@ function Confirm-OfficialRuntimeProvenance(
   if ($actualGhSha -cne $ghSha) {
     Fail "GitHub CLI checksum mismatch (expected $ghSha, got $actualGhSha)"
   }
-  [void][System.Reflection.Assembly]::Load("System.IO.Compression.FileSystem")
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
   [System.IO.Compression.ZipFile]::ExtractToDirectory($ghArchive, $ghRoot)
   $ghItem = Get-Item -LiteralPath $ghBinary -Force -ErrorAction SilentlyContinue
   if (-not $ghItem -or $ghItem.PSIsContainer -or
@@ -673,7 +704,7 @@ if ($arch -notin @("x64", "arm64")) { Fail "unsupported operating-system archite
 function Test-NodeContract([string]$Path, [bool]$Legacy) {
   if (-not $Path) { return $false }
   $mode = if ($Legacy) { "legacy" } else { "modern" }
-  & $Path -e @'
+  & $Path -e (ConvertTo-NativeArgument @'
 const [expectedPlatform, expectedArch, mode, allowOverride] = process.argv.slice(1);
 const [major, minor] = process.versions.node.split(".").map(Number);
 const legacy = mode === "legacy";
@@ -683,7 +714,7 @@ const platformOk = allowOverride === "true" || (
   process.platform === expectedPlatform && process.arch === expectedArch
 );
 if (!versionOk || !abiOk || process.versions.napi !== "10" || !platformOk) process.exit(1);
-'@ $nodePlatform $arch $mode ([string][bool]($env:AGENC_INSTALL_PLATFORM -or $env:AGENC_INSTALL_ARCH)).ToLowerInvariant() `
+'@) $nodePlatform $arch $mode ([string][bool]($env:AGENC_INSTALL_PLATFORM -or $env:AGENC_INSTALL_ARCH)).ToLowerInvariant() `
     2>$null
   return $LASTEXITCODE -eq 0
 }
@@ -719,7 +750,7 @@ if ($env:AGENC_INSTALL_VERSION -ceq "0.7.2") {
       [System.Security.AccessControl.AccessControlType]::Allow
     )
     $privateAcl.AddAccessRule($privateRule)
-    Set-Acl -LiteralPath $bootstrapWork -AclObject $privateAcl
+    Set-PrivateDirectoryAcl $bootstrapWork $privateAcl
   }
   $nodeDistributionArchive = Join-Path $bootstrapWork $nodeDistributionFile
   if ($env:AGENC_INSTALL_BOOTSTRAP_NODE_ARCHIVE) {
@@ -748,7 +779,7 @@ if ($env:AGENC_INSTALL_VERSION -ceq "0.7.2") {
   if ($nodeArchiveSha -cne $nodeDistributionSha256) {
     Fail "Node.js bootstrap checksum mismatch"
   }
-  [void][System.Reflection.Assembly]::Load("System.IO.Compression.FileSystem")
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
   [System.IO.Compression.ZipFile]::ExtractToDirectory($nodeDistributionArchive, $bootstrapWork)
   $nodeBin = Join-Path $bootstrapWork "node-v26.5.0-win-x64\node.exe"
   if (-not (Test-Path -LiteralPath $nodeBin -PathType Leaf)) {
@@ -758,13 +789,13 @@ if ($env:AGENC_INSTALL_VERSION -ceq "0.7.2") {
     & /bin/chmod 700 $nodeBin
     if ($LASTEXITCODE -ne 0) { Fail "could not secure test-seam Node.js bootstrap" }
   }
-  & $nodeBin -e @'
+  & $nodeBin -e (ConvertTo-NativeArgument @'
 const allowOverride = process.argv[1] === "true";
 if (process.versions.node !== "26.5.0" || process.versions.modules !== "147" ||
     process.versions.napi !== "10" || (!allowOverride && (
       process.platform !== "win32" || process.arch !== "x64"
     ))) process.exit(1);
-'@ ([string][bool]($env:AGENC_INSTALL_PLATFORM -or $env:AGENC_INSTALL_ARCH)).ToLowerInvariant()
+'@) ([string][bool]($env:AGENC_INSTALL_PLATFORM -or $env:AGENC_INSTALL_ARCH)).ToLowerInvariant()
   if ($LASTEXITCODE -ne 0) { Fail "pinned Node.js bootstrap identity is invalid" }
   if (-not $actualWindows) {
     $testSeamNode = Join-Path (Split-Path -Parent $nodeBin) "node"
@@ -779,11 +810,11 @@ if (process.versions.node !== "26.5.0" || process.versions.modules !== "147" ||
 
 $node = Get-Command node -ErrorAction Stop
 $nodeBin = [string]$node.Source
-$nodeMajor = [int](node -e "process.stdout.write(process.versions.node.split('.')[0])")
-$nodeModuleAbi = node -e "process.stdout.write(process.versions.modules)"
+$nodeMajor = [int](node -e (ConvertTo-NativeArgument "process.stdout.write(process.versions.node.split('.')[0])"))
+$nodeModuleAbi = node -e (ConvertTo-NativeArgument "process.stdout.write(process.versions.modules)")
 if ($nodeModuleAbi -notmatch "^[0-9]+$") { Fail "Node.js reported an invalid native module ABI: $nodeModuleAbi" }
 $tarPath = if ($actualWindows) {
-  $resolvedTar = & ([string]$node.Source) -e @'
+  $resolvedTar = & ([string]$node.Source) -e (ConvertTo-NativeArgument @'
 const {
   closeSync, constants, fstatSync, lstatSync, openSync, realpathSync,
 } = require("node:fs");
@@ -845,7 +876,7 @@ if (operationError !== undefined || closeErrors.length > 0) {
   );
 }
 process.stdout.write(candidateTar);
-'@
+'@)
   if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$resolvedTar)) {
     Fail "the trusted operating-system tar executable is required (bundled with Windows 10 1803+)."
   }
@@ -856,12 +887,12 @@ process.stdout.write(candidateTar);
   if ($tarCommand) { [string]$tarCommand.Source } else { "" }
 }
 if ($actualWindows) {
-  & ([string]$node.Source) -e '
+  & ([string]$node.Source) -e (ConvertTo-NativeArgument '
     const { lstatSync } = require("node:fs");
     const path = process.argv[1];
     const metadata = lstatSync(path);
     if (!metadata.isFile() || metadata.isSymbolicLink()) process.exit(1);
-  ' $tarPath
+  ') $tarPath
   if ($LASTEXITCODE -ne 0) {
     Fail "the trusted operating-system tar executable is required (bundled with Windows 10 1803+)."
   }
@@ -885,7 +916,7 @@ if ($env:AGENC_INSTALL_VERSION -and
   Fail "AGENC_INSTALL_VERSION must be a canonical semantic version"
 }
 if ($env:AGENC_INSTALL_VERSION -and $env:AGENC_INSTALL_VERSION -cne "0.7.2") {
-  & $nodeBin -e @'
+  & $nodeBin -e (ConvertTo-NativeArgument @'
 const version = process.argv[1];
 const actual = version.split("-", 1)[0].split(".").map(BigInt);
 const minimum = [0n, 11n, 2n];
@@ -894,7 +925,7 @@ for (let index = 0; index < minimum.length; index += 1) {
   if (actual[index] < minimum[index]) process.exit(1);
 }
 process.exit(0);
-'@ $env:AGENC_INSTALL_VERSION
+'@) $env:AGENC_INSTALL_VERSION
   if ($LASTEXITCODE -ne 0) {
     Fail "runtime $($env:AGENC_INSTALL_VERSION) has no supported standalone activation contract; use the frozen 0.7.2 bridge with host Node 25.9, or 0.11.2 and newer with private Node"
   }
@@ -929,7 +960,7 @@ if (!canonicalStat.isDirectory() || canonicalStat.isSymbolicLink()) {
 }
 process.stdout.write(canonical);
 '@
-$agencHome = (& node -e $CanonicalHome $agencHome | Out-String).Trim()
+$agencHome = (& node -e (ConvertTo-NativeArgument $CanonicalHome) $agencHome | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $agencHome) { Fail "could not establish canonical AGENC_HOME" }
 
 $DirectoryIdentity = @'
@@ -954,7 +985,7 @@ process.stdout.write(JSON.stringify({
 '@
 
 function Get-InstallerDirectoryIdentity([string]$Path) {
-  $identityJson = (& node -e $DirectoryIdentity $Path | Out-String).Trim()
+  $identityJson = (& node -e (ConvertTo-NativeArgument $DirectoryIdentity) $Path | Out-String).Trim()
   if ($LASTEXITCODE -ne 0 -or -not $identityJson) {
     Fail "could not establish private installer directory identity: $Path"
   }
@@ -985,9 +1016,9 @@ function Protect-InstallerDirectory([string]$Path) {
       [System.Security.AccessControl.AccessControlType]::Allow
     )
     $privateAcl.AddAccessRule($privateRule)
-    Set-Acl -LiteralPath $Path -AclObject $privateAcl
+    Set-PrivateDirectoryAcl $Path $privateAcl
   } else {
-    & node -e 'require("node:fs").chmodSync(process.argv[1], 0o700)' $Path
+    & node -e (ConvertTo-NativeArgument 'require("node:fs").chmodSync(process.argv[1], 0o700)') $Path
     if ($LASTEXITCODE -ne 0) { Fail "could not secure installer private directory: $Path" }
   }
 }
@@ -1119,7 +1150,7 @@ try {
       }
     }
     if ($nodeMajor -ne 25 -or [string]$nodeModuleAbi -cne "141" -or
-        [string](node -e "process.stdout.write(process.versions.napi)") -cne "10") {
+        [string](node -e (ConvertTo-NativeArgument "process.stdout.write(process.versions.napi)")) -cne "10") {
       Fail "the frozen v0.7.2 bridge requires exact Node 25 ABI 141 / N-API 10"
     }
     $matches = @($manifest.artifacts | Where-Object { $_.platform -eq "win" -and $_.arch -eq $arch })
@@ -1347,7 +1378,7 @@ try {
       [string]$artifact.sha256 -notmatch "^[0-9a-f]{64}$" -or
       $artifactBytes -notmatch "^[1-9][0-9]*$" -or [long]$artifactBytes -gt $MaxArtifactBytes -or
       $artifactNodeApiVersion -notmatch "^[0-9]+$" -or
-      $artifactNodeApiVersion -ne [string](node -e "process.stdout.write(process.versions.napi)") -or
+      $artifactNodeApiVersion -ne [string](node -e (ConvertTo-NativeArgument "process.stdout.write(process.versions.napi)")) -or
       [string]$artifact.bins.agenc -ne "node_modules/@tetsuo-ai/runtime/bin/agenc" -or
       (-not $legacy -and (
         $artifactNodeMajor -ne 26 -or [string]$artifact.nodeModuleAbi -cne "147" -or
@@ -1562,10 +1593,20 @@ function sameWindowsExecutableIdentity(left, right) {
 }
 
 function syncFile(path) {
-  const descriptor = openSync(path, fsConstants.O_RDONLY);
+  // fsyncSync maps to FlushFileBuffers on Windows, the same durability
+  // boundary as FileStream.Flush(true). It needs a handle with write access
+  // there; a read-only handle fails with EPERM.
+  const windows = process.platform === "win32";
+  let descriptor;
   try {
-    // fsyncSync maps to FlushFileBuffers on Windows, the same durability
-    // boundary as FileStream.Flush(true).
+    descriptor = openSync(path, windows ? fsConstants.O_RDWR : fsConstants.O_RDONLY);
+  } catch (error) {
+    // Windows cannot flush a file tar extracted read-only. The marker written
+    // after this tree is still flushed.
+    if (windows && (error?.code === "EPERM" || error?.code === "EACCES")) return;
+    throw error;
+  }
+  try {
     fsyncSync(descriptor);
   } finally {
     closeSync(descriptor);
@@ -2583,9 +2624,9 @@ main().catch((error) => {
     Fail "wrapper directory preparation returned an invalid result"
   }
 
-  $recoveryState = (& node $runtimeInstallerPath recover - $installDir $binRel `
-    ([string]$artifact.sha256) "win" $provenanceExpectationBase64 "" "" `
-    $nodeBinRel $nodeLibraryRel | Out-String).Trim()
+  $recoverArgs = ConvertTo-NativeArguments @($runtimeInstallerPath, "recover", "-", $installDir, $binRel,
+    ([string]$artifact.sha256), "win", $provenanceExpectationBase64, "", "", $nodeBinRel, $nodeLibraryRel)
+  $recoveryState = (& node @recoverArgs | Out-String).Trim()
   if ($LASTEXITCODE -ne 0) { Fail "runtime crash recovery failed" }
 
   if ($recoveryState -eq "ready") {
@@ -2617,9 +2658,10 @@ main().catch((error) => {
       $work `
       $arch `
       $provenanceExpectationBase64
-    & node $runtimeInstallerPath install $tarball $installDir $binRel `
-      ([string]$artifact.sha256) "win" $provenanceExpectationBase64 `
-      $script:OfficialProvenanceReceiptBase64 $tarPath $nodeBinRel $nodeLibraryRel
+    $installArgs = ConvertTo-NativeArguments @($runtimeInstallerPath, "install", $tarball, $installDir, $binRel,
+      ([string]$artifact.sha256), "win", $provenanceExpectationBase64,
+      $script:OfficialProvenanceReceiptBase64, $tarPath, $nodeBinRel, $nodeLibraryRel)
+    & node @installArgs
     if ($LASTEXITCODE -ne 0) { Fail "runtime archive validation or installation failed" }
     Write-Log "runtime $version installed at $installDir"
   } else {
@@ -2629,13 +2671,13 @@ main().catch((error) => {
   # --- shim ------------------------------------------------------------------
 
   if (-not $legacy) {
-    & $privateNodeBin -e @'
+    & $privateNodeBin -e (ConvertTo-NativeArgument @'
 const allowOverride = process.argv[1] === "true";
 if (process.versions.node !== "26.5.0" || process.versions.modules !== "147" ||
     process.versions.napi !== "10" || (!allowOverride && (
       process.platform !== "win32" || process.arch !== "x64"
     ))) process.exit(1);
-'@ ([string][bool]($env:AGENC_INSTALL_PLATFORM -or $env:AGENC_INSTALL_ARCH)).ToLowerInvariant()
+'@) ([string][bool]($env:AGENC_INSTALL_PLATFORM -or $env:AGENC_INSTALL_ARCH)).ToLowerInvariant()
     if ($LASTEXITCODE -ne 0) { Fail "installed private Node.js identity is invalid" }
   }
 
@@ -2739,7 +2781,7 @@ writeFileSync(outputPath, xml, { encoding: "utf8" });
 process.stdout.write(outputPath);
 '@
   # END AGENC WINSW RENDERER
-  $xmlResult = (& node -e $RenderWinSW $cmdExe $shim $agencHome $account $xmlPath | Out-String).Trim()
+  $xmlResult = (& node -e (ConvertTo-NativeArgument $RenderWinSW) $cmdExe $shim $agencHome $account $xmlPath | Out-String).Trim()
   if ($LASTEXITCODE -ne 0 -or -not $xmlResult) { Fail "could not generate the WinSW service definition" }
   Write-Log "wrote WinSW 2.12.0 service definition: $xmlPath (service install is a separate WinSW step)"
   Write-Log "WinSW 2.12.0 is pinned. Do not use install /p. Confirm SERVICE_START_NAME with sc.exe qc agenc-daemon before start"

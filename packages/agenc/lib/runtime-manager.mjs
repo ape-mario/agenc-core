@@ -1265,6 +1265,13 @@ export function resolveTrustedSystemTar(platform = process.platform) {
     USERPROFILE: powershellRoot,
     WINDIR: systemRoot,
   };
+  // `-Command` appends any argument after it to the command text, so `$args`
+  // stayed empty, -LiteralPath got $null and the check failed on every
+  // Windows host. The path travels in the environment and the script as
+  // -EncodedCommand.
+  const authenticodeScript =
+    "$s=Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $env:AGENC_AUTHENTICODE_PATH;" +
+    "if($s.Status -ne 'Valid' -or $s.SignerCertificate.Subject -notmatch 'Microsoft'){exit 51}";
   const signature = spawnSync(
     powershell,
     [
@@ -1273,15 +1280,13 @@ export function resolveTrustedSystemTar(platform = process.platform) {
       "-NonInteractive",
       "-ExecutionPolicy",
       "Bypass",
-      "-Command",
-      "$s=Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $args[0];" +
-        "if($s.Status -ne 'Valid' -or $s.SignerCertificate.Subject -notmatch 'Microsoft'){exit 51}",
-      tarPath,
+      "-EncodedCommand",
+      Buffer.from(authenticodeScript, "utf16le").toString("base64"),
     ],
     {
       cwd: powershellRoot,
       encoding: "utf8",
-      env,
+      env: { ...env, AGENC_AUTHENTICODE_PATH: tarPath },
       maxBuffer: 1024 * 1024,
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 30_000,

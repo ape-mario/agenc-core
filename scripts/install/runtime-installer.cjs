@@ -145,10 +145,20 @@ function sameWindowsExecutableIdentity(left, right) {
 }
 
 function syncFile(path) {
-  const descriptor = openSync(path, fsConstants.O_RDONLY);
+  // fsyncSync maps to FlushFileBuffers on Windows, the same durability
+  // boundary as FileStream.Flush(true). It needs a handle with write access
+  // there; a read-only handle fails with EPERM.
+  const windows = process.platform === "win32";
+  let descriptor;
   try {
-    // fsyncSync maps to FlushFileBuffers on Windows, the same durability
-    // boundary as FileStream.Flush(true).
+    descriptor = openSync(path, windows ? fsConstants.O_RDWR : fsConstants.O_RDONLY);
+  } catch (error) {
+    // Windows cannot flush a file tar extracted read-only. The marker written
+    // after this tree is still flushed.
+    if (windows && (error?.code === "EPERM" || error?.code === "EACCES")) return;
+    throw error;
+  }
+  try {
     fsyncSync(descriptor);
   } finally {
     closeSync(descriptor);
