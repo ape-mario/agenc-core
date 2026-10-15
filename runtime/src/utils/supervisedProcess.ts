@@ -26,7 +26,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve, win32 } from "node:path";
-import type { Readable, Writable } from "node:stream";
+import type { Duplex, Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { serializeProcessBrokerPayload } from "./process-broker-protocol.js";
 import { ProcessBrokerV3StatusDecoder, PROCESS_BROKER_V3_CAPABILITY, type ProcessBrokerV3Outcome } from "./process-broker-protocol-v3.js";
@@ -353,6 +353,17 @@ function stop() {
   process.exit(0);
 }
 
+function watch() {
+  timer = setInterval(() => {
+    extendTracked();
+    if (
+      process.ppid !== config.ownerPid ||
+      !alive(config.ownerPid) ||
+      !alive(config.rootPid)
+    ) stop();
+  }, 25);
+}
+
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
 process.on('SIGHUP', stop);
@@ -360,20 +371,36 @@ process.on('SIGHUP', stop);
 // has no children, so the first snapshot needs only the root's own identity.
 // Querying that one pid is far cheaper than a whole-table ps.
 extendTracked(true);
-try {
-  fs.writeSync(3, 'ready\n');
-  fs.closeSync(3);
-} catch {
-  stop();
+if (config.awaitRelease === true) {
+  // A prepared launch: no command has been chosen for the root yet. It is
+  // blocked on its handoff and can start nothing, so there is nothing to
+  // poll for. The owner writes one line here just before it hands the root a
+  // command; until then this channel is the ownership lease, and its end
+  // (the owner exited or dropped the launch) stops the root.
+  let channel;
+  try {
+    channel = new (require('node:net').Socket)({ fd: 3, readable: true, writable: true });
+  } catch {
+    stop();
+  }
+  channel.on('error', stop);
+  channel.on('end', stop);
+  channel.once('data', () => {
+    channel.removeAllListeners();
+    channel.on('error', () => {});
+    channel.destroy();
+    watch();
+  });
+  channel.write('ready\n');
+} else {
+  try {
+    fs.writeSync(3, 'ready\n');
+    fs.closeSync(3);
+  } catch {
+    stop();
+  }
+  watch();
 }
-timer = setInterval(() => {
-  extendTracked();
-  if (
-    process.ppid !== config.ownerPid ||
-    !alive(config.ownerPid) ||
-    !alive(config.rootPid)
-  ) stop();
-}, 25);
 `;
 
 export const POSIX_PROCESS_GATE_SCRIPT = String.raw`
@@ -708,6 +735,12 @@ export interface ContainedProcessSpawnOptions {
   readonly argv0?: string;
   /** Select the deterministic Linux subreaper boundary even when cgroup v2 is available. */
   readonly linuxContainment?: "auto" | "subreaper";
+  /**
+   * Darwin: claim the launch `prepareContainedProcessLaunch` prepared in this
+   * `cwd`, if one is waiting. That child was spawned before this call, so a
+   * caller that opts in must not wait for its 'spawn' event.
+   */
+  readonly usePreparedLaunch?: boolean;
   /** Trusted pipe-shell optimization. Evaluated only AFTER backend selection. */
   readonly directBwrap?: {
     readonly protocol?: "v3";
@@ -841,6 +874,10 @@ export function spawnContainedProcess(
       args,
       options,
     );
+    if (options.usePreparedLaunch === true && cgroupPath === null) {
+      const prepared = claimPreparedPosixLaunch(options.cwd, gatePayload);
+      if (prepared !== undefined) return prepared;
+    }
     child = spawn(process.execPath, ["-e", POSIX_PROCESS_GATE_SCRIPT], {
       cwd: options.cwd,
       env: trustedPosixBootstrapEnvironment(),
@@ -1423,6 +1460,281 @@ function launchPosixOwnerWatchdog(
   watchdog.once("exit", () => {
     if (!released) fail("exited before it was ready");
   });
+}
+
+/**
+ * How long a prepared launch waits for its command before it is dropped. An
+ * agent's next command usually follows within one model turn; until then
+ * the launch holds two idle Node processes.
+ */
+const PREPARED_LAUNCH_IDLE_MS = 60_000;
+let preparedLaunchIdleMs = PREPARED_LAUNCH_IDLE_MS;
+
+type PreparedPosixLaunch = {
+  readonly child: ChildProcessWithoutNullStreams;
+  readonly gate: Writable;
+  readonly watchdog: ChildProcess;
+  readonly channel: Duplex;
+  readonly cwd: string;
+  readonly directory: string;
+  ready: boolean;
+  state: "idle" | "claimed" | "dropped";
+  idleTimer?: ReturnType<typeof setTimeout>;
+  onReady?: () => void;
+};
+
+let preparedPosixLaunch: PreparedPosixLaunch | undefined;
+
+function directoryIdentity(path: string): string {
+  const stats = statSync(path, { bigint: true });
+  if (!stats.isDirectory()) throw new Error(`not a directory: ${path}`);
+  return `${stats.dev}:${stats.ino}`;
+}
+
+/**
+ * Prepare the next contained launch in `cwd` (darwin).
+ *
+ * Every darwin command starts behind a fresh Node gate and waits until a
+ * fresh Node owner watchdog has recorded the gate's identity: two Node
+ * startups and a `ps` on the path of every command. A prepared launch does
+ * that work while nothing waits on it. Its gate is spawned in `cwd` and
+ * blocks on its handoff like any gate. Its watchdog records the gate's
+ * identity, reports ready, and then waits without polling, because a gate
+ * that holds no command can start nothing. A launch that opts in with
+ * `usePreparedLaunch` claims it: the watchdog is told to start watching,
+ * then the gate receives the command's payload, so the command starts behind
+ * the same boundary and after the same readiness as an unprepared launch.
+ *
+ * If this process exits, both prepared processes see their channels end and
+ * stop. An unclaimed launch is dropped after an idle period and keeps
+ * nothing in this process alive.
+ */
+export function prepareContainedProcessLaunch(cwd: string): void {
+  if (process.platform !== "darwin") return;
+  const current = preparedPosixLaunch;
+  if (current !== undefined) {
+    if (current.cwd === cwd) {
+      armPreparedLaunchIdleTimer(current);
+      return;
+    }
+    dropPreparedPosixLaunch(current);
+  }
+  let directory: string;
+  try {
+    directory = directoryIdentity(cwd);
+  } catch {
+    return;
+  }
+  let child: ChildProcessWithoutNullStreams | undefined;
+  let watchdog: ChildProcess | undefined;
+  try {
+    child = spawn(process.execPath, ["-e", POSIX_PROCESS_GATE_SCRIPT], {
+      cwd,
+      env: trustedPosixBootstrapEnvironment(),
+      stdio: ["pipe", "pipe", "pipe", "pipe"],
+      detached: true,
+      windowsHide: true,
+    }) as ChildProcessWithoutNullStreams;
+    // A failed spawn reports on the next tick; with no listener that is an
+    // uncaught exception in the daemon.
+    child.on("error", () => {});
+    const rootPid = child.pid;
+    const gate = child.stdio[3];
+    if (
+      rootPid === undefined ||
+      !isSignalablePid(rootPid) ||
+      gate === undefined ||
+      gate === null ||
+      typeof gate === "number" ||
+      !("end" in gate)
+    ) {
+      throw new Error("prepared process gate did not start");
+    }
+    gate.on("error", () => {});
+    watchdog = spawn(process.execPath, ["-e", POSIX_OWNER_WATCHDOG_SCRIPT], {
+      cwd: "/",
+      env: trustedPosixBootstrapEnvironment({
+        AGENC_PROCESS_WATCHDOG_CONFIG: Buffer.from(
+          JSON.stringify({ ownerPid: process.pid, rootPid, awaitRelease: true }),
+          "utf8",
+        ).toString("base64"),
+      }),
+      stdio: ["ignore", "ignore", "ignore", "pipe"],
+      detached: true,
+      windowsHide: true,
+    });
+    watchdog.on("error", () => {});
+    const channel = watchdog.stdio?.[3];
+    if (
+      channel === undefined ||
+      channel === null ||
+      typeof channel === "number" ||
+      !("write" in channel) ||
+      !("once" in channel)
+    ) {
+      throw new Error("prepared process watchdog channel is unavailable");
+    }
+    channel.on("error", () => {});
+    const launch: PreparedPosixLaunch = {
+      child,
+      gate,
+      watchdog,
+      channel: channel as unknown as Duplex,
+      cwd,
+      directory,
+      ready: false,
+      state: "idle",
+    };
+    channel.once("data", () => {
+      launch.ready = true;
+      launch.onReady?.();
+    });
+    child.once("exit", () => dropPreparedPosixLaunch(launch));
+    watchdog.once("exit", () => dropPreparedPosixLaunch(launch));
+    setPreparedLaunchRef(launch, false);
+    armPreparedLaunchIdleTimer(launch);
+    preparedPosixLaunch = launch;
+  } catch {
+    if (child !== undefined) safeKill(child, "SIGKILL");
+    if (watchdog !== undefined) safeKill(watchdog, "SIGKILL");
+  }
+}
+
+/** Drop the prepared launch, if any. Its gate holds no command. */
+export function discardPreparedContainedProcessLaunch(): void {
+  if (preparedPosixLaunch !== undefined) dropPreparedPosixLaunch(preparedPosixLaunch);
+}
+
+/** @internal Test seam: the prepared launch's processes, if one is waiting. */
+export function preparedContainedProcessLaunchForTesting():
+  | { readonly gatePid: number; readonly watchdogPid: number; readonly cwd: string; readonly ready: boolean }
+  | undefined {
+  const launch = preparedPosixLaunch;
+  if (launch === undefined || launch.child.pid === undefined || launch.watchdog.pid === undefined) {
+    return undefined;
+  }
+  return {
+    gatePid: launch.child.pid,
+    watchdogPid: launch.watchdog.pid,
+    cwd: launch.cwd,
+    ready: launch.ready,
+  };
+}
+
+/** Tests only: shorten the idle period. Returns a restore function. */
+export function setPreparedLaunchIdleTimeoutForTesting(ms: number): () => void {
+  const previous = preparedLaunchIdleMs;
+  preparedLaunchIdleMs = ms;
+  return () => {
+    preparedLaunchIdleMs = previous;
+  };
+}
+
+function armPreparedLaunchIdleTimer(launch: PreparedPosixLaunch): void {
+  if (launch.idleTimer !== undefined) clearTimeout(launch.idleTimer);
+  launch.idleTimer = setTimeout(() => dropPreparedPosixLaunch(launch), preparedLaunchIdleMs);
+  launch.idleTimer.unref?.();
+}
+
+/** An idle launch must not keep this process alive; a claimed one must. */
+function setPreparedLaunchRef(launch: PreparedPosixLaunch, ref: boolean): void {
+  const handles: unknown[] = [launch.child, launch.channel, ...launch.child.stdio];
+  if (!ref) handles.push(launch.watchdog);
+  for (const handle of handles) {
+    const target = handle as { ref?: () => void; unref?: () => void } | null | undefined;
+    if (ref) target?.ref?.();
+    else target?.unref?.();
+  }
+}
+
+function dropPreparedPosixLaunch(launch: PreparedPosixLaunch): void {
+  if (launch.state !== "idle") return;
+  launch.state = "dropped";
+  if (preparedPosixLaunch === launch) preparedPosixLaunch = undefined;
+  if (launch.idleTimer !== undefined) clearTimeout(launch.idleTimer);
+  // The gate is blocked on its handoff: nothing else runs in its group.
+  safeKill(launch.child, "SIGKILL");
+  for (const stream of launch.child.stdio) {
+    (stream as { destroy?: () => void } | null | undefined)?.destroy?.();
+  }
+  // Ending the lease stops the watchdog, which finds its root gone and exits.
+  launch.channel.destroy();
+}
+
+/**
+ * Hand a prepared launch the command, when it was prepared in `cwd` and is
+ * still intact. The command starts only after the watchdog has reported
+ * ready, as in an unprepared launch.
+ */
+function claimPreparedPosixLaunch(
+  cwd: string,
+  gatePayload: string,
+): ChildProcessWithoutNullStreams | undefined {
+  const launch = preparedPosixLaunch;
+  if (launch === undefined || launch.state !== "idle" || launch.cwd !== cwd) {
+    return undefined;
+  }
+  const { child, watchdog } = launch;
+  let directory: string | undefined;
+  try {
+    directory = directoryIdentity(cwd);
+  } catch {
+    directory = undefined;
+  }
+  if (
+    directory !== launch.directory ||
+    child.exitCode !== null ||
+    child.signalCode !== null ||
+    watchdog.exitCode !== null ||
+    watchdog.signalCode !== null
+  ) {
+    // The directory was replaced since the gate started in it, or a process
+    // of the launch is gone: launch fresh in the current directory instead.
+    dropPreparedPosixLaunch(launch);
+    return undefined;
+  }
+  launch.state = "claimed";
+  preparedPosixLaunch = undefined;
+  if (launch.idleTimer !== undefined) clearTimeout(launch.idleTimer);
+  setPreparedLaunchRef(launch, true);
+  posixOwnerWatchdogs.set(child, watchdog);
+  let released = false;
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  const release = (): void => {
+    if (released) return;
+    released = true;
+    if (deadline !== undefined) clearTimeout(deadline);
+    launch.onReady = undefined;
+    // Start the watchdog's observation, then hand over the command.
+    launch.channel.end("go\n");
+    watchdog.unref();
+    launch.gate.end(gatePayload);
+  };
+  const fail = (why: string): void => {
+    if (released) return;
+    released = true;
+    if (deadline !== undefined) clearTimeout(deadline);
+    launch.onReady = undefined;
+    containedLaunchFailures.set(
+      child,
+      new Error(`the command did not start: its process watchdog ${why}`),
+    );
+    safeKill(child, "SIGKILL");
+    launch.gate.destroy();
+    launch.channel.destroy();
+  };
+  watchdog.once("exit", () => {
+    if (!released) fail("exited before it was ready");
+  });
+  if (launch.ready) {
+    release();
+  } else {
+    launch.onReady = release;
+    deadline = armReadinessDeadline(() =>
+      fail(`was not ready within ${containedWatchdogReadyTimeoutMs} ms`),
+    );
+  }
+  return child;
 }
 
 /**
