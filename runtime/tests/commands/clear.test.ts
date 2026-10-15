@@ -133,7 +133,7 @@ describe("clearCommand", () => {
 
     expect(outcome.result).toEqual({
       kind: "error",
-      message: "Unknown command: /history",
+      message: "Unknown command: /history. Run /help to see available commands.",
     });
     expect(history).toHaveLength(1);
     expect(clearSystemPromptSections).not.toHaveBeenCalled();

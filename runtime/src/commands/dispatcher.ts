@@ -188,7 +188,7 @@ async function dispatchScopedSlashCommand(
         },
       };
     }
-    const message = `Unknown command: /${parsed.name}`;
+    const message = `Unknown command: /${parsed.name}. Run /help to see available commands.`;
     return {
       result: { kind: "error", message },
       immediate: false,
