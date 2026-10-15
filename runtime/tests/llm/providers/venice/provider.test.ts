@@ -147,6 +147,14 @@ describe("Venice built-in provider", () => {
     expect(requests.every(request => request.path.endsWith("/models"))).toBe(true);
   });
 
+  test("names a mistyped model before inference, now that selection accepts any Venice ID", async () => {
+    const { baseURL, requests } = await fakeServer();
+    const provider = createProvider(providerName, { apiKey: key, baseURL, model: "deepseek-v4-flsh", extra: { fetchImpl: fetch, maxRetries: 0 } });
+    await expect(provider.chat([{ role: "user", content: "hello" }]))
+      .rejects.toThrow("deepseek-v4-flsh is not an online Venice text model that supports function calling.");
+    expect(requests.every(request => request.path.endsWith("/models"))).toBe(true);
+  });
+
   test("keeps a small usable offline catalog when discovery fails", async () => {
     const { baseURL } = await fakeServer(503);
     const manager = new StaticModelsManager({ config: { model_provider: "venice", providers: { venice: { base_url: baseURL } } }, fallbackProvider: "venice", metadata: { fetchImpl: fetch, env: { VENICE_API_KEY: key } } });
