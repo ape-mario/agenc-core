@@ -134,24 +134,45 @@ export const I4_FSYNC_RETRY_MS = 100;
 
 /**
  * Durable events that keep their fsync inside a turn (turn-scoped
- * durability): a turn's end, which is the turn boundary, and the rare
- * lifecycle, compaction and protocol records whose recovery orders them
- * against other stores. Everything else a turn writes between its steps
- * commits with write().
+ * durability). A turn's end is the turn boundary. The others are records
+ * another store or session commits a reference to right after this append:
+ * effect intents, results and reviews and the run lifecycle events are
+ * projected into SQLite as "already fsync-committed", sub-agent receipts are
+ * read across sessions, and compaction, artifact, approval and protocol
+ * records order other files against the journal. Recovery relies on the
+ * journal never being behind those projections after an OS crash or power
+ * loss, so they stay write-ahead. Everything else a turn writes between its
+ * steps (admission and usage projections, whose SQLite source commits first,
+ * checkpoints, submissions, errors, plan markers, model items) commits with
+ * write().
  */
 const SYNCED_IN_TURN_EVENT_TYPES: ReadonlySet<string> = new Set([
   "turn_complete",
   "turn_aborted",
   "turn_failed",
-  "context_compacted",
-  "history_cleared",
-  "transcript_epoch",
-  "recovery_decision",
+  "turn_resumed",
+  "effect_intent",
+  "effect_result",
+  "effect_unknown_outcome",
+  "effect_review_resolved",
+  "run_startup_activated",
+  "run_runtime_settings_changed",
   "run_terminal",
   "run_reopened",
   "run_suspended",
   "run_resumed",
   "run_cancel_requested",
+  "subagent_task_admitted",
+  "subagent_turn_outcome",
+  "subagent_funds_notice",
+  "artifact_intent",
+  "artifact_committed",
+  "request_permissions",
+  "permission_decision",
+  "context_compacted",
+  "history_cleared",
+  "transcript_epoch",
+  "recovery_decision",
   "protocol_claim",
   "protocol_settle",
   "protocol_slash",
@@ -2728,13 +2749,14 @@ export class SessionStore {
    * Open a turn's durability scope on this journal (turn-scoped durability,
    * see `durability/turn-durability.ts`). Until the returned release runs, a
    * durable flush returns as soon as its write() completes, in order: the
-   * record already survives the process dying, and it is on disk in the file
-   * before the next model request or tool. The fsync follows at the turn
-   * boundary or from the background flush, at most
-   * {@link DEFERRED_SYNC_INTERVAL_MS} later. A turn's end (complete, aborted,
-   * failed) is itself written with fsync, covering everything before it.
-   * Releasing the last scope with "sync" fsyncs what is still unsynced;
-   * "background" hands that to the background flush.
+   * record already survives the process dying, and it is in the file before
+   * the next model request or tool. The fsync follows at the turn boundary or
+   * from the background flush, at most {@link DEFERRED_SYNC_INTERVAL_MS}
+   * later. A turn's end (complete, aborted, failed) and the records listed in
+   * {@link SYNCED_IN_TURN_EVENT_TYPES} are still written with fsync, which
+   * covers everything before them. Releasing the last scope with "sync"
+   * fsyncs what is still unsynced; "background" hands that to the background
+   * flush.
    */
   deferSyncsForTurn(): TurnDurabilityRelease {
     this.turnSyncDeferrals += 1;
@@ -2748,7 +2770,7 @@ export class SessionStore {
         if (mode === "sync") this.syncDeferredWrites();
         else this.armDeferredSync();
       }
-      releaseScope(mode);
+      releaseScope();
     };
   }
 

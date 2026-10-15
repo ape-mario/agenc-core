@@ -8,12 +8,16 @@
 
 import {
   closeSync,
+  cpSync,
   existsSync,
+  fstatSync,
   fsyncSync,
   mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
+  statSync,
+  writeFileSync,
   writeSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
@@ -26,7 +30,15 @@ const TOOL_STEP_ID = "tool:turn-1:call-1";
 const OPENED_AT = "2026-07-18T00:00:00.000Z";
 const FINISHED_AT = "2026-07-18T00:00:01.000Z";
 
-type Command = "crash" | "recover";
+type Command = "crash" | "recover" | "steps" | "recover-steps";
+
+/**
+ * Power-loss variant (turn-scoped durability): the crash child runs inside one
+ * turn scope and logs the journal size at every fsync, so the parent can cut
+ * the journal back to its last synced byte, as an OS crash or power loss
+ * would, before recovery runs. SQLite keeps every commit (FULL).
+ */
+const POWER_LOSS_LOG_ENV = "AGENC_TEST_TURN_POWER_LOSS_LOG";
 
 interface FixturePaths {
   readonly root: string;
@@ -143,6 +155,17 @@ async function openRolloutSession(
     originator: "m4-failure-matrix",
     agencVersion: "0.6.2",
   });
+  const powerLossLog = process.env[POWER_LOSS_LOG_ENV];
+  if (options.resume !== true && powerLossLog !== undefined) {
+    // The header was fsynced by open(); every later sync is logged as it happens.
+    const syncedAtOpen = statSync(rolloutStore.rolloutPath).size;
+    appendJsonDurably(powerLossLog, { path: rolloutStore.rolloutPath, size: syncedAtOpen });
+    rolloutStore.store.setFsyncImplForTest((fd) => {
+      fsyncSync(fd);
+      appendJsonDurably(powerLossLog, { path: rolloutStore.rolloutPath, size: fstatSync(fd).size });
+    });
+    rolloutStore.deferSyncsForTurn();
+  }
   const [{ openStateDatabases }, { StateRunDurabilityRepository }] =
     await Promise.all([
       import("../../../src/state/sqlite-driver.js"),
@@ -835,6 +858,192 @@ async function recover(
   throw new Error(`unsupported failpoint: ${failpoint}`);
 }
 
+const STEP_COUNT = 3;
+
+function stepToolId(step: number): string {
+  return `tool:turn-1:call-${step}`;
+}
+
+function lastSyncedSize(log: string, rolloutPath: string): number {
+  return readJsonLines(log)
+    .filter((entry) => (entry as { path?: string }).path === rolloutPath)
+    .reduce<number>((max, entry) => Math.max(max, (entry as { size: number }).size), 0);
+}
+
+/**
+ * One turn of STEP_COUNT model and tool steps inside a turn scope, imaged
+ * after each step (P1..Pn: home, workspace and receipts, with the journal's
+ * last synced size), then killed during the next tool's effect (F).
+ */
+async function runSteps(paths: FixturePaths): Promise<never> {
+  const log = process.env[POWER_LOSS_LOG_ENV];
+  if (log === undefined) throw new Error(`${POWER_LOSS_LOG_ENV} is required`);
+  const [
+    rollout,
+    { runAdmittedModelCall },
+    { runAdmittedToolCall },
+    { ExecutionAdmissionKernel },
+    { bindExecutionAdmissionJournal },
+    { runWithStartupProviderSelection },
+  ] = await Promise.all([
+    openRolloutSession(paths),
+    import("../../../src/budget/admitted-model-call.js"),
+    import("../../../src/budget/admitted-tool-call.js"),
+    import("../../../src/budget/execution-admission-kernel.js"),
+    import("../../../src/session/execution-admission-journal.js"),
+    import("../../../src/utils/model/providers.js"),
+  ]);
+  const kernel = new ExecutionAdmissionKernel({
+    agencHome: paths.home,
+    ownerId: `failure-matrix:${process.pid}`,
+    ownerPid: process.pid,
+  });
+  const executionAdmission = kernel.bindClient({
+    cwd: paths.cwd,
+    scope: { runId: RUN_ID, sessionId: RUN_ID, autonomous: false },
+  });
+  bindExecutionAdmissionJournal(rollout.session as never, executionAdmission);
+  const session = {
+    ...rollout.session,
+    conversationId: RUN_ID,
+    services: {
+      executionAdmission,
+      admissionRequired: true,
+      agentControl: { shutdownAgentTree: async () => undefined },
+    },
+    abortTerminal: () => undefined,
+  };
+  const provider = {
+    name: "grok",
+    getExecutionProfile: async () => ({
+      provider: "grok",
+      model: "grok-4.5",
+      usageReporting: "authoritative" as const,
+      supportsMaxOutputTokens: true,
+    }),
+  };
+  const tool = {
+    name: "failure-matrix-side-effect",
+    recoveryCategory: "side-effecting" as const,
+    admissionEstimate: () => ({ maxInputTokens: 0, maxOutputTokens: 0, maxCostUsd: 0 }),
+  };
+  const modelStep = (step: number) =>
+    runWithStartupProviderSelection(
+      { provider: "grok", model: "grok-4.5", environment: {} },
+      () =>
+        runAdmittedModelCall({
+          session: session as never,
+          provider: provider as never,
+          messages: [{ role: "user", content: `step ${step}` }],
+          options: { maxOutputTokens: 32 },
+          stepId: `model-step-${step}`,
+          model: "grok-4.5",
+          providerName: "grok",
+          invoke: async () => {
+            appendJsonDurably(paths.modelReceipt, { attempt: step, response: "tool" });
+            return {
+              content: "",
+              toolCalls: [],
+              model: "grok-4.5",
+              finishReason: "stop",
+              usage: {
+                promptTokens: 8,
+                completionTokens: 4,
+                totalTokens: 12,
+                availability: "reported",
+                provenance: "provider",
+              },
+            };
+          },
+        }),
+    );
+  const toolStep = (step: number, crash: boolean) =>
+    runAdmittedToolCall({
+      session: session as never,
+      turnId: "turn-1",
+      callId: `call-${step}`,
+      tool: tool as never,
+      args: { value: `physical effect ${step}` },
+      invoke: async ({ crossEffectBoundary }) => {
+        crossEffectBoundary();
+        appendJsonDurably(paths.toolReceipt, { invocation: step });
+        if (crash) process.kill(process.pid, "SIGKILL");
+        return {
+          content: "ok",
+          admissionUsage: { inputTokens: 0, outputTokens: 0, costUsd: 0 },
+        };
+      },
+    });
+  for (let step = 1; step <= STEP_COUNT; step += 1) {
+    await modelStep(step);
+    await toolStep(step, false);
+    const image = join(paths.root, "images", `P${step}`);
+    mkdirSync(image, { recursive: true });
+    for (const name of ["home", "workspace", "physical"]) {
+      const source = join(paths.root, name);
+      if (existsSync(source)) cpSync(source, join(image, name), { recursive: true });
+    }
+    writeFileSync(join(image, "journal.json"), JSON.stringify({
+      rolloutPath: rollout.rolloutStore.rolloutPath,
+      syncedSize: lastSyncedSize(log, rollout.rolloutStore.rolloutPath),
+      size: statSync(rollout.rolloutStore.rolloutPath).size,
+    }));
+  }
+  writeFileSync(join(paths.root, "journal.json"), JSON.stringify({
+    rolloutPath: rollout.rolloutStore.rolloutPath,
+  }));
+  await modelStep(STEP_COUNT + 1);
+  await toolStep(STEP_COUNT + 1, true);
+  throw new Error("the step crash did not terminate the child");
+}
+
+/** Production recovery over a multi-step turn, reported for every step. */
+async function recoverSteps(paths: FixturePaths) {
+  const resumed = await openRolloutSession(paths, { resume: true });
+  resumed.rolloutStore.close();
+  const [{ openStateDatabases }, { ExecutionAdmissionRepository }] =
+    await Promise.all([
+      import("../../../src/state/sqlite-driver.js"),
+      import("../../../src/state/execution-admission.js"),
+    ]);
+  const projection = await createEffectProjection(paths);
+  const effects = projection.repository.listEffects(RUN_ID).map((effect) => ({
+    stepId: effect.stepId,
+    outcome: effect.outcome ?? null,
+    reviewStatus: effect.reviewStatus ?? null,
+    intentEventId: effect.intentEventId,
+  }));
+  const pendingEffectReviews = projection.repository.listPendingEffectReviews(RUN_ID).length;
+  const unsettledIntents = projection.repository.listUnsettledEffectIntents(RUN_ID).length;
+  projection.driver.close();
+  const driver = openStateDatabases({ cwd: paths.cwd, agencHome: paths.home });
+  const repository = new ExecutionAdmissionRepository(driver, {
+    ownerId: "failure-matrix-recovery",
+    ownerPid: process.pid,
+  });
+  const firstRecovery = repository.recover({ activeOwnerIds: new Set() });
+  const secondRecovery = repository.recover({ activeOwnerIds: new Set() });
+  const reservations = repository.listReservations({ runId: RUN_ID, limit: 20 });
+  driver.close();
+  const events = canonicalEvents(paths);
+  const intentEventIds = new Set(
+    events.filter((event) => event.msg.type === "effect_intent").map((event) => event.eventId),
+  );
+  return {
+    canonicalEventCounts: countBy(events.map((event) => event.msg.type)),
+    duplicateEventIds: events.length - new Set(events.map((event) => event.eventId)).size,
+    sequencesIncrease: events.every((event, index) => index === 0 || event.seq > events[index - 1]!.seq),
+    effects,
+    effectsWithoutJournalIntent: effects.filter((effect) => !intentEventIds.has(effect.intentEventId)).length,
+    pendingEffectReviews,
+    unsettledIntents,
+    toolPhysicalAttempts: readJsonLines(paths.toolReceipt).length,
+    reservations: countBy(reservations.map((reservation) => reservation.status)),
+    firstRecovery,
+    secondRecovery,
+  };
+}
+
 const command = requireArgument(process.argv[2], "command") as Command;
 const failpoint = requireArgument(
   process.argv[3],
@@ -846,6 +1055,10 @@ if (command === "crash") {
   await crash(failpoint, paths);
 } else if (command === "recover") {
   process.stdout.write(`${JSON.stringify(await recover(failpoint, paths))}\n`);
+} else if (command === "steps") {
+  await runSteps(paths);
+} else if (command === "recover-steps") {
+  process.stdout.write(`${JSON.stringify(await recoverSteps(paths))}\n`);
 } else {
   throw new Error(`unsupported command: ${command}`);
 }
