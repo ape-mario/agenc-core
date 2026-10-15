@@ -3159,7 +3159,7 @@ export class AgenCDaemonAgentManager {
 
       const reviewedAt = new Date().toISOString();
       const reviewedBy = params.reviewer?.trim() || "tui_operator";
-      const resolution = createOperatorEffectReviewResolution({
+      const operatorResolution = createOperatorEffectReviewResolution({
         disposition: params.disposition,
         actorId: reviewedBy,
         ...(isOperatorAttestation(params)
@@ -3176,6 +3176,12 @@ export class AgenCDaemonAgentManager {
             }),
         reviewedAt,
       });
+      // A live conversation's "keep blocked" choice is a pending review.
+      // Job-level abandonment retains its existing terminal semantics.
+      const { domainAction: _domainAction, ...pendingResolution } = operatorResolution;
+      const resolution = params.disposition === "remains_unknown"
+        ? { ...pendingResolution, workflowStatus: "pending" as const }
+        : operatorResolution;
       for (const effect of candidates) {
         const reviewOptions = {
           sessionId: reviewSessionId,

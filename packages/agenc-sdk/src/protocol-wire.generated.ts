@@ -2450,6 +2450,13 @@ export interface SessionTranscriptResult extends JsonObject {
     readonly messages: readonly SessionTranscriptMessage[];
 }
 
+export interface PendingEffectReview extends JsonObject {
+    readonly callId: string;
+    readonly toolName: string;
+    readonly description: string;
+    readonly error: string;
+}
+
 export interface SessionTranscriptV2Message extends JsonObject {
     readonly messageId: string;
     readonly commitEventId: string;
@@ -2580,6 +2587,8 @@ export interface SessionTranscriptV2Event extends JsonObject {
 }
 
 export interface SessionTranscriptV2Result extends JsonObject {
+    /** Independent of the visible transcript boundary and truncation. */
+    readonly pendingEffectReviews?: readonly PendingEffectReview[];
     /** Active selectable canonical user IDs; archived display rows are not targets. */
     readonly activeUserMessageIds?: readonly string[];
     readonly schemaVersion: 2;

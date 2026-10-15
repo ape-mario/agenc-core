@@ -24,6 +24,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { acquireCanonicalCompactionLease, withCanonicalBackgroundWork } from "./canonical-background-work.js";
+import { EffectReviewRequiredError } from "./effect-review-gate.js";
 import {
   basename,
   dirname,
@@ -3382,11 +3383,11 @@ export class RolloutStore {
       const review = callIds.length > 0
         ? callIds.map(id => `/resolve ${id} <disposition>`).join("; ")
         : "/resolve <tool-call-id> <disposition>";
-      throw new Error(
+      throw new EffectReviewRequiredError(
         `run ${this.sessionId} requires effect review before model execution. ` +
         `Inspect the interrupted tool outcome, then run ${review}. ` +
         "Choose confirmed_committed if it took effect, confirmed_no_effect if you verified no effect, " +
-        "or remains_unknown to keep execution blocked. Resend your prompt after review.",
+        "or remains_unknown to keep execution blocked.",
       );
     }
   }

@@ -157,6 +157,10 @@ export function daemonTranscriptSnapshotEvents(
     transcript.push({ id: `snapshot:${snapshot.historyEpoch}:active-users:${snapshot.asOfSequence}`,
       type: "active_conversation", payload: { activeUserMessageIds: snapshot.activeUserMessageIds } });
   }
+  if (snapshot.pendingEffectReviews !== undefined) transcript.push({
+    id: `snapshot:${snapshot.historyEpoch}:reviews:${snapshot.asOfSequence}`,
+    type: "effect_reviews_snapshot", payload: { reviews: snapshot.pendingEffectReviews },
+  });
   return transcript;
 }
 

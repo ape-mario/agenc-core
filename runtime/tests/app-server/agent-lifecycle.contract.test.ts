@@ -6744,7 +6744,7 @@ describe("AgenC background agent lifecycle", () => {
     const effect = repository.getEffectBySessionCall(params.sessionId, params.toolCallId);
     if (effect === undefined) return { kind: "not_found" as const };
     repository.resolveEffectReview({ runId: effect.runId, stepId: effect.stepId, resolution: params.resolution, eventId: `${effect.stepId}:review` });
-    resolveUnknownOutcomeEffect(driver, { sessionId: params.sessionId, toolCallId: params.toolCallId });
+    if (params.resolution.workflowStatus !== "pending") resolveUnknownOutcomeEffect(driver, { sessionId: params.sessionId, toolCallId: params.toolCallId });
     return { kind: "resolved" as const, durable: false as const, resolution: params.resolution };
   };
 
@@ -6859,6 +6859,32 @@ describe("AgenC background agent lifecycle", () => {
       restoreEnv();
       rmSync(home, { recursive: true, force: true });
       rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the live session blocked after repeated operator remains_unknown reviews, then accepts a final review", async () => {
+    const { cwd, home, restoreEnv } = createThreadStoreTestDirs();
+    const sessions = new AgenCDaemonSessionManager({ createSessionId: () => "session_keep_blocked" });
+    const driver = openStateDatabases({ cwd, agencHome: home });
+    try {
+      const effects = await seedUnknownEffectSession(driver, sessions, {
+        cwd, agentId: "conv-keep-blocked", callId: "call_hang", toolName: "Browser",
+      });
+      const runner = { resolveLiveEffectReview: vi.fn(async (_owner: string, params: ResolveDurableEffectReviewOptions) => projectLiveReview(driver, params)) } as unknown as AgenCBackgroundAgentRunner;
+      const agents = new AgenCDaemonAgentManager({ sessionManager: sessions, runner, agencHome: home });
+      for (let i = 0; i < 2; i++) {
+        await expect(agents.resolveSessionToolCall({ sessionId: "session_keep_blocked", toolCallId: "call_hang",
+          disposition: "remains_unknown", attestation: "operator", reviewer: `operator-${i}`,
+        })).resolves.toMatchObject({ remaining: 1 });
+        expect(effects.getEffect("conv-keep-blocked", "tool:turn:call_hang")).toMatchObject({
+          reviewStatus: "pending", review: { disposition: "remains_unknown", actorKind: "operator", actorId: `operator-${i}` },
+        });
+      }
+      await expect(agents.resolveSessionToolCall({ sessionId: "session_keep_blocked", toolCallId: "call_hang",
+        disposition: "confirmed_no_effect", attestation: "operator",
+      })).resolves.toMatchObject({ remaining: 0 });
+    } finally {
+      driver.close(); restoreEnv(); rmSync(home, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true });
     }
   });
 

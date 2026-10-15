@@ -1,3 +1,4 @@
+import { PendingEffectReviews } from "../../session/pending-effect-reviews.js";
 /**
  * Rollout journal scans: transcript reconstruction, transcript boundaries,
  * persisted submissions and run epochs. Split out of
@@ -364,6 +365,10 @@ export function sessionTranscriptV2FromRollout(
   artifactSessionDir?: string,
   options: { readonly includeCompleteMessages?: boolean; readonly publishTextArtifact?: (bytes: Buffer) => string } = {},
 ): SessionTranscriptV2Result {
+  const reviews = new PendingEffectReviews();
+  for (const item of items) {
+    if (item.type === "event_msg") reviews.apply(item.payload);
+  }
   const boundary = latestTranscriptBoundary(items);
   const boundaryIndex = boundary?.index ?? -1;
   const boundaryId = boundary?.id ?? "initial";
@@ -619,6 +624,7 @@ export function sessionTranscriptV2FromRollout(
       : { turnId: activeTurn.turnId, clientMessageId: currentClientMessageId };
   const snapshot: SessionTranscriptV2Result = {
     schemaVersion: 2,
+    pendingEffectReviews: reviews.reviews,
     sessionId,
     runId,
     historyEpoch: historyEpochForBoundary(runId, boundaryId),
