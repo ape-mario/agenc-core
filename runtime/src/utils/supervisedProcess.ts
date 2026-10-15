@@ -261,10 +261,12 @@ function alive(pid) {
   }
 }
 
-function snapshot() {
+function snapshot(rootOnly) {
   const result = spawnSync(
     '/bin/ps',
-    ['-axo', 'pid=,ppid=,state=,lstart='],
+    rootOnly
+      ? ['-o', 'pid=,ppid=,state=,lstart=', '-p', String(config.rootPid)]
+      : ['-axo', 'pid=,ppid=,state=,lstart='],
     { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 2000 }
   );
   if (result.error || result.signal || result.status !== 0) return null;
@@ -285,9 +287,9 @@ function snapshot() {
   return records;
 }
 
-function extendTracked() {
+function extendTracked(rootOnly) {
   if (config.cgroupPath) return;
-  const records = snapshot();
+  const records = snapshot(rootOnly);
   if (!records) return;
   const root = records.get(config.rootPid);
   if (root && tracked.size === 0) tracked.set(root.identity, root);
@@ -354,7 +356,10 @@ function stop() {
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
 process.on('SIGHUP', stop);
-extendTracked();
+// Readiness gates the command: the root is still blocked on its handoff and
+// has no children, so the first snapshot needs only the root's own identity.
+// Querying that one pid is far cheaper than a whole-table ps.
+extendTracked(true);
 try {
   fs.writeSync(3, 'ready\n');
   fs.closeSync(3);
@@ -589,10 +594,13 @@ export function containedProcessCommandOutcome(child: ProcessTreeChild): Process
 
 /**
  * Allow an exited child's native cleanup proof to drain before verification.
- * A complete subreaper proof ends the wait immediately; missing proof and
- * other containment backends retain the bounded settlement window. Resolution
- * is only a scheduling signal, never cleanup authority: callers must still
- * run terminateProcessTreeAndReport and handle its failure.
+ * A complete subreaper proof ends the wait immediately. A child with no native
+ * boundary (the POSIX gate, as on Darwin) ends it once every stdio stream has
+ * closed and its process group is empty: the window lets exiting group members
+ * finish, and none remain. Missing proof, a group that still has a member, and
+ * the other containment backends retain the bounded settlement window.
+ * Resolution is only a scheduling signal, never cleanup authority: callers
+ * must still run terminateProcessTreeAndReport and handle its failure.
  */
 export function waitForContainedProcessSettlement(
   child: ChildProcessWithoutNullStreams,
@@ -600,6 +608,11 @@ export function waitForContainedProcessSettlement(
   const session = sessionProcessBoundaries.get(child);
   if (session) return session.settled;
   const boundary = linuxSubreaperBoundaries.get(child);
+  const groupOnly =
+    boundary === undefined &&
+    process.platform !== "win32" &&
+    !linuxCgroupBoundaries.has(child) &&
+    !windowsJobBoundaries.has(child);
   return new Promise((resolve) => {
     const finish = (): void => {
       clearTimeout(timer);
@@ -614,7 +627,9 @@ export function waitForContainedProcessSettlement(
         boundary.protocolError === undefined
       ) {
         finish();
+        return;
       }
+      if (groupOnly && processGroupIsEmpty(child)) finish();
     };
     const timer = setTimeout(finish, 20);
     timer.unref?.();
@@ -623,8 +638,36 @@ export function waitForContainedProcessSettlement(
       // status bytes and boundary flags are settled before this listener runs.
       child.once("close", onClose);
       onClose(); // Also handle a child that closed before subscription.
+    } else if (groupOnly) {
+      // 'close' follows 'exit' once stdout and stderr have ended, so all
+      // output has been delivered.
+      child.once("close", onClose);
+      if (stdioClosed(child)) onClose();
     }
   });
+}
+
+/** The leader exited and both output streams have closed: 'close' is due or done. */
+function stdioClosed(child: ChildProcessWithoutNullStreams): boolean {
+  return (
+    leaderReaped(child) &&
+    child.stdout.closed === true &&
+    child.stderr.closed === true
+  );
+}
+
+/**
+ * True only when no process, zombies included, is left in the child's process
+ * group. EPERM means a member exists under another user.
+ */
+function processGroupIsEmpty(child: Pick<ChildProcess, "pid">): boolean {
+  if (!isSignalablePid(child.pid)) return false;
+  try {
+    process.kill(-child.pid, 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ESRCH";
+  }
 }
 
 let compiledLinuxSubreaperBroker: string | undefined;
@@ -2377,11 +2420,16 @@ export function captureProcessTreeDescendants(
     return;
   }
 
-  const snapshot = readNativeProcessSnapshot();
   let boundary = ownedProcessBoundaries.get(child);
   // Once the leader has been reaped its pid may belong to another process.
   // Only identities recorded while it was ours can still be matched.
   const reaped = leaderReaped(child);
+  // A reaped leader that was never observed has no identities to match, so a
+  // process-table snapshot cannot extend anything: skip it. On Darwin that
+  // snapshot is a synchronous `ps` of every process (about 20 ms), and the
+  // exec settlement path took two of them after each command exited.
+  if (boundary === undefined && reaped) return;
+  const snapshot = readNativeProcessSnapshot();
   if (snapshot === undefined) {
     boundary ??= {
       rootPid,
@@ -2397,7 +2445,6 @@ export function captureProcessTreeDescendants(
   }
 
   if (boundary === undefined) {
-    if (reaped) return;
     const root = snapshot.records.get(rootPid);
     if (root === undefined && snapshot.complete) return;
     boundary = {
