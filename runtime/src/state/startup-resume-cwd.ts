@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { close, constants, fstat, open } from "node:fs";
 import { lstat, realpath } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
@@ -11,6 +12,13 @@ const fstatAsync = promisify(fstat);
 
 export const STARTUP_RESUME_CWD_TIMEOUT_MS = 10_000;
 
+export class StartupResumeCwdPermissionError extends Error {
+  constructor() {
+    super("macOS is asking for permission to open the folder; answer the dialog, then resume the session");
+    this.name = "StartupResumeCwdPermissionError";
+  }
+}
+
 export interface StartupResumeCwd {
   readonly fd: number;
   readonly identity: { readonly dev: string; readonly ino: string };
@@ -18,17 +26,23 @@ export interface StartupResumeCwd {
 
 /**
  * Workspace syscalls can wait for macOS privacy consent or a remote mount.
- * Keep them off the JS thread and bound the caller's wait. Native operations
- * cannot be cancelled, so an open that returns late must close its descriptor.
+ * On macOS first open the directory in a disposable process. A privacy prompt
+ * must never occupy a daemon worker. The deadline covers probe and pinning;
+ * native pin operations cannot be cancelled, so late descriptors still close.
  */
 export async function openStartupResumeCwd(
   cwd: string,
   options: {
     readonly signal?: AbortSignal;
     readonly timeoutMs?: number;
+    readonly platformForTestingOnly?: NodeJS.Platform;
     readonly afterOpenForTestingOnly?: (cwd: string, fd: number) => void;
   } = {},
 ): Promise<StartupResumeCwd> {
+  if (!isAbsolute(cwd) || resolve(cwd) !== cwd) {
+    throw new Error("canonical startup resume cwd is not absolute and normalized");
+  }
+  let probing = (options.platformForTestingOnly ?? process.platform) === "darwin";
   const deadline = new AbortController();
   const signal =
     options.signal === undefined
@@ -38,11 +52,18 @@ export async function openStartupResumeCwd(
   const timeoutMs = options.timeoutMs ?? STARTUP_RESUME_CWD_TIMEOUT_MS;
   const timer = setTimeout(() => {
     deadline.abort(
-      new Error(`startup resume workspace timed out after ${timeoutMs}ms`),
+      probing
+        ? new StartupResumeCwdPermissionError()
+        : new Error(`startup resume workspace timed out after ${timeoutMs}ms`),
     );
   }, timeoutMs);
   timer.unref?.();
   try {
+    if (probing) {
+      await probeWorkspace(cwd, signal);
+      signal.throwIfAborted();
+      probing = false;
+    }
     return await new Promise<StartupResumeCwd>((resolveProof, reject) => {
       const onAbort = () => reject(signal.reason);
       signal.addEventListener("abort", onAbort, { once: true });
@@ -73,9 +94,6 @@ async function pinCwd(
   signal: AbortSignal,
   afterOpenForTestingOnly?: (cwd: string, fd: number) => void,
 ): Promise<StartupResumeCwd> {
-  if (!isAbsolute(cwd) || resolve(cwd) !== cwd) {
-    throw new Error("canonical startup resume cwd is not absolute and normalized");
-  }
   const before = await lstat(cwd, { bigint: true });
   signal.throwIfAborted();
   if (
@@ -121,4 +139,32 @@ async function pinCwd(
     await closeAsync(fd);
     throw error;
   }
+}
+
+async function probeWorkspace(cwd: string, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  // stat/access do not trigger the same TCC check as opening the directory.
+  // Pass the path as an argument so quotes and shell syntax remain literal.
+  const child = spawn("/bin/sh", ["-c", 'exec 3< "$1"', "sh", cwd], {
+    cwd: "/", env: { PATH: "/usr/bin:/bin" }, stdio: "ignore",
+  });
+  await new Promise<void>((resolveProbe, reject) => {
+    const onAbort = () => {
+      child.kill("SIGKILL");
+      reject(signal.reason);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    child.once("error", (error) => {
+      signal.removeEventListener("abort", onAbort);
+      reject(error);
+    });
+    child.once("exit", (code, exitSignal) => {
+      signal.removeEventListener("abort", onAbort);
+      if (signal.aborted) reject(signal.reason);
+      else if (code === 0) resolveProbe();
+      else reject(new Error(`startup workspace open probe failed (${exitSignal ?? code})`));
+    });
+    // Also cover cancellation between spawning and installing the listener.
+    if (signal.aborted) onAbort();
+  });
 }

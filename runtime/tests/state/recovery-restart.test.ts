@@ -348,7 +348,9 @@ describe("recoverDaemonStateOnStartup", () => {
     ]);
     const source = report.recoveredRuns[0]?.resumeSource;
     expect(source).toBeDefined();
-    await expect(source!.prepareCwd()).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(source!.prepareCwd()).rejects.toThrow(
+      process.platform === "darwin" ? "startup workspace open probe failed" : "ENOENT",
+    );
     source!.close();
     expect(projectedRolloutRows(rolloutPath)).toBe(1);
     expect(agentRunStatus(runId)).toBe("running");
