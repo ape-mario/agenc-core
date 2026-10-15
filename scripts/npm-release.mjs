@@ -34,8 +34,11 @@ const MAX_PACKAGE_BYTES = 64 * 1024 * 1024;
 const MAX_PACKAGE_ENTRIES = 512;
 const RUNTIME_MANIFEST_PATH = "generated/agenc-runtime-manifest-v2.json";
 const PUBLIC_REGISTRY = "https://registry.npmjs.org/";
-const REGISTRY_RECEIPT_ATTEMPTS = 8;
-const REGISTRY_RECEIPT_RETRY_MS = 2_000;
+// npm answers "may take a few minutes to become available" after a publish;
+// 0.19.0 and 0.19.1 both appeared after the former 16 s window closed.
+// Poll for up to five minutes before declaring the receipt missing.
+const REGISTRY_RECEIPT_ATTEMPTS = 60;
+const REGISTRY_RECEIPT_RETRY_MS = 5_000;
 
 function utf8Compare(left, right) {
   return Buffer.compare(Buffer.from(left), Buffer.from(right));
