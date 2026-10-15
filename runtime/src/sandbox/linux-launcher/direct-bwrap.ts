@@ -127,8 +127,8 @@ function preparePlan(input: DirectBwrapInput, namespaceInit: boolean, session = 
     if (capabilityDigest(env) !== capabilityDigest(sanitizeSandboxLauncherEnvironment(env))) return undefined;
     const identities = [input.program, helper, shell].map(fileIdentity);
     const permissions = permissionProfileToRuntimePermissions(options.permissionProfile);
-    const seccompMode = networkSeccompMode(permissions.network, false, false);
-    if (seccompMode !== null && seccompMode !== "restricted") return undefined;
+    const seccompMode = networkSeccompMode(permissions.network, false, false, options.allowLocalBinding);
+    if (seccompMode !== null && seccompMode !== "restricted" && seccompMode !== "local-only") return undefined;
     const networkMode = permissions.network === "enabled" ? "full-access" : "isolated";
     const launcher = preferredBubblewrapLauncher({ cwd: input.cwd, env, requireNamespaces: true,
       ...(options.capabilityHint === undefined ? {} : { capabilityHint: options.capabilityHint }) });

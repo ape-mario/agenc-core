@@ -68,6 +68,47 @@ const FAKE_BWRAP_SOURCE = [
 ].join("\n") + "\n";
 
 describe("Linux sandbox launcher", () => {
+  it("preserves the local binding opt-in without enabling general networking", () => {
+    const args = ["--allow-local-binding", "--sandbox-policy-cwd", "/workspace",
+      "--command-cwd", "/workspace", "--permission-profile",
+      JSON.stringify(workspaceWriteProfile("/workspace", "disabled")),
+      "--session-temp-root", os.tmpdir(), "--", "/bin/true"];
+    expect(parseLinuxSandboxLauncherArgs(args).allowLocalBinding).toBe(true);
+    expect(parseLinuxSandboxLauncherArgs(args.slice(1)).allowLocalBinding).toBe(false);
+    expect(networkSeccompMode("disabled", false, false, true)).toBe("local-only");
+    expect(networkSeccompMode("enabled", false, false, true)).toBeNull();
+    expect(networkSeccompMode("restricted", true, true, true)).toBe("proxy-routed");
+  });
+
+  it.each(["x64", "arm64"] as const)("allows isolated IP and stream stdio pairs without opening Unix services on %s", (arch) => {
+    const program = createNetworkSeccompProgram("local-only", arch);
+    const socket = arch === "x64" ? 41 : 198;
+    const pair = arch === "x64" ? 53 : 199;
+    const syscallResult = (nr: number, arg0 = 0, arg1 = 0): number => {
+      let accumulator = 0;
+      const data = new Map([[0, nr], [4, arch === "x64" ? 0xc000003e : 0xc00000b7], [16, arg0], [24, arg1]]);
+      for (let pc = 0; pc * 8 < program.length; pc++) {
+        const at = pc * 8, code = program.readUInt16LE(at), k = program.readUInt32LE(at + 4);
+        if (code === 0x20) accumulator = data.get(k) ?? 0;
+        else if (code === 0x54) accumulator &= k;
+        else if (code === 0x15) pc += program.readUInt8(at + (accumulator === k ? 2 : 3));
+        else if (code === 0x06) return k;
+        else throw new Error(`unsupported BPF opcode ${code}`);
+      }
+      throw new Error("unterminated BPF");
+    };
+    const allow = 0x7fff0000, deny = 0x00050001;
+    for (const family of [2, 10]) expect(syscallResult(socket, family)).toBe(allow);
+    for (const family of [1, 16, 17]) expect(syscallResult(socket, family)).toBe(deny);
+    // Datagram socketpairs can reconnect to a pathname Unix service. Only
+    // connected stream pairs used for child stdio are safe in this mode.
+    for (const flags of [0, 0x80000, 0x800, 0x80800]) expect(syscallResult(pair, 1, 1 | flags)).toBe(allow);
+    for (const type of [2, 5]) expect(syscallResult(pair, 1, type)).toBe(deny);
+    for (const nr of arch === "x64" ? [42, 49, 50, 43, 288] : [203, 200, 201, 202, 242]) {
+      expect(syscallResult(nr)).toBe(allow);
+    }
+    for (const nr of [425, 426, 427, arch === "x64" ? 101 : 117]) expect(syscallResult(nr)).toBe(deny);
+  });
   it("parses browser CDP stdio transport before the command separator", () => {
     const parsed = parseLinuxSandboxLauncherArgs([
       "--browser-cdp-over-stdio",

@@ -73,6 +73,7 @@ export interface LandlockPlanInput {
   readonly sandboxPolicyCwd: string;
   readonly sessionTempRoot: string;
   readonly allowNetworkForProxy: boolean;
+  readonly allowLocalBinding?: boolean;
   readonly inheritedCwd: boolean;
   readonly extraReadOnlyBindRoots?: readonly string[];
   readonly extraDeviceBindPaths?: readonly string[];
@@ -115,6 +116,9 @@ function enumeratedRootGrants(): string[] {
 }
 
 export function planLandlockConfinement(input: LandlockPlanInput): LandlockPlan {
+  if (input.allowLocalBinding) {
+    return { kind: "refused", reason: "local binding requires a private network namespace; install bubblewrap" };
+  }
   if (input.allowNetworkForProxy) {
     return {
       kind: "refused",

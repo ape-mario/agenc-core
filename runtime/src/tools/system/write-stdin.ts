@@ -20,7 +20,7 @@ import {
 import { SandboxExecutionError } from "../../sandbox/execution-broker.js";
 import { createToolEffectDispositionEvidence } from "../effect-boundary.js";
 import { readToolRuntimeContext } from "../runtimes/context.js";
-import { sandboxEscalationAvailable } from "./exec-sandbox-denial.js";
+import { execSandboxDenialNotice, sandboxEscalationAvailable } from "./exec-sandbox-denial.js";
 import { execNetworkFailureNotice } from "./exec-network-failure.js";
 
 export interface WriteStdinToolConfig {
@@ -245,7 +245,17 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
           (output.exitCode === null && !stillAlive);
         const execContent = formatUnifiedExecToolContent(output, config?.lightMode === true);
         const runtimeContext = readToolRuntimeContext(args);
-        const notice = execNetworkFailureNotice({
+        const denial = execSandboxDenialNotice({
+          output: execContent,
+          exitCode: output.exitCode,
+          sandboxApplied: runtimeSandbox !== undefined,
+          escalationAvailable: runtimeContext === undefined ||
+            sandboxEscalationAvailable(runtimeContext.approvalPolicy, {
+              sandboxMode: runtimeContext.requestedSandboxMode,
+              session: runtimeContext.invocation.session,
+            }),
+        });
+        const notice = denial?.notice ?? execNetworkFailureNotice({
           output: execContent,
           exitCode: output.exitCode,
           runtimeSandbox,

@@ -859,6 +859,7 @@ async function createBoundAgenCDaemonOnlyTuiContext(
       env,
       sessionTempRoot: runtimeOptions.sessionTempRoot,
       allowGpu: effectiveConfig.sandbox?.allow_gpu === true,
+      allowLocalBinding: effectiveConfig.sandbox?.network?.allowLocalBinding === true,
       persistentSession: effectiveConfig.sandbox?.persistent_session !== false,
     });
     const activeSandboxExecutionBroker = sandboxExecutionBroker;

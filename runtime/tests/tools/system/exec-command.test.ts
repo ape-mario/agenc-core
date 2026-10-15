@@ -273,7 +273,7 @@ describe("exec_command tool", () => {
       // And now so is the verdict.
       expect(result.content).toContain("[sandbox]");
       expect(result.content).toContain("Do not run this command again");
-      expect(result.content).toContain("give them the exact command to run in their own terminal");
+      expect(result.content).toContain("sandbox.network.allowLocalBinding = true");
     });
 
     test("under a policy with a human it asks for one escalated retry instead", async () => {
@@ -435,6 +435,7 @@ describe("exec_command tool", () => {
         payload: { kind: "function", arguments: "{}" },
         turn: {
           subId: "turn-network-proxy",
+          config: { sandboxAllowLocalBinding: true },
           cwd: root,
           agencLinuxSandboxExe: "/bin/true",
           networkSandboxPolicy: {
@@ -453,6 +454,7 @@ describe("exec_command tool", () => {
 
     const runtimeSandbox = runtimeSandboxForExec(args, root);
 
+    expect(runtimeSandbox?.network?.allowLocalBinding).toBe(true);
     expect(runtimeSandbox?.networkPolicyDecider).toBe(policyDecider);
     expect(runtimeSandbox?.blockedRequestObserver).toBe(blockedRequestObserver);
     expect(runtimeSandbox?.sessionTempRoot).toBe(root);

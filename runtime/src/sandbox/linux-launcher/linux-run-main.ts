@@ -164,6 +164,7 @@ async function runLinuxSandboxOptions(
     network,
     options.allowNetworkForProxy,
     proxyRoutedNetwork,
+    options.allowLocalBinding,
   );
   const bwrapSeccompMode = options.allowNetworkForProxy ? null : seccompMode;
   const networkMode = bwrapNetworkMode(network, options.allowNetworkForProxy);
@@ -313,6 +314,7 @@ async function runUnderLandlockFallback(input: {
     sandboxPolicyCwd: input.options.sandboxPolicyCwd,
     sessionTempRoot: input.options.sessionTempRoot,
     allowNetworkForProxy: input.options.allowNetworkForProxy,
+    allowLocalBinding: input.seccompMode === "local-only",
     inheritedCwd: input.options.inheritedCwd,
     extraReadOnlyBindRoots: input.extraReadOnlyBindRoots,
     extraDeviceBindPaths: input.extraDeviceBindPaths,
@@ -468,6 +470,7 @@ function createInnerLauncherCommand(
     options.sessionTempRoot,
     ...(options.mountProc ? [] : ["--no-proc"]),
     ...(options.allowNetworkForProxy ? ["--allow-network-for-proxy"] : []),
+    ...(options.allowLocalBinding ? ["--allow-local-binding"] : []),
     ...(proxyRouteSpec === null ? [] : ["--proxy-route-spec", proxyRouteSpec]),
     "--",
     ...options.command,

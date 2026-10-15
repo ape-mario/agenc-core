@@ -9,7 +9,7 @@ import {
 
 const WORKSPACE = "/tmp/ws";
 
-function configure(sandbox?: { readonly persistent_session?: boolean }) {
+function configure(sandbox?: { readonly persistent_session?: boolean; readonly network?: { readonly allowLocalBinding?: boolean } }) {
   return sessionConfigurationFromAgenCConfig({
     config: {
       ...defaultConfig(),
@@ -58,4 +58,17 @@ describe("sandbox persistent_session config projection", () => {
         .persistentSession,
     ).toBeUndefined();
   });
+});
+
+
+test("projects local binding through session and broker authority without enabling networking", () => {
+  for (const allowLocalBinding of [undefined, false, true]) {
+    const configured = configure({ network: { allowLocalBinding } });
+    const authority = sessionExecutionAuthorityFromConfiguration(configured);
+    const broker = sandboxExecutionBrokerAuthorityFromSessionAuthority(authority, WORKSPACE);
+    expect(configured.sandboxAllowLocalBinding).toBe(allowLocalBinding === true ? true : undefined);
+    expect(authority.sandboxAllowLocalBinding).toBe(configured.sandboxAllowLocalBinding);
+    expect(broker.allowLocalBinding).toBe(configured.sandboxAllowLocalBinding);
+    expect(broker.permissionProfile?.network).not.toBe("enabled");
+  }
 });

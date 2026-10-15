@@ -50,29 +50,15 @@ const BIND_DENIED_SIGNATURES: readonly RegExp[] = [
  * next step is to hand the command to the user.
  */
 export const SANDBOX_BIND_DENIED_NO_ESCALATION =
-  "[sandbox] The OS sandbox denied this command permission to bind a " +
-  "listening socket. The command and the port are fine; the sandbox blocks " +
-  "the bind. Escalation is unavailable in this session: the approval policy " +
-  "is never, so nobody is present to approve running outside the sandbox, " +
-  "and sandbox_permissions and justification have no effect under it. " +
-  "Retrying will fail the same way, with any timeout. Do not run this " +
-  "command again. Tell the user the server cannot be started from here and " +
-  "give them the exact command to run in their own terminal.";
+  "[sandbox] The sandbox blocks local servers. Do not run this command again unchanged. " +
+  "Escalation is unavailable; ask the user to enable sandbox.network.allowLocalBinding = true for sandbox-local servers or run the command in their terminal.";
 
 /**
  * A human can still approve, so one escalated retry is the correct move —
  * and exactly one, because a second identical request answers nothing.
  */
 export const SANDBOX_BIND_DENIED_ESCALATION_AVAILABLE =
-  "[sandbox] The OS sandbox denied this command permission to bind a " +
-  "listening socket. The command and the port are fine; the sandbox blocks " +
-  "the bind. Retrying it unchanged will fail the same way, with any " +
-  "timeout. Send this exact command once more with sandbox_permissions " +
-  'set to "require_escalated" and a one-line justification. Extra network ' +
-  "permissions do not help: only running outside the sandbox grants a " +
-  "listening socket. If that request is refused, tell the user the server " +
-  "cannot be started from here and give them the exact command to run in " +
-  "their own terminal.";
+  "[sandbox] The sandbox blocks local servers. Retry this command once with sandbox_permissions=\"require_escalated\" and a justification, or ask the user to enable sandbox.network.allowLocalBinding = true for sandbox-local servers.";
 
 /**
  * The notice for a finished exec, or null when this was not a sandbox

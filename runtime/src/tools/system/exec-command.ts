@@ -590,6 +590,7 @@ export function runtimeSandboxForExec(
         readonly windowsSandboxPrivateDesktop?: unknown;
       };
       readonly sandboxAllowGpu?: unknown;
+      readonly sandboxAllowLocalBinding?: unknown;
       readonly sandboxPersistentSession?: unknown;
     };
     readonly features?: unknown;
@@ -641,6 +642,7 @@ export function runtimeSandboxForExec(
     sandboxPolicyCwd,
     sessionTempRoot: childTempRoot,
     preference: "require",
+    ...(booleanValue(turn.config?.sandboxAllowLocalBinding) === true ? { network: { allowLocalBinding: true } } : {}),
     ...(booleanValue(turn.config?.sandboxPersistentSession) === false ? { persistentSession: false } : {}),
     ...(booleanValue(turn.config?.sandboxAllowGpu) === true
       ? { allowGpu: true }
