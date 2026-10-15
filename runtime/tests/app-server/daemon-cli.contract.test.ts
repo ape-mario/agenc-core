@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import fsPromises from "node:fs/promises";
 import { once } from "node:events";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -6822,6 +6825,94 @@ snapshot_max_bytes = 64
       return outcome === marker;
     }
 
+    it.each(["timeout", "shutdown"] as const)("publishes readiness and restores other sessions while one workspace never responds (%s)", async (settlement) => {
+      const agencHome = await tempAgencHome();
+      const blockedCwd = await fsPromises.realpath(
+        await mkdtemp(join(tmpdir(), "agenc-blocked-workspace-")),
+      );
+      const host = createHost(agencHome);
+      const signalProcess = createSignalProcess();
+      const io = createIo();
+      seedRecoverableDaemonState(agencHome, {
+        cwd: blockedCwd,
+        runId: "run-blocked-workspace",
+        sessionId: "session-blocked-workspace",
+      });
+      seedRecoverableDaemonState(agencHome, {
+        cwd: process.cwd(),
+        runId: "run-healthy-workspace",
+        sessionId: "session-healthy-workspace",
+      });
+      const originalLstatSync = fs.lstatSync;
+      const synchronousWorkspaceAccess = vi.fn();
+      const syncStat = vi.spyOn(fs, "lstatSync").mockImplementation((...args) => {
+        if (args[0] === blockedCwd) {
+          synchronousWorkspaceAccess();
+          // Fail instead of blocking the test runner's main thread forever.
+          throw new Error("workspace synchronous stat would block");
+        }
+        return Reflect.apply(originalLstatSync, fs, args);
+      });
+      const originalLstat = fsPromises.lstat;
+      const blockedStat = vi.spyOn(fsPromises, "lstat").mockImplementation((...args) => {
+        if (args[0] === blockedCwd) return new Promise(() => {});
+        return Reflect.apply(originalLstat, fsPromises, args);
+      });
+      syncBuiltinESMExports();
+      const restoreAgent = vi.fn(async (_params: Parameters<NonNullable<AgenCBackgroundAgentRunner["restoreAgent"]>>[0]) => true);
+      const running = runAgenCDaemonCli(
+        { kind: "command", action: "run" },
+        {
+          host, io, signalProcess, startupRestoreShutdownGraceMs: 0,
+          runner: { startAgent: async () => {}, restoreAgent },
+        },
+      );
+      try {
+        await expect(waitForPid(resolveAgenCDaemonPidPath(host.env, host.userHome))).resolves.toBe(4100);
+        expect(readDaemonRuntimeInfo(resolveAgenCDaemonRuntimeInfoPath(agencHome))).toMatchObject({ pid: 4100 });
+        const release = await acquireAgenCDaemonLifecycleLock(host);
+        await release();
+        const client = await daemonClient(host, 15_000);
+        expect(synchronousWorkspaceAccess).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(restoreAgent).toHaveBeenCalledOnce());
+        expect(restoreAgent.mock.calls[0]?.[0]).toMatchObject({ agentId: "run-healthy-workspace" });
+        await expect(client.request("health.ready", {})).resolves.toMatchObject({
+          ready: true, restoringSessions: 1,
+        });
+        await expect(client.request("agent.list", {})).resolves.toMatchObject({
+          agents: [expect.objectContaining({ agentId: "run-healthy-workspace" })],
+        });
+        if (settlement === "timeout") {
+          // A request naming the blocked session is released by its deadline.
+          await expect(client.request("session.attach", {
+            sessionId: "session-blocked-workspace", clientId: "client-blocked",
+          })).resolves.toMatchObject({ sessionId: "session-blocked-workspace" });
+          await expect(client.request("health.ready", {})).resolves.toMatchObject({
+            ready: true, restoringSessions: 0,
+          });
+          await expect(client.request("agent.list", {})).resolves.toMatchObject({
+            agents: expect.arrayContaining([
+              expect.objectContaining({
+                agentId: "run-blocked-workspace",
+                metadata: expect.objectContaining({
+                  recovery: expect.objectContaining({ runtimeRestore: "unavailable" }),
+                }),
+              }),
+            ]),
+          });
+          expect(restoreAgent).toHaveBeenCalledOnce();
+        }
+      } finally {
+        signalProcess.emit("SIGTERM");
+        await expect(running).resolves.toBe(0);
+        blockedStat.mockRestore();
+        syncStat.mockRestore();
+        syncBuiltinESMExports();
+        await rm(blockedCwd, { recursive: true, force: true });
+        await rm(agencHome, { recursive: true, force: true });
+      }
+    }, 25_000);
+
     it("serves before any rebuild, rebuilds four at a time, and publishes each one as it finishes", async () => {
       const agencHome = await tempAgencHome();
       const host = createHost(agencHome);
@@ -6838,7 +6929,7 @@ snapshot_max_bytes = 64
         // Readiness is published while every rebuild is still held.
         await expect(waitForPid(pidPath)).resolves.toBe(4100);
         await vi.waitFor(() => expect(gated.started).toHaveLength(4));
-        expect(gated.started).toEqual(parallelRunIds.slice(0, 4));
+        expect([...gated.started].sort()).toEqual(parallelRunIds.slice(0, 4));
         const client = await daemonClient(host);
         await expect(client.request("health.ready", {})).resolves.toMatchObject({
           ready: true,
@@ -6857,7 +6948,8 @@ snapshot_max_bytes = 64
         await vi.waitFor(() => expect(gated.started).toHaveLength(5));
         await releaseAndPublish("run-parallel-b");
         await vi.waitFor(() => expect(gated.started).toHaveLength(6));
-        expect(gated.started).toEqual(parallelRunIds);
+        expect([...gated.started.slice(0, 4)].sort()).toEqual(parallelRunIds.slice(0, 4));
+        expect(gated.started.slice(4)).toEqual(parallelRunIds.slice(4));
         await expect(client.request("health.ready", {})).resolves.toMatchObject({
           restoringSessions: 4,
         });
@@ -7100,7 +7192,7 @@ snapshot_max_bytes = 64
       try {
         await expect(waitForPid(pidPath)).resolves.toBe(4100);
         await vi.waitFor(() =>
-          expect(gated.started).toEqual(parallelRunIds.slice(0, 4)),
+          expect([...gated.started].sort()).toEqual(parallelRunIds.slice(0, 4)),
         );
         const client = await daemonClient(host, 5_000);
         // The last session in recovery order.
@@ -7214,7 +7306,7 @@ snapshot_max_bytes = 64
         );
         await expect(waitForPid(pidPath)).resolves.toBe(4100);
         await vi.waitFor(() =>
-          expect(gated.started).toEqual(parallelRunIds.slice(0, 4)),
+          expect([...gated.started].sort()).toEqual(parallelRunIds.slice(0, 4)),
         );
         const client = await daemonClient(host, 5_000);
         const waitingForQueued = client.request("session.attach", {
@@ -7238,7 +7330,7 @@ snapshot_max_bytes = 64
         expect(rollbackRestoredAgent).not.toHaveBeenCalled();
         // The two queued ones were never started. Their runs are untouched and
         // restored by the next start.
-        expect(gated.started).toEqual(parallelRunIds.slice(0, 4));
+        expect([...gated.started].sort()).toEqual(parallelRunIds.slice(0, 4));
         expect(io.stderrText()).toContain(
           "agenc: daemon shutdown stopped restoring the sessions open at its last shutdown; " +
             "2 of 6 were not restored and will be at the next start",
