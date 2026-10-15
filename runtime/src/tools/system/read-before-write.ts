@@ -32,7 +32,9 @@ export function unreadFilePreflight(
   const unread: string[] = [];
   for (const path of paths) {
     try {
-      const canonical = realpathSync(resolve(cwd, path)).normalize("NFC");
+      const resolved = realpathSync(resolve(cwd, path));
+      // Match safePath: POSIX Unicode spellings retain their file identity.
+      const canonical = process.platform === "win32" ? resolved.normalize("NFC") : resolved;
       // Missing files, directories and special files have separate execute-time
       // diagnostics. In particular, creation must not require an impossible read.
       if (statSync(canonical).isFile() && !hasSessionRead(sessionId, canonical)) unread.push(canonical);
