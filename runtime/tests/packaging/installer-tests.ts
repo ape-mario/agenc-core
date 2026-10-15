@@ -2884,12 +2884,11 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
     expect(ps1).toContain(
       '"PATH", "LD_LIBRARY_PATH", "LD_PRELOAD", "DYLD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES"',
     );
-    expect(ps1).toContain('[System.Reflection.Assembly]::Load("System.Net.Http")');
+    // Add-Type resolves these in Windows PowerShell 5.1, where Assembly::Load by short name fails.
+    expect(ps1).toContain("Add-Type -AssemblyName System.Net.Http");
     expect(ps1).toContain(".SendAsync(");
     expect(ps1).toContain(".ReadAsStreamAsync()");
-    expect(ps1).toContain(
-      '[System.Reflection.Assembly]::Load("System.IO.Compression.FileSystem")',
-    );
+    expect(ps1).toContain("Add-Type -AssemblyName System.IO.Compression.FileSystem");
   });
 
   test("standalone bootstrap pins are mechanically bound to release-toolchain.json", () => {
