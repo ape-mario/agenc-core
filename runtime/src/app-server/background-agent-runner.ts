@@ -1401,6 +1401,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
             params,
             runtimeWorkspaceRoot(bootstrap),
             bootstrap.configStore.current(),
+            bootstrap.session.services.providerEnvironment,
           );
           if (!runtimeSettingsEqual(restoreOverrides, restoredBaseline)) {
             const previousSettings = restoredBaseline;
@@ -4619,6 +4620,8 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
                 ? { model: reloadModel }
                 : {}),
             },
+            session.services.providerEnvironment,
+            { validateCatalog: false },
           );
           preparedReloadProviderSwitch = await runWithCurrentRuntimeSession(
             session,
@@ -4759,6 +4762,8 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
                   ? { model: requestedModel }
                   : {}),
               },
+              session.services.providerEnvironment,
+              { validateCatalog: false },
             )
           : undefined);
       const targetModel = targetSelection?.model;

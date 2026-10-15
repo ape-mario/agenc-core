@@ -1414,6 +1414,7 @@ function runtimeSettingsWithRestoreOverrides(
   params: AgenCBackgroundAgentRestoreParams,
   workspaceRoot: string,
   config: AgenCConfig,
+  env: Readonly<Record<string, string | undefined>> = process.env,
 ): RunRuntimeSettingsSnapshot {
   const permissionMode = params.permissionMode ?? canonical.permissionMode;
   const permissionChanged = permissionMode !== canonical.permissionMode;
@@ -1435,6 +1436,13 @@ function runtimeSettingsWithRestoreOverrides(
         : {}),
       ...(params.model !== undefined ? { model: params.model } : {}),
     },
+    env,
+    // Automatic daemon restore repeats the saved pair. Only a new model
+    // override is an admission request; catalog drift cannot block replay.
+    { validateCatalog: params.model !== undefined && (
+      params.model !== canonical.model ||
+      (params.provider !== undefined && params.provider !== canonical.provider)
+    ) },
   );
   // Resuming on another model is a model switch: the effort stays only when
   // that model accepts it.

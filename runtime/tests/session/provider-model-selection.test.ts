@@ -144,3 +144,14 @@ test("uses the endpoint environment supplied by the caller", () => {
     DEEPSEEK_BASE_URL: "https://api.deepseek.com/v1/",
   })).toThrow(/unknown model/u);
 });
+
+
+test("configured model admission keeps managed policy while allowing catalog drift", () => {
+  const current = { provider: "deepseek", model: "retired-model" };
+  expect(resolveProviderModelSelection({}, current, {}, {}, { validateCatalog: false }))
+    .toMatchObject(current);
+  expect(() => resolveProviderModelSelection({ availableModels: ["deepseek-flash"] }, current, {}, {}, { validateCatalog: false }))
+    .toThrow(ModelNotAllowedError);
+  expect(() => resolveProviderModelSelection({}, current, { model: "retired-model" }, {}))
+    .toThrow(/unknown model/u);
+});
