@@ -1286,6 +1286,7 @@ async function bootstrapLocalRuntimeSessionScoped(
     baseEnv: env,
     shellPath: commandExecutionAuthority.path,
     commandWrapperArgv: commandExecutionAuthority.commandWrapperArgv,
+    prepareContainedLaunches: true,
   });
   const unifiedExecLifecycleParticipantName = "unified-exec-manager";
   let unifiedExecQuiesceToken:

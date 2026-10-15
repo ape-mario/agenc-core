@@ -57,6 +57,8 @@ import {
   retainCurrentWorkspaceOperation,
 } from "../workspace/tool-operation-lifetime.js";
 import {
+  discardPreparedContainedProcessLaunch,
+  prepareContainedProcessLaunch,
   signalProcessTree,
   spawnContainedProcess,
   terminateProcessTreeAndReport,
@@ -552,6 +554,7 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
   private readonly maxProcesses: number;
   private readonly sandboxManager: UnifiedExecSandboxManager;
   private readonly sandboxAuthorityQuiesceTimeoutMs: number;
+  private readonly prepareContainedLaunches: boolean;
   private readonly oneShotServers = new Map<string, OneShotProcessServer>();
   private oneShotServerFor(ownerId?: string): OneShotProcessServer {
     const key = ownerId ?? "";
@@ -628,6 +631,7 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
     this.sandboxAuthorityQuiesceTimeoutMs =
       options.sandboxAuthorityQuiesceTimeoutMs ??
       SANDBOX_AUTHORITY_QUIESCE_TIMEOUT_MS;
+    this.prepareContainedLaunches = options.prepareContainedLaunches === true;
     if (
       !Number.isFinite(this.sandboxAuthorityQuiesceTimeoutMs) ||
       this.sandboxAuthorityQuiesceTimeoutMs <= 0
@@ -1234,6 +1238,7 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
 
   async closeAll(_reason = "session_shutdown"): Promise<void> {
     this.sandboxAuthorityGeneration += 1;
+    if (this.prepareContainedLaunches) discardPreparedContainedProcessLaunch();
     const sandboxCleanup = this.closeSessionSandboxes();
     const entries = [...this.processes.values()];
     for (const entry of entries) {
@@ -1670,6 +1675,7 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
     this.assertOwnerAdmission(params.ownerId, params.ownerBinding);
     let probeHint: ReturnType<typeof prepareLinuxSandboxProbeHint>;
     let child: ChildProcessWithoutNullStreams;
+    let containedLaunch = false;
     try {
       const validateAdmission = (): void => {
         this.assertSandboxAuthorityAdmission(params.sandboxAuthorityGeneration);
@@ -1697,6 +1703,7 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
         // The native subreaper remains a complete containment boundary. Avoid
         // probing cgroup delegation for every command in this short run.
         ...(oneShotFastModeActive() ? { linuxContainment: "subreaper" as const } : {}),
+        ...(this.prepareContainedLaunches ? { usePreparedLaunch: true } : {}),
         cwd: params.cwd,
         env: params.env,
         argv0: params.argv0 ?? basename(params.program),
@@ -1713,6 +1720,7 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
           },
         } : {}),
       });
+      containedLaunch = persistent === undefined;
     } catch (error) {
       if ((error instanceof SessionSandboxCleanupError || error instanceof OneShotProcessServerCleanupError)) this.poisonSandboxAuthority(error);
       probeHint?.invalidate();
@@ -1743,6 +1751,12 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
     child.stderr.on("data", (data: Buffer) =>
       notifyData("stderr", data.toString("utf8")),
     );
+    if (containedLaunch && this.prepareContainedLaunches && process.platform === "darwin") {
+      // Prepare the next command's launch while this one runs: this event
+      // loop is waiting on the command anyway.
+      const cwd = params.cwd;
+      setImmediate(() => prepareContainedProcessLaunch(cwd));
+    }
     const entry: ProcessEntry = {
       ...entryBase,
       stored: { kind: "pipe", process: child },

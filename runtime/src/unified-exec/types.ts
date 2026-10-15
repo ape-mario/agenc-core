@@ -100,6 +100,12 @@ export interface UnifiedExecManagerOptions {
   readonly sandboxManager?: UnifiedExecSandboxManager;
   /** Injectable only for deterministic sandbox-authority drain tests. */
   readonly sandboxAuthorityQuiesceTimeoutMs?: number;
+  /**
+   * Darwin: prepare each command's contained launch while the previous one
+   * runs, so a command does not wait for its gate and watchdog to start. See
+   * `prepareContainedProcessLaunch`.
+   */
+  readonly prepareContainedLaunches?: boolean;
 }
 
 export interface ExecCommandRequest extends ToolExecutionInjectedArgs {
