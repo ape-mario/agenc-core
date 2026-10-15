@@ -21,6 +21,7 @@ import {
   plainTextErrorToolResult as errorResult,
   validationErrorToolResult,
 } from "../results.js";
+import { unreadFilePreflight } from "../system/read-before-write.js";
 import { SESSION_ID_ARG } from "../system/filesystem.js";
 import { parsePatch } from "./parser.js";
 import { applyPatchText } from "./runtime.js";
@@ -185,6 +186,16 @@ export function createApplyPatchTool(config: ApplyPatchToolConfig): Tool {
       },
       required: ["input"],
       additionalProperties: false,
+    },
+    preflight(args) {
+      const patch = asNonEmptyString(args.input);
+      if (!patch) return { code: "invalid_patch", message: "input must be a non-empty string" };
+      try {
+        const hunks = parsePatch(patch).hunks;
+        return unreadFilePreflight(args, hunks.flatMap(hunk => pathsForHunk(hunk).map(target => target.path)), config.cwd);
+      } catch (error) {
+        return { code: "invalid_patch", message: error instanceof Error ? error.message : String(error) };
+      }
     },
     checkPermissions(input, context) {
       const args = input as ApplyPatchToolInput;

@@ -440,6 +440,11 @@ function createCanonicalTool(options: CanonicalToolOptions): Tool {
         runtimeTool.isConcurrencySafe?.(mapCanonicalInput(options, input, root)) === true
       );
     },
+    async validateInput(input) {
+      const root = workspaceRoot();
+      const failure = getRuntimeTool(root).preflight?.(mapCanonicalInput(options, input, root));
+      return failure ? { result: false, message: failure.message, errorCode: 1 } : { result: true };
+    },
     async checkPermissions(input, context) {
       const root = workspaceRoot();
       const runtimeTool = getRuntimeTool(root);

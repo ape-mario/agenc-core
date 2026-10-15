@@ -51,6 +51,7 @@ import {
   resolveSessionId,
   safePathAllowingSessionPlanFile,
 } from "./filesystem.js";
+import { readBeforeWriteMessage, unreadFilePreflight } from "./read-before-write.js";
 import { checkMemorySecrets } from "../../memory/privacy.js";
 import {
   FILE_TOOL_PATH_SCHEMA,
@@ -70,9 +71,6 @@ export const FILE_MULTI_EDIT_TOOL_NAME = "MultiEdit";
 
 const FILE_UNEXPECTEDLY_MODIFIED_ERROR =
   "File has been modified since read, either by the user or by a linter. Read it again before attempting to write it.";
-
-const READ_BEFORE_WRITE_ERROR =
-  "File has not been read yet. Read it first before writing to it.";
 
 const SESSION_ID_MISSING_ERROR =
   "file_edit was invoked without a session id. The runtime injects this automatically; if you are calling the tool from a unit test, pass __testBypassSessionGuard:true to opt out of read-before-write enforcement.";
@@ -869,6 +867,11 @@ export function createFileEditTool(config: FileEditToolConfig): Tool {
       required: ["file_path", "old_string", "new_string"],
       additionalProperties: false,
     },
+    preflight(args) {
+      const validated = validateInputs(args);
+      if ("error" in validated) return { code: "invalid_edit", message: validated.error };
+      return unreadFilePreflight(args, [validated.file_path], config.allowedPaths[0] ?? process.cwd());
+    },
     checkPermissions(input, context) {
       const args = input as EditArgs;
       const filePath = asNonEmptyString(args.file_path);
@@ -1038,7 +1041,7 @@ export function createFileEditTool(config: FileEditToolConfig): Tool {
         recordedSnapshot = getSessionReadSnapshot(sessionId, absoluteFilePath);
         if (!isAuthorizingSessionRead(recordedSnapshot)) {
           return preMutationErrorResult(
-            READ_BEFORE_WRITE_ERROR,
+            readBeforeWriteMessage([absoluteFilePath]),
             FILE_EDIT_TOOL_NAME,
           );
         }
@@ -1228,6 +1231,11 @@ export function createFileMultiEditTool(config: FileEditToolConfig): Tool {
       additionalProperties: false,
     },
     reshapeModelArgs: foldEditShapedMultiEditArgs,
+    preflight(args) {
+      const validated = validateMultiEditInputs(args);
+      if ("error" in validated) return { code: "invalid_edit", message: validated.error };
+      return unreadFilePreflight(args, [validated.file_path], config.allowedPaths[0] ?? process.cwd());
+    },
     checkPermissions(input, context) {
       const args = input as MultiEditArgs;
       const filePath = asNonEmptyString(args.file_path);
@@ -1408,7 +1416,7 @@ export function createFileMultiEditTool(config: FileEditToolConfig): Tool {
         recordedSnapshot = getSessionReadSnapshot(sessionId, absoluteFilePath);
         if (!isAuthorizingSessionRead(recordedSnapshot)) {
           return preMutationErrorResult(
-            READ_BEFORE_WRITE_ERROR,
+            readBeforeWriteMessage([absoluteFilePath]),
             FILE_MULTI_EDIT_TOOL_NAME,
           );
         }
