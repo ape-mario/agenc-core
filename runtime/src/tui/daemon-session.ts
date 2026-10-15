@@ -1496,8 +1496,8 @@ export function createDaemonTuiSession<
       queuedInputBytes = 0;
       idleInputAdmissions.clear();
     },
-    resolveDaemonToolCall: async (params: ResolveDaemonToolCallParams) =>
-      client.request("session.resolveToolCall", {
+    resolveDaemonToolCall: async (params: ResolveDaemonToolCallParams) => {
+      const result = await client.request("session.resolveToolCall", {
         sessionId,
         toolCallId: params.toolCallId,
         disposition: params.disposition,
@@ -1508,7 +1508,12 @@ export function createDaemonTuiSession<
               evidenceSha256: params.evidenceSha256,
             }),
         ...(params.reviewer !== undefined ? { reviewer: params.reviewer } : {}),
-      }),
+      });
+      eventReplay.publish({ type: "effect_review_acknowledged", payload: {
+        callId: params.toolCallId, disposition: params.disposition, remaining: result.remaining,
+      } });
+      return result;
+    },
     getDaemonSessionSnapshot: async () => {
       const snapshot = await client.request("session.snapshot", { sessionId });
       if (snapshot.sessionId !== sessionId) {

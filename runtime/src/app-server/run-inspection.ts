@@ -580,6 +580,10 @@ function buildRunStatus(
   const workflow = workflowStatusProjection(db, runId, durableTerminal);
   const reopenedWithoutTerminal =
     currentLifecycleEpoch !== undefined && durableTerminal === undefined;
+  const reviewNeeded = tableExists(db, "run_effects") && db.prepare(
+    `SELECT 1 FROM run_effects WHERE session_id = ? AND review_status = 'pending'
+       AND recovery_category IN ('side-effecting', 'interactive') LIMIT 1`,
+  ).get(runId) !== undefined;
   const staleLegacyStatus = reopenedWithoutTerminal && run !== undefined && (
     isTerminalAgentRunStatus(run.status) ||
     (run.status === "suspended" && latestSuspensionResumed(db, runId, currentLifecycleEpoch))
@@ -587,7 +591,7 @@ function buildRunStatus(
   return {
     runId,
     status:
-      durableTerminal?.status ??
+      (reviewNeeded ? "review_needed" : durableTerminal?.status) ??
       (workflow?.control?.state === "paused" ? "paused" : staleLegacyStatus
         ? "running"
         : run?.status ?? "admission_only"),

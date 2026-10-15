@@ -575,7 +575,7 @@ vi.mock("./Message.js", async () => {
       React.createElement(
         "ink-text",
         null,
-        `queued-message:${String(props.message ?? "")}`,
+        `queued-message:${JSON.stringify(props.message ?? "")}`,
       ),
   };
 });
@@ -2214,6 +2214,87 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
       expect(session.submit).toHaveBeenCalledTimes(2);
       expect(session.submit.mock.calls[1]?.[1]?.clientMessageId).not.toBe(session.submit.mock.calls[0]?.[1]?.clientMessageId);
     });
+  });
+
+  test("keeps every prompt visible behind effect review and sends them in order after the final review", async () => {
+    const { AgenCTuiApp } = await import("./App.js");
+    resetShellSurfaceProbe();
+    fullscreenProbe.fullscreen = true;
+    const subscribers = new Set<(event: unknown) => void>();
+    const publish = (event: unknown) => { for (const cb of subscribers) cb(event); };
+    const session = {
+      ...createSession(),
+      getInitialTranscriptEvents: () => [{ type: "effect_reviews_snapshot", payload: { reviews: [
+        { callId: "call-browser", toolName: "Browser", description: "navigate http://127.0.0.1:4173", error: "Chrome crashed at launch" },
+        { callId: "call-second", toolName: "Bash", description: "write file", error: "Unknown outcome" },
+      ] } }],
+      subscribeToEvents: (cb: (event: unknown) => void) => { subscribers.add(cb); return () => { subscribers.delete(cb); }; },
+      submit: vi.fn(async (value: string) => {
+        publish({ type: "turn_started", payload: { turnId: value } });
+        await new Promise(resolve => setTimeout(resolve, 10));
+        publish({ type: "turn_complete", payload: { turnId: value, lastAgentMessage: `Done ${value}` } });
+      }),
+      resolveDaemonToolCall: vi.fn(async () => ({ sessionId: "conversation-app-smoke", resolved: [], remaining: 1 })),
+    };
+    const helpers = { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() };
+    try { await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async ({ output }) => {
+      await vi.waitFor(() => expect(stripAnsi(output()).replace(/\s/gu, "")).toContain("Chromecrashedatlaunch"));
+      expect(stripAnsi(output()).replace(/\s/gu, "")).toContain("Browsernavigatehttp://127.0.0.1:4173");
+      expect(stripAnsi(output()).replace(/\s/gu, "")).toContain("1Ithadnoeffect");
+      expect(stripAnsi(output()).replace(/\s/gu, "")).toContain("2Ittookeffect");
+      expect(stripAnsi(output()).replace(/\s/gu, "")).toContain("3Keepblocked");
+      await (providerProbe.promptProps.at(-1)!.onSubmit as (value: string, helpers: typeof helpers) => Promise<void>)("/resolve call-browser remains_unknown", helpers);
+      expect(session.resolveDaemonToolCall).toHaveBeenCalledWith({ toolCallId: "call-browser", disposition: "remains_unknown", attestation: "operator" });
+      for (const prompt of ["OPEN IT IN CHROME", "run", "runeun", "so"]) {
+        await (providerProbe.promptProps.at(-1)!.onSubmit as (value: string, helpers: typeof helpers) => Promise<void>)(prompt, helpers);
+      }
+      await vi.waitFor(() => expect(stripAnsi(output()).replace(/\s/gu, "")).toContain('"text":"so"'));
+      expect(stripAnsi(output()).replace(/\s/gu, "")).toContain("OPENITINCHROME");
+      expect(stripAnsi(output()).replace(/\s/gu, "")).toContain("reviewneeded·promptswaitfortooloutcomereview");
+      expect(session.submit).not.toHaveBeenCalled();
+      publish({ type: "effect_review_resolved", payload: { callId: "call-browser", resolution: { workflowStatus: "pending", disposition: "remains_unknown" } } });
+      await new Promise(resolve => setTimeout(resolve, 25));
+      expect(session.submit).not.toHaveBeenCalled();
+      publish({ type: "effect_review_resolved", payload: { callId: "call-browser", resolution: { workflowStatus: "resolved" } } });
+      await new Promise(resolve => setTimeout(resolve, 25));
+      expect(session.submit).not.toHaveBeenCalled();
+      publish({ type: "effect_review_resolved", payload: { callId: "call-second", resolution: { workflowStatus: "resolved" } } });
+      await vi.waitFor(() => expect(session.submit).toHaveBeenCalledTimes(4));
+      expect(session.submit.mock.calls.map(call => call[0])).toEqual(["OPEN IT IN CHROME", "run", "runeun", "so"]);
+    }); } finally { fullscreenProbe.fullscreen = false; }
+  });
+
+  test.each([true, false])("queues a prompt when review becomes pending during daemon admission (event delivered: %s)", async (eventDelivered) => {
+    const { AgenCTuiApp } = await import("./App.js");
+    resetShellSurfaceProbe();
+    fullscreenProbe.fullscreen = true;
+    const subscribers = new Set<(event: unknown) => void>();
+    const publish = (event: unknown) => { for (const cb of subscribers) cb(event); };
+    let attempts = 0;
+    const session = {
+      ...createSession(),
+      subscribeToEvents: (cb: (event: unknown) => void) => { subscribers.add(cb); return () => { subscribers.delete(cb); }; },
+      resolveDaemonToolCall: vi.fn(async () => ({ sessionId: "conversation-app-smoke", resolved: [], remaining: 0 })),
+      submit: vi.fn(async (_value: string) => {
+        if (++attempts === 1) {
+          publish({ type: "tool_call_started", payload: { callId: "call-race", toolName: "Browser", args: "navigate local preview" } });
+          if (eventDelivered) publish({ type: "effect_unknown_outcome", payload: { callId: "call-race", toolName: "Browser", recoveryCategory: "interactive", requiresReview: true, reason: "Chrome crashed" } });
+          throw new Error("run conversation-app-smoke requires effect review before model execution. Run /resolve call-race <disposition>.");
+        }
+        publish({ type: "turn_complete", payload: { turnId: "race-turn", lastAgentMessage: "Done" } });
+      }),
+    };
+    const helpers = { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() };
+    try { await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async ({ output }) => {
+      await (providerProbe.promptProps.at(-1)!.onSubmit as (value: string, helpers: typeof helpers) => Promise<void>)("keep this prompt", helpers);
+      await vi.waitFor(() => expect(stripAnsi(output()).replace(/\s/gu, "")).toContain('"text":"keepthisprompt"'));
+      expect(session.submit).toHaveBeenCalledTimes(1);
+      publish(eventDelivered
+        ? { type: "effect_review_resolved", payload: { callId: "call-race", resolution: { workflowStatus: "resolved" } } }
+        : { type: "effect_review_acknowledged", payload: { callId: "call-race", remaining: 0 } });
+      await vi.waitFor(() => expect(session.submit).toHaveBeenCalledTimes(2));
+      expect(session.submit.mock.calls.map(call => call[0])).toEqual(["keep this prompt", "keep this prompt"]);
+    }); } finally { fullscreenProbe.fullscreen = false; }
   });
 
   test("restores a rejected draft without resetting the cursor, also when a busy retry is refused", async () => {

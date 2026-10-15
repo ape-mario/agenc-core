@@ -12,6 +12,13 @@ interface TranscriptV2JsonObject {
   readonly [key: string]: TranscriptV2JsonValue | undefined;
 }
 
+export interface PendingEffectReview extends TranscriptV2JsonObject {
+  readonly callId: string;
+  readonly toolName: string;
+  readonly description: string;
+  readonly error: string;
+}
+
 export interface SessionTranscriptV2Message extends TranscriptV2JsonObject {
   readonly messageId: string;
   readonly commitEventId: string;
@@ -128,6 +135,8 @@ export interface SessionTranscriptV2Event extends TranscriptV2JsonObject {
 }
 
 export interface SessionTranscriptV2Result extends TranscriptV2JsonObject {
+  /** Independent of the visible transcript boundary and truncation. */
+  readonly pendingEffectReviews?: readonly PendingEffectReview[];
   /** Active selectable canonical user IDs; archived display rows are not targets. */
   readonly activeUserMessageIds?: readonly string[];
   readonly schemaVersion: 2;

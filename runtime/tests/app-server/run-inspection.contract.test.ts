@@ -1,3 +1,5 @@
+import { createOperatorEffectReviewResolution } from "../../src/state/effect-review.js";
+import { seedPendingEffectReview } from "../state/helpers/effect-review-fixture.js";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -623,6 +625,22 @@ describe("durable run inspection", () => {
     expect(service.result({ runId: "canonical-only" })).not.toHaveProperty(
       "durableRun",
     );
+  });
+
+  it("reports review_needed for a completed legacy run reopened only for review", () => {
+    seedDurableRuns();
+    seedPendingEffectReview(driver, "run-complete", NOW);
+    expect(service.status({ runId: "run-complete" })).toMatchObject({
+      status: "review_needed", terminal: false,
+      statusSource: "run_lifecycle_epoch", durableRun: { status: "completed" },
+    });
+    const durability = new StateRunDurabilityRepository(driver);
+    durability.resolveEffectReview({
+      runId: "run-complete", stepId: "tool:step-1", eventId: "reviewed-1",
+      resolution: createOperatorEffectReviewResolution({ disposition: "confirmed_no_effect", actorId: "operator",
+        reviewedAt: NOW, evidenceRef: "operator:verified", evidenceSha256: "e".repeat(64) }),
+    });
+    expect(service.status({ runId: "run-complete" }).status).toBe("running");
   });
 
   it("does not expose an earlier epoch terminal after an explicit reopen", () => {

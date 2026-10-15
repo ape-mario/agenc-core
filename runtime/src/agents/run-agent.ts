@@ -1,3 +1,4 @@
+import { isEffectReviewRequired, waitForEffectReview } from "../session/effect-review-gate.js";
 /**
  * runAgent — drive one subagent's run-turn loop.
  *
@@ -1714,7 +1715,15 @@ export function requestParentFollowupTurn(params: {
         followupTurnStateByParent.delete(parent);
         return;
       }
+      if (parent.rolloutStore?.hasPendingEffectReviews?.()) {
+        void waitForEffectReview(parent).then((allowed) => {
+          if (allowed && followupTurnStateByParent.get(parent) === state) schedule();
+          else followupTurnStateByParent.delete(parent);
+        });
+        return;
+      }
       state.submitInFlight = true;
+      let reviewRequired = false;
       let transientSubmitFailure = false;
       let suppressed = false;
       void parent
@@ -1727,6 +1736,10 @@ export function requestParentFollowupTurn(params: {
         .catch((err) => {
           const message = err instanceof Error ? err.message : String(err);
           if (message === "Session submit hook is not installed") return;
+          if (isEffectReviewRequired(err)) {
+            reviewRequired = true;
+            return;
+          }
           transientSubmitFailure = true;
           state.transientFailureCount += 1;
           if (!state.transientFailureWarningReported) {
@@ -1749,6 +1762,13 @@ export function requestParentFollowupTurn(params: {
           if (followupTurnStateByParent.get(parent) !== state) return;
           if (parent.abortController.signal.aborted || suppressed || parent.stoppedByUserSinceLastPrompt || state.generation !== parent.userStopGeneration) {
             followupTurnStateByParent.delete(parent);
+            return;
+          }
+          if (reviewRequired) {
+            void waitForEffectReview(parent).then((allowed) => {
+              if (allowed && followupTurnStateByParent.get(parent) === state) schedule();
+              else followupTurnStateByParent.delete(parent);
+            });
             return;
           }
           if (transientSubmitFailure && parent.mailbox.hasPending()) {

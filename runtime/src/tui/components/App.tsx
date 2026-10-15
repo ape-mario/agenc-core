@@ -1,3 +1,6 @@
+import { isEffectReviewRequired } from "../../session/effect-review-gate.js";
+import { usePendingEffectReviews } from "../hooks/usePendingEffectReviews.js";
+import { EffectReviewCard } from "./EffectReviewCard.js";
 import { useStartupUpdate } from "../hooks/useStartupUpdate.js";
 import { logForDebugging } from "src/utils/debug.js";
 import { isRecord } from "../../utils/record.js";
@@ -2628,6 +2631,8 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     props.session,
     props.initialUserMessages ?? EMPTY_INITIAL_USER_MESSAGES,
   );
+  const { reviews: pendingEffectReviews, noteRefusal: noteReviewRefusal } = usePendingEffectReviews(props.session);
+  const reviewNeeded = pendingEffectReviews.length > 0;
   const ledgerVerification = useSyncExternalStore(
     subscribeLedgerVerification,
     getLedgerVerificationSnapshot,
@@ -3016,6 +3021,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     hasActiveSessionTurn ||
     hasActiveModelSubmission;
   const effectiveInputBusy =
+    reviewNeeded ||
     isLoading ||
     isCompacting ||
     shellAbortController !== null ||
@@ -3048,52 +3054,6 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     pendingSubmission,
     activeModelSubmissionCount,
   ]);
-  // M4 unknown-outcome gate visibility: when a tool result reports the
-  // session blocked by an unresolved unknown-outcome effect, the block
-  // otherwise only reaches the agent as a tool error — the user just watches
-  // the agent go quiet ("se calló el proceso"). Surface it as an immediate
-  // notification with the /resolve hint, once per blocking effect.
-  const lastGateNotifiedRef = useRef<string | null>(null);
-  useEffect(() => {
-    const messages = transcript.messages as readonly {
-      type?: string;
-      message?: { content?: unknown };
-    }[];
-    const textOf = (content: unknown): string => {
-      if (typeof content === "string") return content;
-      if (Array.isArray(content)) {
-        return content
-          .map((block) =>
-            block !== null && typeof block === "object" && "text" in block
-              ? String((block as { text?: unknown }).text ?? "")
-              : "",
-          )
-          .join("\n");
-      }
-      return "";
-    };
-    for (
-      let i = messages.length - 1;
-      i >= 0 && i > messages.length - 6;
-      i -= 1
-    ) {
-      const text = textOf(messages[i]?.message?.content);
-      const match = text.match(
-        /unresolved unknown-outcome effect\(s\) \[([^\]]+)\]/,
-      );
-      if (match === null) continue;
-      const blocking = match[1]!;
-      if (lastGateNotifiedRef.current === blocking) return;
-      lastGateNotifiedRef.current = blocking;
-      addNotification({
-        key: "unknown-outcome-gate",
-        text: `Session blocked by an unknown tool outcome (${blocking}). Side-effecting tools are gated until you review it. Run /resolve to lift the gate.`,
-        priority: "immediate",
-        timeoutMs: 15000,
-      });
-      return;
-    }
-  }, [transcript.messages, addNotification]);
   const allQueuedCommands = useCommandQueue();
   const queuedCommands = useMemo(
     () =>
@@ -3545,7 +3505,9 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         rejectNonModelSubmission();
         return;
       }
-      if (!options?.fromQueue && effectiveInputBusyRef.current) {
+      const isReviewCommand = parsedSlashCommand !== null &&
+        (parsedSlashCommand.name === "resolve" || parsedSlashCommand.name === "resolve-effects");
+      if (!options?.fromQueue && effectiveInputBusyRef.current && !isReviewCommand) {
         if (retry !== null) {
           showTransientResult("Wait for the current request to settle before retrying the restored submission.", { display: "error" });
           return;
@@ -3687,6 +3649,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           rollback(): boolean;
         } | null = null;
         let submitted = false;
+        let reviewRefusal = false;
         try {
           try {
             startPendingSubmission();
@@ -3724,12 +3687,17 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
                   true,
             };
             submission.ready = true;
-            await submitToSession(submission.value, submission.options);
-            submitted = true;
+            try {
+              await submitToSession(submission.value, submission.options);
+              submitted = true;
+            } catch (error) {
+              reviewRefusal = isEffectReviewRequired(error);
+              throw error;
+            }
           } finally {
             if (submitted) {
               admissionLease?.commit();
-            } else if (admissionLease === null || admissionLease.rollback()) {
+            } else if ((admissionLease === null || admissionLease.rollback()) && !reviewRefusal) {
               restoreComposerDraft({
                 input: draftRestoreValue,
                 pastedContents: activePastedContents,
@@ -3738,6 +3706,14 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
             }
           }
         } catch (error) {
+          if (reviewRefusal) {
+            noteReviewRefusal(error);
+            enqueue({ value, preExpansionValue: value, mode: "prompt", queueOwner: commandQueueOwner,
+              ...(hasAttachments ? { pastedContents: snapshotQueuedPastedContents(activePastedContents) } : {}),
+            });
+            setPendingEcho(null);
+            return;
+          }
           const message = error instanceof Error ? error.message : String(error);
           showTransientResult(message, { display: "error" });
           addNotification({
@@ -3998,6 +3974,17 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         }
         if (retry !== null && pendingSubmissionIdRef.current === clientMessageId) setPendingSubmission(false);
       } catch (err_1) {
+        if (isEffectReviewRequired(err_1)) {
+          noteReviewRefusal(err_1);
+          if (attachmentAdmissionToken !== null) props.session.rollbackIdleInputAdmission?.(attachmentAdmissionToken);
+          enqueue({ value, preExpansionValue: value, mode: "prompt", queueOwner: commandQueueOwner,
+            ...(hasAttachments ? { pastedContents: snapshotQueuedPastedContents(activePastedContents) } : {}),
+          });
+          if (!options?.fromQueue) { setComposerInput(""); setComposerPastedContents({}); }
+          setPendingEcho(null);
+          if (pendingSubmissionIdRef.current === clientMessageId) setPendingSubmission(false);
+          return;
+        }
         // Same defense as submitPromptToModel above: a daemon JSON-RPC
         // error response (e.g. "AgenC daemon agent not running:
         // <agentId>") rejects the pending request, which turns into an
@@ -4057,6 +4044,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       dynamicCommandSnapshot,
       runLocalControlCommand,
       submitToSession,
+      noteReviewRefusal,
       setComposerInput,
       setComposerPastedContents,
       restoreComposerDraft,
@@ -5059,7 +5047,20 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           {selectorNotice}
         </Text>
       ) : null}
+      {reviewNeeded && pendingEffectReviews[0]!.callId.length > 0 && props.session.resolveDaemonToolCall !== undefined ? (
+        <EffectReviewCard key={pendingEffectReviews[0]!.callId}
+          review={pendingEffectReviews[0]!}
+          resolve={props.session.resolveDaemonToolCall}
+          active={input.length === 0 && permissionRequests.length === 0 && elicitation.prompt === null && !isMessageSelectorVisible && !toolOwnsPrompt}
+        />
+      ) : null}
+      {reviewNeeded && fullscreen && queuedCommands.length > 0 ? (
+        <Text dimColor wrap="truncate">
+          {queuedCommands.length} queued · {queuedCommandInputText(queuedCommands[queuedCommands.length - 1]!)}
+        </Text>
+      ) : null}
       {promptInputElement}
+      {reviewNeeded ? <Text color="warning">review needed · prompts wait for tool outcome review</Text> : null}
     </Box>
   );
 
