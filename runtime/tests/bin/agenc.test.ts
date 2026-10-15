@@ -242,6 +242,7 @@ function installDaemonCliDepsForTest(
     readonly liveAgentPath?: string;
     readonly runtimeOptions?: AgentRuntimeOptions;
     readonly runtimeSettings?: RunRuntimeSettingsSnapshot;
+    readonly model?: string;
     readonly resumePromptAgentError?: Error;
     readonly requestErrors?: Partial<Record<string, Error | readonly Error[]>>;
     readonly mcpManager?: unknown;
@@ -282,7 +283,7 @@ function installDaemonCliDepsForTest(
       bypassPermissionsModeAvailable: false,
       bypassPermissionsWorkspace: null,
       bypassPermissionsConsentWorkspace: null,
-      model: "grok-4.3",
+      model: options.model ?? "grok-4.3",
       provider: "grok",
       profile: null,
       reasoningEffort: null,
@@ -600,7 +601,7 @@ function installDaemonCliDepsForTest(
         env: params.env ?? {},
         base: {
           ...defaultConfig(),
-          model: "grok-4.3",
+          model: options.model ?? "grok-4.3",
           model_provider: "grok",
         },
       });
@@ -638,7 +639,7 @@ function installDaemonCliDepsForTest(
           nextInternalSubId: () => "daemon-test-sub",
           listMcpClients: () => [],
         },
-        model: "grok-4.3",
+        model: options.model ?? "grok-4.3",
         workspaceRoot: params.cwd,
       };
     },
@@ -4485,6 +4486,7 @@ describe("main() smoke", () => {
     const runtimeOptions = resolveAgentRuntimeOptions({}, { simpleMode: true });
     const daemon = installDaemonCliDepsForTest({
       agentId: "agent_bare_attach",
+      model: "grok-4.6",
       sessionId: "session_bare_attach",
       cwd: tmpCwd,
       runtimeOptions,
@@ -4522,7 +4524,7 @@ describe("main() smoke", () => {
           runtimeOptions,
           runtimeSettings: expect.objectContaining({
             permissionMode: "default",
-            model: "grok-4.3",
+            model: "grok-4.6",
             provider: "grok",
           }),
         }),
@@ -4574,13 +4576,13 @@ describe("main() smoke", () => {
       await expect(attachWithModel("client_qualified_provider", "openai:gpt-6.1-sol")).rejects.toThrow(
         "attach-time provider openai disagrees with live daemon provider grok",
       );
-      await expect(attachWithModel("client_qualified_model", "grok:grok-4.2")).rejects.toThrow(
-        "attach-time model grok-4.2 disagrees with live daemon model grok-4.3",
+      await expect(attachWithModel("client_qualified_model", "grok:grok-4.7")).rejects.toThrow(
+        "attach-time model grok-4.7 disagrees with live daemon model grok-4.6",
       );
       expect(daemon.createTuiContext).toHaveBeenCalledOnce();
       // Rerunning the same `--model provider:id` command with --continue
       // names the live session's model and attaches.
-      await expect(attachWithModel("client_qualified_same", "grok:grok-4.3")).resolves.toBe(0);
+      await expect(attachWithModel("client_qualified_same", "grok:grok-4.6")).resolves.toBe(0);
       expect(daemon.createTuiContext).toHaveBeenCalledTimes(2);
     } finally {
       vi.doUnmock("../tui/main.js");

@@ -193,6 +193,7 @@ async function handleProfileSubcommand(
     {
       includePending: true,
       fallbackConfig: snapshot,
+      validateCatalog: false,
     },
   );
   ctx.session.setPendingProviderSwitch({

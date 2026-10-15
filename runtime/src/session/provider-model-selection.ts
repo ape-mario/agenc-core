@@ -228,7 +228,7 @@ export function readBuiltInSessionSelection(
 export function resolveSessionProviderModelSelection(
   session: Session | unknown,
   layer: Pick<AgenCConfig, "model_provider" | "model">,
-  options: ReadSessionSelectionOptions = {},
+  options: ReadSessionSelectionOptions & { readonly validateCatalog?: boolean } = {},
 ): ResolvedSessionSelection {
   const sessionRecord = asRecord(session);
   const config = options.fallbackConfig ?? configStoreCurrent(sessionRecord);
@@ -240,5 +240,6 @@ export function resolveSessionProviderModelSelection(
   return resolveProviderModelSelection(
     config, current, layer,
     environment as Readonly<Record<string, string | undefined>> | undefined,
+    { validateCatalog: options.validateCatalog },
   );
 }
