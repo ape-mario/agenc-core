@@ -31,11 +31,11 @@ export function EffectReviewCard({ review, resolve, active = true }: {
     }
     return true;
   }, { context: "Modal" });
-  return <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
-    <Text color="yellow" wrap="truncate">Review needed: {review.toolName} {review.description.replace(/\s+/gu, " ")}</Text>
+  return <Box flexDirection="column" borderStyle="single" borderColor="warning" paddingX={1}>
+    <Text color="warning" bold wrap="truncate">Review needed: {review.toolName} {review.description.replace(/\s+/gu, " ")}</Text>
     <Text wrap="truncate">{summarizeToolError(review.error)}</Text>
     <Text>1 It had no effect · 2 It took effect · 3 Keep blocked</Text>
     <Text dimColor>{busy ? "Recording review..." : "Prompts stay queued. Press 1, 2, or 3 with an empty prompt."}</Text>
-    {error !== null ? <Text color="red">{error}</Text> : null}
+    {error !== null ? <Text color="error">{error}</Text> : null}
   </Box>;
 }
