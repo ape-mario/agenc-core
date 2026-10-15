@@ -357,7 +357,8 @@ jobs:
   publish:
     needs: [release-source, pack]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Room for the receipt and latest dist-tag polls (up to five minutes each).
+    timeout-minutes: 25
     environment: npm-production
     permissions:
       contents: read
