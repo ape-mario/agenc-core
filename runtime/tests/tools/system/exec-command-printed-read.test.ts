@@ -4,9 +4,13 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, expect, test } from "vitest";
 
-import { recordPrintedFileReads } from "./exec-command.js";
+import { createExecCommandTool, PRINTED_READ_MAX_VISIBLE_BYTES, recordPrintedFileReads } from "./exec-command.js";
+import { formatUnifiedExecToolContent } from "./exec-result-format.js";
 import { createFileEditTool } from "./file-edit.js";
 import { getSessionReadSnapshot, hasSessionRead, SESSION_ID_ARG } from "./filesystem.js";
+import { MIN_TOOL_RESULT_BYTES } from "../execution.js";
+import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
+import { UnifiedExecProcessManager } from "../../unified-exec/process-manager.js";
 import type { ExecCommandToolOutput } from "../../unified-exec/types.js";
 
 // Standard sessions count a workspace file as read when a command printed its
@@ -38,7 +42,10 @@ function finished(stdout: string, overrides: Partial<ExecCommandToolOutput> = {}
 }
 
 async function record(cmd: string, output: ExecCommandToolOutput, cwd = root): Promise<void> {
-  await recordPrintedFileReads({ cmd, output, cwd, allowedPaths: [root], args: { [SESSION_ID_ARG]: session } });
+  await recordPrintedFileReads({
+    cmd, output, visible: formatUnifiedExecToolContent(output), cwd, allowedPaths: [root],
+    args: { [SESSION_ID_ARG]: session },
+  });
 }
 
 function catN(text: string): string {
@@ -126,4 +133,80 @@ test("an Edit after a printed read passes the read-before-write gate", async () 
   await record('for f in src/*.js; do cat -n "$f"; done', finished(catN(MONEY)));
   const applied = await edit.execute({ ...args });
   expect(applied.isError).not.toBe(true);
+});
+
+// The read must be what the model receives. Real exec_command runs, so the head-and-tail cut and the
+// returned text are the production ones.
+async function execStandard(cmd: string, extra: Record<string, unknown> = {}) {
+  const manager = new UnifiedExecProcessManager({ cwd: root });
+  try {
+    const tool = bindExplicitDangerBoundary(createExecCommandTool({
+      cwd: root, allowedPaths: [root], unifiedExecManager: manager,
+    }));
+    return await tool.execute({ cmd, ...extra, [SESSION_ID_ARG]: session });
+  } finally {
+    await manager.closeAll();
+  }
+}
+
+async function editRefused(file: string, oldString: string): Promise<boolean> {
+  const edit = createFileEditTool({ allowedPaths: [root] });
+  const result = await edit.execute({
+    file_path: file, old_string: oldString, new_string: `${oldString}_changed`, cwd: root, [SESSION_ID_ARG]: session,
+  });
+  return result.isError === true && String(result.content).includes("File has not been read yet");
+}
+
+function numberedLines(count: number, width: number): string {
+  return Array.from({ length: count }, (_, i) => `line ${String(i).padStart(6, "0")} ${"x".repeat(width)}`).join("\n") + "\n";
+}
+
+test("the visible-size bound is the smallest cap the tool-result pipeline applies", () => {
+  expect(PRINTED_READ_MAX_VISIBLE_BYTES).toBe(MIN_TOOL_RESULT_BYTES);
+});
+
+test("a real cat of a small file counts as read and lets Edit through", async () => {
+  await writeFile(join(root, "money.js"), MONEY, "utf8");
+  const result = await execStandard("cat money.js");
+  expect(result.isError).not.toBe(true);
+  expect(hasSessionRead(session, join(root, "money.js"))).toBe(true);
+  expect(await editRefused(join(root, "money.js"), "Math.floor")).toBe(false);
+});
+
+test("a file larger than the default exec output cap, printed with cat, does not count and Edit stays refused", async () => {
+  // The default exec cap keeps 40,000 characters as head and tail; this file is about 60 KB.
+  const big = numberedLines(1200, 40);
+  expect(big.length).toBeGreaterThan(40_000);
+  await writeFile(join(root, "big.txt"), big, "utf8");
+  const result = await execStandard("cat big.txt");
+  expect(String(result.content).length).toBeLessThan(big.length);
+  expect(getSessionReadSnapshot(session, join(root, "big.txt"))).toBeUndefined();
+  expect(await editRefused(join(root, "big.txt"), "line 000600")).toBe(true);
+});
+
+test("an explicit max_output_tokens cut does not count either", async () => {
+  const text = numberedLines(60, 20);
+  await writeFile(join(root, "mid.txt"), text, "utf8");
+  await execStandard("cat mid.txt", { max_output_tokens: 100 });
+  expect(getSessionReadSnapshot(session, join(root, "mid.txt"))).toBeUndefined();
+  expect(await editRefused(join(root, "mid.txt"), "line 000030")).toBe(true);
+});
+
+test("an untruncated result above the smallest pipeline cap does not count", async () => {
+  // Under the exec cap (40,000 characters) but over the 16,000 bytes a small-window model's
+  // tool-result cap can cut to, so the model might not see all of it.
+  const text = numberedLines(500, 40);
+  expect(text.length).toBeGreaterThan(PRINTED_READ_MAX_VISIBLE_BYTES);
+  expect(text.length).toBeLessThan(40_000);
+  await writeFile(join(root, "medium.txt"), text, "utf8");
+  const result = await execStandard("cat medium.txt");
+  expect(String(result.content)).toContain(text);
+  expect(getSessionReadSnapshot(session, join(root, "medium.txt"))).toBeUndefined();
+  expect(await editRefused(join(root, "medium.txt"), "line 000250")).toBe(true);
+});
+
+test("a file with terminal control characters does not count", async () => {
+  await writeFile(join(root, "ansi.txt"), `\u001b[31mred\u001b[0m ${MONEY}`, "utf8");
+  await execStandard("cat ansi.txt");
+  expect(getSessionReadSnapshot(session, join(root, "ansi.txt"))).toBeUndefined();
 });
