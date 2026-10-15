@@ -807,6 +807,12 @@ function isInterruptedAdmissionResult(value: unknown): boolean {
   return typeof message === "string" && /^(?:AdmissionDeniedError: )?execution admission cancelled: interrupted$/u.test(message);
 }
 
+function truncatedToolArgumentsError(value: unknown): string | null {
+  const parsed = payloadRecord(typeof value === "string" ? safeJson(value) : value);
+  return parsed.code === "tool_arguments_truncated" && parsed.executed === false &&
+    typeof parsed.error === "string" ? parsed.error : null;
+}
+
 function pushToolResult(
   out: any[],
   openTools: Set<string>,
@@ -2652,6 +2658,23 @@ export function adaptTranscriptEvents(
         const callId =
           typeof payload.callId === "string" ? payload.callId : null;
         if (callId === null) break;
+        // A capped argument stream never reached execution. It has no durable
+        // tool start (and collaboration input cells are deliberately hidden),
+        // so settle it explicitly instead of reporting reordering or losing
+        // the retry notice behind collaboration-row suppression.
+        const truncatedArguments = truncatedToolArgumentsError(payload.result);
+        if (truncatedArguments !== null) {
+          if (!settledToolCallIds.has(callId)) {
+            out.push(makeSystemMessage(truncatedArguments, "warning", nextUuid()));
+          }
+          openTools.delete(callId);
+          runningToolNames.delete(callId);
+          suppressedToolResults.delete(callId);
+          discardStreamingToolUse(callId);
+          clearSuppressedStreamingToolInput(callId);
+          settledToolCallIds.add(callId);
+          break;
+        }
         if (
           suppressedToolResults.has(callId) ||
           suppressedStreamingToolCallIds.has(callId)
