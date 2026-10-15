@@ -32,7 +32,7 @@ test.each(["127.0.0.1", "::1"])("local binding on %s stays inside the sandbox ne
       try {
         const port = server.address().port;
         const url = 'http://' + (host.includes(':') ? '[' + host + ']' : host) + ':' + port;
-        const body = cp.execFileSync('curl', ['--noproxy', '*', '--fail', '--max-time', '3', '-s', url], {encoding:'utf8'});
+        const body = await require('node:util').promisify(cp.execFile)('curl', ['--noproxy', '*', '--fail', '--max-time', '3', '-s', url], {encoding:'utf8'}).then(result => result.stdout);
         if (body !== 'sandbox-local-ok') throw new Error(body);
         if (cp.execFileSync(process.execPath, ['-e', 'process.stdout.write("child-stdio-ok")'], {encoding:'utf8'}) !== 'child-stdio-ok') throw new Error('stdio failed');
         console.log(JSON.stringify({ port, body, hostBlocked: await refused({host, port:${hostPort}}), unixBlocked: await refused(${JSON.stringify(unixPath)}) }));
