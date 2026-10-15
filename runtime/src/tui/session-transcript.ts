@@ -2815,6 +2815,9 @@ export function adaptTranscriptEvents(
         break;
       case "error":
       case "stream_error": {
+        // Keep a failed attempt's partial answer before its failure notice.
+        // The next attempt must start with a fresh streaming accumulator.
+        if (event.type === "stream_error") flushStreamingText(nextUuid);
         // A correlated tool failure is already displayed on its call row.
         if (typeof payload.callId === "string" &&
           (openTools.has(payload.callId) || settledToolCallIds.has(payload.callId))) break;
