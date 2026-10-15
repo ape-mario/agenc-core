@@ -4,6 +4,7 @@ import { nonEmptyString } from "../../utils/stringUtils.js";
 import { readToolRuntimeContext } from "../runtimes/context.js";
 import type { ToolPreflightFailure } from "../types.js";
 import { hasSessionRead, resolveSessionId } from "./filesystem.js";
+import { mayProvePrintedRead } from "./printed-read-proof.js";
 
 /** Keep the recovery instruction usable for both preflight and execute-time races. */
 export function readBeforeWriteMessage(paths: readonly string[]): string {
@@ -59,7 +60,8 @@ export function unreadFilePreflight(
       const canonical = process.platform === "win32" ? resolved.normalize("NFC") : resolved;
       // Missing files, directories and special files have separate execute-time
       // diagnostics. In particular, creation must not require an impossible read.
-      if (!hasSessionRead(sessionId, canonical)) unread.push(canonical);
+      // A file a kept exec_command result may show whole is proved, or refused, at execute time.
+      if (!hasSessionRead(sessionId, canonical) && !mayProvePrintedRead(sessionId, canonical)) unread.push(canonical);
     } catch {
       // No known unmet read prerequisite. Existing path/permission gates decide.
     }

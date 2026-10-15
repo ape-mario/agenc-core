@@ -4,9 +4,18 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, expect, test } from "vitest";
 
-import { createExecCommandTool, PRINTED_READ_MAX_VISIBLE_BYTES, recordPrintedFileReads } from "./exec-command.js";
+import { createExecCommandTool } from "./exec-command.js";
 import { formatUnifiedExecToolContent } from "./exec-result-format.js";
 import { createFileEditTool } from "./file-edit.js";
+import { createFileWriteTool } from "./file-write.js";
+import {
+  mayProvePrintedRead,
+  PRINTED_READ_MAX_VISIBLE_BYTES,
+  provePrintedRead,
+  rememberPrintedOutput,
+  resetPrintedOutputsForTest,
+} from "./printed-read-proof.js";
+import { unreadFilePreflight } from "./read-before-write.js";
 import { getSessionReadSnapshot, hasSessionRead, SESSION_ID_ARG } from "./filesystem.js";
 import { MIN_TOOL_RESULT_BYTES } from "../execution.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
@@ -17,7 +26,9 @@ import type { ExecCommandToolOutput } from "../../unified-exec/types.js";
 // exact current text, whatever shell construct printed it. In the agent race
 // DeepSeek read the sources with `for f in src/*.js; do ... cat -n "$f"; done`
 // in 4 of 6 standard runs; every first Edit was then refused and the model
-// paid a FileRead round trip plus a resent edit. Light keeps its stricter
+// paid a FileRead round trip plus a resent edit. exec_command only keeps the
+// text it returned; the proof runs when an Edit or Write asks for a file that
+// was not read, so commands pay nothing for it. Light keeps its stricter
 // parser (exec-command-cat-read*.test.ts).
 
 let root: string;
@@ -28,6 +39,7 @@ beforeEach(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), "agenc-printed-read-")));
   counter += 1;
   session = `session-printed-read-${process.pid}-${counter}`;
+  resetPrintedOutputsForTest();
 });
 
 afterEach(async () => {
@@ -42,10 +54,12 @@ function finished(stdout: string, overrides: Partial<ExecCommandToolOutput> = {}
 }
 
 async function record(cmd: string, output: ExecCommandToolOutput, cwd = root): Promise<void> {
-  await recordPrintedFileReads({
-    cmd, output, visible: formatUnifiedExecToolContent(output), cwd, allowedPaths: [root],
-    args: { [SESSION_ID_ARG]: session },
-  });
+  rememberPrintedOutput({ cmd, output, visible: formatUnifiedExecToolContent(output), cwd, args: { [SESSION_ID_ARG]: session } });
+}
+
+/** What an Edit or Write of `file` asks before refusing it as unread. */
+async function proves(file: string): Promise<boolean> {
+  return provePrintedRead(session, file, [root], { [SESSION_ID_ARG]: session });
 }
 
 function catN(text: string): string {
@@ -65,6 +79,10 @@ test("a for loop over a glob with cat -n records a full read of every printed fi
     `cd ${root} && for f in src/*.js src/**/*.js; do echo "===== $f ====="; cat -n "$f"; done 2>/dev/null`,
     finished(`===== src/money.js =====\n${catN(MONEY)}===== src/split.js =====\n${catN(SPLIT)}`, { exitCode: 1, exit_code: 1 }),
   );
+  // Keeping the text records nothing; the proof runs when an edit asks for the file.
+  expect(hasSessionRead(session, join(root, "src", "money.js"))).toBe(false);
+  expect(await proves(join(root, "src", "money.js"))).toBe(true);
+  expect(await proves(join(root, "src", "split.js"))).toBe(true);
   expect(getSessionReadSnapshot(session, join(root, "src", "money.js"))).toMatchObject({ viewKind: "full", rawContent: MONEY });
   expect(hasSessionRead(session, join(root, "src", "split.js"))).toBe(true);
 });
@@ -73,6 +91,7 @@ test("a raw cat in a cd chain records the file relative to the cd target", async
   await mkdir(join(root, "src"));
   await writeFile(join(root, "src", "money.js"), MONEY, "utf8");
   await record("cd src && cat money.js", finished(MONEY));
+  expect(await proves(join(root, "src", "money.js"))).toBe(true);
   expect(hasSessionRead(session, join(root, "src", "money.js"))).toBe(true);
 });
 
@@ -89,6 +108,7 @@ test("output that is not the whole current text, or an incomplete command, recor
     ["cat other.js", finished(MONEY)],
   ];
   for (const [cmd, output] of cases) await record(cmd, output);
+  expect(await proves(join(root, "a.js"))).toBe(false);
   expect(getSessionReadSnapshot(session, join(root, "a.js"))).toBeUndefined();
 });
 
@@ -101,6 +121,8 @@ test("a quoted mention or a short file proves nothing", async () => {
   await record("cat short.txt", finished("old\n"));
   // The text must start a line of the output.
   await record("cat a.js", finished(`prefix ${MONEY}`));
+  expect(await proves(join(root, "a.js"))).toBe(false);
+  expect(await proves(join(root, "short.txt"))).toBe(false);
   expect(getSessionReadSnapshot(session, join(root, "a.js"))).toBeUndefined();
   expect(getSessionReadSnapshot(session, join(root, "short.txt"))).toBeUndefined();
 });
@@ -111,6 +133,7 @@ test("a file outside the workspace is never recorded", async () => {
     await writeFile(join(outside, "secret.txt"), "token\n", "utf8");
     await record(`cat ${join(outside, "secret.txt")}`, finished("token\n"));
     await record(`for f in ${outside}/*.txt; do cat "$f"; done`, finished("token\n"));
+    expect(await proves(join(outside, "secret.txt"))).toBe(false);
     expect(getSessionReadSnapshot(session, join(outside, "secret.txt"))).toBeUndefined();
   } finally {
     await rm(outside, { recursive: true, force: true });
@@ -147,6 +170,8 @@ test("a loop over find in a named directory records each printed file the output
     'cat README.md && ls -R src test && for f in $(find src test -type f); do echo "--- $f ---"; cat "$f"; done',
     finished(`src:\nmoney.js\n\ntest:\nmoney.test.js\n--- src/money.js ---\n${MONEY}--- test/money.test.js ---\n${MONEY_TEST}`),
   );
+  expect(await proves(join(root, "src", "money.js"))).toBe(true);
+  expect(await proves(join(root, "test", "money.test.js"))).toBe(true);
   expect(getSessionReadSnapshot(session, join(root, "src", "money.js"))).toMatchObject({ viewKind: "full", rawContent: MONEY });
   expect(hasSessionRead(session, join(root, "test", "money.test.js"))).toBe(true);
 });
@@ -156,6 +181,7 @@ test("a file found through its directory needs its name in the output", async ()
   await writeFile(join(root, "src", "money.js"), MONEY, "utf8");
   // The text is printed, but nothing says which file it came from.
   await record("find src -type f -exec cat {} +", finished(MONEY));
+  expect(await proves(join(root, "src", "money.js"))).toBe(false);
   expect(getSessionReadSnapshot(session, join(root, "src", "money.js"))).toBeUndefined();
 });
 
@@ -163,7 +189,7 @@ test("a file named without a dot or a slash is checked like any other", async ()
   const makefile = "test:\n\tnode --test\n\nlint:\n\tnode scripts/lint.mjs --strict --max-warnings 0\n";
   await writeFile(join(root, "Makefile"), makefile, "utf8");
   await record("cat Makefile", finished(makefile));
-  expect(hasSessionRead(session, join(root, "Makefile"))).toBe(true);
+  expect(await proves(join(root, "Makefile"))).toBe(true);
 });
 
 test("a named directory outside the workspace adds nothing", async () => {
@@ -174,6 +200,7 @@ test("a named directory outside the workspace adds nothing", async () => {
       `for f in $(find ${outside} -type f); do echo "--- $f ---"; cat "$f"; done`,
       finished(`--- ${join(outside, "notes.js")} ---\n${MONEY}`),
     );
+    expect(await proves(join(outside, "notes.js"))).toBe(false);
     expect(getSessionReadSnapshot(session, join(outside, "notes.js"))).toBeUndefined();
   } finally {
     await rm(outside, { recursive: true, force: true });
@@ -214,8 +241,8 @@ test("a real cat of a small file counts as read and lets Edit through", async ()
   await writeFile(join(root, "money.js"), MONEY, "utf8");
   const result = await execStandard("cat money.js");
   expect(result.isError).not.toBe(true);
-  expect(hasSessionRead(session, join(root, "money.js"))).toBe(true);
   expect(await editRefused(join(root, "money.js"), "Math.floor")).toBe(false);
+  expect(hasSessionRead(session, join(root, "money.js"))).toBe(true);
 });
 
 test("a file larger than the default exec output cap, printed with cat, does not count and Edit stays refused", async () => {
@@ -253,5 +280,54 @@ test("an untruncated result above the smallest pipeline cap does not count", asy
 test("a file with terminal control characters does not count", async () => {
   await writeFile(join(root, "ansi.txt"), `\u001b[31mred\u001b[0m ${MONEY}`, "utf8");
   await execStandard("cat ansi.txt");
+  expect(await proves(join(root, "ansi.txt"))).toBe(false);
   expect(getSessionReadSnapshot(session, join(root, "ansi.txt"))).toBeUndefined();
+});
+
+test("a file changed after it was printed is not proved, and its edit stays refused", async () => {
+  await writeFile(join(root, "money.js"), MONEY, "utf8");
+  await execStandard("cat money.js");
+  await writeFile(join(root, "money.js"), MONEY.replace("Math.floor", "Math.trunc"), "utf8");
+  expect(await editRefused(join(root, "money.js"), "Math.trunc")).toBe(true);
+});
+
+test("Write over a file printed whole goes through, and over an unprinted one stays refused", async () => {
+  await writeFile(join(root, "money.js"), MONEY, "utf8");
+  await writeFile(join(root, "split.js"), SPLIT, "utf8");
+  await execStandard("cat money.js");
+  const write = createFileWriteTool({ allowedPaths: [root] });
+  const ok = await write.execute({ file_path: join(root, "money.js"), content: "export const x = 1;\n", cwd: root, [SESSION_ID_ARG]: session });
+  expect(ok.isError).not.toBe(true);
+  const refused = await write.execute({ file_path: join(root, "split.js"), content: "export const y = 2;\n", cwd: root, [SESSION_ID_ARG]: session });
+  expect(refused.isError).toBe(true);
+  expect(String(refused.content)).toContain("File has not been read yet");
+});
+
+test("the preflight leaves a file a kept result may prove to the edit and refuses one no result names", async () => {
+  await writeFile(join(root, "money.js"), MONEY, "utf8");
+  await writeFile(join(root, "split.js"), SPLIT, "utf8");
+  await record("cat money.js", finished(MONEY));
+  const args = { [SESSION_ID_ARG]: session, cwd: root };
+  expect(mayProvePrintedRead(session, join(root, "money.js"))).toBe(true);
+  expect(unreadFilePreflight(args, [join(root, "money.js")], root, [root])).toBeNull();
+  expect(unreadFilePreflight(args, [join(root, "split.js")], root, [root])?.code).toBe("file_read_required");
+});
+
+test("only the last twelve results of a session are kept", async () => {
+  await writeFile(join(root, "money.js"), MONEY, "utf8");
+  await record("cat money.js", finished(MONEY));
+  for (let i = 0; i < 12; i += 1) await record(`ls -la ${i}`, finished(`listing ${i}\n`));
+  expect(await proves(join(root, "money.js"))).toBe(false);
+});
+
+test("keeping a result touches no file: a directory word is not walked when the command runs", async () => {
+  // In a large tree `ls src` named every file it listed; the old eager proof then read each of
+  // them. Now only the command words and the returned text are kept.
+  await mkdir(join(root, "src"));
+  for (let i = 0; i < 40; i += 1) await writeFile(join(root, "src", `f${i}.js`), `${MONEY}// ${i}\n`, "utf8");
+  const listing = Array.from({ length: 40 }, (_, i) => `f${i}.js`).join("\n") + "\n";
+  await record("ls src", finished(listing));
+  for (let i = 0; i < 40; i += 1) expect(hasSessionRead(session, join(root, "src", `f${i}.js`))).toBe(false);
+  // The listing names the files but does not show their text, so none is proved.
+  expect(await proves(join(root, "src", "f3.js"))).toBe(false);
 });

@@ -52,6 +52,7 @@ import {
   safePathAllowingSessionPlanFile,
 } from "./filesystem.js";
 import { readBeforeWriteMessage, unreadFilePreflight } from "./read-before-write.js";
+import { provePrintedRead } from "./printed-read-proof.js";
 import { checkMemorySecrets } from "../../memory/privacy.js";
 import {
   FILE_TOOL_PATH_SCHEMA,
@@ -1027,6 +1028,13 @@ export function createFileEditTool(config: FileEditToolConfig): Tool {
         undefined;
       if (sessionId !== undefined) {
         recordedSnapshot = getSessionReadSnapshot(sessionId, absoluteFilePath);
+        // A file the model saw whole in a recent exec_command result counts as read.
+        if (
+          !isAuthorizingSessionRead(recordedSnapshot) &&
+          await provePrintedRead(sessionId, absoluteFilePath, config.allowedPaths, rawArgs)
+        ) {
+          recordedSnapshot = getSessionReadSnapshot(sessionId, absoluteFilePath);
+        }
         if (!isAuthorizingSessionRead(recordedSnapshot)) {
           return preMutationErrorResult(
             readBeforeWriteMessage([absoluteFilePath]),
@@ -1399,6 +1407,13 @@ export function createFileMultiEditTool(config: FileEditToolConfig): Tool {
         undefined;
       if (sessionId !== undefined) {
         recordedSnapshot = getSessionReadSnapshot(sessionId, absoluteFilePath);
+        // A file the model saw whole in a recent exec_command result counts as read.
+        if (
+          !isAuthorizingSessionRead(recordedSnapshot) &&
+          await provePrintedRead(sessionId, absoluteFilePath, config.allowedPaths, rawArgs)
+        ) {
+          recordedSnapshot = getSessionReadSnapshot(sessionId, absoluteFilePath);
+        }
         if (!isAuthorizingSessionRead(recordedSnapshot)) {
           return preMutationErrorResult(
             readBeforeWriteMessage([absoluteFilePath]),
