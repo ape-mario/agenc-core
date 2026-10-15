@@ -582,6 +582,7 @@ export interface TuiConfig {
   readonly copyOnSelect?: boolean;
   readonly flickerFreeMode?: boolean;
   readonly prStatusFooterEnabled?: boolean;
+  readonly gitStatusEnabled?: boolean;
   readonly keybindings?: readonly TuiKeybindingConfig[];
 }
 
@@ -1249,6 +1250,7 @@ export function defaultConfig(): AgenCConfig {
       copyOnSelect: true,
       flickerFreeMode: true,
       prStatusFooterEnabled: true,
+      gitStatusEnabled: true,
     }) as TuiConfig,
     ideConnector: Object.freeze({
       autoInstallExtension: true,
@@ -3936,6 +3938,7 @@ export function validateTuiConfig(raw: unknown): TuiConfig | undefined {
       "copyOnSelect",
       "flickerFreeMode",
       "prStatusFooterEnabled",
+      "gitStatusEnabled",
       "keybindings",
     ]),
     (field, detail) => new InvalidTuiConfigError(field, detail),
@@ -3957,6 +3960,7 @@ export function validateTuiConfig(raw: unknown): TuiConfig | undefined {
     "copyOnSelect",
     "flickerFreeMode",
     "prStatusFooterEnabled",
+    "gitStatusEnabled",
   ] as const) {
     if (raw[key] !== undefined) {
       if (typeof raw[key] !== "boolean") {

@@ -33,6 +33,12 @@ import {
 } from "../../services/Ledger/ledgerVerification.js";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../remoteAuthSessionContext.fixture.js";
 
+// Keep shell smoke frames independent of the checkout and async git redraws.
+// The live chrome and subprocess have dedicated GitStatusChrome and git-status suites.
+vi.mock("../../../src/tui/git-status.js", () => ({
+  probeGitStatus: vi.fn(async () => null),
+}));
+
 if (process.versions.bun !== undefined) {
   test("App render suite requires Vitest module mocks", () => {
     expect(true).toBe(true);

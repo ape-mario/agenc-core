@@ -1,6 +1,4 @@
 import { c as _c } from "react-compiler-runtime";
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { homedir } from 'node:os';
 import { resolve, sep } from 'node:path';
 import React, { createContext, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -13,7 +11,7 @@ import { useTerminalSize } from '../hooks/useTerminalSize';
 import { selectAgenCTuiGlyphs } from "../glyphs.js";
 import ScrollBox, { type ScrollBoxHandle } from '../ink/components/ScrollBox.js';
 import instances from '../ink/instances.js';
-import { Box, Text, useTerminalFocus } from '../ink.js';
+import { Box, Text } from '../ink.js';
 import { isBackgroundTask } from '../../tasks/types.js';
 import type { Message } from '../../types/message';
 import { openBrowser, openPath } from '../../utils/browser.js';
@@ -30,7 +28,7 @@ import type { PermissionMode } from '../../permissions/types.js';
 import type { StickyPrompt } from './VirtualMessageList';
 import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
 import { PlanModeBanner } from './v2/primitives.js';
-import { useStatusEffort, useStatusContextUsage, useStatusTurnBusy } from '../context/statusEffortContext.js';
+import { useStatusEffort, useStatusContextUsage } from '../context/statusEffortContext.js';
 import ThemedText from './design-system/ThemedText.js';
 import { LedgerStatus } from './LedgerStatus.js';
 import { swarmStatusPresentation } from './SwarmStatusIndicator.js';
@@ -521,57 +519,6 @@ export function FullscreenLayout(t0) {
   return t8;
 }
 
-const execFileAsync = promisify(execFile);
-
-/** Slow poll cadence for the git chrome probe — covers branch switches made
- *  while the terminal keeps focus (the focus-in re-probe covers the rest). */
-const GIT_CHROME_REFRESH_MS = 30_000;
-
-let cachedGitChromeLabel: string | null = null;
-
-/** The current branch, or null outside a git repository. */
-async function probeGitChromeLabel(): Promise<string | null> {
-  try {
-    const branch = (await execFileAsync('git', ['branch', '--show-current'], {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-      timeout: 1000,
-    })).stdout.trim();
-    return branch || 'detached';
-  } catch {
-    return null;
-  }
-}
-
-/** Branch for the status line. The probe runs async (one short `git`
- *  subprocess) so it never blocks the first paint; it re-runs on terminal
- *  focus changes, at turn/shell boundaries, and on a slow interval so a branch switch
- *  surfaces. Until the first probe resolves, and outside a repository, the
- *  branch segment stays hidden. */
-function useGitChromeLabel(): string | null {
-  const terminalFocused = useTerminalFocus();
-  const turnBusy = useStatusTurnBusy();
-  const [label, setLabel] = useState<string | null>(() => cachedGitChromeLabel);
-  useEffect(() => {
-    let cancelled = false;
-    const refresh = () => {
-      void probeGitChromeLabel().then(next => {
-        if (cancelled) return;
-        cachedGitChromeLabel = next;
-        setLabel(prev => (prev === next ? prev : next));
-      }, () => {});
-    };
-    refresh();
-    const interval = setInterval(refresh, GIT_CHROME_REFRESH_MS);
-    interval.unref?.();
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [terminalFocused, turnBusy]);
-  return label;
-}
-
 /** Slow tick that keeps the session spend label fresh: getTotalCost() is a
  *  plain non-reactive getter over the cost sidecar, so the chrome polls it on
  *  a slow cadence instead of re-rendering per API response. */
@@ -609,7 +556,6 @@ function statusModeLabel(mode: PermissionMode): string {
 }
 
 const STATUS_FOLDER_MIN_COLUMNS = 80;
-const STATUS_BRANCH_MIN_COLUMNS = 64;
 
 export type StatusLineSegments = {
   readonly folder: string | null;
@@ -617,21 +563,19 @@ export type StatusLineSegments = {
   readonly effort: string | null;
   readonly mode: string;
   readonly light: string | null;
-  readonly branch: string | null;
   readonly spend: string | null;
 };
 
 /**
- * What the status line shows, each fact once: folder, model, mode and branch
+ * What the status line shows, each fact once: folder, model and mode
  * on the left, spend on the right once there is a figure. Narrow terminals
- * drop the folder, then the branch.
+ * drop the folder.
  */
 export function statusLineSegments(
   columns: number,
   folder: string,
   modelLabel: string,
   mode: PermissionMode,
-  branch: string | null,
   spend: string,
   effort: string | null = null,
   lightMode = false,
@@ -643,7 +587,6 @@ export function statusLineSegments(
     mode: statusModeLabel(mode),
     // Light is the default harness; it is shown in /status, not the status line.
     light: null,
-    branch: branch !== null && columns >= STATUS_BRANCH_MIN_COLUMNS ? branch : null,
     spend: spend === '' ? null : spend,
   };
 }
@@ -665,7 +608,7 @@ function workspaceFolderLabel(columns: number): string {
 
 /**
  * The one status line under the prompt. Plain text on the terminal's own
- * background, no border or wash: cwd and branch share secondary ink, facts
+ * background, no border or wash: cwd uses secondary ink, facts
  * use primary ink, and risky state uses the warning tone. Context and spend
  * sit on the right.
  */
@@ -685,11 +628,10 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   ).length;
   const folder = React.useMemo(() => workspaceFolderLabel(columns), [columns]);
   const spend = useSessionSpendLabel();
-  const branch = useGitChromeLabel();
   const effort = useStatusEffort();
   const contextPercent = useStatusContextUsage();
   const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) === true;
-  const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, branch, spend, effort, lightMode);
+  const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, spend, effort, lightMode);
   const bypass = mode === 'bypassPermissions';
   const rightLabels = [
     contextPercent !== null ? `ctx ${contextPercent}%` : null,
@@ -698,7 +640,7 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const rightWidth = stringWidth(rightLabels.join(' · '));
   const leftWidth = Math.max(1, columns - 4 - rightWidth - (rightWidth > 0 ? 1 : 0));
   const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error' | 'accentSoft' | 'accent'; bold?: boolean }> = [
-    ...(segments.folder !== null ? [{ key: 'folder', label: `${segments.folder}${segments.branch ? ` (${segments.branch})` : ''}`, color: 'text2' as const }] : []),
+    ...(segments.folder !== null ? [{ key: 'folder', label: segments.folder, color: 'text2' as const }] : []),
     { key: 'model', label: segments.model, color: 'text' },
     ...(segments.effort !== null ? [{ key: 'effort', label: segments.effort, color: 'text' as const }] : []),
     { key: 'mode', label: segments.mode, color: bypass ? 'error' : 'text', bold: bypass },
@@ -707,7 +649,7 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
     ...(shellCount > 0 ? [{ key: 'shells', label: `${shellCount} ${shellCount === 1 ? 'shell' : 'shells'}`, color: 'text' as const }] : []),
     ...(runningAgents > 0 ? [{ key: 'agents', label: `${runningAgents} ${runningAgents === 1 ? 'agent' : 'agents'}`, color: 'text' as const }] : []),
   ];
-  // Reserve the truthful context/cost block first. Drop cwd/branch, shorten
+  // Reserve the truthful context/cost block first. Drop cwd, shorten
   // effort/mode, then drop swarm/effort/light before truncating the model.
   // Every segment remains in this single row even at a narrow width.
   const width = () => items.reduce((sum, item) => sum + stringWidth(item.label), Math.max(0, items.length - 1) * 3);

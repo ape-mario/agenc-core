@@ -94,6 +94,7 @@ import {
 } from "../state/AppState.js";
 import { useSettings } from "../hooks/useSettings.js";
 import { useMainLoopModel } from "../hooks/useMainLoopModel.js";
+import { GitStatusChrome } from "./GitStatusLine.js";
 import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext } from "../context/statusEffortContext.js";
 import { readSessionSelection } from "../../session/provider-model-selection.js";
 import {
@@ -5059,6 +5060,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           {queuedCommands.length} queued · {queuedCommandInputText(queuedCommands[queuedCommands.length - 1]!)}
         </Text>
       ) : null}
+      {showPromptInput ? <GitStatusChrome session={props.session} /> : null}
       {promptInputElement}
       {reviewNeeded ? <Text color="warning">review needed · prompts wait for tool outcome review</Text> : null}
     </Box>

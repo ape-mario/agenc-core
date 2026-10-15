@@ -237,57 +237,55 @@ describe("FullscreenLayout modal viewport", () => {
   });
 
   test("omits the Light label without changing other status facts", () => {
-    const regular = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort");
-    const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "$0.04", "max effort", true);
+    const regular = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort");
+    const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort", true);
     expect(light).toEqual(regular);
     expect(light.light).toBeNull();
   });
 
   test("shows each status fact once with plain mode labels", () => {
     expect(
-      statusLineSegments(100, "~/project", "grok-4-fast", "bypassPermissions", "main", "$0.04"),
+      statusLineSegments(100, "~/project", "grok-4-fast", "bypassPermissions", "$0.04"),
     ).toEqual({
       folder: "~/project",
       model: "grok-4-fast",
       effort: null,
       mode: "never asks",
       light: null,
-      branch: "main",
       spend: "$0.04",
     });
     expect(
-      statusLineSegments(100, "~/project", "grok-4-fast", "acceptEdits", "main", "$0.00").mode,
+      statusLineSegments(100, "~/project", "grok-4-fast", "acceptEdits", "$0.00").mode,
     ).toBe("edits freely");
     expect(
-      statusLineSegments(100, "~/project", "grok-4-fast", "plan", "main", "$0.00").mode,
+      statusLineSegments(100, "~/project", "grok-4-fast", "plan", "$0.00").mode,
     ).toBe("plan only");
   });
 
-  test("drops the folder, then the branch, on narrow terminals", () => {
+  test("drops the folder on narrow terminals and leaves git to the composer", () => {
     expect(
-      statusLineSegments(72, "~/project", "grok-4-fast", "default", "main", "$0.00"),
-    ).toMatchObject({ folder: null, branch: "main" });
+      statusLineSegments(72, "~/project", "grok-4-fast", "default", "$0.00"),
+    ).toMatchObject({ folder: null });
     expect(
-      statusLineSegments(60, "~/project", "grok-4-fast", "default", "main", "$0.00"),
-    ).toMatchObject({ folder: null, branch: null, model: "grok-4-fast" });
+      statusLineSegments(60, "~/project", "grok-4-fast", "default", "$0.00"),
+    ).toMatchObject({ folder: null, model: "grok-4-fast" });
   });
 
   test("shows the session effort next to the model", () => {
     expect(
-      statusLineSegments(100, "~/project", "deepseek-flash", "default", "main", "", "high effort").effort,
+      statusLineSegments(100, "~/project", "deepseek-flash", "default", "", "high effort").effort,
     ).toBe("high effort");
   });
 
-  test("hides the branch outside git and the spend until usage arrives", () => {
+  test("hides the spend until usage arrives", () => {
     expect(
-      statusLineSegments(100, "~/project", "grok-4-fast", "default", null, ""),
+      statusLineSegments(100, "~/project", "grok-4-fast", "default", ""),
     ).toEqual({
       folder: "~/project",
       model: "grok-4-fast",
       effort: null,
       mode: "asks first",
       light: null,
-      branch: null,
       spend: null,
     });
   });
