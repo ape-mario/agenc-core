@@ -37,7 +37,11 @@ import {
   allowNetworkForProxy,
   createLinuxSandboxCommandArgsForPermissionProfile,
 } from "./landlock.js";
-import { chromiumBundleIdentifier, createSeatbeltCommandArgs } from "./seatbelt.js";
+import {
+  chromiumBundleIdentifier,
+  createSeatbeltCommandArgs,
+  darwinUserTempDir,
+} from "./seatbelt.js";
 import { isWsl1 } from "./bwrap.js";
 import {
   NETWORK_DISABLED,
@@ -124,6 +128,7 @@ export class SandboxManager {
               ? {
                   chromiumBrowser: {
                     bundleIdentifier: chromiumBundleIdentifier(request.command.program),
+                    userTempDir: darwinUserTempDir(platform),
                   },
                 }
               : {}),

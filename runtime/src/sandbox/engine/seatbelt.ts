@@ -102,7 +102,11 @@ export interface CreateSeatbeltCommandArgsParams {
    * browser app's CFBundleIdentifier, the prefix of the Mach names Chromium
    * registers for its own processes.
    */
-  readonly chromiumBrowser?: { readonly bundleIdentifier: string | undefined };
+  readonly chromiumBrowser?: {
+    readonly bundleIdentifier: string | undefined;
+    /** The per-user temporary folder (`getconf DARWIN_USER_TEMP_DIR`). */
+    readonly userTempDir?: string | undefined;
+  };
 }
 
 interface ProxyPolicyInputs {
@@ -169,7 +173,8 @@ export const MACOS_SEATBELT_GPU_POLICY = `; GPU compute (Metal) — opt-in via c
  * clipboard, AppleEvents, keychain and credential services, location,
  * Spotlight, iCloud, notifications, Time Machine, analytics, and GPU user
  * clients (rendering falls back to software). File and network rules are
- * the session profile's, unchanged.
+ * the session profile's, plus the per-user temporary folder (see
+ * {@link MACOS_SEATBELT_CHROMIUM_TEMP_POLICY}).
  */
 export const MACOS_SEATBELT_CHROMIUM_POLICY = `; Chromium browser launch (Browser tool only)
 (allow mach-lookup
@@ -215,6 +220,17 @@ export const MACOS_SEATBELT_CHROMIUM_POLICY = `; Chromium browser launch (Browse
  */
 export const MACOS_SEATBELT_CHROMIUM_BUNDLE_POLICY = `(allow mach-lookup mach-register
   (global-name-prefix (param "CHROMIUM_MACH_NAME_PREFIX")))`;
+
+/**
+ * Chromium creates its process-singleton socket folder
+ * (`com.google.Chrome.XXXXXX`) in the per-user temporary folder that
+ * `getconf DARWIN_USER_TEMP_DIR` names, whatever TMPDIR says, and aborts with
+ * "Failed to create a ProcessSingleton" when it cannot. With the default
+ * TMPDIR that folder is already the session's temporary root; with a custom
+ * TMPDIR or AGENC_TMPDIR it is not, so the browser gets it explicitly.
+ */
+export const MACOS_SEATBELT_CHROMIUM_TEMP_POLICY = `(allow file-write*
+  (subpath (param "CHROMIUM_USER_TEMP_DIR")))`;
 
 const BUNDLE_IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.-]{0,254}$/u;
 
@@ -325,6 +341,11 @@ export function createSeatbeltCommandArgs(
     ) {
       policySections.push(MACOS_SEATBELT_CHROMIUM_BUNDLE_POLICY);
       chromiumParams.push(["CHROMIUM_MACH_NAME_PREFIX", `${bundleIdentifier}.`]);
+    }
+    const userTempDir = chromiumBrowser.userTempDir;
+    if (userTempDir !== undefined && path.isAbsolute(userTempDir)) {
+      policySections.push(MACOS_SEATBELT_CHROMIUM_TEMP_POLICY);
+      chromiumParams.push(["CHROMIUM_USER_TEMP_DIR", normalizePathForPolicy(userTempDir)]);
     }
   }
   const fullPolicy = policySections.join("\n");
@@ -874,6 +895,31 @@ function darwinUserCacheDir(): string | null {
   }
   resolvedDarwinUserCacheDir = normalizePathForPolicy(realPath);
   return resolvedDarwinUserCacheDir;
+}
+
+let resolvedDarwinUserTempDir: string | undefined;
+
+/**
+ * The per-user temporary folder macOS gives every process, independent of
+ * TMPDIR. Remembered once its real path resolved, like the cache folder.
+ */
+export function darwinUserTempDir(
+  platform: NodeJS.Platform = process.platform,
+): string | undefined {
+  if (platform !== "darwin") return undefined;
+  if (resolvedDarwinUserTempDir !== undefined) return resolvedDarwinUserTempDir;
+  const result = spawnSync("/usr/bin/getconf", ["DARWIN_USER_TEMP_DIR"], {
+    encoding: "utf8",
+  });
+  if (result.error !== undefined || result.status !== 0) return undefined;
+  const value = result.stdout.trim();
+  if (value.length === 0 || !path.isAbsolute(value)) return undefined;
+  try {
+    resolvedDarwinUserTempDir = normalizePathForPolicy(fs.realpathSync(value));
+  } catch {
+    return undefined;
+  }
+  return resolvedDarwinUserTempDir;
 }
 
 function normalizePathForSandbox(candidate: string): string | null {
