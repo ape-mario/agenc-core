@@ -704,10 +704,13 @@ describe("bootstrapLocalRuntimeSession", () => {
       // session running (standard tool deferral).
       expect(boot.registry.tools.map((tool) => tool.name)).toContain("write_stdin");
       expect(providerToolNames).not.toContain("write_stdin");
+      // TodoWrite is registered too; a standard session loads it when long
+      // work needs a visible plan.
+      expect(boot.registry.tools.map((tool) => tool.name)).toContain("TodoWrite");
+      expect(providerToolNames).not.toContain("TodoWrite");
       expect(providerToolNames).toEqual(
         expect.arrayContaining([
           "exec_command",
-          "TodoWrite",
           "EnterPlanMode",
           "ExitPlanMode",
           "system.searchTools",

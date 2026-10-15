@@ -65,7 +65,7 @@ describe("deferred rare tools", () => {
     expect(advertised(tools)).toContain("exec_command");
     const search = tools.toLLMTools().find((tool) => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME);
     expect(search?.function.description).toContain(
-      "Deferred tools you can load with select: MultiEdit (several replacements in one file in one call), Orient (rank the files most relevant to a question in a large repository), ImagineImage (generate or edit images), VerifyPlanExecution (compare progress with an approved plan), SendUserMessage (send the user a progress note).",
+      "Deferred tools you can load with select: TodoWrite (a visible plan for long work with many steps), MultiEdit (several replacements in one file in one call), Orient (rank the files most relevant to a question in a large repository), ImagineImage (generate or edit images), VerifyPlanExecution (compare progress with an approved plan), SendUserMessage (send the user a progress note).",
     );
     expect(search?.function.description).toContain(
       "To hand a self-contained task to a helper agent, load spawn_agent with select:spawn_agent; it loads wait_agent, send_message, assign_task, close_agent, list_agents with it.",
