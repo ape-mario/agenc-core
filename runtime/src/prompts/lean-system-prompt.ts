@@ -120,7 +120,7 @@ export function getLeanUsingYourToolsSection(
     items.push(`A successful Edit or Write result means the change is on disk as requested, and both fail with a "modified since read" error when the file changed after you read it, so a file you just read or edited needs no second read.`);
   }
   if (has("TodoWrite")) {
-    items.push(`Use TodoWrite for work with 3 or more distinct steps, not for single-step requests, and update it in the same response as the work it tracks. Each time you mark a task completed, tell the user in one or two sentences of your own what you finished and what comes next, naming the concrete result, then continue; the user follows the plan through these notes. When the last task is done, say so and stop.`);
+    items.push(`Use TodoWrite for longer work with 3 or more distinct steps, not for a task a few tool calls finish, and send each update in the same response as the tool call for the next step, never in a response of its own. Each time you mark a task completed, tell the user in one or two sentences of your own what you finished and what comes next, naming the concrete result, then continue; the user follows the plan through these notes. When the last task is done, say so and stop.`);
   }
   if (has("Skill")) {
     items.push(`Skill runs skills only. A project skill lives in .agenc/skills/<name>/SKILL.md with a name and a one-line description in its frontmatter; leave allowed-tools empty (project skills ignore it, and for user skills it makes every invocation ask for approval).`);

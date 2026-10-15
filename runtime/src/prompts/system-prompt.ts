@@ -340,7 +340,7 @@ export function getUsingYourToolsSection(
 
   if (hasTodoWrite) {
     items.push(
-      `Use TodoWrite only for work with 3 or more distinct steps, and update it in the same response as the work it tracks (mark the finished step and start the next in one call). Never call it for a single-step request or when nothing changed. Each time you mark a task completed, tell the user in one or two sentences, in your own words, what you finished and what comes next, before you continue; the user follows the plan through those notes, so do not wait until the whole plan is done. Name the concrete result rather than repeating a formula. When the last task is done, say so and stop; do not add work the user did not ask for.`,
+      `Use TodoWrite only for longer work with 3 or more distinct steps, not for a task a few tool calls finish, and update it in the same response as the tool call for the next step (mark the finished step and start the next in one call), never in a response of its own. Never call it for a single-step request or when nothing changed. Each time you mark a task completed, tell the user in one or two sentences, in your own words, what you finished and what comes next, before you continue; the user follows the plan through those notes, so do not wait until the whole plan is done. Name the concrete result rather than repeating a formula. When the last task is done, say so and stop; do not add work the user did not ask for.`,
     );
   }
 
