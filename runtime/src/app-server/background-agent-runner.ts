@@ -4572,10 +4572,12 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     }
     const changes: string[] = [];
     let applied = false;
+    let keepLiveReasoningEffort = false;
     let preparedReloadSelection:
       ReturnType<typeof resolveProviderModelSelection> | undefined;
     let preparedReloadProviderSwitch: PreparedSessionProviderSwitch | undefined;
     if (params.reload === true) {
+      const configuredEffortBeforeReload = configStore.current().reasoning_effort;
       const preparedConfigReload = await configStore.prepareReload();
       const preparedMcpAuthorityRefresh = prepareMcpAuthorityRefresh(session);
       try {
@@ -4584,6 +4586,11 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           params.profile !== undefined
             ? resolveProfile(preparedConfig, params.profile)
             : preparedConfig;
+        // A saved swarm toggle must not replace a later /effort choice with
+        // an unchanged startup default. A profile or changed default is an
+        // explicit configuration request and still takes effect.
+        keepLiveReasoningEffort = params.profile === undefined &&
+          configuredEffortBeforeReload === preparedResolved.reasoning_effort;
         if (
           typeof preparedResolved.model === "string" ||
           typeof preparedResolved.model_provider === "string"
@@ -4775,7 +4782,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
                 session.prepareProviderSwitch(pendingSelection),
               ),
             )));
-      const nextReasoning = normalizeRuntimeSetting(
+      const nextReasoning = keepLiveReasoningEffort ? null : normalizeRuntimeSetting(
         resolved.reasoning_effort,
         RUN_RUNTIME_REASONING_EFFORTS,
         "reasoning effort",
