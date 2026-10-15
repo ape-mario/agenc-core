@@ -33,6 +33,7 @@ describe("execSandboxDenialNotice", () => {
       const notice = denial({ exitCode: null, escalationAvailable })?.notice;
       expect(notice).toContain("sandbox.network.allowLocalBinding");
       expect(notice).toContain("true");
+      expect(notice).toContain("on Linux, start and test the server in the same command");
       expect(notice?.split("\n")).toHaveLength(1);
       expect(notice!.length).toBeLessThan(340);
       expect(notice).not.toContain("—");

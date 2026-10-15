@@ -51,14 +51,14 @@ const BIND_DENIED_SIGNATURES: readonly RegExp[] = [
  */
 export const SANDBOX_BIND_DENIED_NO_ESCALATION =
   "[sandbox] The sandbox blocks local servers. Do not run this command again unchanged. " +
-  "Escalation is unavailable; ask the user to enable sandbox.network.allowLocalBinding = true for sandbox-local servers or run the command in their terminal.";
+  "Escalation is unavailable; ask the user to enable sandbox.network.allowLocalBinding = true (on Linux, start and test the server in the same command), or run it in their terminal.";
 
 /**
  * A human can still approve, so one escalated retry is the correct move —
  * and exactly one, because a second identical request answers nothing.
  */
 export const SANDBOX_BIND_DENIED_ESCALATION_AVAILABLE =
-  "[sandbox] The sandbox blocks local servers. Retry this command once with sandbox_permissions=\"require_escalated\" and a justification, or ask the user to enable sandbox.network.allowLocalBinding = true for sandbox-local servers.";
+  "[sandbox] The sandbox blocks local servers. Retry this command once with sandbox_permissions=\"require_escalated\" and a justification, or ask the user to enable sandbox.network.allowLocalBinding = true (on Linux, start and test the server in the same command).";
 
 /**
  * The notice for a finished exec, or null when this was not a sandbox
