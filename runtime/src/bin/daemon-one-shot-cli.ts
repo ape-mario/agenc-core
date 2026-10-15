@@ -1609,6 +1609,7 @@ export async function oneShotCLI(
     const profileName = resolvedStartupProfileName(startupCliFlags, sessionEnv);
     const startup = resolveCanonicalStartupSelection({
       config,
+      env: sessionEnv,
       ...(profileName !== undefined ? { profileName } : {}),
     });
     const resolvedStartupImages =

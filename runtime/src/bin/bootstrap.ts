@@ -924,6 +924,7 @@ async function bootstrapLocalRuntimeSessionScoped(
   );
   let startup = resolveCanonicalStartupSelection({
     config: configStore.current(),
+    env: providerEnvironment,
     ...(profileName !== undefined ? { profileName } : {}),
   });
   const cli = options.cli;

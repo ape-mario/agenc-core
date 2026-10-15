@@ -3259,6 +3259,7 @@ export async function bootTUIEntry(
       );
       const startup = resolveCanonicalStartupSelection({
         config,
+        env: sessionEnv,
         ...(profileName !== undefined ? { profileName } : {}),
       });
       const initialContent = startupContentFromInputs(
