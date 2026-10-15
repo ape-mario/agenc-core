@@ -1059,6 +1059,23 @@ describe("PromptInput render surface", () => {
     }
   });
 
+  test("normalizes CRLF once when storing a multiline paste", async () => {
+    let contents: Record<number, { content: string }> = {};
+    const setPastedContents = vi.fn((next: unknown) => {
+      contents = typeof next === "function" ? next(contents) : next as typeof contents;
+    });
+    const rendered = await renderPromptInput({ input: "", setPastedContents });
+    const first = "alpha".repeat(10);
+    const last = "omega".repeat(10);
+    try {
+      const props = await waitForPromptInputProps();
+      (props.onPaste as (value: string) => void)(`${first}\r\n${last}`);
+      expect(Object.values(contents).map(item => item.content)).toEqual([`${first}\n${last}`]);
+    } finally {
+      await rendered.dispose();
+    }
+  });
+
   test("routes bulk ! input through direct shell before its mode rerender", async () => {
     const onInputChange = vi.fn();
     const onModeChange = vi.fn();
