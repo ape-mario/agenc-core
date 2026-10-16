@@ -75,6 +75,7 @@ import { readStartupCliFlags, resolveCanonicalStartupSelection, resolvedStartupP
 import { resolveStartupSandboxBypass, writeStartupSandboxBypassNotice } from "./bypass-approvals.js";
 import { setIsRemoteMode } from "../bootstrap/state.js";
 import { isRecord } from "../utils/record.js";
+import { withoutTrailingPeriod } from "../utils/stringUtils.js";
 import type { AgenCTuiBridgeSession } from "../tui/daemon-session.js";
 import { createWorkflowApprovalControls, type WorkflowApprovalControls } from "../tui/workflow-approval-controls.js";
 import { UNUSED_TUI_PREWARM_STOP_REASON } from "../app-server/agent-stop-reasons.js";
@@ -1845,7 +1846,7 @@ async function createDeferredDaemonPromptTuiSession(params: {
             : {}),
           metadata: { mode: "tui" },
         }).catch((error: unknown) => {
-          const reason = error instanceof Error ? error.message : String(error);
+          const reason = withoutTrailingPeriod(error instanceof Error ? error.message : String(error));
           throw new Error(
             `Cannot start daemon session: ${reason}. Fix the cause, run agenc daemon start in another shell, then press Enter to retry.`,
             { cause: error },

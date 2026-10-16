@@ -3,6 +3,7 @@
 import type * as React from 'react';
 import type { HomeContext } from '../../config/home.js';
 import { formatNumber } from '../../utils/format.js';
+import { withoutTrailingPeriod } from '../../utils/stringUtils.js';
 import type { getRuntimeState } from '../../utils/config.js';
 import { getAnthropicApiKeyWithSourceForContext, getPrimaryApiKeyFromSecureStorage, getAuthTokenSourceForContext, isAgenCAISubscriberForContext, selectedProviderUsesExternalAuth, type ProviderAuthReadContext } from '../../utils/auth.js';
 import type { AgentDefinitionsResult } from '../../tools/AgentTool/loadAgentsDir.js';
@@ -187,7 +188,7 @@ const daemonAutostartFailedNotice: StatusNoticeDefinition = {
   type: 'error',
   isActive: context => Boolean(context.daemonStatus.autostartFailure),
   render: context => {
-    return `AgenC daemon autostart failed: ${context.daemonStatus.autostartFailure}. Fix the cause, run agenc daemon start in another shell, then press Enter to retry.`;
+    return `AgenC daemon autostart failed: ${withoutTrailingPeriod(context.daemonStatus.autostartFailure ?? '')}. Fix the cause, run agenc daemon start in another shell, then press Enter to retry.`;
   }
 };
 const jetbrainsPluginNotice: StatusNoticeDefinition = {

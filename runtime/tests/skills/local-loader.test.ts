@@ -8,6 +8,7 @@ import { FileWatcher } from "../file-watcher/index.js";
 import { createSkillChangeDetector } from "./change-detector.js";
 import { parseSkillFrontmatterFields } from "./loadSkillsDir.js";
 import {
+  buildSkillListingWithinBudget,
   clearInvokedSkills,
   createLocalSkillsServices,
   discoverSkillWatchRoots,
@@ -439,6 +440,25 @@ describe("local skills loader", () => {
     ]);
     expect(snapshot.skills.map((skill) => skill.name)).not.toContain(
       "default-home-skill",
+    );
+  });
+
+  it("lists simplify for explicit review or cleanup requests only, untruncated", async () => {
+    const agencHome = tmpRoot("skills-simplify-home");
+    const workspaceRoot = tmpRoot("skills-simplify-workspace");
+    const snapshot = await loadLocalSkillsSnapshot({
+      agencHome,
+      pluginStorageRoot: join(agencHome, "plugins"),
+      workspaceRoot,
+      config: {},
+      env: {},
+    });
+
+    const line = buildSkillListingWithinBudget(snapshot.skills).listing
+      .split("\n")
+      .find((entry) => entry.startsWith("- simplify: "));
+    expect(line).toBe(
+      "- simplify: Review changed code for reuse, quality, and efficiency, then fix issues. - Only if the user asks to review or clean up.",
     );
   });
 

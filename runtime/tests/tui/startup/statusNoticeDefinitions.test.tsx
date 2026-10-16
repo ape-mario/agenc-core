@@ -243,6 +243,24 @@ describe("startup status notice definitions", () => {
     expect(collectText(notice?.render(context))).toContain("agenc daemon start");
   });
 
+  it("does not double the period after an autostart failure that ends with one", async () => {
+    const context = {
+      ...baseContext(),
+      daemonStatus: {
+        autostartDisabled: false,
+        autostartFailure: "grok provider requires credentials. Set XAI_API_KEY or GROK_API_KEY.",
+      },
+    };
+
+    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const notice = getActiveNotices(context).find((candidate) => candidate.id === "daemon-autostart-failed");
+
+    expect(collectText(notice?.render(context))).toBe(
+      "AgenC daemon autostart failed: grok provider requires credentials. Set XAI_API_KEY or GROK_API_KEY. " +
+        "Fix the cause, run agenc daemon start in another shell, then press Enter to retry.",
+    );
+  });
+
   it("keeps the JetBrains notice on marketplace text without a hard-coded docs URL", async () => {
     mocks.supportedIde = true;
     mocks.terminalIdeType = "IntelliJ IDEA";
