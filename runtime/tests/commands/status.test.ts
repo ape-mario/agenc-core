@@ -235,6 +235,24 @@ describe("status git summary", () => {
     ).toEqual({ state: "dirty", branch: "main", changedFiles: 2 });
   });
 
+  it("reports a missing git as informational, not as a git failure", () => {
+    // Windows without Git for Windows: the spawn fails before git can say anything.
+    const summary = summarizeGitStatus({
+      insideWorkTree: { stdout: "", stderr: "Error: spawn git ENOENT", code: -1 },
+      branch: { stdout: "", stderr: "", code: 0 },
+      porcelain: { stdout: "", stderr: "", code: 0 },
+    });
+    expect(summary).toEqual({ state: "no-git", message: "Install git to see branch state here." });
+    const row = createStatusDashboardSnapshot({ lines: [], git: summary }).rows.find((entry) => entry.section === "git");
+    expect(row).toMatchObject({ value: "git not installed", state: "info" });
+    // Any other spawn failure is still an error.
+    expect(summarizeGitStatus({
+      insideWorkTree: { stdout: "", stderr: "Error: spawn git EMFILE", code: -1 },
+      branch: { stdout: "", stderr: "", code: 0 },
+      porcelain: { stdout: "", stderr: "", code: 0 },
+    }).state).toBe("error");
+  });
+
   it("detects non-git directories", () => {
     expect(
       summarizeGitStatus({
