@@ -28,6 +28,7 @@ import {
   readAndValidateSchemaVersionFd,
   resolveCanonicalSessionCwd,
 } from "../session/session-store.js";
+import { canonicalRolloutHoldsNoInput } from "../session/rollout-input.js";
 import { projectStorageKey } from "../utils/project-storage-key.js";
 import {
   DEFAULT_MAX_STARTUP_RECOVERY_MS,
@@ -721,9 +722,15 @@ export function resolveLatestSessionId(
   agencHome: string,
 ): ResumeSessionResolution {
   const search = budget(agencHome);
-  const latest = projectCandidatesCrossSlug(cwd, agencHome, search)[0];
+  const candidates = projectCandidatesCrossSlug(cwd, agencHome, search);
   const stopped = incomplete("--continue", search);
   if (stopped !== undefined) return stopped;
+  // A session that records no input is one a TUI provisioned and could not
+  // retire (it crashed or was killed before its first prompt). Continue the
+  // newest session someone used instead.
+  const latest = candidates.find(
+    (candidate) => !canonicalRolloutHoldsNoInput(candidate.rolloutPath),
+  );
   if (latest === undefined) return { kind: "none" };
   const descriptor = sealCandidate(latest, search);
   return descriptor === null

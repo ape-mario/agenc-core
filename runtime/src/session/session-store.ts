@@ -4408,6 +4408,9 @@ export class SessionStore {
    * or missing snapshot is recoverable.
    */
   private writeIndexSnapshot(): void {
+    // An archive moved the rollout away: a snapshot beside its old path would
+    // only recreate a stray session directory.
+    if (!existsSync(this.rolloutPath)) return;
     const snapshot: IndexSnapshot = {
       snapshotSequenceNumber: this.lastSeqWritten,
       fileSize: this.fileSize,

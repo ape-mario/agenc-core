@@ -13,6 +13,8 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
+  rmdirSync,
+  rmSync,
   statSync,
 } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
@@ -357,6 +359,31 @@ export interface FileThreadStoreOpts {
 }
 
 /**
+ * A session directory whose rollout moved to archived_sessions/ keeps only the
+ * advisory index snapshot, which is rebuilt from the rollout when needed.
+ * Remove it and the directory, so an archived thread leaves nothing under
+ * sessions/. A directory that still holds a rollout file is left as it is.
+ */
+function removeArchivedSessionDir(sessionDir: string): void {
+  removeDisplayArtifacts(sessionDir);
+  let names: string[];
+  try {
+    names = readdirSync(sessionDir);
+  } catch {
+    return;
+  }
+  if (names.some((name) => name.startsWith("rollout-"))) return;
+  for (const name of ["index.json", "index.json.tmp"]) {
+    rmSync(join(sessionDir, name), { force: true });
+  }
+  try {
+    rmdirSync(sessionDir);
+  } catch {
+    // Another file still lives here: keep the directory.
+  }
+}
+
+/**
  * Default filesystem-backed `ThreadStore`. Tracks live thread writers
  * (via the caller-supplied `RolloutStore` per thread) in memory, and
  * persists thread metadata in the per-project AgenC state database.
@@ -593,7 +620,7 @@ export class FileThreadStore implements ThreadStore {
         updatedAt: new Date().toISOString(),
       });
       this.writeRegistryUnlocked(registry);
-      if (archivedSessionDir !== undefined) removeDisplayArtifacts(archivedSessionDir);
+      if (archivedSessionDir !== undefined) removeArchivedSessionDir(archivedSessionDir);
     });
   }
 
@@ -985,7 +1012,7 @@ export class FileThreadStore implements ThreadStore {
             if (existing.rolloutPath && (archivedRolloutPath !== undefined || !existsSync(existing.rolloutPath))) archivedSessionDir = dirname(existing.rolloutPath);
           }
           this.writeRegistryUnlocked(registry);
-          if (archivedSessionDir !== undefined) removeDisplayArtifacts(archivedSessionDir);
+          if (archivedSessionDir !== undefined) removeArchivedSessionDir(archivedSessionDir);
           if (archiveArtifactDir !== undefined && archiveArtifactDir !== archivedSessionDir) removeDisplayArtifacts(archiveArtifactDir);
           return;
         }
@@ -1005,7 +1032,7 @@ export class FileThreadStore implements ThreadStore {
           ...(archivedRolloutPath !== undefined ? { archivedRolloutPath } : {}),
         });
         this.writeRegistryUnlocked(registry);
-        if (archivedSessionDir !== undefined) removeDisplayArtifacts(archivedSessionDir);
+        if (archivedSessionDir !== undefined) removeArchivedSessionDir(archivedSessionDir);
         if (archiveArtifactDir !== undefined && archiveArtifactDir !== archivedSessionDir) removeDisplayArtifacts(archiveArtifactDir);
       }),
     );
