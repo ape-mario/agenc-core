@@ -6,6 +6,7 @@ import { reproveResumeDescriptor, type ResumeCwdProof, openResumeCwdProof, asser
 import { runDefaultCliRoute } from "./default-cli-route.js";
 import { readProcessCwdSafely, resolveCliCwdForStartup, writeUnavailableCliCwd } from "./cli-cwd.js";
 import { requireProjectTrustForTui } from "./project-trust-preflight.js";
+import { requireWindowsSandboxChoiceForTui } from "./windows-sandbox-choice.js";
 import { prepareCliRuntime } from "./cli-runtime.js";
 import { runCliProcessMain } from "./cli-process-main.js";
 import { isDirectInvocation, shouldRunDaemonStartupSecurityAudit } from "./daemon-entry-policy.js";
@@ -72,12 +73,17 @@ import { createRecoveryMutationAdapter } from "../state/recovery-mutations.js";
 import { formatAgenCTrajectoriesCliHelpText, parseAgenCTrajectoriesCliArgs } from "./trajectories-cli-args.js";
 import { prepareUserPromptForTurn } from "../hooks/user-prompt-ingress.js";
 import { readStartupCliFlags, resolveCanonicalStartupSelection, resolvedStartupProfileName, startupConfigLayerOptions, type StartupCliFlags } from "./startup-selection.js";
-import { resolveStartupSandboxBypass, writeStartupSandboxBypassNotice } from "./bypass-approvals.js";
+import {
+  resolveStartupSandboxBypass,
+  writeStartupSandboxBypassNotice,
+  type StartupSandboxBypass,
+} from "./bypass-approvals.js";
 import { setIsRemoteMode } from "../bootstrap/state.js";
 import { isRecord } from "../utils/record.js";
 import { withoutTrailingPeriod } from "../utils/stringUtils.js";
 import type { AgenCTuiBridgeSession } from "../tui/daemon-session.js";
 import { createWorkflowApprovalControls, type WorkflowApprovalControls } from "../tui/workflow-approval-controls.js";
+import { queueTuiStartupNotice } from "../tui/startup-notices.js";
 import { UNUSED_TUI_PREWARM_STOP_REASON } from "../app-server/agent-stop-reasons.js";
 import { oneShotCLI as runDaemonOneShotCLI, type AgenCDaemonCliDeps, startupImageMessagesFromInputs, startupContentFromInputs, validateAgencHome, stopDaemonAgentBestEffort, type OneShotDeadlineBackstopGlobal, startupPermissionMode } from "./daemon-one-shot-cli.js";
 export { parseStreamJsonPrompt, validateAgencHome, oneShotFinalMessageRemainder, type PrintModeGoal, parsePrintModeGoal } from "./daemon-one-shot-cli.js";
@@ -3262,6 +3268,12 @@ export const __wrapDaemonTuiSessionWithPromptPreparationForTest =
   wrapDaemonTuiSessionWithPromptPreparation;
 
 
+/** The TUI owns the terminal, so a dropped sandbox is also shown in its footer. */
+function queueSandboxBypassTuiNotice(sandboxBypass: StartupSandboxBypass): void {
+  if (sandboxBypass.tuiNotice === undefined) return;
+  queueTuiStartupNotice({ key: "sandbox-unavailable", text: sandboxBypass.tuiNotice });
+}
+
 type BootTUIEntryArgs = BootTUIArgs & {
   readonly resumeId?: string;
   readonly resumeFailureMessage?: string;
@@ -3280,6 +3292,7 @@ async function resumeColdDaemonSession(params: {
     env: sessionEnv,
   });
   writeStartupSandboxBypassNotice(sandboxBypass);
+  queueSandboxBypassTuiNotice(sandboxBypass);
   const runtimeOptions = resolveAgentRuntimeOptions(sessionEnv, {
     simpleMode: startupFlags.simpleMode === true,
     ...(startupFlags.lightMode === true ? { lightMode: true } : {}),
@@ -3369,6 +3382,7 @@ export async function bootTUIEntry(
     env: sessionEnv,
   });
   writeStartupSandboxBypassNotice(sandboxBypass);
+  queueSandboxBypassTuiNotice(sandboxBypass);
   const runtimeOptions = resolveAgentRuntimeOptions(sessionEnv, {
     simpleMode: startupCliFlags.simpleMode === true,
     ...(startupCliFlags.lightMode === true ? { lightMode: true } : {}),
@@ -3381,6 +3395,18 @@ export async function bootTUIEntry(
     if (!cliCwd.ok) {
       return writeUnavailableCliCwd();
     }
+    // Windows asks once whether to run without a sandbox, before the trust
+    // card, so the trust card's note already reflects the answer.
+    if (
+      args.resumeId === undefined &&
+      !(await requireWindowsSandboxChoiceForTui({
+        env: sessionEnv,
+        startupCliFlags,
+        cwd: cliCwd.cwd,
+      }))
+    ) {
+      return 1;
+    }
     if (
       args.resumeId === undefined &&
       !(await requireProjectTrustForTui({
@@ -3388,6 +3414,7 @@ export async function bootTUIEntry(
         argv: process.argv,
         startupCliFlags,
         cwd: cliCwd.cwd,
+        sandboxBypass,
       }))
     ) {
       return 1;
@@ -4065,6 +4092,16 @@ async function resumeResolvedTUIEntry(
   }
   try {
     if (
+      !(await requireWindowsSandboxChoiceForTui({
+        env: process.env,
+        startupCliFlags,
+        cwd: descriptor.cwd,
+        useEnvWorkspace: false,
+      }))
+    ) {
+      return 1;
+    }
+    if (
       !(await requireProjectTrustForTui({
         env: process.env,
         argv: process.argv,
@@ -4330,6 +4367,16 @@ export async function main(): Promise<number> {
         env: process.env,
         cwd: agentStartCwd,
         ensureDaemonReady: async () => {
+          if (
+            !(await requireWindowsSandboxChoiceForTui({
+              env: process.env,
+              argv: process.argv,
+              cwd: agentStartCwd,
+              useEnvWorkspace: false,
+            }))
+          ) {
+            throw new Error("running without a sandbox on Windows was not accepted");
+          }
           if (
             !(await requireProjectTrustForTui({
               env: process.env,
