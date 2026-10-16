@@ -53,6 +53,8 @@ export interface ToolRegistry {
   discoverToolNames?(toolNames: readonly string[]): void;
   /** Catalog tools that load through system.searchTools; fixed per session. */
   getDeferredToolNames?(): ReadonlySet<string>;
+  /** Compact tool and permission wording (a standard session with the default deferral). */
+  readonly compactPresentation?: boolean;
   /**
    * The session's fixed tool policy (`agent.create` `toolPolicy`), when it has
    * one. Session-level surfaces that are not tools (skill listings, slash

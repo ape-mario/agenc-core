@@ -30,13 +30,13 @@ export const RARE_DEFERRED_TOOLS: ReadonlyArray<readonly [name: string, purpose:
   ["ImagineImage", "generate or edit images"],
   ["ImagineVideo", "generate video"],
   ["XSearch", "search posts on X"],
-  ["LSP", "language-server definitions and references"],
+  ["LSP", "definitions and references"],
   ["NotebookRead", "read Jupyter notebooks"],
-  ["request_ledger_transfer", "Ledger hardware wallet transfer"],
-  ["ledger_wallet_cli_status", "Ledger wallet CLI status"],
-  ["install_ledger_wallet_cli", "install the Ledger wallet CLI"],
-  ["VerifyPlanExecution", "compare progress with an approved plan"],
-  ["SendUserMessage", "send the user a progress note"],
+  ["request_ledger_transfer", "Ledger transfer"],
+  ["ledger_wallet_cli_status", "Ledger CLI status"],
+  ["install_ledger_wallet_cli", "install the Ledger CLI"],
+  ["VerifyPlanExecution", "check progress against a plan"],
+  ["SendUserMessage", "progress note to the user"],
 ];
 
 /**
@@ -52,13 +52,13 @@ export const RARE_DEFERRED_TOOLS: ReadonlyArray<readonly [name: string, purpose:
  * PLAN_MODE_TOOLS without a search.
  */
 export const STANDARD_ON_DEMAND_TOOLS: ReadonlyArray<readonly [name: string, purpose: string]> = [
-  ["TodoWrite", "a visible plan for long work with many steps"],
-  ["Orient", "rank the files most relevant to a question in a large repository"],
+  ["TodoWrite", "a plan for long work"],
+  ["Orient", "rank files for a question in a large repository"],
   ["web_fetch", "fetch a web page"],
   ["WebSearch", "search the web"],
-  ["report_agent_job_result", "a CSV job worker records its result"],
-  ["AskUserQuestion", "ask the user a multiple-choice question"],
-  ["EnterPlanMode", "ask to plan a large change before making it"],
+  ["report_agent_job_result", "CSV job worker result"],
+  ["AskUserQuestion", "multiple-choice question to the user"],
+  ["EnterPlanMode", "plan a large change first"],
   ["ExitPlanMode", "present a plan for approval"],
 ];
 
@@ -156,14 +156,8 @@ export function rareToolPointer(
         (companions.length > 0 ? `; it loads ${companions.join(", ")} with it.` : "."),
     );
   }
-  const processTools = options.standard === true
-    ? PROCESS_SESSION_TOOLS.filter((name) => presentNames.has(name))
-    : [];
-  if (processTools.length > 0) {
-    lines.push(
-      `${processTools.join(", ")} load by themselves when exec_command leaves a session running.`,
-    );
-  }
+  // The process tools load by themselves when exec_command leaves a session
+  // running, and exec_command's description names them; the pointer does not.
   const present = [
     ...(options.standard === true ? STANDARD_ON_DEMAND_TOOLS : []),
     ...RARE_DEFERRED_TOOLS,

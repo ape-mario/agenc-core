@@ -71,6 +71,18 @@ describe("per-root skill scan cap", () => {
 });
 
 describe("skill listing relevance", () => {
+  it("caps each listed description at 120 characters; the skill's file keeps the full text", () => {
+    const long = "Use Ledger's official wallet-cli, including safe missing-binary detection and approved latest-version installation of the binary";
+    const listing = formatSkillListingWithinBudget([
+      { name: "ledger-wallet-cli", description: long, whenToUse: "Use whenever the user means a Ledger hardware wallet." },
+      { name: "keybindings", description: "Create or modify AgenC TUI keybindings." },
+    ]);
+    const line = listing.split("\n").find((l) => l.startsWith("- ledger-wallet-cli: "))!;
+    expect(line.length - "- ledger-wallet-cli: ".length).toBeLessThanOrEqual(120);
+    expect(line.startsWith(`- ledger-wallet-cli: ${long.slice(0, 100)}`)).toBe(true);
+    expect(listing).toContain("- keybindings: Create or modify AgenC TUI keybindings.");
+  });
+
   // Live measurement on the reviewer's machine (1,823 skills installed under
   // ~/.agents/skills, 500k context window): the 20,000-char budget fit 101 of
   // them, the list stopped at "apollo-core-workflow-a", and every skill that

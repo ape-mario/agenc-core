@@ -191,6 +191,11 @@ export interface ToolRegistry {
    * to answer a call to one with an explicit refusal.
    */
   readonly toolPolicy?: SessionToolPolicy;
+  /**
+   * A standard session with the default deferral: compact tool wording, and
+   * the permission section in the same compact words (prompts/permissions-prompt.ts).
+   */
+  readonly compactPresentation?: boolean;
 }
 
 /**
@@ -1435,17 +1440,18 @@ export function buildToolRegistry(
     provider: string | undefined; tools: LLMTool[] } | undefined;
   function buildPresentedTools(router: ToolRouter): LLMTool[] {
       const visible = standardDeferral ? loadOrderedSpecs(visibleSpecs(router)) : visibleSpecs(router);
-      const leanExec = visible.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME) &&
-        !discoveredToolNames.has("exec_command");
+      const searchVisible = visible.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME);
+      const leanExec = searchVisible && !discoveredToolNames.has("exec_command");
+      const leanGrep = searchVisible && !discoveredToolNames.has("Grep");
       const tools = visible.map((spec) => {
         const tool = toolToLLMTool(spec.tool);
         if (spec.tool.metadata?.source !== "builtin") return tool;
         if (options.lightMode === true) return lightPresentation(tool, { leanExec });
         // Standard sessions with the default deferral send compact wording for
         // the core tools (same fields, same schema) and the lean exec_command
-        // until system.searchTools selects it.
+        // and Grep until system.searchTools selects them.
         return standardDeferral
-          ? standardPresentation(tool, { lightWording: STANDARD_COMPACT_PRESENTATION.has(spec.tool.name), leanExec })
+          ? standardPresentation(tool, { lightWording: STANDARD_COMPACT_PRESENTATION.has(spec.tool.name), leanExec, leanGrep })
           : tool;
       });
       if (!deferRareTools) return tools;
@@ -1461,6 +1467,7 @@ export function buildToolRegistry(
 
   return {
     ...(options.toolPolicy !== undefined ? { toolPolicy: options.toolPolicy } : {}),
+    compactPresentation: standardDeferral,
     get tools(): readonly Tool[] {
       return allSpecs().map((spec) => spec.tool);
     },

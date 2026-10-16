@@ -309,6 +309,11 @@ export function getPermissionsSection(
   options: {
     readonly light?: boolean;
     readonly lightPrint?: boolean;
+    /**
+     * A standard session with compact tool wording (ToolRegistry.compactPresentation):
+     * Light's shorter texts, with the bypass note naming the standard head's section.
+     */
+    readonly compact?: boolean;
     /** A child whose escalated command stays confined (sandbox/escalation/confinement.ts). */
     readonly escalationConfined?: boolean;
   } = {},
@@ -338,6 +343,9 @@ export function getPermissionsSection(
     return options.lightPrint === true && unattendedPolicyForContext(ctx).noApprover !== true
       ? lightPrintPermissionsSection(ctx, authority)
       : lightPermissionsSection(ctx, authority, options.escalationConfined === true);
+  }
+  if (options.compact === true) {
+    return lightPermissionsSection(ctx, authority, options.escalationConfined === true, COMPACT_BYPASS_AUTONOMY_NOTE);
   }
 
   const sandboxText = renderSandbox(
@@ -440,6 +448,10 @@ function bypassGrantsEscalation(
 export const LIGHT_BYPASS_AUTONOMY_NOTE =
   "Tool calls are pre-approved: do not ask for tool permission or plan approval, and do not pause to confirm local, reversible work. The action rules above still apply: destructive, irreversible, shared-system or externally visible actions need the user's explicit request. If the task is genuinely ambiguous, ask one question with AskUserQuestion; when the requested work is done and verified, stop and report.";
 
+/** LIGHT_BYPASS_AUTONOMY_NOTE for a standard head, which names its action rules' section. */
+export const COMPACT_BYPASS_AUTONOMY_NOTE =
+  "Tool calls are pre-approved: do not ask for tool permission or plan approval, and do not pause to confirm local, reversible work. The rules in 'Executing actions with care' still apply: destructive, irreversible, shared-system or externally visible actions need the user's explicit request. If the task is genuinely ambiguous, ask one question with AskUserQuestion; when the requested work is done and verified, stop and report.";
+
 const LIGHT_APPROVAL_TEXT: Partial<Record<PermissionMode, string>> = {
   plan: LIGHT_APPROVAL_UNLESS_TRUSTED,
   default: LIGHT_APPROVAL_ON_REQUEST,
@@ -473,6 +485,7 @@ function lightPermissionsSection(
   ctx: ToolPermissionContext,
   authority: PermissionPromptExecutionAuthority,
   escalationConfined: boolean,
+  autonomyNote: string = LIGHT_BYPASS_AUTONOMY_NOTE,
 ): string | null {
   const binding = MODE_BINDINGS[ctx.mode];
   const approvalText = bypassGrantsEscalation(ctx, authority, escalationConfined)
@@ -483,7 +496,7 @@ function lightPermissionsSection(
   const note = unattendedPolicyForContext(ctx).noApprover === true
     ? ROUTINE_NO_APPROVER_NOTE
     : binding.autonomyNote !== undefined
-      ? LIGHT_BYPASS_AUTONOMY_NOTE
+      ? autonomyNote
       : undefined;
   return [
     `Permission mode: ${binding.label}. ${LIGHT_SANDBOX_TEXT[authority.sandboxPolicy]} Network access is ${network}.`,
