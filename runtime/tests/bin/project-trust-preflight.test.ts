@@ -448,7 +448,7 @@ describe("project trust preflight", () => {
         expect.objectContaining({
           workspaceRoot: workspace,
           bypassPermissionsRequested: true,
-          bypassSandboxRequested: true,
+          sandboxOff: true,
         }),
       );
     } finally {
@@ -513,18 +513,118 @@ describe("project trust preflight", () => {
           stdout: stdio.stdout,
           stderr: stdio.stderr,
           renderPrompt,
+          platform: "linux",
+          sandboxProbe: () => ({ kind: "ready", mode: "workspace_write", platform: "linux" }),
         }),
       ).resolves.toEqual({ accepted: true, projectRoot: workspace, prompted: true });
       expect(renderPrompt).toHaveBeenCalledWith(
         expect.objectContaining({
           bypassPermissionsRequested: true,
-          bypassSandboxRequested: false,
+          sandboxOff: false,
         }),
       );
       // Confirming under a bypass flag records an explicit grant.
       expect(
         resolveProjectTrustKindSync({ agencHome: home, env, projectRoot: workspace }),
       ).toBe("explicit");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it("says the sandbox is off when --bypass-approvals runs on a host without one", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agenc-trust-home-"));
+    const workspace = await mkdtemp(join(tmpdir(), "agenc-trust-ws-"));
+    const env = makeEnv(home, workspace);
+    const stdio = makeTtyStdio();
+    const renderPrompt = vi.fn(async () => true);
+    const sandboxProbe = vi.fn(() => ({
+      kind: "unavailable" as const,
+      mode: "workspace_write" as const,
+      platform: "win32" as const,
+      reason: "Windows restricted-token sandbox is not implemented",
+    }));
+    try {
+      await expect(
+        runProjectTrustPreflightForTui({
+          env,
+          argv: ["node", "agenc", "--bypass-approvals"],
+          cwd: workspace,
+          stdin: stdio.stdin,
+          stdout: stdio.stdout,
+          stderr: stdio.stderr,
+          renderPrompt,
+          platform: "win32",
+          sandboxProbe,
+        }),
+      ).resolves.toMatchObject({ accepted: true, prompted: true });
+      expect(sandboxProbe).toHaveBeenCalledOnce();
+      expect(renderPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ bypassPermissionsRequested: true, sandboxOff: true }),
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it("reuses the startup's own --bypass-approvals resolution instead of probing again", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agenc-trust-home-"));
+    const workspace = await mkdtemp(join(tmpdir(), "agenc-trust-ws-"));
+    const env = makeEnv(home, workspace);
+    const stdio = makeTtyStdio();
+    const renderPrompt = vi.fn(async () => true);
+    const sandboxProbe = vi.fn();
+    try {
+      await runProjectTrustPreflightForTui({
+        env,
+        argv: ["node", "agenc", "--bypass-approvals"],
+        cwd: workspace,
+        stdin: stdio.stdin,
+        stdout: stdio.stdout,
+        stderr: stdio.stderr,
+        renderPrompt,
+        sandboxBypass: { dangerouslyBypassApprovalsAndSandbox: true, notice: "dropped" },
+        sandboxProbe,
+      });
+      expect(sandboxProbe).not.toHaveBeenCalled();
+      expect(renderPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ sandboxOff: true }),
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it("says the sandbox is off when the config selects danger-full-access", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agenc-trust-home-"));
+    const workspace = await mkdtemp(join(tmpdir(), "agenc-trust-ws-"));
+    await writeFile(
+      join(home, "config.toml"),
+      'config_version = 2\nsandbox_mode = "danger-full-access"\n',
+      "utf8",
+    );
+    await shipRepoHook(workspace);
+    const env = makeEnv(home, workspace);
+    const stdio = makeTtyStdio();
+    const renderPrompt = vi.fn(async () => true);
+    try {
+      await expect(
+        runProjectTrustPreflightForTui({
+          env,
+          argv: ["node", "agenc"],
+          cwd: workspace,
+          stdin: stdio.stdin,
+          stdout: stdio.stdout,
+          stderr: stdio.stderr,
+          renderPrompt,
+        }),
+      ).resolves.toMatchObject({ accepted: true, prompted: true });
+      expect(renderPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ bypassPermissionsRequested: false, sandboxOff: true }),
+      );
     } finally {
       await rm(home, { recursive: true, force: true });
       await rm(workspace, { recursive: true, force: true });

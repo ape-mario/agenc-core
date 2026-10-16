@@ -202,6 +202,7 @@ import {
   resolveSessionProviderModelSelection,
 } from "../../session/provider-model-selection.js";
 import { useMcpConnectivityStatus } from "../hooks/notifs/useMcpConnectivityStatus.js";
+import { useStartupNotices } from "../hooks/notifs/useStartupNotices.js";
 import { useCostSummary } from "../../cost/hook.js";
 import { getTotalCost } from "../../cost/tracker.js";
 import { useNotifications, type Notification } from "../context/notifications.js";
@@ -4305,6 +4306,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     mcpClients,
     mcpServers: mcpSurface.servers,
   });
+  useStartupNotices();
   const title = useMemo(() => terminalTitle(props), [props]);
   const titleIsAnimating =
     transcript.isStreaming &&
