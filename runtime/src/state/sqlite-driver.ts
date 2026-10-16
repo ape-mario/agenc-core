@@ -71,6 +71,27 @@ export const STATE_PRE_V21_BACKUP_FILENAME = "agenc-state_1.pre-v21.sqlite";
 
 export type SqliteDatabase = BetterSqlite3.Database;
 
+/**
+ * When a state transaction's commit must reach the disk.
+ *
+ * - `"full"` (default): `synchronous = FULL`. The commit is fsynced before it
+ *   returns, and so is every commit before it in the WAL.
+ * - `"rebuildable"`: the transaction writes only the SQLite projection of a
+ *   canonical rollout journal (`thread_rollout_items`, its `backfill_files`
+ *   and `rollout_receipts` bookkeeping and the merged thread metadata), which
+ *   backfill rebuilds from the journal. In WAL mode it commits at
+ *   `synchronous = NORMAL`: the commit is in the WAL and visible to every
+ *   connection when it returns, and survives the process dying, but it is
+ *   fsynced only by the next FULL commit on this database (any connection) or
+ *   by a checkpoint. A power loss before that can drop it, and only it and the
+ *   other rebuildable commits after the last FULL one: WAL recovery keeps a
+ *   prefix of the commit sequence, so the database still holds every FULL
+ *   commit and stays self-consistent. The projection's receipt rolls back
+ *   with its rows, so the next index of that journal re-reads the dropped
+ *   tail. Outside WAL mode it stays FULL.
+ */
+export type StateCommitDurability = "full" | "rebuildable";
+
 type TransactionOperation = () => unknown;
 type TransactionRunner = BetterSqlite3.Transaction<
   (operation: TransactionOperation) => unknown
@@ -194,6 +215,8 @@ class PreparedStatementCache {
 
 export class StateSqliteDriver {
   readonly #eagerAdmissionState: boolean;
+  /** The state connection runs in WAL mode (see {@link StateCommitDurability}). */
+  readonly #stateWal: boolean;
   readonly projectDir: string;
   readonly #writeBehindBarrier: () => void;
   readonly stateDbPath: string;
@@ -222,7 +245,7 @@ export class StateSqliteDriver {
       // Before the WAL pragma: switching the journal mode writes the file
       // header, and auto_vacuum can only be chosen while there is none.
       configureFreshDatabaseVacuum(state);
-      configureDatabase(state);
+      this.#stateWal = configureDatabase(state);
       if (logs !== undefined) configureDatabase(logs);
       applyStateMigrations(state, paths);
       if (logs !== undefined) applyLogsMigrations(logs);
@@ -293,11 +316,15 @@ export class StateSqliteDriver {
    * commit between the check and the write. Nested calls degrade to a
    * savepoint inside the outer transaction (better-sqlite3 semantics).
    */
-  transactionImmediate<T>(fn: () => T): T {
+  transactionImmediate<T>(fn: () => T, durability: StateCommitDurability = "full"): T {
     if (!this.#eagerAdmissionState) this.#writeBehindBarrier();
     // The mode method supplies its fresh default wrapper as the callback's
     // receiver. Retain that callable family and per-invocation identity.
-    return this.withTransactionDurability(this.state, () => this.state.transaction(fn).immediate());
+    return this.withTransactionDurability(
+      this.state,
+      () => this.state.transaction(fn).immediate(),
+      durability === "rebuildable" && this.#stateWal,
+    );
   }
 
   logsTransaction<T>(fn: () => T): T {
@@ -305,18 +332,30 @@ export class StateSqliteDriver {
     return this.withTransactionDurability(logs, () => this.#logsTransaction!(fn) as T);
   }
 
-  private withTransactionDurability<T>(db: SqliteDatabase, operation: () => T): T {
+  /**
+   * Run `operation` at the connection's durability. `rebuildable` (state, WAL
+   * only) commits at NORMAL; see {@link StateCommitDurability}. Nested, an
+   * operation runs at its outer transaction's level, and a full-durability
+   * one refuses to run inside a relaxed transaction.
+   */
+  private withTransactionDurability<T>(
+    db: SqliteDatabase,
+    operation: () => T,
+    rebuildable = false,
+  ): T {
     const relaxed = relaxedOneShotTransaction(this.projectDir, this.durabilityRunId);
     if (db.inTransaction) {
-      if (!relaxed && db.pragma("synchronous", { simple: true }) !== 2) {
+      if (!relaxed && !rebuildable && db.pragma("synchronous", { simple: true }) !== 2) {
         throw new Error("a full-durability operation cannot nest in a relaxed transaction");
       }
       return operation();
     }
-    if (!relaxed) return operation();
+    if (!relaxed && !rebuildable) return operation();
+    // SQLite refuses to change the level inside a transaction, so it changes
+    // around one and only while no transaction is open.
     db.pragma("synchronous = NORMAL");
     try { return operation(); }
-    finally { db.pragma("synchronous = FULL"); }
+    finally { restoreFullSynchronous(db); }
   }
 
   /** A clean one-shot seal requires stable WAL and database bytes. */
@@ -463,13 +502,29 @@ export function openStateDatabasePathReader(
  */
 export const STATE_WAL_AUTOCHECKPOINT_PAGES = 10_000;
 
-function configureDatabase(db: SqliteDatabase): void {
-  db.pragma("journal_mode = WAL");
+/** Configure a read-write connection; returns whether it runs in WAL mode. */
+function configureDatabase(db: SqliteDatabase): boolean {
+  const wal = db.pragma("journal_mode = WAL", { simple: true }) === "wal";
   db.pragma("synchronous = FULL");
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   db.pragma("temp_store = MEMORY");
   db.pragma(`wal_autocheckpoint = ${STATE_WAL_AUTOCHECKPOINT_PAGES}`);
+  return wal;
+}
+
+/**
+ * Put a connection back to FULL after a relaxed transaction. A connection
+ * left at NORMAL would commit later full-durability work without its fsync,
+ * so if that fails the connection is closed and every later use fails.
+ */
+function restoreFullSynchronous(db: SqliteDatabase): void {
+  try {
+    db.pragma("synchronous = FULL");
+  } catch (error) {
+    if (db.open) db.close();
+    throw error;
+  }
 }
 
 function applyLogsMigrations(db: SqliteDatabase): void {

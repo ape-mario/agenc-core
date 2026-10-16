@@ -345,6 +345,12 @@ export class StateThreadRepository {
    * boundary. The fresh metadata read, rows, receipts and final filesystem
    * validation share one immediate transaction. Nothing catches an append
    * failure here, so the outer rollback also covers its private append body.
+   *
+   * The commit is "rebuildable" (see `StateCommitDurability`): it is visible
+   * to every reader when this returns, and the next FULL commit on the
+   * database makes it durable. If a power loss drops it first, its receipt
+   * goes with its rows, and the next index of this source re-reads the
+   * dropped lines from the journal.
    */
   appendRolloutProjection(params: AppendRolloutItemsParameters & {
     readonly threadMetadata: IncrementalProjectionMetadata;
@@ -377,7 +383,7 @@ export class StateThreadRepository {
       }
       this.appendRolloutItemsInTransaction(params);
       params.validateCanonical();
-    });
+    }, "rebuildable");
   }
 
   private appendRolloutItemsInTransaction(params: AppendRolloutItemsParameters): void {
