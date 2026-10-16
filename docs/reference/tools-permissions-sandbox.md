@@ -785,7 +785,7 @@ OS-level confinement for shell execution lives in `runtime/src/sandbox/`:
 | --- | --- |
 | Linux | Primary: system `bwrap` via the Node helper `agenc-linux-sandbox`. Fallback: `agenc-landlock-run` when the probe reports Landlock fully enforced. `engine/landlock.ts` only serializes helper flags; kernel Landlock is the C binary. |
 | macOS | In-tree Seatbelt (`engine/seatbelt.ts`, `engine/policies/*.sbpl`) via `/usr/bin/sandbox-exec`. No AgenC native binary. |
-| Windows | Restricted-token isolation is not implemented (`windows_restricted_token_unimplemented`). Restricted modes fail closed. Use WSL2, `external_sandbox`, or `--dangerously-bypass-approvals-and-sandbox` / `danger-full-access`. |
+| Windows | Restricted-token isolation is not implemented (`windows_restricted_token_unimplemented`). Restricted modes fail closed. The TUI asks once before the first session whether to continue without a sandbox; continuing saves `sandbox_mode = "danger-full-access"` in the user `config.toml` and keeps approvals. Otherwise use WSL2, `external_sandbox`, or `--dangerously-bypass-approvals-and-sandbox` / `danger-full-access`. |
 
 Native helpers:
 
@@ -974,7 +974,7 @@ Docker sandbox driver and SSH remote exec targets remain roadmap items
 | `[sandbox_policy_unexpressible]` on shell or workspace-write stdio MCP | Landlock cannot keep `.git` / `.agenc` read-only inside a writable project. Restore bubblewrap, use `sandbox_mode = "read-only"`, or choose `danger-full-access`. Plugin-declared MCP servers keep a tighter, Landlock-expressible profile. `Grep` / `Glob` / `Orient` use a narrowed read-only child and usually keep working. |
 | `[sandbox_policy_unexpressible]` + `reserved Desktop authority paths require non-overridable read-only carve-outs` | `AGENC_HOME` sits under a writable workspace or session temp ancestor. Landlock cannot keep that home read-only. Restore bubblewrap, or move `AGENC_HOME` off the writable root. Do not reinstall the helper. Distinct from home-as-workspace helper containment. See [AgenC home under writable sandbox roots](#agenc-home-under-writable-sandbox-roots). |
 | `/proc` or `/sys` reads fail with `EACCES` on Landlock fallback | Expected. The fallback never grants those roots, including under full-disk-read. Restore bubblewrap for a private procfs, or avoid `/proc`-dependent commands. |
-| Windows restricted-mode spawn refused | Native restricted-token isolation is unimplemented. Use WSL2, `external_sandbox`, or the deliberate danger-mode escape hatch. |
+| Windows restricted-mode spawn refused | Native restricted-token isolation is unimplemented. Start the TUI once and choose Continue on the "No sandbox on Windows" card (it saves `sandbox_mode = "danger-full-access"`), or use WSL2, `external_sandbox`, or the deliberate danger-mode escape hatch. A project or profile that sets a restricted `sandbox_mode` keeps failing closed. |
 
 ## Pre-execute guards
 

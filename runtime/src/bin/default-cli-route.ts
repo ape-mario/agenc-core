@@ -88,7 +88,7 @@ export async function runDefaultCliRoute(
         env: process.env,
         argv,
         startupCliFlags,
-        cwd: routeCwd?.ok === true ? routeCwd.cwd : process.cwd(),
+        ...(routeCwd?.ok === true ? { cwd: routeCwd.cwd } : {}),
       }))
     ) {
       return 1;

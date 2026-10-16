@@ -211,11 +211,17 @@ which AgenC looks for under `C:\Program Files\Git\bin`,
 set `AGENC_SHELL` to the absolute path of another bash or zsh. When no shell is
 found the error lists every path it checked and why each was rejected.
 
-There is no Windows sandbox yet. The sandboxed permission modes refuse to
-start a session on Windows (`sandbox_required_unavailable`); use
-`--dangerously-bypass-approvals-and-sandbox`, WSL2 with bubblewrap, or an
-external sandbox. Credentials are kept in a DPAPI-protected file under the
-AgenC home and decrypted through PowerShell once per process.
+There is no Windows sandbox yet. The first time you start the TUI on Windows,
+AgenC asks once whether to continue without a sandbox. Continue saves
+`sandbox_mode = "danger-full-access"` in your `config.toml`. Approvals still
+apply, so the default mode asks before each command and file edit. Quit saves
+nothing, and the question comes back on the next start. To answer again, run
+`agenc config unset sandbox_mode`. A run without a terminal (`agenc -p`) never
+asks: until you have answered, it refuses with `sandbox_required_unavailable`,
+and it cannot answer approvals, so pass `--bypass-approvals` for unattended
+runs. For a sandbox, use WSL2 with bubblewrap or an external sandbox.
+Credentials are kept in a DPAPI-protected file under the AgenC home and
+decrypted through PowerShell once per process.
 
 ## Supported hosts
 

@@ -27,6 +27,7 @@ import {
   type SandboxExecutionStatus,
 } from "../sandbox/execution-broker.js";
 import { sandboxPolicyValueFromAgenCConfig } from "../session/configuration.js";
+import { readProcessCwdSafely } from "./cli-cwd.js";
 import {
   readStartupCliFlags,
   startupConfigLayerOptions,
@@ -140,10 +141,13 @@ export async function runWindowsSandboxChoiceForTui(
     return NOT_NEEDED;
   }
   const agencHome = resolveAgencHome(env);
+  // A resume can start from a folder that no longer exists; the AgenC home
+  // still gives the config layers a place to start from.
   const workspace =
-    options.useEnvWorkspace === false
-      ? (options.cwd ?? process.cwd())
-      : (resolveWorkspaceFromEnv(env) ?? options.cwd ?? process.cwd());
+    (options.useEnvWorkspace === false ? undefined : resolveWorkspaceFromEnv(env)) ??
+    options.cwd ??
+    readProcessCwdSafely() ??
+    agencHome;
   const source = await startupSandboxSource({
     env,
     agencHome,
@@ -176,17 +180,24 @@ export async function runWindowsSandboxChoiceForTui(
   });
   if (!accepted) return { kind: "quit" };
   const patch = { sandbox_mode: WINDOWS_NO_SANDBOX_MODE };
-  assertConfigPatchAuthority("user", patch);
   const configPath = getConfigFilePath(agencHome);
-  mutateCanonicalUserConfigSync(configPath, (raw) => {
-    raw.sandbox_mode = patch.sandbox_mode;
-  });
+  try {
+    assertConfigPatchAuthority("user", patch);
+    mutateCanonicalUserConfigSync(configPath, (raw) => {
+      raw.sandbox_mode = patch.sandbox_mode;
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`could not save sandbox_mode in ${configPath}: ${message}`, {
+      cause: error,
+    });
+  }
   return { kind: "continued", configPath };
 }
 
 /**
  * Ask on Windows when needed; false means the TUI must not start (the user
- * quit, or the answer could not be saved).
+ * quit, or asking or saving the answer failed).
  */
 export async function requireWindowsSandboxChoiceForTui(
   options: WindowsSandboxChoiceOptions = {},
@@ -197,7 +208,7 @@ export async function requireWindowsSandboxChoiceForTui(
     choice = await runWindowsSandboxChoiceForTui(options);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    stderr.write(`agenc: could not save the Windows sandbox choice: ${message}\n`);
+    stderr.write(`agenc: ${message}\n`);
     return false;
   }
   if (choice.kind === "quit") {

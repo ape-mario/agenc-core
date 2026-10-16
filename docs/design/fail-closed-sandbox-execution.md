@@ -78,7 +78,10 @@ and adding a boundary regression test.
 - macOS requires `/usr/bin/sandbox-exec` and a bounded restricted-process probe.
 - Native Windows restricted-token isolation is not implemented, so restricted
   execution fails closed. Operators can use WSL2, an explicit external sandbox,
-  or deliberately select danger-full-access.
+  or deliberately select danger-full-access. The interactive TUI asks once
+  before the first session; Continue is that deliberate selection, saved as
+  `sandbox_mode = "danger-full-access"` in the user config. It never replaces
+  a sandbox mode a user, profile or repository chose.
 
 Probe results are cached per session. Daemon `commandExec` applies the same
 behavioral probe before transform/spawn. A successful probe does not weaken the
