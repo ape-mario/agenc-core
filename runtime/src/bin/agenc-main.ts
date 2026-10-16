@@ -3,10 +3,9 @@ import { readCompactionProgressEvent } from "../services/compact/progress.js";
 import type { CompactionProgressEvent } from "../services/compact/types.js";
 import type { OneShotContinueSession } from "./route.js";
 import { reproveResumeDescriptor, type ResumeCwdProof, openResumeCwdProof, assertResumeCwdProof, assertLiveAgentMatchesResumeDescriptor, isCanonicalSessionAlreadyActiveError } from "./daemon-one-shot-continue.js";
-import { runDefaultCliRoute } from "./default-cli-route.js";
+import { requireWindowsSandboxChoiceBeforeTui, runDefaultCliRoute } from "./default-cli-route.js";
 import { readProcessCwdSafely, resolveCliCwdForStartup, writeUnavailableCliCwd } from "./cli-cwd.js";
 import { requireProjectTrustForTui } from "./project-trust-preflight.js";
-import { requireWindowsSandboxChoiceForTui } from "./windows-sandbox-choice.js";
 import { prepareCliRuntime } from "./cli-runtime.js";
 import { runCliProcessMain } from "./cli-process-main.js";
 import { isDirectInvocation, shouldRunDaemonStartupSecurityAudit } from "./daemon-entry-policy.js";
@@ -3395,18 +3394,6 @@ export async function bootTUIEntry(
     if (!cliCwd.ok) {
       return writeUnavailableCliCwd();
     }
-    // Windows asks once whether to run without a sandbox, before the trust
-    // card, so the trust card's note already reflects the answer.
-    if (
-      args.resumeId === undefined &&
-      !(await requireWindowsSandboxChoiceForTui({
-        env: sessionEnv,
-        startupCliFlags,
-        cwd: cliCwd.cwd,
-      }))
-    ) {
-      return 1;
-    }
     if (
       args.resumeId === undefined &&
       !(await requireProjectTrustForTui({
@@ -4092,16 +4079,6 @@ async function resumeResolvedTUIEntry(
   }
   try {
     if (
-      !(await requireWindowsSandboxChoiceForTui({
-        env: process.env,
-        startupCliFlags,
-        cwd: descriptor.cwd,
-        useEnvWorkspace: false,
-      }))
-    ) {
-      return 1;
-    }
-    if (
       !(await requireProjectTrustForTui({
         env: process.env,
         argv: process.argv,
@@ -4368,7 +4345,7 @@ export async function main(): Promise<number> {
         cwd: agentStartCwd,
         ensureDaemonReady: async () => {
           if (
-            !(await requireWindowsSandboxChoiceForTui({
+            !(await requireWindowsSandboxChoiceBeforeTui({
               env: process.env,
               argv: process.argv,
               cwd: agentStartCwd,

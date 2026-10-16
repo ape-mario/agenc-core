@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { requireWindowsSandboxChoiceBeforeTui } from "../../src/bin/default-cli-route.js";
 import {
   WINDOWS_SANDBOX_QUIT_MESSAGE,
   requireWindowsSandboxChoiceForTui,
@@ -216,6 +217,28 @@ describe("Windows no-sandbox card", () => {
       expect(renderPrompt).not.toHaveBeenCalled();
     },
   );
+
+  it("is a no-op off Windows at the CLI route and asks on Windows", async () => {
+    const renderPrompt = vi.fn(async () => false);
+    const stderr = { write: vi.fn(() => true) } as unknown as NodeJS.WriteStream;
+    await expect(
+      requireWindowsSandboxChoiceBeforeTui({ platform: "linux", renderPrompt, stderr }),
+    ).resolves.toBe(true);
+    expect(renderPrompt).not.toHaveBeenCalled();
+    await expect(
+      requireWindowsSandboxChoiceBeforeTui({
+        env: env(),
+        argv: ARGV,
+        cwd: workspace,
+        platform: "win32",
+        probe: () => windowsStatus(),
+        renderPrompt,
+        stderr,
+        ...terminal(),
+      }),
+    ).resolves.toBe(false);
+    expect(renderPrompt).toHaveBeenCalledOnce();
+  });
 
   it("leaves a run without a terminal to the existing refusal", async () => {
     const renderPrompt = vi.fn(async () => true);
