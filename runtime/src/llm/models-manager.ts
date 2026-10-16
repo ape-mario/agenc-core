@@ -62,6 +62,14 @@ export class StaticModelsManager implements ModelsManager {
     return await this.resolveModelInfo({ provider, model });
   }
 
+  /** Read completed discovery without starting or waiting for a lookup. */
+  tryGetModelInfoForProvider(provider: string, model: string): ModelInfo | undefined {
+    if (this.modelRegistry.metadataRevision({ provider, model }) !== this.metadataRevision) {
+      return undefined;
+    }
+    return this.modelInfoCache.get(`${provider}:${model}`);
+  }
+
   tryListModels(): ReadonlyArray<ModelInfo> | undefined {
     return this.pickerModels();
   }

@@ -652,6 +652,16 @@ optional `headers`), `github` (`repo`, optional `ref`, `path`, `sparsePaths`),
 
 ### Authentication, providers, and profiles
 
+Catalogued DeepSeek models can start a cold session with built-in limits while
+endpoint metadata refreshes in the background. Once that refresh completes, the
+next turn adopts the live context window and output limit, including smaller
+limits advertised by a proxy. Compaction and request budgets use that turn's
+limits; an already running turn keeps its snapshot. Set
+`providers.deepseek.context_window_tokens` and
+`providers.deepseek.max_output_tokens` when a proxy needs specific limits from
+the first turn. Explicitly configured DeepSeek limits take precedence over
+discovered metadata.
+
 | Paths | Type / meaning |
 | --- | --- |
 | `auth` | Authentication policy block. |
