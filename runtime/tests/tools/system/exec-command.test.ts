@@ -342,8 +342,25 @@ describe("exec_command tool", () => {
         approvalPolicy: "never", mode: "bypassPermissions", sandboxMode: "workspace_write", platformSandbox: true, toolName,
       }));
       expect(result.content).toContain("network access was disabled");
-      expect(result.content).toContain("approval flow before retrying");
+      expect(result.content).toContain('retry it once with sandbox_permissions="require_escalated"');
       expect(result.content).not.toContain("approval is unavailable");
+    });
+
+    // curl -s prints only its -w value when the lookup fails, so the exit status is the only signal.
+    test("a silent curl that cannot resolve its host gets the same notice", async () => {
+      const output = failedExecOutput("000", 6);
+      const manager: UnifiedExecProcessManagerLike = {
+        maxTimeoutMs: 30_000,
+        execCommand: vi.fn(async () => output),
+        writeStdin: vi.fn(async () => output),
+        closeAll: vi.fn(async () => {}),
+      };
+      const tool = createExecCommandTool({ cwd: root, unifiedExecManager: manager });
+      const result = await tool.execute(contextArgs({ cmd: "curl -s -o /dev/null -w '%{http_code}' https://example.com" }, {
+        approvalPolicy: "never", mode: "bypassPermissions", sandboxMode: "workspace_write", platformSandbox: true, toolName: "exec_command",
+      }));
+      expect(result.content).toContain("network access was disabled");
+      expect(result.content).toContain('sandbox_permissions="require_escalated"');
     });
 
     test("an ordinary failure is left alone", async () => {
