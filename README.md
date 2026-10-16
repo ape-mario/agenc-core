@@ -8,6 +8,11 @@
 ![node](https://img.shields.io/badge/node-26.x-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict%20%E2%80%A2%200%20%40ts--nocheck-3178C6?logo=typescript&logoColor=white)
 
+An open source AI coding agent for your terminal. It works with any model
+provider. With DeepSeek V4.1 Flash it scored 76.2% on Terminal-Bench 2.1 for $34
+([results](https://get.agenc.ag/terminal-bench/)). Install it from
+[get.agenc.ag](https://get.agenc.ag).
+
 **AgenC Core** is the implementation repository for the `agenc` CLI. A local
 daemon owns agent/session lifecycle, permissions, provider calls, and command
 execution. The interactive TUI, headless `--print` / `--no-tui` CLI, background
