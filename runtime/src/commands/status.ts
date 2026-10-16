@@ -49,6 +49,7 @@ export type GitStatusSummary =
       readonly changedFiles: number;
     }
   | { readonly state: "not-repo"; readonly message: string }
+  | { readonly state: "no-git"; readonly message: string }
   | { readonly state: "error"; readonly message: string };
 
 type GitRunner = (args: readonly string[], cwd: string) => Promise<GitCommandResult>;
@@ -89,6 +90,11 @@ export function summarizeGitStatus(params: {
       /^fatal: not a git repository \(or any /m.test(params.insideWorkTree.stderr)
     ) {
       return { state: "not-repo", message: "Run /status inside a git work tree for branch state." };
+    }
+    // Without git on PATH the spawn itself fails (spawn git ENOENT): that is no repository
+    // state to report, not a broken one.
+    if (params.insideWorkTree.code === -1 && /\bENOENT\b/.test(params.insideWorkTree.stderr)) {
+      return { state: "no-git", message: "Install git to see branch state here." };
     }
     return { state: "error", message: params.insideWorkTree.stderr || "git repository discovery failed" };
   }

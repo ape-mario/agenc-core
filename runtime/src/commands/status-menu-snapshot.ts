@@ -122,6 +122,8 @@ function gitRow(git: GitStatusSummary): StatusDashboardRow {
       );
     case "not-repo":
       return row("git", "working tree", "not a git repository", "info", git.message);
+    case "no-git":
+      return row("git", "working tree", "git not installed", "info", git.message);
     case "error":
       return row("git", "working tree", "error", "error", git.message);
   }
