@@ -325,11 +325,16 @@ export function classifyOpenAIHttpFailure(options: {
     };
   }
 
+  // A 5xx with an HTML or other non-JSON body is a gateway or load-balancer
+  // error page (502, 503, 504 during an outage), so it falls through to the
+  // retryable server failure below instead of ending the turn.
   if (
     (options.status >= 200 &&
       options.status < 300 &&
       isMalformedProviderResponse(body)) ||
-    (options.status >= 400 && isMalformedProviderResponse(body))
+    (options.status >= 400 &&
+      options.status < 500 &&
+      isMalformedProviderResponse(body))
   ) {
     return {
       source: "http",
