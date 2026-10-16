@@ -47,7 +47,9 @@ export const RARE_DEFERRED_TOOLS: ReadonlyArray<readonly [name: string, purpose:
  * and Grep cover Orient's job. MultiEdit stays: without it DeepSeek made
  * several edits to one file one call at a time. Skill stays:
  * the skill listing names skills in every session, and a deferred Skill cost a
- * search call each time the model went for a listed skill.
+ * search call each time the model went for a listed skill. The question and
+ * plan-mode tools load when needed; a session in plan mode sees
+ * PLAN_MODE_TOOLS without a search.
  */
 export const STANDARD_ON_DEMAND_TOOLS: ReadonlyArray<readonly [name: string, purpose: string]> = [
   ["TodoWrite", "a visible plan for long work with many steps"],
@@ -55,7 +57,13 @@ export const STANDARD_ON_DEMAND_TOOLS: ReadonlyArray<readonly [name: string, pur
   ["web_fetch", "fetch a web page"],
   ["WebSearch", "search the web"],
   ["report_agent_job_result", "a CSV job worker records its result"],
+  ["AskUserQuestion", "ask the user a multiple-choice question"],
+  ["EnterPlanMode", "ask to plan a large change before making it"],
+  ["ExitPlanMode", "present a plan for approval"],
 ];
+
+/** Deferred tools a session in plan mode always sees: it plans, asks and asks for approval. */
+export const PLAN_MODE_TOOLS: ReadonlySet<string> = new Set(["AskUserQuestion", "ExitPlanMode"]);
 
 /** The delegation entry point; selecting it also loads its companions. */
 export const DELEGATION_ENTRY_TOOL = "spawn_agent";

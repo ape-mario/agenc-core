@@ -187,37 +187,16 @@ function memorySearchExample(): string {
 /**
  * Path-free memory instructions for the cacheable static head of the system
  * prompt: when to save, where, the one-fact-per-file frontmatter format, the
- * `MEMORY.md` index, and how to recall. Roughly 650 tokens.
+ * `MEMORY.md` index, and how to recall. Roughly 350 tokens.
  */
 export function buildMemoryInstructionLines(): string[] {
   return [
     `# ${AUTO_MEM_DISPLAY_NAME}`,
     '',
-    `You have persistent, file-based memory directories: a global memory directory for user-level facts that apply across projects, and a project memory directory for facts about this repository. Their paths are listed under "Memory directories" in this prompt. Each directory already exists and holds one markdown file per memory plus a \`${ENTRYPOINT_NAME}\` index.`,
-    '',
-    '## When to save',
-    '- When the user asks you to remember something, save it immediately. When they ask you to forget something, delete the memory file and its index line.',
-    '- Save facts about the user (role, expertise, how they want to work), feedback (corrections and approaches the user confirmed, with the reason), project context that is not in the code (decisions and why, deadlines, incidents, who owns what), and references (where things live in external systems).',
-    '- Do not save code patterns, architecture, file paths, git history, fix recipes, anything already in AGENC.md, or in-progress task state; these are derivable from the repository. If the user asks you to save an activity log or PR list, ask what was surprising or non-obvious about it and save that.',
-    '',
-    '## How to save',
-    'One fact per file. Write `<topic>.md` in the matching directory with this frontmatter, then the fact:',
-    '```markdown',
-    '---',
-    'name: {{short name}}',
-    'description: {{one line used to judge relevance in later sessions, be specific}}',
-    `type: {{${MEMORY_TYPES.join(', ')}}}`,
-    '---',
-    '',
-    '{{the fact; for feedback and project memories add a **Why:** line and a **How to apply:** line}}',
-    '```',
-    `Then add one line to that directory's \`${ENTRYPOINT_NAME}\` index: \`- [Title](topic.md): one-line hook\`. \`${ENTRYPOINT_NAME}\` is an index, not a memory: one line per file, no frontmatter, under 150 characters per line, and only its first ${MAX_ENTRYPOINT_LINES} lines are loaded. Before writing, check for an existing file on the topic and update or delete it instead of adding a duplicate.`,
-    '',
-    '## How to recall',
-    `- Both \`${ENTRYPOINT_NAME}\` indexes are loaded into your context, and memories that match the current request may be attached to a turn. When an index line looks relevant, read that file. You must check memory when the user asks you to check, recall, or remember something.`,
-    `- To search memory: ${memorySearchExample()}.`,
-    '- A memory is a claim about the past. Before recommending a file, function, or flag it names, verify it still exists; trust what you observe now and fix or delete the stale memory.',
-    '- If the user says to ignore memory, proceed as if the indexes were empty and do not mention memory content.',
+    `You have file-based memory: a global directory for user-level facts across projects and a project directory for this repository, both listed under "Memory directories". Each holds one markdown file per memory and a \`${ENTRYPOINT_NAME}\` index.`,
+    '- Save at once when the user asks you to remember something; when they ask you to forget something, delete the file and its index line. Also save who the user is and how they want to work, feedback they gave or confirmed (with the reason), project context that is not in the code (decisions and why, deadlines, incidents, owners) and pointers to external systems. Never save code patterns, file paths, git history, fix recipes, AGENC.md content or in-progress task state; if asked to save an activity log, save what was non-obvious about it.',
+    `- One fact per file: \`<topic>.md\` with frontmatter \`name\`, \`description\` (one specific line used to judge relevance later) and \`type\` (${MEMORY_TYPES.join(', ')}), then the fact; feedback and project memories add a **Why:** line and a **How to apply:** line. Then add \`- [Title](topic.md): one-line hook\` to that directory's \`${ENTRYPOINT_NAME}\` (an index: one line per file, under 150 characters, no frontmatter; only its first ${MAX_ENTRYPOINT_LINES} lines load). Update an existing file on the topic instead of adding a duplicate.`,
+    `- Both indexes are in your context and matching memories may be attached to a turn: read a file when its line looks relevant, and always check memory when the user asks you to check, recall or remember. Search with ${memorySearchExample()}. A memory is a claim about the past: verify that what it names still exists, and fix or delete it when stale. If the user says to ignore memory, act as if the indexes were empty.`,
   ]
 }
 

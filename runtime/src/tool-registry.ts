@@ -28,7 +28,7 @@ import { prepareModelToolArgs, validateToolPreflight } from "./tools/execution.j
  */
 
 import type { LLMTool, LLMToolCall } from "./llm/types.js";
-import { lightPresentation } from "./tools/light-presentation.js";
+import { lightPresentation, standardPresentation } from "./tools/light-presentation.js";
 import { LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES, LIGHT_INITIAL_TOOL_NAMES, lightEditsWithApplyPatch } from "./tools/light-profile.js";
 import type { FunctionCallOutputContentItem } from "./tools/context.js";
 import type {
@@ -49,6 +49,7 @@ import { SYSTEM_SEARCH_TOOLS_NAME } from "./tools/system/tool-search-name.js";
 import {
   isRareDeferredTool,
   isStandardDeferredTool,
+  PLAN_MODE_TOOLS,
   PROCESS_SESSION_TOOLS,
   rareToolPointer,
   withDeferredCompanions,
@@ -1291,12 +1292,17 @@ export function buildToolRegistry(
   }
 
   function isDeferredSpec(spec: ConfiguredToolSpec): boolean {
+    if (standardDeferral && PLAN_MODE_TOOLS.has(spec.tool.name) && planModeActive()) return false;
     return spec.deferred === true ||
       (deferRareTools && (standardDeferral
         // A policy without system.searchTools (coordinator mode, for one)
         // could never load them, so they stay advertised there.
         ? isStandardDeferredTool(spec.tool.name) && searchToolAvailable()
         : isRareDeferredTool(spec.tool.name)));
+  }
+
+  function planModeActive(): boolean {
+    return options.getSession?.()?.services?.permissionModeRegistry?.current().mode === "plan";
   }
 
   // Called for every spec while a request's tool list is built, so the answer
@@ -1435,10 +1441,12 @@ export function buildToolRegistry(
         const tool = toolToLLMTool(spec.tool);
         if (spec.tool.metadata?.source !== "builtin") return tool;
         if (options.lightMode === true) return lightPresentation(tool, { leanExec });
-        // Standard sessions with the default deferral send Light's compact
-        // wording for the core tools Light also uses (same fields, same schema).
-        return standardDeferral && STANDARD_COMPACT_PRESENTATION.has(spec.tool.name)
-          ? lightPresentation(tool) : tool;
+        // Standard sessions with the default deferral send compact wording for
+        // the core tools (same fields, same schema) and the lean exec_command
+        // until system.searchTools selects it.
+        return standardDeferral
+          ? standardPresentation(tool, { lightWording: STANDARD_COMPACT_PRESENTATION.has(spec.tool.name), leanExec })
+          : tool;
       });
       if (!deferRareTools) return tools;
       const pointer = rareToolPointer(new Set(router.getSpecs()

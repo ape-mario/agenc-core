@@ -182,9 +182,11 @@ describe("lean system prompt", () => {
     expect(contract(lean.staticPrefix)).toBe(contract(standard.staticPrefix));
   });
 
-  test("is at least a third shorter than the standard head", async () => {
+  test("is at least a quarter shorter than the standard head", async () => {
+    // The standard head is itself condensed now, so the margin is smaller
+    // than the third it once was.
     const standard = await assemble({});
     const lean = await assemble({ [LEAN_SYSTEM_PROMPT_ENV]: "1" });
-    expect(lean.staticPrefix.length).toBeLessThan(standard.staticPrefix.length * (2 / 3));
+    expect(lean.staticPrefix.length).toBeLessThan(standard.staticPrefix.length * 0.75);
   });
 });

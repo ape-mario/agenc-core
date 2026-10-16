@@ -708,11 +708,14 @@ describe("bootstrapLocalRuntimeSession", () => {
       // work needs a visible plan.
       expect(boot.registry.tools.map((tool) => tool.name)).toContain("TodoWrite");
       expect(providerToolNames).not.toContain("TodoWrite");
+      // The plan-mode tools are registered too and load on demand outside plan mode.
+      for (const name of ["EnterPlanMode", "ExitPlanMode"]) {
+        expect(boot.registry.tools.map((tool) => tool.name)).toContain(name);
+        expect(providerToolNames).not.toContain(name);
+      }
       expect(providerToolNames).toEqual(
         expect.arrayContaining([
           "exec_command",
-          "EnterPlanMode",
-          "ExitPlanMode",
           "system.searchTools",
           extraTool.name,
         ]),
