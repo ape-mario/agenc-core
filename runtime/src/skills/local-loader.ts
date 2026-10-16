@@ -1996,22 +1996,19 @@ export function rankSkillsForRequest(
   };
 }
 
-/** Skills a compact listing describes: the ones the opening request is about. */
-const COMPACT_DESCRIBED_LIMIT = 3;
-
 /**
  * The skill listing of a session with compact presentation (memory and skill
- * guidance on demand): a description line for at most three skills the
- * opening request is about, then every other skill by name. The listing rides
- * on every request, so descriptions the request does not need stay out of it.
- * Only the described skills count as listed: a later turn's relevance block
- * (rankSkillsForRequest) can still describe the others when a request is about
- * them.
+ * guidance on demand): every skill by name, no descriptions. The listing rides
+ * on every request, and a skill's own text explains it once Skill loads it.
+ * Describing the request's best match up front was tried and dropped: on the
+ * qb ten, a request to build a Node server got only the verify skill described
+ * ("a concrete verification pass for CLI, server, or UI changes"), and three of
+ * four runs started the server in the foreground and spent 159 to 271 s
+ * polling and killing it, against 33 to 56 s for the full listing.
  */
 export function buildCompactSkillListing(
   skills: readonly SkillListingEntry[],
   contextWindowTokens?: number,
-  request?: string | null,
 ): {
   readonly listing: string;
   readonly stats: SkillListingStats;
@@ -2019,34 +2016,11 @@ export function buildCompactSkillListing(
 } {
   const commands = skills.filter((skill) => !skill.disableModelInvocation);
   const budget = getListingCharBudget(contextWindowTokens);
-  // Described up front only on a strong match: the request names the skill or
-  // shares two words with its description. One shared word ("modify", "test")
-  // described keybindings and agenc-in-browser for a request to fix failing
-  // npm tests.
-  const terms = requestMatchTokens(request);
-  const strong = (skill: SkillListingEntry): boolean => {
-    const entry = indexedSkill(skill);
-    let shared = 0;
-    for (const term of terms) {
-      if (entry.nameTerms.has(term)) return true;
-      if (entry.textTerms.has(term)) shared += 1;
-    }
-    return shared >= 2;
-  };
-  const ranked = rankSkillsForRequest(commands, request, new Set(), commands.length);
-  const byName = new Map(commands.map((skill) => [skill.name, skill]));
-  const picks = ranked.names
-    .map((name, index) => ({ name, line: ranked.lines[index]! }))
-    .filter((pick) => strong(byName.get(pick.name)!))
-    .slice(0, COMPACT_DESCRIBED_LIMIT);
-  const described = { names: picks.map((pick) => pick.name), lines: picks.map((pick) => pick.line) };
-  const describedNames = new Set(described.names);
-  const lines = [...described.lines];
-  let used = lines.reduce((sum, line) => sum + line.length + 1, 0);
   const names: string[] = [];
+  const listedNames: string[] = [];
+  let used = "Skills: .".length;
   let hidden = 0;
   for (const skill of commands) {
-    if (describedNames.has(skill.name)) continue;
     const label = skill.pluginId === undefined
       ? skill.name
       : `${skill.name} [plugin: ${truncate(sanitizeSkillListingMetadata(skill.pluginId), 96)}]`;
@@ -2055,22 +2029,23 @@ export function buildCompactSkillListing(
       continue;
     }
     names.push(label);
+    listedNames.push(skill.name);
     used += label.length + 2;
   }
-  if (names.length > 0) lines.push(`${lines.length > 0 ? "Other skills" : "Skills"}: ${names.join(", ")}.`);
+  const lines = names.length > 0 ? [`Skills: ${names.join(", ")}.`] : [];
   if (hidden > 0) lines.push(formatHiddenSkillsLine(hidden));
   const listing = lines.join("\n");
   return {
     listing,
     stats: {
       invocable: commands.length,
-      listed: commands.length - hidden,
+      listed: listedNames.length,
       hidden,
       budgetChars: budget,
       usedChars: listing.length,
-      ranked: described.names.length > 0,
+      ranked: false,
     },
-    listedNames: described.names,
+    listedNames,
   };
 }
 

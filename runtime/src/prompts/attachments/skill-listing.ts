@@ -132,14 +132,15 @@ export const skillListingProducer: AttachmentProducer = async (opts, tracking) =
     for (const name of relevant.names) tracking.listedSkillNames.add(name);
     return [{ kind: "skill_relevance", content: relevant.lines.join("\n"), ...(compact ? { compact: true } : {}) }];
   }
-  const { listing, stats, listedNames } = (compact ? buildCompactSkillListing : buildSkillListingWithinBudget)(
-    catalog,
-    opts.contextWindowTokens,
-    // What the user just asked for decides which skills get the budget when
-    // the installed catalog does not fit, and which ones a compact listing
-    // describes.
-    opts.userInput,
-  );
+  const { listing, stats, listedNames } = compact
+    ? buildCompactSkillListing(catalog, opts.contextWindowTokens)
+    : buildSkillListingWithinBudget(
+        catalog,
+        opts.contextWindowTokens,
+        // What the user just asked for decides which skills get the budget when
+        // the installed catalog does not fit.
+        opts.userInput,
+      );
   for (const name of listedNames) tracking.listedSkillNames.add(name);
   // What the model was shown is otherwise unrecoverable: the listing is an
   // attachment, so it never reaches the rollout, and the provider trace keeps
