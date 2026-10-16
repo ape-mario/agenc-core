@@ -153,14 +153,19 @@ export function WindowsSandboxDialog(
       paddingX={2}
       paddingTop={1}
     >
-      <ThemedText color="text" bold>
+      {/* wrap-trim drops the space a soft wrap would carry to the next line. */}
+      <ThemedText color="text" bold wrap="wrap-trim">
         {WINDOWS_SANDBOX_CARD_COPY.warning}
       </ThemedText>
       <Box marginTop={1}>
-        <ThemedText color="text">{WINDOWS_SANDBOX_CARD_COPY.body}</ThemedText>
+        <ThemedText color="text" wrap="wrap-trim">
+          {WINDOWS_SANDBOX_CARD_COPY.body}
+        </ThemedText>
       </Box>
       <Box marginTop={1}>
-        <ThemedText color="inactive">{WINDOWS_SANDBOX_CARD_COPY.note}</ThemedText>
+        <ThemedText color="inactive" wrap="wrap-trim">
+          {WINDOWS_SANDBOX_CARD_COPY.note}
+        </ThemedText>
       </Box>
       <Box marginTop={1} flexDirection="row" justifyContent="flex-end">
         {button("quit", "n")}
