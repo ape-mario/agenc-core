@@ -2721,6 +2721,9 @@ const BUNDLED_SKILLS: readonly BundledSkillDefinition[] = [
   {
     name: "simplify",
     description: "Review changed code for reuse, quality, and efficiency, then fix issues.",
+    // GPT-6 Luna ran it unasked once its own fix passed: three review agents, about 50 s and 365k
+    // tokens more (2026-10-16 race). The listing line must stay within SKILL_LISTING_DESC_MAX_CHARS.
+    whenToUse: "Only if the user asks to review or clean up.",
     argumentHint: "[additional focus]",
     getPrompt: (args) =>
       args.trim()
