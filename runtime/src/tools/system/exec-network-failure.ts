@@ -22,6 +22,8 @@ export function execNetworkFailureNotice(params: {
   readonly command?: string;
   readonly runtimeSandbox?: UnifiedExecRuntimeSandbox;
   readonly escalationAvailable: boolean;
+  /** Approvals are off (bypass), so the escalated retry runs without asking anyone. */
+  readonly escalationWithoutAsking?: boolean;
 }): string | null {
   const sandbox = params.runtimeSandbox;
   if (
@@ -32,8 +34,15 @@ export function execNetworkFailureNotice(params: {
     !(LOOKUP_FAILURE.test(params.output) || silentClientNetworkFailure(params.command, params.exitCode))
   ) return null;
 
-  return "[sandbox] This command's network access was disabled; " +
-    (params.escalationAvailable
-      ? "retry it once with sandbox_permissions=\"require_escalated\" and a short justification."
-      : "network approval is unavailable in this session, so use local dependencies or report the blocker.");
+  if (!params.escalationAvailable) {
+    return "[sandbox] This command's network access was disabled; " +
+      "network approval is unavailable in this session, so use local dependencies or report the blocker.";
+  }
+  // Models in bypass sessions sometimes declined the retry as "working around your sandbox setting":
+  // say that the user turned approvals off, so the retry is theirs to run.
+  return params.escalationWithoutAsking === true
+    ? "[sandbox] This command's network access was disabled. Approvals are off in this session, so a retry " +
+      "with sandbox_permissions=\"require_escalated\" runs without asking: retry it once."
+    : "[sandbox] This command's network access was disabled; retry it once with " +
+      "sandbox_permissions=\"require_escalated\" and a short justification.";
 }
