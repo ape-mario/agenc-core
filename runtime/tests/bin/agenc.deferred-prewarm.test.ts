@@ -416,4 +416,32 @@ describe("speculative TUI session provisioning", () => {
       { agentId: "agent-1", reason: "tui_prewarm_unused" },
     ]);
   });
+
+  it("retires the unused session when the terminal goes away, and the close stops nothing more", async () => {
+    const h = harness();
+    const { deferred } = await deferredSession(h);
+
+    deferred.prewarm();
+    await vi.waitFor(() => expect(h.requests.some(({ method }) => method === "agent.attach")).toBe(true));
+    await deferred.retireUnusedOnTerminalLoss();
+
+    expect(stops(h).map(({ params }) => params)).toEqual([
+      { agentId: "agent-1", reason: "tui_prewarm_unused" },
+    ]);
+    await deferred.close();
+    expect(stops(h)).toHaveLength(1);
+  });
+
+  it("leaves a used session to the daemon when the terminal goes away", async () => {
+    const h = harness();
+    const { deferred, session } = await deferredSession(h);
+
+    deferred.prewarm();
+    await vi.waitFor(() => expect(h.requests.some(({ method }) => method === "agent.attach")).toBe(true));
+    await session.submit("fix the failing tests");
+    await deferred.retireUnusedOnTerminalLoss();
+
+    expect(h.deps.stopPromptAgent).not.toHaveBeenCalled();
+    expect(stops(h)).toHaveLength(0);
+  });
 });

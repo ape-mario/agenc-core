@@ -840,6 +840,7 @@ async function loadBootTUI(): Promise<
     initialComposerText?: string;
     initialUserMessages?: readonly LLMMessage[];
     stdinMode?: "readable" | "data";
+    beforeTerminalLossExit?: () => Promise<void>;
   }) => Promise<{ unmount: () => void; waitUntilExit: () => Promise<void> }>
 > {
   // The path is relative to the *compiled* output layout (both
@@ -860,6 +861,7 @@ async function loadBootTUI(): Promise<
       initialComposerText?: string;
       initialUserMessages?: readonly LLMMessage[];
       stdinMode?: "readable" | "data";
+      beforeTerminalLossExit?: () => Promise<void>;
     }) => Promise<{
       unmount: () => void;
       waitUntilExit: () => Promise<void>;
@@ -1214,6 +1216,11 @@ async function createDeferredDaemonPromptTuiSession(params: {
    * types, so the first prompt starts its turn at once. Safe to skip.
    */
   readonly prewarm: () => void;
+  /**
+   * The terminal went away: retire the speculative session if no prompt used
+   * it. A used session keeps running in the daemon and is not waited for.
+   */
+  readonly retireUnusedOnTerminalLoss: () => Promise<void>;
   readonly close: () => Promise<void>;
 }> {
   const configStore = requireTuiSessionConfigStore(params.baseSession);
@@ -3057,6 +3064,11 @@ async function createDeferredDaemonPromptTuiSession(params: {
   return {
     session,
     prewarm,
+    retireUnusedOnTerminalLoss: async () => {
+      await awaitSpeculativeStartup();
+      if (speculativeSessionUnused()) discardSpeculativeSession();
+      await Promise.all(speculativeDiscards);
+    },
     close: async () => {
       deferredSessionClosed = true;
       await awaitSpeculativeStartup();
@@ -3524,6 +3536,9 @@ export async function bootTUIEntry(
           const boot = await loadBootTUI();
           const handle = await boot({
             session: deferred.session,
+            // A closed terminal exits from the TUI's stdin-loss path, before
+            // the close below: retire an unused speculative session there.
+            beforeTerminalLossExit: () => deferred.retireUnusedOnTerminalLoss(),
             model,
             stdinMode:
               runtimeOptions.stdinDataMode === true ? "data" : "readable",

@@ -50,6 +50,12 @@ export interface BootTUIOptions {
   readonly initialPrompt?: string;
   readonly initialUserMessages?: AgenCTuiProps["initialUserMessages"];
   readonly initialComposerText?: string;
+  /**
+   * Runs after the teardown barrier when the terminal went away (stdin closed
+   * or failed) and before the process exits, so the session owner can retire
+   * what its ordinary close would retire.
+   */
+  readonly beforeTerminalLossExit?: () => Promise<void>;
 }
 
 export interface BootTUIHandle {
@@ -204,7 +210,12 @@ export async function bootTUI(options: BootTUIOptions): Promise<BootTUIHandle> {
           unmountRef?.();
         } catch {}
       },
-      { beforeExit: () => teardownBarrier.drain() },
+      {
+        beforeExit: async () => {
+          await teardownBarrier.drain();
+          await options.beforeTerminalLossExit?.();
+        },
+      },
     );
   };
   stdin.once("close", onStdinLoss);
@@ -271,6 +282,9 @@ export async function bootTUI(options: BootTUIOptions): Promise<BootTUIHandle> {
   // A once-handler disappears before invocation and can be mistaken for an
   // unhandled signal while asynchronous draft persistence is still pending.
   process.on("SIGTERM", onTerminate);
+  // Closing the terminal window sends SIGHUP. Take the same orderly teardown
+  // instead of signal-exit's immediate exit, which skipped the session close.
+  process.on("SIGHUP", onTerminate);
   let waitPromise: Promise<void> | null = null;
   return {
     unmount: unmountRef,
@@ -287,6 +301,7 @@ export async function bootTUI(options: BootTUIOptions): Promise<BootTUIHandle> {
             await teardownBarrier.drain();
           } finally {
             process.removeListener("SIGTERM", onTerminate);
+            process.removeListener("SIGHUP", onTerminate);
             stdin.removeListener("close", onStdinLoss);
             stdin.removeListener("end", onStdinLoss);
             stdin.removeListener("error", onStdinLoss);

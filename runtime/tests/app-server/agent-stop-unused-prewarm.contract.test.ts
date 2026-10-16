@@ -1,15 +1,13 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdtempSync, rmSync, utimesSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { canonicalTmpdir } from "../helpers/canonical-temp-dir.js";
 import { RolloutStore } from "../session/rollout-store.js";
 import { FileThreadStore } from "../thread-store/store.js";
 import { resolveLatestSessionId } from "../bin/resume-session.js";
-import {
-  AgenCDaemonAgentManager,
-  canonicalRolloutHoldsNoInput,
-} from "./agent-lifecycle.js";
+import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
+import { canonicalRolloutHoldsNoInput } from "../session/rollout-input.js";
 import { UNUSED_TUI_PREWARM_STOP_REASON } from "./agent-stop-reasons.js";
 import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
 import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
@@ -17,8 +15,10 @@ import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
 // The TUI creates its daemon session while the user types the first prompt.
 // When nobody uses that session (the TUI closes first, a staged startup choice
 // replaces it, or the daemon restarts under it), its stop must leave nothing
-// behind: no session in the daemon's list, none for `--continue`, across a
-// daemon restart. A thread that holds any input is never archived this way.
+// behind: no session in the daemon's list, none for `--continue`, no session
+// directory, across a daemon restart. A thread that holds any input is never
+// archived this way, and `--continue` never picks an untouched thread the TUI
+// could not retire (it crashed or was killed).
 
 const cleanups: Array<() => void> = [];
 
@@ -137,7 +137,8 @@ describe("stopping an unused TUI prewarm session", () => {
     const { cwd, home } = dirs();
     const rolloutPath = persistThread(cwd, home, "conv-prewarmed", "untouched");
     expect(await listedSessionIds(cwd, home)).toContain("conv-prewarmed");
-    expect(resolveLatestSessionId(cwd, home)).toMatchObject({ kind: "ok", sessionId: "conv-prewarmed" });
+    // --continue already passes over an untouched thread.
+    expect(resolveLatestSessionId(cwd, home)).toEqual({ kind: "none" });
 
     await expect(
       stopWith(cwd, home, "conv-prewarmed", UNUSED_TUI_PREWARM_STOP_REASON),
@@ -146,6 +147,17 @@ describe("stopping an unused TUI prewarm session", () => {
     expect(await listedSessionIds(cwd, home)).not.toContain("conv-prewarmed");
     expect(resolveLatestSessionId(cwd, home)).toEqual({ kind: "none" });
     expect(existsSync(rolloutPath)).toBe(false);
+    expect(existsSync(dirname(rolloutPath))).toBe(false);
+  });
+
+  it("continues the newest used thread when a newer one was left untouched", () => {
+    const { cwd, home } = dirs();
+    persistThread(cwd, home, "conv-used", "prompted");
+    const untouched = persistThread(cwd, home, "conv-left", "untouched");
+    const later = new Date(Date.now() + 60_000);
+    utimesSync(untouched, later, later);
+
+    expect(resolveLatestSessionId(cwd, home)).toMatchObject({ kind: "ok", sessionId: "conv-used" });
   });
 
   it("keeps a thread that received a prompt", async () => {

@@ -601,6 +601,31 @@ describe("FileThreadStore.archiveThread / listThreads", () => {
     }
   });
 
+  it("leaves no session directory behind once the rollout moved, and unarchive restores it", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "agenc-ts-archive-dir-"));
+    const rollout = openStore({ cwd, sessionId: "archive-dir" });
+    const sessionDir = rollout.store.sessionDir;
+    try {
+      const store = new FileThreadStore({ agencHome, cwd });
+      store.createThread({ threadId: "archive-dir", rolloutStore: rollout });
+      store.appendItems({ threadId: "archive-dir", items: [responseItem("a", "alpha")] });
+      store.shutdownThread("archive-dir");
+      rollout.close();
+      expect(existsSync(join(sessionDir, "index.json"))).toBe(true);
+
+      store.archiveThread({ threadId: "archive-dir" });
+      expect(existsSync(sessionDir)).toBe(false);
+
+      const restored = store.unarchiveThread({ threadId: "archive-dir" });
+      expect(dirname(restored.rolloutPath!)).toBe(sessionDir);
+      expect(rolloutLineCount(restored.rolloutPath!)).toBeGreaterThan(1);
+      store.close();
+    } finally {
+      rollout.close();
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("unarchiveThread clears the archived flag and the thread reappears in active listing", () => {
     const cwd = mkdtempSync(join(tmpdir(), "agenc-ts-cwd-"));
     const rollout = openStore({ cwd, sessionId: "flip" });
