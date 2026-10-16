@@ -1521,6 +1521,7 @@ describe("prepareTurnRuntimeInputs", () => {
     expect(load).toHaveBeenLastCalledWith(
       expect.objectContaining({ cwd: nested, configStore: store }),
       undefined,
+      { compact: false },
     );
     expect(first.mcpServers).toEqual([
       { name: "alpha", instructions: "MCP-ONE" },

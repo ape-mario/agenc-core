@@ -457,6 +457,7 @@ describe("/context TUI bridge", () => {
       expect(load).toHaveBeenCalledWith(
         expect.objectContaining({ cwd: home, configStore }),
         session.services.providerEnvironment,
+        { compact: false },
       );
       expect((await load.mock.results[0]?.value)?.directories).toContain(join(home, "memory"));
     } finally {
