@@ -20,11 +20,14 @@ describe("catalogued DeepSeek session metadata", () => {
     const manager = new StaticModelsManager({ config, metadata: {
       fetchImpl, env: { DEEPSEEK_BASE_URL: "https://proxy.example/v1" },
     } });
+    expect(manager.tryGetModelInfoForProvider(selection.provider, selection.model)).toBeUndefined();
+    expect(fetchImpl).not.toHaveBeenCalled();
     let resolved = false;
     const first = manager.getModelInfoForProvider(selection.provider, selection.model)
       .then((info) => { resolved = true; return info; });
     await nextTick();
     const resolvedBeforeDownload = resolved;
+    expect(manager.tryGetModelInfoForProvider(selection.provider, selection.model)).toBeUndefined();
     download.resolve(listing(64_000));
     const initial = await first;
     expect(resolvedBeforeDownload).toBe(true);
@@ -33,6 +36,8 @@ describe("catalogued DeepSeek session metadata", () => {
       expect((await manager.getModelInfoForProvider(selection.provider, selection.model)).contextWindow).toBe(64_000);
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(manager.tryGetModelInfoForProvider(selection.provider, selection.model)?.contextWindow).toBe(64_000);
+    expect(manager.tryGetModelInfoForProvider("openai", selection.model)).toBeUndefined();
   });
 
   it("deduplicates background refreshes and keeps catalog limits on transport failure", async () => {
@@ -84,6 +89,20 @@ describe("catalogued DeepSeek session metadata", () => {
     });
     expect(await manager.getModelInfo(selection.model)).toMatchObject({ contextWindow: 16_000, maxOutputTokens: 2_000 });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("does not expose completed metadata after the endpoint authority changes", async () => {
+    const env = { DEEPSEEK_BASE_URL: "https://first.example/v1" };
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(listing(64_000));
+    const manager = new StaticModelsManager({ config, metadata: {
+      fetchImpl, env, endpointCatalogs: new EndpointMetadataCache(),
+    } });
+    await manager.getModelInfo(selection.model);
+    await vi.waitFor(() => expect(manager.tryGetModelInfoForProvider(selection.provider, selection.model)?.contextWindow).toBe(64_000));
+    env.DEEPSEEK_BASE_URL = "https://second.example/v1";
+    expect(manager.tryGetModelInfoForProvider(selection.provider, selection.model)).toBeUndefined();
+    // A cache-only read must not cause a new request on the changed endpoint.
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("still waits for an uncatalogued model's actual endpoint limits", async () => {

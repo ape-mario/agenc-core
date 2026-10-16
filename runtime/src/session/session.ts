@@ -1050,6 +1050,8 @@ export interface ModelsManager {
   getProviderDefaultModel?(provider: string): Promise<string | undefined>;
   getModelInfo(modelSlug: string, config?: unknown): Promise<ModelInfo>;
   getModelInfoForProvider?(provider: string, model: string): Promise<ModelInfo>;
+  /** Completed metadata only; must not initiate or await discovery. */
+  tryGetModelInfoForProvider?(provider: string, model: string): ModelInfo | undefined;
   tryListModels(): ReadonlyArray<ModelInfo> | undefined;
   listModels(
     strategy?: "online_if_uncached",
@@ -3161,6 +3163,7 @@ export class Session {
 
   newDefaultTurnWithSubId(subId: string): TurnContext {
     this.assertProviderSwitchTransactionHealthy();
+    this.adoptCompletedModelMetadata();
     return buildDefaultTurnWithSubId(this, subId);
   }
 
@@ -3183,7 +3186,22 @@ export class Session {
     configOverrides?: Partial<Config>,
   ): TurnContext {
     this.assertProviderSwitchTransactionHealthy();
+    this.adoptCompletedModelMetadata();
     return buildTurnWithSubId(this, subId, configOverrides);
+  }
+
+  private adoptCompletedModelMetadata(): void {
+    const manager = this.services.modelsManager;
+    if (manager?.tryGetModelInfoForProvider === undefined) return;
+    const { provider, model } = this.providerBinding;
+    // DeepSeek can start from the catalog while discovery runs in the
+    // background. Replace the root snapshot only when constructing a turn;
+    // contexts already in use retain their original limits.
+    if (provider !== "deepseek") return;
+    const refreshed = manager.tryGetModelInfoForProvider(provider, model);
+    if (refreshed !== undefined) {
+      (this as { modelInfo: ModelInfo }).modelInfo = refreshed;
+    }
   }
 
   private assertProviderSwitchTransactionHealthy(): void {
