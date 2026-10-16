@@ -2,7 +2,7 @@ import "../bootstrap/node-env.js";
 import React, { useCallback } from "react";
 
 import { TrustDialog } from "../permissions/trust/TrustDialog.js";
-import { WindowsSandboxDialog } from "../tui/components/WindowsSandboxDialog.js";
+import { WindowsSandboxDialog } from "../permissions/WindowsSandboxDialog.js";
 import { render as renderInk } from "../tui/ink.js";
 import type { ProjectTrustPromptOptions } from "./project-trust-preflight.js";
 import type { WindowsSandboxPromptOptions } from "./windows-sandbox-choice.js";

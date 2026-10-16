@@ -1,18 +1,20 @@
 import React, { useCallback, useContext, useRef, useState } from "react";
-import useInput from "../ink/hooks/use-input.js";
-import { TerminalSizeContext } from "../ink/components/TerminalSizeContext.js";
-import { Box } from "../ink.js";
-import { applyTextStyles } from "../ink/colorize.js";
-import type { Color } from "../ink/styles.js";
-import { useTheme } from "./design-system/ThemeProvider.js";
-import ThemedBox from "./design-system/ThemedBox.js";
-import ThemedText from "./design-system/ThemedText.js";
-import { getTheme } from "../../utils/theme.js";
+import useInput from "../tui/ink/hooks/use-input.js";
+import { TerminalSizeContext } from "../tui/ink/components/TerminalSizeContext.js";
+import { Box } from "../tui/ink.js";
+import { applyTextStyles } from "../tui/ink/colorize.js";
+import type { Color } from "../tui/ink/styles.js";
+import { useTheme } from "../tui/components/design-system/ThemeProvider.js";
+import ThemedBox from "../tui/components/design-system/ThemedBox.js";
+import ThemedText from "../tui/components/design-system/ThemedText.js";
+import { getTheme } from "../utils/theme.js";
 
 /**
  * The one-time card shown before the first interactive session on Windows,
- * where AgenC has no sandbox yet. It follows the trust card: the title sits in
- * the border, nothing is preselected, y and n answer at once.
+ * where AgenC has no sandbox yet. It is a pre-TUI startup card like the trust
+ * card shown right after it (permissions/trust/TrustDialog.tsx) and uses the
+ * same frame: the title sits in the border, nothing is preselected, y and n
+ * answer at once.
  */
 export const WINDOWS_SANDBOX_CARD_COPY = Object.freeze({
   title: "No sandbox on Windows",
