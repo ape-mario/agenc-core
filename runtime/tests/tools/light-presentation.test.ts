@@ -167,3 +167,34 @@ test("Standard sessions keep the canonical exec_command", () => {
   const shell = standard.toLLMTools().find(t => t.function.name === "exec_command")!;
   expect(shell.function.parameters).toEqual(standard.tools.find(t => t.name === "exec_command")!.inputSchema);
 });
+
+function withoutVendorKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutVendorKeys);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith("x-agenc-"))
+    .map(([key, child]) => [key, withoutVendorKeys(child)]));
+}
+
+test("standard sessions with deferral send compact core tools with the canonical contract", () => {
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: true });
+  const lean = registry.toLLMTools().find(t => t.function.name === "exec_command")!;
+  expect(Object.keys(lean.function.parameters.properties as object).sort()).toEqual(["cmd", "timeoutMs", "workdir"]);
+  expect(lean.function.description).toContain("select:exec_command loads their schema");
+  registry.discoverToolNames?.(["exec_command"]);
+  const wire = registry.toLLMTools();
+  for (const item of wire) {
+    const canonical = registry.tools.find(t => t.name === item.function.name)!;
+    if (canonical.metadata?.source !== "builtin") continue;
+    // Same fields, alternatives, defaults and standard validation keywords; only AgenC's own
+    // x-agenc-* keys stay off the wire.
+    expect(withoutDescriptions(item.function.parameters)).toEqual(withoutVendorKeys(withoutDescriptions(canonical.inputSchema)));
+    expect(JSON.stringify(item.function.parameters)).not.toContain("x-agenc-");
+  }
+  const read = wire.find(t => t.function.name === "FileRead")!;
+  expect(read.function.description).toContain("numbered from 1 (cat -n)");
+  expect(read.function.description).toContain("A read over 25000 tokens fails");
+  const multi = wire.find(t => t.function.name === "MultiEdit")!;
+  expect(multi.function.description).toContain("The file is written only if every edit succeeds");
+  // The canonical tools are untouched.
+  expect(registry.tools.find(t => t.name === "Grep")!.inputSchema).toHaveProperty("properties.pattern.x-agenc-maxUtf8Bytes");
+});

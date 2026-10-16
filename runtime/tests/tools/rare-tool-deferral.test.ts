@@ -65,7 +65,7 @@ describe("deferred rare tools", () => {
     expect(advertised(tools)).toContain("exec_command");
     const search = tools.toLLMTools().find((tool) => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME);
     expect(search?.function.description).toContain(
-      "Deferred tools you can load with select: TodoWrite (a visible plan for long work with many steps), Orient (rank the files most relevant to a question in a large repository), ImagineImage (generate or edit images), VerifyPlanExecution (compare progress with an approved plan), SendUserMessage (send the user a progress note).",
+      "Deferred tools you can load with select: TodoWrite (a visible plan for long work with many steps), Orient (rank the files most relevant to a question in a large repository), AskUserQuestion (ask the user a multiple-choice question), EnterPlanMode (ask to plan a large change before making it), ExitPlanMode (present a plan for approval), ImagineImage (generate or edit images), VerifyPlanExecution (compare progress with an approved plan), SendUserMessage (send the user a progress note).",
     );
     expect(search?.function.description).toContain(
       "To hand a self-contained task to a helper agent, load spawn_agent with select:spawn_agent; it loads wait_agent, send_message, assign_task, close_agent, list_agents with it.",
@@ -77,6 +77,10 @@ describe("deferred rare tools", () => {
       expect(advertised(tools)).not.toContain(name);
     }
     expect(advertised(tools)).toContain("MultiEdit");
+    // The question and plan-mode tools load on demand outside plan mode.
+    for (const name of ["AskUserQuestion", "EnterPlanMode", "ExitPlanMode"]) {
+      expect(advertised(tools)).not.toContain(name);
+    }
     // Tools that are not registered are not named.
     expect(search?.function.description).not.toContain("XSearch");
 
@@ -90,6 +94,24 @@ describe("deferred rare tools", () => {
     // The description stays the same once a tool is loaded.
     const after = tools.toLLMTools().find((tool) => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME);
     expect(after?.function.description).toBe(search?.function.description);
+  });
+
+  test("a session in plan mode sees AskUserQuestion and ExitPlanMode without a search", () => {
+    let mode = "default";
+    const tools = buildToolRegistry({
+      workspaceRoot: "/tmp",
+      requireAdmission: false,
+      sandboxExecutionBroker: explicitDangerBroker,
+      deferRareTools: true,
+      getSession: () => ({ services: { permissionModeRegistry: { current: () => ({ mode }) } } }) as never,
+    });
+    expect(advertised(tools)).not.toContain("ExitPlanMode");
+    expect(advertised(tools)).not.toContain("AskUserQuestion");
+    mode = "plan";
+    expect(advertised(tools)).toEqual(expect.arrayContaining(["ExitPlanMode", "AskUserQuestion"]));
+    expect(advertised(tools)).not.toContain("EnterPlanMode");
+    mode = "default";
+    expect(advertised(tools)).not.toContain("ExitPlanMode");
   });
 
   test("ignore the daemon's process environment", () => {

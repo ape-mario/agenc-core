@@ -84,10 +84,59 @@ const LEAN_EXEC_FIELDS: ReadonlySet<string> = new Set(["cmd", "workdir", "timeou
 const LEAN_EXEC_POINTER =
   " Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens, sandbox escalation) are accepted; system.searchTools select:exec_command loads their schema.";
 
-function lightPresentationCanonical(tool: LLMTool): LLMTool {
-  const description = descriptions[tool.function.name];
-  if (description === undefined) return tool;
-  const hints = fieldHints[tool.function.name] ?? {};
+/**
+ * Standard sessions' own wording for core tools whose Light text does not fit them: FileRead
+ * keeps dense line numbers in standard sessions, and Light has no MultiEdit. Same fields and
+ * schema as the canonical tool.
+ */
+const standardDescriptions: Readonly<Record<string, string>> = {
+  FileRead: "Read text, images, PDFs or Jupyter notebooks. Default: the first 2000 lines, numbered from 1 (cat -n); for a large file pass offset (1-based) and limit and read only what you need. A read over 25000 tokens fails. PDFs over 10 pages need pages (at most 20 per read). Directories fail: list them with the shell. A whole-file read authorizes edits; Edit and Write fail if their change did not land, so do not re-read to check one.",
+  MultiEdit: "Several exact replacements in one file, applied in order, each to the result of the one before. Read the file first (FileRead, or exec_command output that printed it whole). Each old_string must be unique when its edit applies unless replace_all is set. The file is written only if every edit succeeds.",
+};
+const standardFieldHints: Readonly<Record<string, Readonly<Record<string, string | null>>>> = {
+  FileRead: { file_path: path },
+  MultiEdit: { file_path: path },
+};
+
+/** AgenC's own validation keys (x-agenc-*) inform the runtime validator, not the model. */
+function withoutVendorKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutVendorKeys);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith("x-agenc-"))
+    .map(([key, child]) => [key, withoutVendorKeys(child)]));
+}
+
+/**
+ * Standard-session wording for a built-in tool: Light's compact text where it fits
+ * (`lightWording`), the standard text above for FileRead and MultiEdit, and the lean
+ * exec_command until system.searchTools selects it. The schema keeps every field, default
+ * and standard validation keyword; only AgenC's x-agenc-* keys stay off the wire.
+ */
+export function standardPresentation(
+  tool: LLMTool,
+  options: { readonly lightWording?: boolean; readonly leanExec?: boolean } = {},
+): LLMTool {
+  const name = tool.function.name;
+  const description = standardDescriptions[name];
+  const worded = options.lightWording === true
+    ? lightPresentation(tool, { leanExec: options.leanExec === true })
+    : description === undefined
+      ? tool
+      : presentWith(tool, description, standardFieldHints[name] ?? {});
+  return {
+    ...worded,
+    function: {
+      ...worded.function,
+      parameters: withoutVendorKeys(worded.function.parameters) as LLMTool["function"]["parameters"],
+    },
+  };
+}
+
+function presentWith(
+  tool: LLMTool,
+  description: string,
+  hints: Readonly<Record<string, string | null>>,
+): LLMTool {
   const parameters = tool.function.parameters;
   const properties = parameters.properties as Record<string, unknown> | undefined;
   return {
@@ -96,10 +145,16 @@ function lightPresentationCanonical(tool: LLMTool): LLMTool {
       ...tool.function, description,
       parameters: properties ? {
         ...parameters,
-        properties: Object.fromEntries(Object.entries(properties).map(([name, schema]) => [name,
-          presentProperty(schema, hints[name]),
+        properties: Object.fromEntries(Object.entries(properties).map(([field, schema]) => [field,
+          presentProperty(schema, hints[field]),
         ])),
       } : parameters,
     },
   };
+}
+
+function lightPresentationCanonical(tool: LLMTool): LLMTool {
+  const description = descriptions[tool.function.name];
+  if (description === undefined) return tool;
+  return presentWith(tool, description, fieldHints[tool.function.name] ?? {});
 }

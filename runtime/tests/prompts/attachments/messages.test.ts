@@ -243,7 +243,9 @@ describe("attachmentsToMessages", () => {
     expect(content).toContain("explicit user confirmation");
     expect(content).toContain("Never share secrets");
     expect(content).not.toContain("Auto Mode Active");
-    expect(content.length).toBeLessThan(String(full[0]?.content).length / 3);
+    // One short paragraph, well under the full variant.
+    expect(content.length).toBeLessThan(400);
+    expect(content.length).toBeLessThan(String(full[0]?.content).length * 0.6);
   });
 
   test("renders date_change with the new date", () => {

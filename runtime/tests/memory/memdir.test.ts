@@ -105,19 +105,19 @@ describe("memory prompt", () => {
     installMemoryAuthority();
     const instructions = memory.buildMemoryInstructionLines().join("\n");
     expect(instructions.startsWith("# auto memory")).toBe(true);
-    expect(instructions).toContain("## When to save");
-    expect(instructions).toContain("## How to save");
-    expect(instructions).toContain("## How to recall");
+    // When to save, what never to save, the file format, the index and recall.
+    expect(instructions).toContain("Save at once when the user asks you to remember something");
+    expect(instructions).toContain("Never save code patterns");
     expect(instructions).toContain("One fact per file");
-    expect(instructions).toContain("name: {{short name}}");
-    expect(instructions).toContain("type: {{user, feedback, project, reference}}");
-    expect(instructions).toContain("`MEMORY.md` is an index, not a memory");
-    expect(instructions).toContain("You must check memory when the user asks you to check, recall, or remember");
+    expect(instructions).toContain("frontmatter `name`, `description`");
+    expect(instructions).toContain("`type` (user, feedback, project, reference)");
+    expect(instructions).toContain("(an index: one line per file");
+    expect(instructions).toContain("always check memory when the user asks you to check, recall or remember");
     expect(instructions).toContain('Grep with pattern="<term>" path="<memory directory>" glob="*.md"');
     // Paths live only in the directory block so the instructions stay cacheable.
     expect(instructions).not.toContain(tempRoot);
-    // Well under the 1.5k-token target (about 4 characters per token).
-    expect(instructions.length).toBeLessThan(4_000);
+    // The instructions ride on every request: about 400 tokens at most.
+    expect(instructions.length).toBeLessThan(1_800);
     expect(instructions).not.toContain("\u2014");
   });
 
