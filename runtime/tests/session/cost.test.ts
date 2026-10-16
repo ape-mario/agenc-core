@@ -15,6 +15,7 @@ import {
   BUILT_IN_PROVIDER_MODEL_CATALOG,
 } from "../config/resolve-provider.js";
 import { BudgetTracker } from "../conversation/token-budget.js";
+import { monotonicMs } from "../../src/utils/monotonic.js";
 
 const ZERO_COST_DEFAULT_PROVIDERS = new Set([
   "lmstudio",
@@ -792,7 +793,11 @@ describe("CostSidecar", () => {
         },
       },
     });
-    await new Promise((resolve) => setTimeout(resolve, 2));
+    // A timer callback does not prove that two monotonic milliseconds elapsed.
+    const toolStartedAt = monotonicMs();
+    while (monotonicMs() - toolStartedAt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
     sidecar.onEvent({
       id: "tool-end",
       seq: 2,
