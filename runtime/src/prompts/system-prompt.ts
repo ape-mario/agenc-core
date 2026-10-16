@@ -389,9 +389,8 @@ export function getAgentToolSection(
  */
 export function getDeferredAgentToolSection(): string {
   return joinSection("# Subagents", [
-    `spawn_agent hands a self-contained task to a helper agent; system.searchTools with select:spawn_agent loads it with wait_agent, send_message, assign_task, close_agent and list_agents.`,
-    `Delegate when the user asks for it or the active Goal or workflow requires it, once its approvals and conditions are met: spawn the child before doing its work yourself, and say so if delegation is unavailable or refused. Quoted examples and terms such as worker threads, child processes or React children props are not requests to delegate.`,
-    `Otherwise keep the step you are blocked on local and do work your own tools can finish yourself. A helper does not see this conversation unless you set fork_turns: give it the goal, its files, the constraints and how to verify, with paths relative to your working directory. Parallel helpers that edit files need disjoint write sets and isolation: "worktree". Call wait_agent only when your next step needs the result, and review what comes back before integrating it.`,
+    `spawn_agent (select:spawn_agent) hands a self-contained task to a helper agent. Delegate when the user asks for it or the active Goal or workflow requires it, once its approvals and conditions are met, and spawn the child before doing its work yourself; quoted examples and terms such as worker threads or child processes are not requests. Otherwise do the work yourself.`,
+    `A helper does not see this conversation unless you set fork_turns: give it the goal, files, constraints and how to verify. Parallel helpers that edit files need disjoint write sets and isolation: "worktree". Review what comes back before integrating it.`,
   ]);
 }
 
@@ -763,6 +762,8 @@ export interface SystemPromptSessionSnapshot {
     readonly userShell?: { readonly childEnvironment: NodeJS.ProcessEnv };
     readonly sandboxExecutionBroker?: SandboxExecutionBrokerLike;
     readonly providerEnvironment?: ProviderEnvironment;
+    /** Compact tool wording also selects the compact permission section. */
+    readonly registry?: { readonly compactPresentation?: boolean };
   };
 }
 
@@ -1274,6 +1275,7 @@ export async function assembleSystemPrompt(
             }, {
               light,
               lightPrint,
+              compact: session.services?.registry?.compactPresentation === true,
               escalationConfined: escalationStaysConfined(session),
             }),
       "permission mode can change mid-session via /mode and bypass toggles",

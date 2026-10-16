@@ -729,7 +729,7 @@ describe("model-facing tools", () => {
     const llmTools = registry.toLLMTools();
     expect(llmTools.map((tool) => tool.function.name)).not.toContain("LSP");
     expect(llmTools.find((tool) => tool.function.name === "system.searchTools")?.function.description)
-      .toContain("LSP (language-server definitions and references)");
+      .toContain("LSP (definitions and references)");
     expect(build({ AGENC_DEFER_RARE_TOOLS: "0" }).toLLMTools().map((tool) => tool.function.name))
       .toContain("LSP");
 

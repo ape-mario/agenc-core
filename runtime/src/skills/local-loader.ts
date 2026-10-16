@@ -253,7 +253,8 @@ const SKILL_LISTING_DEFAULT_CHAR_BUDGET = 8_000;
  * `SLASH_COMMAND_TOOL_CHAR_BUDGET` still overrides both the scale and the cap.
  */
 const SKILL_LISTING_MAX_CHAR_BUDGET = 12_000;
-const SKILL_LISTING_DESC_MAX_CHARS = 250;
+/** The listing rides on every request; a skill's own file carries the full text. */
+const SKILL_LISTING_DESC_MAX_CHARS = 120;
 const SKILL_LISTING_CONTEXT_PERCENT = 0.01;
 const CHARS_PER_TOKEN = 4;
 const SKIP_DIRS = new Set([

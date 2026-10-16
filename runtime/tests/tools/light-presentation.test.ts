@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { lightPresentation } from "../../src/tools/light-presentation.js";
+import { lightPresentation, standardPresentation } from "../../src/tools/light-presentation.js";
 import { buildToolRegistry } from "../../src/tool-registry.js";
 import type { LLMTool } from "../../src/llm/types.js";
 
@@ -180,7 +180,7 @@ test("standard sessions with deferral send compact core tools with the canonical
   const lean = registry.toLLMTools().find(t => t.function.name === "exec_command")!;
   expect(Object.keys(lean.function.parameters.properties as object).sort()).toEqual(["cmd", "timeoutMs", "workdir"]);
   expect(lean.function.description).toContain("select:exec_command loads their schema");
-  registry.discoverToolNames?.(["exec_command"]);
+  registry.discoverToolNames?.(["exec_command", "Grep"]);
   const wire = registry.toLLMTools();
   for (const item of wire) {
     const canonical = registry.tools.find(t => t.name === item.function.name)!;
@@ -197,4 +197,50 @@ test("standard sessions with deferral send compact core tools with the canonical
   expect(multi.function.description).toContain("The file is written only if every edit succeeds");
   // The canonical tools are untouched.
   expect(registry.tools.find(t => t.name === "Grep")!.inputSchema).toHaveProperty("properties.pattern.x-agenc-maxUtf8Bytes");
+});
+
+test("standard sessions send the lean Grep until system.searchTools selects it", async () => {
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: true, requireAdmission: false });
+  const grep = () => registry.toLLMTools().find(t => t.function.name === "Grep")!;
+  const canonical = registry.tools.find(t => t.name === "Grep")!;
+  expect(Object.keys(grep().function.parameters.properties as object).sort()).toEqual(["-i", "glob", "output_mode", "path", "pattern"]);
+  expect(grep().function.parameters.required).toEqual(["pattern"]);
+  expect(grep().function.description).toContain("select:Grep loads their schema");
+  const result = await registry.dispatch({ id: "load-grep", name: "system.searchTools", arguments: JSON.stringify({ select: "Grep" }) });
+  expect(result.isError).not.toBe(true);
+  expect(Object.keys(grep().function.parameters.properties as object).sort())
+    .toEqual(Object.keys(canonical.inputSchema.properties!).sort());
+  expect(grep().function.description).not.toContain("select:Grep");
+});
+
+test("Light presentation keeps every Grep field", () => {
+  const canonical = buildToolRegistry({ workspaceRoot: "/tmp" }).tools.find(t => t.name === "Grep")!;
+  const tool: LLMTool = { type: "function", function: { name: "Grep", description: canonical.description, parameters: canonical.inputSchema } };
+  expect(Object.keys(lightPresentation(tool, { leanExec: true }).function.parameters.properties as object).sort())
+    .toEqual(Object.keys(canonical.inputSchema.properties!).sort());
+});
+
+test("standard sessions describe Skill in a few words with the same schema", () => {
+  const parameters = {
+    type: "object",
+    properties: {
+      skill: { type: "string", description: "Skill name only. Do not pass MCP tool names such as mcp.server.tool." },
+      args: { type: "string", description: "Optional arguments for the skill." },
+    },
+    required: ["skill"],
+    additionalProperties: false,
+  };
+  const tool: LLMTool = { type: "function", function: { name: "Skill", description: "Execute a skill within the main conversation.", parameters } };
+  const presented = standardPresentation(tool);
+  expect(presented.function.description).toContain("Run a skill listed in the system reminders");
+  expect(presented.function.description).toContain("Skill names only");
+  expect(withoutDescriptions(presented.function.parameters)).toEqual(withoutDescriptions(parameters));
+  expect((presented.function.parameters.properties as Record<string, { description?: string }>).skill.description).toBe("A listed skill name.");
+  expect((presented.function.parameters.properties as Record<string, { description?: string }>).args.description).toBeUndefined();
+});
+
+test("the registry reports compact presentation for standard deferral only", () => {
+  expect(buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: true }).compactPresentation).toBe(true);
+  expect(buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: false }).compactPresentation).toBe(false);
+  expect(buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: true, lightMode: true }).compactPresentation).toBe(false);
 });

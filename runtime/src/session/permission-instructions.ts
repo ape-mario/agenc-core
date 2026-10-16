@@ -28,6 +28,7 @@ export function getSessionPermissionInstructions(
     }, {
       light: session.services.runtimeOptions?.lightMode === true,
       lightPrint: isLightPrintRun(session.services.runtimeOptions, session.services.providerEnvironment),
+      compact: session.services.registry?.compactPresentation === true,
       escalationConfined: escalationStaysConfined(session),
     }),
     getAutonomousWorkSection(ctx.config.autonomousMode === true, currentPermissions),

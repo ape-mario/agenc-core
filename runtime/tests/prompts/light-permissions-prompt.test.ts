@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  COMPACT_BYPASS_AUTONOMY_NOTE,
   LIGHT_APPROVAL_BYPASS_ESCALATION,
+  LIGHT_APPROVAL_NEVER,
   LIGHT_APPROVAL_ON_REQUEST,
+  LIGHT_BYPASS_AUTONOMY_NOTE,
   ROUTINE_NO_APPROVER_NOTE,
   getPermissionsSection,
 } from "../../src/prompts/permissions-prompt.js";
@@ -189,6 +192,59 @@ describe("Light permission section", () => {
       expect(request.baseInstructions).toBe(`STABLE_BASE\n\n${expected}`);
       expect(request.baseInstructions.includes("# Escalation Requests")).toBe(!lightMode);
       expect(request.baseInstructions.includes("Permission mode: default.")).toBe(lightMode);
+    }
+  });
+});
+
+// A standard session with compact tool wording (ToolRegistry.compactPresentation)
+// gets the same short texts; its head names the action rules' section.
+describe("compact standard permission section", () => {
+  function compact(mode: PermissionMode, sandboxPolicy: SandboxPolicy, network = false): string | null {
+    return getPermissionsSection(
+      createEmptyToolPermissionContext({ mode }),
+      { sandboxPolicy, networkSandboxPolicy: { enabled: network } },
+      { compact: true },
+    );
+  }
+
+  test.each(MODES)("%s uses Light's texts", (mode) => {
+    for (const [sandboxPolicy] of SANDBOXES) {
+      const text = compact(mode, sandboxPolicy)!;
+      const light = section(mode, sandboxPolicy, false, true)!;
+      expect(text.replace(COMPACT_BYPASS_AUTONOMY_NOTE, LIGHT_BYPASS_AUTONOMY_NOTE)).toBe(light);
+      expect(text).not.toContain("# Escalation Requests");
+    }
+  });
+
+  test("on-request keeps every escalation rule", () => {
+    expect(compact("default", "workspace_write")).toContain(LIGHT_APPROVAL_ON_REQUEST);
+  });
+
+  test("bypass names the standard head's section for the action rules", () => {
+    const text = compact("bypassPermissions", "danger_full_access")!;
+    expect(text).toContain(LIGHT_APPROVAL_NEVER);
+    expect(text).toContain("The rules in 'Executing actions with care' still apply");
+    expect(text).not.toContain("The action rules above");
+    expect(compact("bypassPermissions", "workspace_write")).toContain(LIGHT_APPROVAL_BYPASS_ESCALATION);
+  });
+
+  test("Light wins when both are set", () => {
+    const both = getPermissionsSection(
+      createEmptyToolPermissionContext({ mode: "bypassPermissions" }),
+      { sandboxPolicy: "danger_full_access", networkSandboxPolicy: { enabled: false } },
+      { light: true, compact: true },
+    );
+    expect(both).toContain("The action rules above still apply");
+  });
+
+  test("deferred per-request instructions follow the registry's compact presentation", () => {
+    const context = { ...mkCtx({ permissionMode: "default" }), permissionInstructionsDeferred: true };
+    const ctx = createEmptyToolPermissionContext({ mode: "default" });
+    for (const compactPresentation of [true, false]) {
+      const session = { services: { runtimeOptions: {}, registry: { compactPresentation } } } as never;
+      const text = getSessionPermissionInstructions(session, context, ctx);
+      expect(text.includes(LIGHT_APPROVAL_ON_REQUEST)).toBe(compactPresentation);
+      expect(text.includes("# Escalation Requests")).toBe(!compactPresentation);
     }
   });
 });

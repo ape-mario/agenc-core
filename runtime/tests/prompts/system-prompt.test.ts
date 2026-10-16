@@ -367,6 +367,25 @@ describe("static section emitters", () => {
     expect(s).toBeNull();
   });
 
+  test("a deferred spawn_agent keeps the delegation rules in a short section", () => {
+    const s = getAgentToolSection(new Set(["spawn_agent", "FileRead"]), new Set(["spawn_agent"]));
+    expect(s!.startsWith("# Subagents")).toBe(true);
+    for (const fact of [
+      "spawn_agent (select:spawn_agent)",
+      "Delegate when the user asks for it or the active Goal or workflow requires it",
+      "once its approvals and conditions are met",
+      "spawn the child before doing its work yourself",
+      "are not requests",
+      "Otherwise do the work yourself.",
+      "unless you set fork_turns",
+      'isolation: "worktree"',
+      "Review what comes back before integrating it.",
+    ]) {
+      expect(s).toContain(fact);
+    }
+    expect(s!.length).toBeLessThan(700);
+  });
+
   test("agent_tool returns null when spawn_agent is not enabled (gated)", () => {
     expect(getAgentToolSection(new Set())).toBeNull();
     expect(

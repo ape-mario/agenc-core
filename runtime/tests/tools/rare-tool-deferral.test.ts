@@ -65,14 +65,15 @@ describe("deferred rare tools", () => {
     expect(advertised(tools)).toContain("exec_command");
     const search = tools.toLLMTools().find((tool) => tool.function.name === SYSTEM_SEARCH_TOOLS_NAME);
     expect(search?.function.description).toContain(
-      "Deferred tools you can load with select: TodoWrite (a visible plan for long work with many steps), Orient (rank the files most relevant to a question in a large repository), AskUserQuestion (ask the user a multiple-choice question), EnterPlanMode (ask to plan a large change before making it), ExitPlanMode (present a plan for approval), ImagineImage (generate or edit images), VerifyPlanExecution (compare progress with an approved plan), SendUserMessage (send the user a progress note).",
+      "Deferred tools you can load with select: TodoWrite (a plan for long work), Orient (rank files for a question in a large repository), AskUserQuestion (multiple-choice question to the user), EnterPlanMode (plan a large change first), ExitPlanMode (present a plan for approval), ImagineImage (generate or edit images), VerifyPlanExecution (check progress against a plan), SendUserMessage (progress note to the user).",
     );
     expect(search?.function.description).toContain(
       "To hand a self-contained task to a helper agent, load spawn_agent with select:spawn_agent; it loads wait_agent, send_message, assign_task, close_agent, list_agents with it.",
     );
-    expect(search?.function.description).toContain(
-      "write_stdin, kill_process, list_processes load by themselves when exec_command leaves a session running.",
-    );
+    // The process tools load by themselves; exec_command's own description names them.
+    expect(search?.function.description).not.toContain("write_stdin");
+    const exec = tools.toLLMTools().find((tool) => tool.function.name === "exec_command");
+    expect(exec?.function.description).toContain("Yielded session_id exposes write_stdin; kill_process stops it.");
     for (const name of ["spawn_agent", ...DELEGATION_COMPANION_TOOLS, ...PROCESS_SESSION_TOOLS]) {
       expect(advertised(tools)).not.toContain(name);
     }
