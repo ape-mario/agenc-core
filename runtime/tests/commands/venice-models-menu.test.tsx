@@ -22,6 +22,20 @@ import { renderPtyRows } from "../../scripts/check-tui-e2e/harness.mjs";
 import { createRoot } from "../tui/ink.js";
 import { AppStateProvider, getDefaultAppState } from "../tui/state/AppState.js";
 
+// Opening the providers screen probes the local runtimes (Ollama, LM Studio,
+// a local OpenAI-compatible server) on localhost. Report none running, so
+// these tests make no network attempt; the Venice list comes from the local
+// server below. The screen loads this module only for the probe. The stub is
+// synchronous: with a factory that first loaded the real module, probes that
+// started meanwhile reached the real one.
+const localProbe = vi.hoisted(() => ({ calls: 0 }));
+vi.mock("../../src/onboarding/Onboarding.js", () => ({
+  detectRunningLocalProviders: async () => {
+    localProbe.calls += 1;
+    return [];
+  },
+}));
+
 // Venice's public GET /api/v1/models?type=text answer on 2026-10-15, saved
 // as served (no credential involved): 133 text models, 128 with function calling.
 const fixture = JSON.parse(readFileSync(new URL("../llm/fixtures/venice-models.json", import.meta.url), "utf8")) as {
@@ -206,6 +220,8 @@ describe("Venice models in the providers screen", () => {
       expect(listed).not.toContain("hermes-3-llama-3.1-405b");
       expect(listed).not.toContain("grok-4-20-multi-agent");
       expect(venice.authorizations).toEqual([`Bearer ${KEY_A}`]);
+      // The screen asked about local runtimes, and got the stub's answer.
+      expect(localProbe.calls).toBeGreaterThan(0);
     } finally {
       hub.unmount();
     }
