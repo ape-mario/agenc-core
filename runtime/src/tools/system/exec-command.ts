@@ -1318,6 +1318,7 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
         const notice = denial?.notice ?? execNetworkFailureNotice({
           output: execContent,
           exitCode: output.exitCode,
+          command: cmd,
           runtimeSandbox,
           escalationAvailable: runtimeContext !== undefined &&
             sandboxEscalationAvailable(runtimeContext.approvalPolicy, {
