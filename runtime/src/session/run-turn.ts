@@ -935,6 +935,7 @@ async function prepareSamplingRequestBoundary(
   const attachments = await getAttachments({
     sessionKey: session,
     lightMode: session.services.runtimeOptions?.lightMode === true,
+    compactPresentation: session.services.registry?.compactPresentation === true,
     lightPrint: isLightPrintRun(session.services.runtimeOptions, session.services.providerEnvironment),
     admittedMemorySelector: createAdmittedMemorySelector(session),
     // Producers hold only an opaque session key, so what they decide is

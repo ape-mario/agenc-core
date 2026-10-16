@@ -151,4 +151,37 @@ describe("skillListingProducer with runtime-registered bundled skills", () => {
     expect(listing.match(/^- browser-automation: /gmu)).toHaveLength(1);
     expect(listing).toContain("- browser-automation: Project-owned browser notes");
   });
+
+  // A compact session's system prompt points at agenc-memory for the memory
+  // rules; every other session carries the rules and is not told about it.
+  test("a compact session lists agenc-memory and gets the compact listing", async () => {
+    const compact = await skillListingProducer(
+      makeOpts([{ name: "repo-docs", description: "Explain the repository docs", loadedFrom: "skills" }], {
+        compactPresentation: true,
+        userInput: "Remember that I like tabs over spaces in every project.",
+      }),
+      getAttachmentTrackingState({}),
+    );
+    expect(compact).toHaveLength(1);
+    expect(compact[0]).toMatchObject({ kind: "skill_listing", compact: true });
+    const listing = (compact[0] as { readonly content: string }).content;
+    expect(listing).toContain("agenc-memory");
+    expect(listing).toContain("repo-docs");
+    const standard = await listingFor(
+      makeOpts([{ name: "repo-docs", description: "Explain the repository docs", loadedFrom: "skills" }]),
+    );
+    expect(standard).not.toContain("agenc-memory");
+  });
+
+  test("agenc-memory returns the memory rules and stays out of the user's slash commands", async () => {
+    const { getBundledSkills } = await import("../../skills/bundledSkills.js");
+    const skill = getBundledSkills().find((command) => command.name === "agenc-memory");
+    expect(skill).toBeDefined();
+    expect(skill?.isHidden).toBe(true);
+    expect(skill?.disableModelInvocation).toBe(false);
+    const { buildMemorySkillGuide } = await import("../../memory/memdir.js");
+    const blocks = await (skill as { getPromptForCommand(args: string, ctx: never): Promise<ReadonlyArray<{ readonly text?: string }>> })
+      .getPromptForCommand("", {} as never);
+    expect(blocks[0]?.text).toBe(buildMemorySkillGuide());
+  });
 });

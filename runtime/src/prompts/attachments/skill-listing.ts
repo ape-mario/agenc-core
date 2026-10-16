@@ -7,10 +7,12 @@ import {
   type SessionToolPolicy,
 } from "../../permissions/session-tool-policy.js";
 import {
+  buildCompactSkillListing,
   buildSkillListingWithinBudget,
   rankSkillsForRequest,
   type SkillListingEntry,
 } from "../../skills/local-loader.js";
+import { MEMORY_SKILL_NAME } from "../../skills/bundled/memoryGuide.js";
 
 /** Relevance lines per root-human turn, small enough to keep in the prompt. */
 const RELEVANCE_LIMIT = 12;
@@ -107,8 +109,11 @@ export const skillListingProducer: AttachmentProducer = async (opts, tracking) =
     (root) => root.droppedCount > 0,
   );
   const known = new Set(skills.map((skill) => skill.name));
+  // A compact session's system prompt points at agenc-memory for the memory
+  // rules; any other session carries those rules and lists no such skill.
+  const compact = opts.compactPresentation === true;
   const bundled = (await bundledRegistrySkills(opts.toolPolicy, opts.config)).filter(
-    (skill) => !known.has(skill.name),
+    (skill) => !known.has(skill.name) && (compact || skill.name !== MEMORY_SKILL_NAME),
   );
   if (opts.signal.aborted) return [];
   const catalog = [...skills, ...bundled];
@@ -125,13 +130,14 @@ export const skillListingProducer: AttachmentProducer = async (opts, tracking) =
     );
     if (relevant.lines.length === 0) return [];
     for (const name of relevant.names) tracking.listedSkillNames.add(name);
-    return [{ kind: "skill_relevance", content: relevant.lines.join("\n") }];
+    return [{ kind: "skill_relevance", content: relevant.lines.join("\n"), ...(compact ? { compact: true } : {}) }];
   }
-  const { listing, stats, listedNames } = buildSkillListingWithinBudget(
+  const { listing, stats, listedNames } = (compact ? buildCompactSkillListing : buildSkillListingWithinBudget)(
     catalog,
     opts.contextWindowTokens,
     // What the user just asked for decides which skills get the budget when
-    // the installed catalog does not fit.
+    // the installed catalog does not fit, and which ones a compact listing
+    // describes.
     opts.userInput,
   );
   for (const name of listedNames) tracking.listedSkillNames.add(name);
@@ -161,6 +167,7 @@ export const skillListingProducer: AttachmentProducer = async (opts, tracking) =
     {
       kind: "skill_listing",
       content: listing,
+      ...(compact ? { compact: true } : {}),
     },
   ];
 };

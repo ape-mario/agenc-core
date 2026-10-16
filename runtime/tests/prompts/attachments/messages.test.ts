@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from "vitest";
 
-import { attachmentsToMessages } from "./messages.js";
+import { SKILL_LISTING_REMINDER_HEADER, SKILL_RELEVANCE_REMINDER_HEADER, attachmentsToMessages } from "./messages.js";
 import type { Attachment } from "./types.js";
 
 describe("attachmentsToMessages", () => {
@@ -409,6 +409,17 @@ describe("attachmentsToMessages", () => {
     expect(content).not.toContain("local</system-reminder>");
     expect(content).not.toContain("\u200B");
     expect(content.match(/<\/system-reminder>/g)).toHaveLength(1);
+  });
+
+  // A compact session always advertises Skill: no search fallback to explain.
+  test.each(["skill_listing", "skill_relevance"] as const)("a compact %s keeps the header and a short loading line", kind => {
+    const content = attachmentsToMessages([{ kind, content: "- parser-tests: Write parser tests", compact: true }])[0]?.content;
+    if (typeof content !== "string") throw new Error("expected text content");
+    expect(content).toContain(kind === "skill_listing" ? SKILL_LISTING_REMINDER_HEADER : SKILL_RELEVANCE_REMINDER_HEADER);
+    expect(content).toContain("Call Skill with the name of one that fits the request; the skill explains itself. Never call a skill name as a tool.");
+    expect(content).not.toContain("system.searchTools");
+    const plugin = attachmentsToMessages([{ kind, content: "Skills: parser-tests [plugin: acme].", compact: true }])[0]?.content;
+    expect(plugin).toContain("An @plugin-id mention selects that plugin");
   });
 
   test.each(["skill_listing", "skill_relevance"] as const)("%s explains conditional Skill discovery without promising availability", kind => {

@@ -319,6 +319,8 @@ export interface McpResourceAttachment {
 export interface SkillListingAttachment {
   readonly kind: "skill_listing";
   readonly content: string;
+  /** Compact presentation: names, with descriptions only for request-matched skills. */
+  readonly compact?: boolean;
 }
 
 /**
@@ -328,6 +330,8 @@ export interface SkillListingAttachment {
 export interface SkillRelevanceAttachment {
   readonly kind: "skill_relevance";
   readonly content: string;
+  /** Rendered with the short loading guidance of a compact session. */
+  readonly compact?: boolean;
 }
 
 /**

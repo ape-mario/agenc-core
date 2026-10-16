@@ -79,6 +79,11 @@ export interface GetAttachmentsOptions {
   /** Captured print-session presentation; never changes approval policy. */
   readonly lightPrint?: boolean;
   /**
+   * A standard session with compact presentation (ToolRegistry.compactPresentation):
+   * the skill listing names skills and describes only those the request is about.
+   */
+  readonly compactPresentation?: boolean;
+  /**
    * Exact turn identity plus the authoritative root-human turn currently
    * bound to the session. The root turn can be absent or belong to another
    * turn during synthetic/internal follow-ups; provenance-sensitive

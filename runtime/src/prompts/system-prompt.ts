@@ -494,7 +494,12 @@ function getMemoryInstructionsSection(
  * when the memory directories or settings authority cannot be resolved, so a
  * memory misconfiguration never blocks prompt assembly.
  */
-export async function resolveMemoryPromptInputs(session: SystemPromptSessionSnapshot, cwd: string): Promise<{
+export async function resolveMemoryPromptInputs(
+  session: SystemPromptSessionSnapshot,
+  cwd: string,
+  /** Compact presentation; callers holding the registry apart from the session pass it here. */
+  options: { readonly compact?: boolean } = {},
+): Promise<{
   readonly memoryInstructions: string;
   readonly memoryPrompt: string;
 }> {
@@ -506,7 +511,9 @@ export async function resolveMemoryPromptInputs(session: SystemPromptSessionSnap
       configStore,
       env: session.services?.userShell?.childEnvironment ?? session.services?.providerEnvironment ?? {},
       runtimeOptions: { remoteMode: false, ...session.services?.runtimeOptions },
-    }, session.services?.providerEnvironment);
+    }, session.services?.providerEnvironment, {
+      compact: options.compact ?? session.services?.registry?.compactPresentation === true,
+    });
     return {
       memoryInstructions: prompt?.instructions ?? "",
       memoryPrompt: prompt?.directories ?? "",
@@ -976,6 +983,7 @@ export async function assembleBaseInstructionsForModel(params: {
   readonly registry: {
     readonly tools: ReadonlyArray<{ readonly name: string }>;
     readonly getDeferredToolNames?: () => ReadonlySet<string>;
+    readonly compactPresentation?: boolean;
   };
   readonly provider: string;
   readonly promptIdentity?: { readonly provider: string; readonly model: string };
@@ -986,7 +994,9 @@ export async function assembleBaseInstructionsForModel(params: {
   const enabledToolNames = new Set(
     params.registry.tools.map((tool) => tool.name),
   );
-  const memory = await resolveMemoryPromptInputs(params.session, params.ctx.cwd);
+  const memory = await resolveMemoryPromptInputs(params.session, params.ctx.cwd, {
+    compact: params.registry.compactPresentation === true,
+  });
   const snapshot = await assembleSystemPromptSnapshot({
     profile: params.profile,
     deferPermissionInstructions: true,

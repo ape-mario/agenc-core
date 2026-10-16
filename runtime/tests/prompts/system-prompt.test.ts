@@ -986,6 +986,33 @@ describe("assembleSystemPrompt", () => {
     expect(text).not.toContain("# Memory directories");
   });
 
+  test("a registry with compact presentation selects the short memory pointer and the two paths", async () => {
+    const home = mkdtempSync(join(tmpdir(), "agenc-base-memory-compact-"));
+    onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+    const configStore = new ConfigStore({ home, cwd: home, env: { HOME: home, AGENC_HOME: home } });
+    const base = {
+      session: { services: { configStore, runtimeOptions: { simpleMode: false } } },
+      ctx: fakeCtx({ cwd: home }),
+      provider: "grok",
+      permissionContext: null,
+      profile: "standard" as const,
+    };
+    const compact = await assembleBaseInstructionsForModel({
+      ...base,
+      registry: { tools: [{ name: "FileRead" }, { name: "Write" }], compactPresentation: true },
+    });
+    expect(compact).toContain("run the agenc-memory skill first");
+    expect(compact).not.toContain("One fact per file");
+    expect(compact).toContain(`- Global: \`${join(home, "memory")}`);
+    expect(compact).not.toContain("These directories already exist");
+    const standard = await assembleBaseInstructionsForModel({
+      ...base,
+      registry: { tools: [{ name: "FileRead" }, { name: "Write" }] },
+    });
+    expect(standard).toContain("One fact per file");
+    expect(standard).not.toContain("agenc-memory");
+  });
+
   test("base instructions carry the memory prompt when auto memory is enabled and drop it in simple mode", async () => {
     const home = mkdtempSync(join(tmpdir(), "agenc-base-memory-owner-"));
     onTestFinished(() => rmSync(home, { recursive: true, force: true }));

@@ -8,6 +8,7 @@ import { FileWatcher } from "../file-watcher/index.js";
 import { createSkillChangeDetector } from "./change-detector.js";
 import { parseSkillFrontmatterFields } from "./loadSkillsDir.js";
 import {
+  buildCompactSkillListing,
   clearInvokedSkills,
   createLocalSkillsServices,
   discoverSkillWatchRoots,
@@ -71,6 +72,51 @@ describe("per-root skill scan cap", () => {
 });
 
 describe("skill listing relevance", () => {
+  // A compact session (memory and skill guidance on demand) describes only the
+  // skills the opening request is about and names the rest.
+  const bundledCatalog = [
+    { name: "verify", description: "Plan and run a concrete verification pass for CLI, server, or UI changes that the project's own tests do not cover.", loadedFrom: "bundled" },
+    { name: "keybindings", description: "Create or modify AgenC TUI keybindings.", loadedFrom: "bundled" },
+    { name: "agenc-in-browser", description: "Inspect, test, or debug a web UI with the runtime's Browser tool.", loadedFrom: "bundled" },
+    { name: "loop", description: "Run a prompt on a fixed interval or dynamically reschedule it in the current AgenC session.", loadedFrom: "bundled" },
+    { name: "stock-analyzer", description: "Technical and SEC fundamentals", pluginId: "stonks-copilot", loadedFrom: "plugin", scope: "plugin" },
+    { name: "hidden-skill", description: "Private instructions", disableModelInvocation: true },
+  ];
+
+  it("compact listing describes strong matches only and names the other skills", () => {
+    const { listing, listedNames, stats } = buildCompactSkillListing(
+      bundledCatalog,
+      undefined,
+      "The tests in this repo are failing. Fix the source code so that npm test passes. Do not modify the tests.",
+    );
+    // verify shares "test" and "pass" with the request; keybindings ("modify") and
+    // agenc-in-browser ("test") share one word each and stay names.
+    expect(listing.split("\n")).toEqual([
+      "- verify: Plan and run a concrete verification pass for CLI, server, or UI changes that the project's own tests do not cover.",
+      "Other skills: keybindings, agenc-in-browser, loop, stock-analyzer [plugin: stonks-copilot].",
+    ]);
+    // Only described skills count as listed, so a later relevance block can describe the others.
+    expect(listedNames).toEqual(["verify"]);
+    expect(stats).toMatchObject({ invocable: 5, listed: 5, hidden: 0, ranked: true });
+    expect(listing).not.toContain("hidden-skill");
+  });
+
+  it("compact listing names every skill when the request matches none, and a name match is described", () => {
+    expect(buildCompactSkillListing(bundledCatalog, undefined, "hello").listing).toBe(
+      "Skills: verify, keybindings, agenc-in-browser, loop, stock-analyzer [plugin: stonks-copilot].",
+    );
+    const byName = buildCompactSkillListing(bundledCatalog, undefined, "set up a loop for this").listing;
+    expect(byName.split("\n")[0]).toBe("- loop: Run a prompt on a fixed interval or dynamically reschedule it in the current AgenC session.");
+  });
+
+  it("compact listing counts the names that do not fit the budget", () => {
+    const many = Array.from({ length: 3_000 }, (_, i) => ({ name: `skill-number-${i}`, description: "Something" }));
+    const { listing, stats } = buildCompactSkillListing(many, undefined, "hello");
+    expect(stats.hidden).toBeGreaterThan(0);
+    expect(listing.split("\n").at(-1)).toBe(`- ...and ${stats.hidden} more skills not shown; ask the user to run /skills <search> to find one`);
+    expect(listing.length).toBeLessThanOrEqual(stats.budgetChars + 120);
+  });
+
   it("caps each listed description at 120 characters; the skill's file keeps the full text", () => {
     const long = "Use Ledger's official wallet-cli, including safe missing-binary detection and approved latest-version installation of the binary";
     const listing = formatSkillListingWithinBudget([

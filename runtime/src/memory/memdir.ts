@@ -1,4 +1,5 @@
 import { lightMemoryContext } from "../prompts/light-workflow.js";
+import { MEMORY_SKILL_NAME } from "../skills/bundled/memoryGuide.js";
 import { isLightPrintRun, lightPrintMemoryContext } from "../prompts/light-print.js";
 /**
  * Ports the upstream `src/memdir/memdir.ts` prompt flow onto AgenC memory layers.
@@ -224,6 +225,49 @@ export function buildMemoryDirectoryLines(
 }
 
 /**
+ * Memory instructions for a session with compact presentation
+ * (ToolRegistry.compactPresentation): when memory matters and where its rules
+ * are. The rules themselves (what to save, the file format, the index) ride on
+ * every request otherwise; here they load with the agenc-memory skill
+ * ({@link buildMemorySkillGuide}) when the user is saving or recalling.
+ */
+export function buildCompactMemoryInstructionLines(): string[] {
+  return [
+    `# ${AUTO_MEM_DISPLAY_NAME}`,
+    '',
+    `You have file-based memory for facts that outlast this conversation: a global directory for the user across projects and a project directory for this repository, listed under "Memory directories", each with a \`${ENTRYPOINT_NAME}\` index that is in your context when it has entries. When the user asks you to remember, update, forget or recall something, or states a preference, correction or project fact worth keeping, run the ${MEMORY_SKILL_NAME} skill first; it has the rules and the file format. Read a memory file when its index line looks relevant, check what it names against the current files before relying on it, and act as if the indexes were empty if the user says to ignore memory.`,
+  ]
+}
+
+/** The memory directory block for a compact session: the two paths. */
+export function buildCompactMemoryDirectoryLines(
+  projectMemoryDir: string,
+  extraGuidelines: readonly string[] | undefined,
+  globalMemoryDir: string,
+): string[] {
+  return [
+    '# Memory directories',
+    `- Global: \`${globalMemoryDir}\``,
+    `- Project: \`${projectMemoryDir}\``,
+    ...(extraGuidelines !== undefined && extraGuidelines.length > 0
+      ? ['', ...extraGuidelines]
+      : []),
+  ]
+}
+
+/**
+ * The text the agenc-memory skill returns: the same rules a standard session
+ * carries in its head, plus the directory guidance its directory block drops.
+ */
+export function buildMemorySkillGuide(): string {
+  return [
+    ...buildMemoryInstructionLines(),
+    '',
+    'The directories are listed under "Memory directories". They already exist: write to them directly with the Write tool; do not run mkdir or check for their existence. Session memory is the current conversation: use plans and tasks for state that only matters in this session.',
+  ].join('\n')
+}
+
+/**
  * Assistant-mode daily-log prompt. Gated behind feature('KAIROS').
  *
  * Assistant sessions are effectively perpetual, so the agent writes memories
@@ -358,6 +402,8 @@ export async function loadMemoryPrompt(
   owner?: ResolveAutoMemoryDirectoryOptions,
   // Client presentation can differ from the shell environment used for paths.
   presentationEnvironment: Readonly<Record<string, string | undefined>> | undefined = owner?.env,
+  /** A session with compact presentation: short instructions, rules in the agenc-memory skill. */
+  options: { readonly compact?: boolean } = {},
 ): Promise<MemoryPromptSections | null> {
   const resolved = owner === undefined ? undefined : await resolveAutoMemoryDirectory(owner)
   if (resolved === undefined ? !isAutoMemoryEnabled() : !resolved.enabled || resolved.path === undefined) return null
@@ -392,13 +438,19 @@ export async function loadMemoryPrompt(
 
   // Harness guarantees the directories exist so the model can write without
   // checking. The prompt text reflects this ("already exist").
+  const lightOneShot = owner?.runtimeOptions?.lightMode === true && owner.runtimeOptions.nonInteractive === true
   return {
-    instructions: owner?.runtimeOptions?.lightMode === true && owner.runtimeOptions.nonInteractive === true
-      ? '' : buildMemoryInstructionLines().join('\n'),
-    directories: owner?.runtimeOptions?.lightMode === true && owner.runtimeOptions.nonInteractive === true
+    instructions: lightOneShot
+      ? ''
+      : options.compact === true
+        ? buildCompactMemoryInstructionLines().join('\n')
+        : buildMemoryInstructionLines().join('\n'),
+    directories: lightOneShot
       ? isLightPrintRun(owner.runtimeOptions, presentationEnvironment)
         ? lightPrintMemoryContext(autoDir, globalDir, extraGuidelines)
         : lightMemoryContext(autoDir, globalDir, extraGuidelines)
-      : buildMemoryDirectoryLines(autoDir, extraGuidelines, globalDir).join('\n'),
+      : options.compact === true
+        ? buildCompactMemoryDirectoryLines(autoDir, extraGuidelines, globalDir).join('\n')
+        : buildMemoryDirectoryLines(autoDir, extraGuidelines, globalDir).join('\n'),
   }
 }

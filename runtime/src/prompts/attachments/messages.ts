@@ -333,13 +333,13 @@ function renderAttachment(attachment: Attachment): LLMMessage | null {
     case "skill_listing": {
       const content = sanitizeSystemReminderContent(attachment.content);
       return userContextMessage(
-        wrapSystemReminder(`${SKILL_LISTING_REMINDER_HEADER} ${skillLoadingGuidance(content)}\n\n${content}`),
+        wrapSystemReminder(`${SKILL_LISTING_REMINDER_HEADER} ${skillLoadingGuidance(content, attachment.compact === true)}\n\n${content}`),
       );
     }
     case "skill_relevance": {
       const content = sanitizeSystemReminderContent(attachment.content);
       return userContextMessage(
-        wrapSystemReminder(`${SKILL_RELEVANCE_REMINDER_HEADER} ${skillLoadingGuidance(content)}\n\n${content}`),
+        wrapSystemReminder(`${SKILL_RELEVANCE_REMINDER_HEADER} ${skillLoadingGuidance(content, attachment.compact === true)}\n\n${content}`),
       );
     }
     case "instruction_update": {
@@ -385,10 +385,18 @@ const SKILL_LOADING_GUIDANCE =
 const PLUGIN_SKILL_GUIDANCE =
   "A [plugin: id] label identifies the plugin that provides that skill. An @plugin-id mention selects that plugin; use its listed skill names, which may differ from the plugin name. Discover its MCP tools separately with system.searchTools when callable; an empty tool search does not mean its listed skills are unavailable.";
 
-function skillLoadingGuidance(content: string): string {
+/**
+ * A compact session always advertises Skill, so its listing needs no fallback
+ * through system.searchTools.
+ */
+const COMPACT_SKILL_LOADING_GUIDANCE =
+  "Call Skill with the name of one that fits the request; the skill explains itself. Never call a skill name as a tool.";
+
+function skillLoadingGuidance(content: string, compact = false): string {
+  const guidance = compact ? COMPACT_SKILL_LOADING_GUIDANCE : SKILL_LOADING_GUIDANCE;
   return content.includes("[plugin:")
-    ? `${SKILL_LOADING_GUIDANCE} ${PLUGIN_SKILL_GUIDANCE}`
-    : SKILL_LOADING_GUIDANCE;
+    ? `${guidance} ${PLUGIN_SKILL_GUIDANCE}`
+    : guidance;
 }
 
 function permissionModeMessage(

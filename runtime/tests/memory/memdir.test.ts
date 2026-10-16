@@ -121,6 +121,56 @@ describe("memory prompt", () => {
     expect(instructions).not.toContain("\u2014");
   });
 
+  it("a compact session gets a short memory pointer; the agenc-memory skill carries the rules", () => {
+    installMemoryAuthority();
+    const compact = memory.buildCompactMemoryInstructionLines().join("\n");
+    const full = memory.buildMemoryInstructionLines().join("\n");
+    expect(compact.startsWith("# auto memory")).toBe(true);
+    // When memory matters, where the rules are, and the recall and staleness rules.
+    expect(compact).toContain("remember, update, forget or recall");
+    expect(compact).toContain("states a preference, correction or project fact worth keeping");
+    expect(compact).toContain("run the agenc-memory skill first");
+    expect(compact).toContain("`MEMORY.md` index");
+    expect(compact).toContain("check what it names against the current files");
+    expect(compact).toContain("act as if the indexes were empty if the user says to ignore memory");
+    expect(compact).not.toContain(tempRoot);
+    expect(compact.length).toBeLessThan(full.length / 2);
+    expect(compact).not.toContain("\u2014");
+    // The skill's text is the full set of rules plus the directory guidance.
+    const guide = memory.buildMemorySkillGuide();
+    expect(guide).toContain(full);
+    expect(guide).toContain("They already exist: write to them directly with the Write tool");
+    expect(guide).toContain("Session memory is the current conversation");
+    expect(guide).not.toContain("\u2014");
+  });
+
+  it("loadMemoryPrompt with compact presentation sends the pointer and the two paths", async () => {
+    installMemoryAuthority();
+    const prompt = await memory.loadMemoryPrompt(undefined, undefined, { compact: true });
+    expect(prompt?.instructions).toBe(memory.buildCompactMemoryInstructionLines().join("\n"));
+    expect(prompt?.directories).toBe(
+      ["# Memory directories", `- Global: \`${getGlobalMemoryPath()}\``, `- Project: \`${getProjectMemoryPath()}\``].join("\n"),
+    );
+    expect(existsSync(getGlobalMemoryPath())).toBe(true);
+    expect(existsSync(getProjectMemoryPath())).toBe(true);
+  });
+
+  it("compact presentation keeps Light one-shot memory text and owner guidance", async () => {
+    const env = { HOME: tempRoot, AGENC_HOME: join(tempRoot, "home") };
+    const cwd = join(tempRoot, "repo");
+    const configStore = new ConfigStore({ home: env.AGENC_HOME, env, cwd });
+    const owner = { cwd, env, configStore, runtimeOptions: { remoteMode: false, coworkMemoryExtraGuidelines: "OWNER_POLICY" } };
+    const compact = await memory.loadMemoryPrompt(owner, undefined, { compact: true });
+    expect(compact?.directories.endsWith("\n\nOWNER_POLICY")).toBe(true);
+    const lightOneShot = await memory.loadMemoryPrompt(
+      { ...owner, runtimeOptions: { ...owner.runtimeOptions, lightMode: true, nonInteractive: true } },
+      undefined,
+      { compact: true },
+    );
+    expect(lightOneShot?.instructions).toBe("");
+    expect(lightOneShot?.directories).not.toContain("# Memory directories");
+  });
+
   it("loadMemoryPrompt returns cacheable instructions plus per-session directories and creates both directories", async () => {
     installMemoryAuthority();
     const prompt = await memory.loadMemoryPrompt();
