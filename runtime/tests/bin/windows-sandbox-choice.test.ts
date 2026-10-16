@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -239,6 +239,35 @@ describe("Windows no-sandbox card", () => {
     ).resolves.toBe(false);
     expect(renderPrompt).toHaveBeenCalledOnce();
   });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "refuses to start when the answer cannot be saved",
+    async () => {
+      await chmod(home, 0o500);
+      const stderr = { write: vi.fn(() => true) } as unknown as NodeJS.WriteStream;
+      try {
+        await expect(
+          requireWindowsSandboxChoiceForTui({
+            env: env(),
+            argv: ARGV,
+            cwd: workspace,
+            platform: "win32",
+            probe: () => windowsStatus(),
+            renderPrompt: async () => true,
+            stderr,
+            ...terminal(),
+          }),
+        ).resolves.toBe(false);
+        expect(stderr.write).toHaveBeenCalledExactlyOnceWith(
+          expect.stringMatching(
+            new RegExp(`^agenc: could not save sandbox_mode in ${join(home, "config.toml").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}: `),
+          ),
+        );
+      } finally {
+        await chmod(home, 0o700);
+      }
+    },
+  );
 
   it("leaves a run without a terminal to the existing refusal", async () => {
     const renderPrompt = vi.fn(async () => true);
