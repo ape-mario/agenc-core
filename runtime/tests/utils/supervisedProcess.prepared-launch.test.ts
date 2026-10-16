@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { Duplex } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, vi } from "vitest";
-import { itOnDarwin } from "../helpers/platform-registration.js";
+import { itOnDarwin, itWhen } from "../helpers/platform-registration.js";
 
 // On darwin every contained command starts behind a fresh Node gate and waits
 // for a fresh Node watchdog to record the gate's identity: two Node startups
@@ -158,6 +158,13 @@ function fakeWatchdogSpawns() {
     sent: () => Buffer.concat(written).toString("utf8"),
   };
 }
+
+// Off darwin there is no prepared launch: preparing one starts nothing, and a
+// command that asks to claim one starts through the platform's own contained
+// launch and settles like any other. These cases also give the suite a test
+// on every platform.
+const itOffDarwin = itWhen(process.platform !== "darwin");
+const itOnOtherPosix = itWhen(process.platform !== "darwin" && process.platform !== "win32");
 
 describe("prepared contained launches", () => {
   itOnDarwin("give the command the same cwd, environment and argv0 as an unprepared launch", async () => {
@@ -340,5 +347,41 @@ describe("prepared contained launches", () => {
     } finally {
       await manager.closeAll("test cleanup");
     }
+  }, 60_000);
+
+  itOffDarwin("prepare nothing: no gate and no watchdog are started", () => {
+    const cwd = scratch();
+    prepareContainedProcessLaunch(cwd);
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(preparedContainedProcessLaunchForTesting()).toBeUndefined();
+  });
+
+  itOnOtherPosix("run a command that asks for one like any other contained command, and settle it", async () => {
+    const cwd = scratch();
+    prepareContainedProcessLaunch(cwd);
+    const plain = spawnContainedProcess(process.execPath, ["-e", PROBE], {
+      cwd,
+      env,
+      argv0: "agenc-probe",
+    });
+    const expected = await outcome(plain);
+    await settle(plain);
+    expect(expected.code).toBe(0);
+
+    const asked = spawnContainedProcess(process.execPath, ["-e", PROBE], {
+      cwd,
+      env,
+      argv0: "agenc-probe",
+      usePreparedLaunch: true,
+    });
+    const actual = await outcome(asked);
+    await settle(asked);
+    expect(actual).toMatchObject({ code: 0, signal: null });
+    const seen = JSON.parse(actual.stdout) as { cwd: string; argv0: string; env: Array<[string, string]> };
+    const before = JSON.parse(expected.stdout) as typeof seen;
+    expect(seen.cwd).toBe(cwd);
+    expect(seen.argv0).toBe(before.argv0);
+    expect(seen.env).toContainEqual(["AGENC_PREPARED_PROBE", "value with spaces"]);
+    expect(preparedContainedProcessLaunchForTesting()).toBeUndefined();
   }, 60_000);
 });
