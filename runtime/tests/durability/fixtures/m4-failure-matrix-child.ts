@@ -15,7 +15,9 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readSync,
   readdirSync,
+  rmSync,
   statSync,
   writeFileSync,
   writeSync,
@@ -39,6 +41,19 @@ type Command = "crash" | "recover" | "steps" | "recover-steps";
  * would, before recovery runs. SQLite keeps every commit (FULL).
  */
 const POWER_LOSS_LOG_ENV = "AGENC_TEST_TURN_POWER_LOSS_LOG";
+
+/**
+ * Mirror variant: the steps child also keeps the SQLite mirror of its rollout
+ * (`thread_rollout_items`) current, as FileThreadStore does for a live
+ * recorder: one index when it binds, then one after every rollout commit.
+ * Every projection that commits at synchronous=NORMAL ("rebuildable") is
+ * logged with the WAL bytes before and after it, so the parent can find the
+ * WAL bytes a power loss keeps (the end of the last FULL commit) and cut the
+ * WAL there. The recover-steps child then reports the mirror against a fresh
+ * projection of the journal, before and after production recovery.
+ */
+const MIRROR_WAL_LOG_ENV = "AGENC_TEST_MIRROR_WAL_LOG";
+const MIRROR_RECOVERY_ENV = "AGENC_TEST_MIRROR_RECOVERY";
 
 interface FixturePaths {
   readonly root: string;
@@ -129,6 +144,135 @@ function canonicalEvents(paths: FixturePaths): CanonicalEvent[] {
       return [event as CanonicalEvent];
     })
     .sort((left, right) => left.seq - right.seq);
+}
+
+/** Size of a WAL file and its header salts (they change when the WAL restarts). */
+function walMark(walPath: string): { readonly bytes: number; readonly salt: string } {
+  if (!existsSync(walPath)) return { bytes: 0, salt: "" };
+  const fd = openSync(walPath, "r");
+  try {
+    const salt = Buffer.alloc(8);
+    const read = readSync(fd, salt, 0, 8, 16);
+    return { bytes: fstatSync(fd).size, salt: read === 8 ? salt.toString("hex") : "" };
+  } finally {
+    closeSync(fd);
+  }
+}
+
+interface RolloutCommitSource {
+  readonly rolloutPath: string;
+  setOnRolloutCommitted(listener: ((rolloutPath: string) => void) | undefined): void;
+}
+
+/**
+ * Keep the rollout's SQLite mirror current exactly as FileThreadStore does
+ * for a live recorder (prepareLiveRecorder, then bindLiveRecorder): index the
+ * file once, then after every rollout commit. With `walLog`, every top-level
+ * rebuildable (NORMAL) projection commit is logged with its WAL bytes.
+ */
+async function bindRolloutMirror(
+  paths: FixturePaths,
+  source: RolloutCommitSource,
+  walLog?: string,
+) {
+  const [{ openStateDatabases }, { StateThreadRepository }, { backfillRolloutFile }] =
+    await Promise.all([
+      import("../../../src/state/sqlite-driver.js"),
+      import("../../../src/state/threads.js"),
+      import("../../../src/state/backfill.js"),
+    ]);
+  const driver = openStateDatabases({ cwd: paths.cwd, agencHome: paths.home });
+  if (walLog !== undefined) {
+    const wal = `${driver.stateDbPath}-wal`;
+    const commit = driver.transactionImmediate.bind(driver);
+    driver.transactionImmediate = ((fn: () => unknown, durability?: "full" | "rebuildable") => {
+      // A nested call commits with its outer transaction, at that level.
+      if (durability !== "rebuildable" || driver.state.inTransaction) return commit(fn, durability);
+      const before = walMark(wal);
+      const result = commit(fn, durability);
+      const after = walMark(wal);
+      appendJsonDurably(walLog, {
+        before: before.bytes,
+        after: after.bytes,
+        saltBefore: before.salt,
+        salt: after.salt,
+      });
+      return result;
+    }) as typeof driver.transactionImmediate;
+  }
+  const threads = new StateThreadRepository(driver);
+  const index = (): void => {
+    backfillRolloutFile({ rolloutPath: source.rolloutPath, threads });
+  };
+  index();
+  source.setOnRolloutCommitted(() => index());
+  return {
+    stateDbPath: driver.stateDbPath,
+    close(): void {
+      source.setOnRolloutCommitted(undefined);
+      driver.close();
+    },
+  };
+}
+
+interface MirrorRow {
+  readonly line_number: number;
+  readonly byte_offset: number;
+  readonly item_index: number;
+  readonly item_type: string;
+  readonly event_version: number | null;
+  readonly event_id: string | null;
+  readonly event_seq: number | null;
+  readonly payload_json: string;
+  readonly line_hash: string;
+}
+
+const MIRROR_ROW_SQL = `SELECT line_number, byte_offset, item_index, item_type, event_version,
+  event_id, event_seq, payload_json, line_hash
+  FROM thread_rollout_items WHERE source_path = ? ORDER BY line_number`;
+
+/**
+ * The mirror's rows for one rollout against a fresh projection of the
+ * journal's current bytes into an empty database (the oracle).
+ */
+async function compareMirror(paths: FixturePaths, rolloutPath: string) {
+  const [{ openStateDatabases }, { StateThreadRepository }, { backfillRolloutFile }] =
+    await Promise.all([
+      import("../../../src/state/sqlite-driver.js"),
+      import("../../../src/state/threads.js"),
+      import("../../../src/state/backfill.js"),
+    ]);
+  const driver = openStateDatabases({ cwd: paths.cwd, agencHome: paths.home });
+  let mirror: MirrorRow[];
+  try {
+    mirror = driver.prepareState<[string], MirrorRow>(MIRROR_ROW_SQL).all(rolloutPath);
+  } finally {
+    driver.close();
+  }
+  const oracleRoot = join(paths.root, `mirror-oracle-${process.pid}`);
+  const oracleCwd = join(oracleRoot, "workspace");
+  mkdirSync(join(oracleCwd, ".git"), { recursive: true });
+  const oracle = openStateDatabases({ cwd: oracleCwd, agencHome: join(oracleRoot, "home") });
+  let journal: MirrorRow[];
+  try {
+    backfillRolloutFile({ rolloutPath, threads: new StateThreadRepository(oracle) });
+    journal = oracle.prepareState<[string], MirrorRow>(MIRROR_ROW_SQL).all(rolloutPath);
+  } finally {
+    oracle.close();
+    rmSync(oracleRoot, { recursive: true, force: true });
+  }
+  const key = (row: MirrorRow) => JSON.stringify(row);
+  const mirrorKeys = new Set(mirror.map(key));
+  const journalKeys = new Set(journal.map(key));
+  return {
+    journalRows: journal.length,
+    mirrorRows: mirror.length,
+    /** Journal rows the mirror lacks (a projection a power loss dropped). */
+    missing: journal.filter((row) => !mirrorKeys.has(key(row))).length,
+    /** Mirror rows the journal lacks (journal bytes a power loss dropped). */
+    extra: mirror.filter((row) => !journalKeys.has(key(row))).length,
+    equal: mirror.length === journal.length && mirror.every((row, index) => key(row) === key(journal[index]!)),
+  };
 }
 
 async function openRolloutSession(
@@ -893,6 +1037,14 @@ async function runSteps(paths: FixturePaths): Promise<never> {
     import("../../../src/session/execution-admission-journal.js"),
     import("../../../src/utils/model/providers.js"),
   ]);
+  const walLog = process.env[MIRROR_WAL_LOG_ENV];
+  const mirror = walLog === undefined
+    ? undefined
+    : await bindRolloutMirror(paths, rollout.rolloutStore, walLog);
+  const mirrorMeta = () =>
+    mirror === undefined || walLog === undefined
+      ? {}
+      : { stateDbPath: mirror.stateDbPath, walLogEntries: readJsonLines(walLog).length };
   const kernel = new ExecutionAdmissionKernel({
     agencHome: paths.home,
     ownerId: `failure-matrix:${process.pid}`,
@@ -987,10 +1139,12 @@ async function runSteps(paths: FixturePaths): Promise<never> {
       rolloutPath: rollout.rolloutStore.rolloutPath,
       syncedSize: lastSyncedSize(log, rollout.rolloutStore.rolloutPath),
       size: statSync(rollout.rolloutStore.rolloutPath).size,
+      ...mirrorMeta(),
     }));
   }
   writeFileSync(join(paths.root, "journal.json"), JSON.stringify({
     rolloutPath: rollout.rolloutStore.rolloutPath,
+    ...mirrorMeta(),
   }));
   await modelStep(STEP_COUNT + 1);
   await toolStep(STEP_COUNT + 1, true);
@@ -999,8 +1153,18 @@ async function runSteps(paths: FixturePaths): Promise<never> {
 
 /** Production recovery over a multi-step turn, reported for every step. */
 async function recoverSteps(paths: FixturePaths) {
+  const mirrored = process.env[MIRROR_RECOVERY_ENV] === "1";
+  const rolloutPath = mirrored
+    ? (JSON.parse(readFileSync(join(paths.root, "journal.json"), "utf8")) as { rolloutPath: string }).rolloutPath
+    : undefined;
+  // The mirror as the image left it, against the journal as the image left it.
+  const mirrorBefore = mirrored ? await compareMirror(paths, rolloutPath!) : undefined;
   const resumed = await openRolloutSession(paths, { resume: true });
+  // A resumed session's recorder is bound to the thread store again, which
+  // indexes the file at once and after every commit (the production catch-up).
+  const mirror = mirrored ? await bindRolloutMirror(paths, resumed.rolloutStore) : undefined;
   resumed.rolloutStore.close();
+  mirror?.close();
   const [{ openStateDatabases }, { ExecutionAdmissionRepository }] =
     await Promise.all([
       import("../../../src/state/sqlite-driver.js"),
@@ -1041,6 +1205,9 @@ async function recoverSteps(paths: FixturePaths) {
     reservations: countBy(reservations.map((reservation) => reservation.status)),
     firstRecovery,
     secondRecovery,
+    ...(mirrored
+      ? { mirror: { before: mirrorBefore, after: await compareMirror(paths, rolloutPath!) } }
+      : {}),
   };
 }
 

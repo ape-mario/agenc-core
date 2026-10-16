@@ -1,10 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import {
   chmodSync,
+  closeSync,
   cpSync,
   existsSync,
   mkdtempSync,
+  openSync,
   readFileSync,
+  readSync,
   rmSync,
   statSync,
   truncateSync,
@@ -721,15 +724,32 @@ interface StepsRecoveryReport {
     readonly cancelledExpiredJobIds: readonly string[];
     readonly detachedQueuedJobIds: readonly string[];
   };
+  /** Present when the recovery child compared the rollout's SQLite mirror. */
+  readonly mirror?: {
+    readonly before: MirrorComparison;
+    readonly after: MirrorComparison;
+  };
 }
 
-async function runStepsChild(stateDirectory: string, log: string): Promise<void> {
+interface MirrorComparison {
+  readonly journalRows: number;
+  readonly mirrorRows: number;
+  readonly missing: number;
+  readonly extra: number;
+  readonly equal: boolean;
+}
+
+async function runStepsChild(
+  stateDirectory: string,
+  log: string,
+  extraEnv: NodeJS.ProcessEnv = {},
+): Promise<void> {
   const child = spawn(
     process.execPath,
     ["--loader", NODE_TEST_LOADER, "--import", TSX_IMPORT, FIXTURE, "steps", "after_tool_ack_commit", stateDirectory],
     {
       cwd: dirname(dirname(dirname(dirname(FIXTURE)))),
-      env: { ...cleanChildEnvironment(), [POWER_LOSS_LOG_ENV]: log },
+      env: { ...cleanChildEnvironment(), [POWER_LOSS_LOG_ENV]: log, ...extraEnv },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
@@ -740,13 +760,16 @@ async function runStepsChild(stateDirectory: string, log: string): Promise<void>
   ).toMatchObject({ code: null, signal: "SIGKILL" });
 }
 
-async function recoverStepsChild(stateDirectory: string): Promise<StepsRecoveryReport> {
+async function recoverStepsChild(
+  stateDirectory: string,
+  extraEnv: NodeJS.ProcessEnv = {},
+): Promise<StepsRecoveryReport> {
   const child = spawn(
     process.execPath,
     ["--loader", NODE_TEST_LOADER, "--import", TSX_IMPORT, FIXTURE, "recover-steps", "after_tool_ack_commit", stateDirectory],
     {
       cwd: dirname(dirname(dirname(dirname(FIXTURE)))),
-      env: cleanChildEnvironment(),
+      env: { ...cleanChildEnvironment(), ...extraEnv },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
@@ -841,3 +864,144 @@ describe.sequential("M4 kernel-panic images of a multi-step turn", () => {
   );
 });
 
+
+// ---------------------------------------------------------------------------
+// Power loss after rebuildable mirror commits.
+//
+// The rollout's SQLite mirror (`thread_rollout_items`, kept current after
+// every rollout commit as FileThreadStore does for a live recorder) commits
+// at synchronous=NORMAL. Its commits reach the disk with the next FULL commit
+// on the database, so a power loss can drop every mirror commit after the
+// last FULL one, and nothing else: WAL recovery keeps a prefix of the commit
+// sequence. These images cut the WAL back to the end of the last FULL commit
+// and the journal either to its last fsynced byte (nothing flushed since) or
+// not at all (its deferred fsync landed, the WAL's did not). Recovery must
+// reach the same boundary as before, and the mirror must equal a fresh
+// projection of the recovered journal.
+// ---------------------------------------------------------------------------
+
+const MIRROR_WAL_LOG_ENV = "AGENC_TEST_MIRROR_WAL_LOG";
+const MIRROR_RECOVERY_ENV = "AGENC_TEST_MIRROR_RECOVERY";
+
+interface WalMark {
+  readonly before: number;
+  readonly after: number;
+  readonly saltBefore: string;
+  readonly salt: string;
+}
+
+function readWalMarks(log: string): WalMark[] {
+  if (!existsSync(log)) return [];
+  return readFileSync(log, "utf8")
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as WalMark);
+}
+
+function walHeader(stateDbPath: string): { readonly bytes: number; readonly salt: string } {
+  const fd = openSync(`${stateDbPath}-wal`, "r");
+  try {
+    const salt = Buffer.alloc(8);
+    expect(readSync(fd, salt, 0, 8, 16)).toBe(8);
+    return { bytes: statSync(`${stateDbPath}-wal`).size, salt: salt.toString("hex") };
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * The WAL bytes a power loss keeps: the end of the last FULL commit. Every
+ * logged mark is a NORMAL mirror commit; any other WAL growth is a FULL
+ * commit, which fsyncs the WAL up to its end. So if the WAL grew after the
+ * last mark, everything is durable; otherwise the durable end is the start of
+ * the trailing run of back-to-back mirror commits.
+ */
+function durableWalBytes(marks: readonly WalMark[], wal: { readonly bytes: number; readonly salt: string }): number {
+  // The WAL never restarted during the run, so its byte offsets are comparable.
+  for (const mark of marks) {
+    expect(mark.saltBefore).toBe(wal.salt);
+    expect(mark.salt).toBe(wal.salt);
+  }
+  const last = marks.at(-1);
+  if (last === undefined) return wal.bytes;
+  expect(wal.bytes).toBeGreaterThanOrEqual(last.after);
+  if (wal.bytes > last.after) return wal.bytes;
+  let first = marks.length - 1;
+  while (first > 0 && marks[first - 1]!.after === marks[first]!.before) first -= 1;
+  return marks[first]!.before;
+}
+
+/** Cut the WAL to `bytes`; the shared-memory index is rebuilt from it, as after a reboot. */
+function cutWal(stateDbPath: string, bytes: number): number {
+  const dropped = statSync(`${stateDbPath}-wal`).size - bytes;
+  truncateSync(`${stateDbPath}-wal`, bytes);
+  rmSync(`${stateDbPath}-shm`, { force: true });
+  return dropped;
+}
+
+describe.sequential("M4 power loss after rebuildable mirror commits", () => {
+  it(
+    "recovers every image with the WAL cut to its last FULL commit, and the mirror equals the journal",
+    { timeout: 300_000 },
+    async () => {
+      const stateDirectory = mkdtempSync(join(tmpdir(), "agenc-m4-mirror-"));
+      directories.push(stateDirectory);
+      const log = join(stateDirectory, "synced.jsonl");
+      const walLog = join(stateDirectory, "wal.jsonl");
+      await runStepsChild(stateDirectory, log, { [MIRROR_WAL_LOG_ENV]: walLog });
+      const marks = readWalMarks(walLog);
+      expect(marks.length).toBeGreaterThan(0);
+      const finalImage = join(stateDirectory, "images", "F");
+      restoreImage(finalImage, stateDirectory);
+      const final = JSON.parse(readFileSync(join(stateDirectory, "journal.json"), "utf8")) as {
+        rolloutPath: string;
+        stateDbPath: string;
+      };
+      const finalSynced = readSyncLog(log)
+        .filter((entry) => entry.path === final.rolloutPath)
+        .reduce((max, entry) => Math.max(max, entry.size), 0);
+
+      let walBytesDropped = 0;
+      let mirrorRowsReprojected = 0;
+      for (const name of ["P1", "P2", "P3", "F"]) {
+        const image = join(stateDirectory, "images", name);
+        const meta = name === "F"
+          ? { ...final, syncedSize: finalSynced, walLogEntries: marks.length }
+          : (JSON.parse(readFileSync(join(image, "journal.json"), "utf8")) as {
+              rolloutPath: string;
+              stateDbPath: string;
+              syncedSize: number;
+              walLogEntries: number;
+            });
+        for (const journalCut of [true, false]) {
+          restoreImage(stateDirectory, image);
+          const durable = durableWalBytes(marks.slice(0, meta.walLogEntries), walHeader(meta.stateDbPath));
+          walBytesDropped += cutWal(meta.stateDbPath, durable);
+          if (journalCut) truncateSync(meta.rolloutPath, meta.syncedSize);
+          const report = await recoverStepsChild(stateDirectory, { [MIRROR_RECOVERY_ENV]: "1" });
+          const label = `${name} journal ${journalCut ? "cut" : "whole"}`;
+          expectConsistentRecovery(report);
+          if (name === "F") {
+            expect(report.effects, label).toHaveLength(4);
+            expect(report.effects.filter((effect) => effect.outcome === "committed"), label).toHaveLength(3);
+            expect(report.effects.filter((effect) => effect.outcome === "unknown_outcome"), label).toHaveLength(1);
+            expect(report.pendingEffectReviews, label).toBe(1);
+            expect(report.toolPhysicalAttempts, label).toBe(4);
+          } else {
+            const step = Number(name.slice(1));
+            expect(report.effects, label).toHaveLength(step);
+            expect(report.effects.every((effect) => effect.outcome === "committed"), label).toBe(true);
+            expect(report.pendingEffectReviews, label).toBe(0);
+          }
+          expect(report.mirror?.after, label).toMatchObject({ equal: true, missing: 0, extra: 0 });
+          expect(report.mirror!.after.mirrorRows, label).toBeGreaterThan(0);
+          mirrorRowsReprojected += report.mirror!.before.missing;
+        }
+      }
+      // The cuts dropped mirror commits, and recovery re-projected rows the
+      // journal kept but the mirror had lost.
+      expect(walBytesDropped).toBeGreaterThan(0);
+      expect(mirrorRowsReprojected).toBeGreaterThan(0);
+    },
+  );
+});
