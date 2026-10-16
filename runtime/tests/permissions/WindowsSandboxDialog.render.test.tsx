@@ -3,17 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 
 // useInput flips the terminal into raw mode, which the non-TTY test stream
 // does not support. The layout is what this file checks.
-vi.mock("../../../src/tui/ink/hooks/use-input.js", () => ({
+vi.mock("../../src/tui/ink/hooks/use-input.js", () => ({
   default: () => {},
 }));
 
-import { TerminalSizeContext } from "../../../src/tui/ink/components/TerminalSizeContext.js";
+import { TerminalSizeContext } from "../../src/tui/ink/components/TerminalSizeContext.js";
 import {
   WINDOWS_SANDBOX_CARD_COPY,
   WindowsSandboxDialog,
   windowsSandboxOptionLabel,
-} from "../../../src/tui/components/WindowsSandboxDialog.js";
-import { renderToString } from "../../../src/utils/staticRender.js";
+} from "../../src/permissions/WindowsSandboxDialog.js";
+import { renderToString } from "../../src/utils/staticRender.js";
 
 function renderCard(columns: number): Promise<string> {
   return renderToString(
