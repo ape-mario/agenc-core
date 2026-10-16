@@ -342,7 +342,8 @@ describe("exec_command tool", () => {
         approvalPolicy: "never", mode: "bypassPermissions", sandboxMode: "workspace_write", platformSandbox: true, toolName,
       }));
       expect(result.content).toContain("network access was disabled");
-      expect(result.content).toContain('retry it once with sandbox_permissions="require_escalated"');
+      // Bypass: the user turned approvals off, so the notice says the retry runs without asking.
+      expect(result.content).toContain('a retry with sandbox_permissions="require_escalated" runs without asking');
       expect(result.content).not.toContain("approval is unavailable");
     });
 

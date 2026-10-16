@@ -1325,6 +1325,7 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
               sandboxMode: runtimeContext.requestedSandboxMode,
               session: runtimeContext.invocation.session,
             }),
+          escalationWithoutAsking: runtimeContext?.approvalPolicy === "never",
         }) ?? (confinedWorktree === undefined
           ? null
           : worktreeWriteDenialNotice({

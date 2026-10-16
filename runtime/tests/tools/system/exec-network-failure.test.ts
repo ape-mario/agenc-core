@@ -21,6 +21,9 @@ describe("network-disabled command failure guidance", () => {
       expect(notice({ output })).not.toContain("request it");
     }
     expect(notice({ escalationAvailable: true })).toContain('retry it once with sandbox_permissions="require_escalated"');
+    // With approvals off the notice says the retry is the user's own setting, not a workaround.
+    expect(notice({ escalationAvailable: true, escalationWithoutAsking: true }))
+      .toContain('Approvals are off in this session, so a retry with sandbox_permissions="require_escalated" runs without asking');
   });
 
   test("reads a silent client's exit status when it printed nothing", () => {

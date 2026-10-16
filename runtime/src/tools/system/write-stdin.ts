@@ -262,6 +262,7 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
               sandboxMode: runtimeContext.requestedSandboxMode,
               session: runtimeContext.invocation.session,
             }),
+          escalationWithoutAsking: runtimeContext?.approvalPolicy === "never",
         });
         return {
           content: notice === null ? execContent : `${execContent}\n\n${notice}`,
