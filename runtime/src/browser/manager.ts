@@ -978,7 +978,9 @@ export class BrowserManager {
     tabId?: number,
     signal?: AbortSignal,
   ): Promise<BrowserPage> {
-    if (this.#tabs.length === 0 && tabId === undefined) {
+    // With nothing open yet, models name the tab the first navigate creates (tab 1): open it.
+    // Any other id is still refused before the browser launches.
+    if (this.#tabs.length === 0 && (tabId === undefined || tabId === this.#nextTabId)) {
       await this.#ensureLaunched();
       this.#touchIdle();
       const entry = await this.#createTab(url, signal);
