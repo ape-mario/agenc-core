@@ -38,11 +38,11 @@ const GITHUB_COPILOT_MODEL_IDS = Object.freeze([
   "claude-opus-5.5",
   "claude-sonnet-4.6",
   "claude-sonnet-5",
-  "gemini-3.5-flash",
-  "gemini-3.6-flash",
+  // GitHub deprecated Gemini 3.5 Flash, Gemini 3.6 Flash and Kimi K2.7 Code
+  // across Copilot on 2026-10-02.
+  // https://github.blog/changelog/2026-10-02-selected-models-in-github-copilot-deprecated
   "gemini-3.7-flash",
   "mai-code-1.1-flash",
-  "kimi-k2.7-code",
   "kimi-k3",
   "grok-4.5",
   "grok-4.6",

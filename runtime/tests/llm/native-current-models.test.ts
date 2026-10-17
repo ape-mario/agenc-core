@@ -106,7 +106,8 @@ describe("provider-specific price resolution", () => {
   test.each([["openai", "gpt-4-turbo", 0.04], ["openai", "chat-latest", 0.035], ["gemini", "gemini-3.1-pro-preview-customtools", 0.014], ["gemini", "gemma-4-31b-it", 0], ["gemini", "gemini-robotics-er-2-preview", 0.006]] as const)("prices %s/%s independently", (provider, model, expected) => {
     expect(computeUsdCostWithResolution(usage(provider, model), DEFAULT_MODEL_COSTS).costUsd).toBeCloseTo(expected, 7);
   });
-  test.each(NVIDIA_CURRENT_MODEL_CATALOG)("keeps unpublished NIM price unknown for $model", entry => {
-    expect(computeUsdCostWithResolution(usage(entry.provider, entry.model), DEFAULT_MODEL_COSTS)).toMatchObject({ known: false, costEstimated: true });
+  // NVIDIA's hosted NIM endpoints are free to Developer Program members; nothing bills per token.
+  test.each(NVIDIA_CURRENT_MODEL_CATALOG)("prices NIM model $model as the free tier", entry => {
+    expect(computeUsdCostWithResolution(usage(entry.provider, entry.model), DEFAULT_MODEL_COSTS)).toMatchObject({ known: true, costUsd: 0 });
   });
 });

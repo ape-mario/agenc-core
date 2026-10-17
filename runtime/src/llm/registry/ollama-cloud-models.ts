@@ -8,6 +8,14 @@ export const OLLAMA_CLOUD_PROVIDER_ID = "ollama-cloud";
 export const OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1";
 export const OLLAMA_CLOUD_API_KEY_ENV = "OLLAMA_API_KEY";
 export const OLLAMA_CLOUD_DEFAULT_MODEL = "deepseek-v4.1-flash";
+/**
+ * Not on Ollama's per-token price list (https://ollama.com/pricing, checked
+ * 2026-10-17). Every Cloud call bills per token since 2026-08-31, so these are
+ * hidden from the picker; a configured one keeps working if Ollama serves it.
+ */
+export const OLLAMA_CLOUD_UNLISTED_MODELS: ReadonlySet<string> = new Set([
+  "deepseek-v4-flash:0731", "glm-5.1", "qwen3.5:397b",
+]);
 export const OLLAMA_CLOUD_MODELS = [
   {
     "model": "deepseek-v4.1-flash",
