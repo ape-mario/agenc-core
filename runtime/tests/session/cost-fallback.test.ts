@@ -1,5 +1,14 @@
 import { expect, test } from "vitest";
-import { conservativeModelCost, DEFAULT_MODEL_COSTS, computeUsdCostWithResolution, type ModelCostEntry } from "../../src/session/cost.js";
+import {
+  conservativeModelCost,
+  DEFAULT_MODEL_COSTS,
+  DEFAULT_UNKNOWN_MODEL_COST,
+  computeUsdCostWithResolution,
+  type ModelCostEntry,
+} from "../../src/session/cost.js";
+
+// A Bedrock model AgenC has no price for yet.
+const WITH_UNPRICED_BEDROCK = { ...DEFAULT_MODEL_COSTS, "amazon-bedrock:future-bedrock-model": DEFAULT_UNKNOWN_MODEL_COST };
 
 test.each([
   ["anthropic", 1000, 0, 0.36],
@@ -21,13 +30,13 @@ test.each([
   ["nvidia-nim", "nvidia/llama-3.1-nemotron-70b-instruct", 500, 0, 0.21],
   ["nvidia-nim", "nvidia/llama-3.1-nemotron-70b-instruct", 0, 500, 0.21],
   ["nvidia-nim", "nvidia/llama-3.1-nemotron-70b-instruct", 300, 200, 0.21],
-  ["amazon-bedrock", "amazon.nova-pro-v1:0", 300, 200, 0.285],
+  ["amazon-bedrock", "future-bedrock-model", 300, 200, 0.285],
 ] as const)("uses provider cache semantics for matched %s/%s fallback with %i reads and %i writes", (provider, model, cachedInputTokens, cacheCreationInputTokens, costUsd) => {
   const result = computeUsdCostWithResolution({
     provider, model, inputTokens: 1000, outputTokens: 100,
     cachedInputTokens, cacheCreationInputTokens, reasoningOutputTokens: 0,
     webSearchRequests: 0, totalTokens: 1100, turns: 1,
-  }, DEFAULT_MODEL_COSTS);
+  }, WITH_UNPRICED_BEDROCK);
   expect(result).toMatchObject({ known: false, costEstimated: true });
   expect(result.matchedKey).toBeDefined();
   expect(result.costUsd).toBeCloseTo(costUsd, 9);
@@ -76,4 +85,15 @@ test("does not borrow a native tariff for future Meta releases or subscription e
       webSearchRequests: 0, totalTokens: 2000, turns: 1}, DEFAULT_MODEL_COSTS))
       .toMatchObject({known: false, costEstimated: true, costUsd: 0.75});
   }
+});
+
+test("prices Bedrock at its published on-demand rates, cache tokens apart from input", () => {
+  const result = computeUsdCostWithResolution({
+    provider: "amazon-bedrock", model: "amazon.nova-pro-v1:0", inputTokens: 1000, outputTokens: 100,
+    cachedInputTokens: 300, cacheCreationInputTokens: 200, reasoningOutputTokens: 0,
+    webSearchRequests: 0, totalTokens: 1600, turns: 1,
+  }, DEFAULT_MODEL_COSTS);
+  expect(result.known).toBe(true);
+  // $0.80 input, $3.20 output, $0.20 cache reads, free cache writes per 1M.
+  expect(result.costUsd).toBeCloseTo((1000 * 0.8 + 100 * 3.2 + 300 * 0.2) / 1e6, 12);
 });
