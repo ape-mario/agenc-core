@@ -2221,6 +2221,7 @@ describe("VerifiedChangeWorkflowController — stop reasons", () => {
 
   it("completes a Goal with an unpriced provider fixture and persists estimated spend", async () => {
     let client!: ExecutionAdmissionClient;
+    // A Meta release AgenC has no price for yet (the Qwen Token Plan is now a known $0 plan).
     const project = makeHarness({ admission: () => client });
     const kernel = new ExecutionAdmissionKernel({ agencHome: project.home });
     try {
@@ -2228,20 +2229,20 @@ describe("VerifiedChangeWorkflowController — stop reasons", () => {
         autonomous: false, maxCostUsd: 2, hasHardCostCap: true } });
       const session = { conversationId: RUN_ID, services: { executionAdmission: client, admissionRequired: true },
         abortTerminal: vi.fn() } as unknown as Session;
-      const provider = { name: "qwen-token-plan", getExecutionProfile: async () => ({ usageReporting: "authoritative", supportsMaxOutputTokens: true }) } as unknown as LLMProvider;
+      const provider = { name: "meta", getExecutionProfile: async () => ({ usageReporting: "authoritative", supportsMaxOutputTokens: true }) } as unknown as LLMProvider;
       let settledUsage = client.getUsageSummary?.();
       client.subscribeUsage?.(usage => { settledUsage = usage; });
       const spawn = project.spawner.spawn.bind(project.spawner);
       vi.spyOn(project.spawner, "spawn").mockImplementation(async input => {
-        const response = await runAdmittedModelCall({ session, provider, model: "qwen3.8-max", providerName: "qwen-token-plan",
+        const response = await runAdmittedModelCall({ session, provider, model: "muse-spark-1.4", providerName: "meta",
           messages: [{ role: "user", content: input.prompt }], options: { maxOutputTokens: 128 },
-          stepId: `${input.kind}:fixture-model-call`, invoke: async () => ({ model: "qwen3.8-max", content: "fixture answer",
+          stepId: `${input.kind}:fixture-model-call`, invoke: async () => ({ model: "muse-spark-1.4", content: "fixture answer",
             toolCalls: [], finishReason: "stop", usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20,
               availability: "reported", provenance: "provider" } }) });
         expect(response.content).toBe("fixture answer");
         return spawn(input);
       });
-      await runToTerminal(project, { provider: "qwen-token-plan", model: "qwen3.8-max", maxCostUsd: 2 });
+      await runToTerminal(project, { provider: "meta", model: "muse-spark-1.4", maxCostUsd: 2 });
       expect(project.repo.getCurrentTerminalResult(RUN_ID)).toMatchObject({ status: "completed" });
       expect(project.spawner.spawn).toHaveBeenCalledTimes(3);
       expect(settledUsage).toMatchObject({ costEstimated: true, hasUnknownCost: false });
