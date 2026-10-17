@@ -47,6 +47,10 @@ function mkHarness(opts: {
 } = {}): Harness {
   const cwd = opts.cwd ?? mkdtempSync(join(tmpdir(), "agenc-plan-cwd-"));
   const agencHome = mkdtempSync(join(tmpdir(), "agenc-plan-home-"));
+  // The platform home must exist. A made-up path under /home reaches the autofs
+  // mount on macOS, where every lookup takes tens of milliseconds and each plan
+  // file read or write pays it several times.
+  const home = mkdtempSync(join(tmpdir(), "agenc-plan-user-"));
   const registry = new PermissionModeRegistry(
     createEmptyToolPermissionContext({
       mode: opts.initialMode ?? "default",
@@ -75,7 +79,7 @@ function mkHarness(opts: {
     session,
     argsRaw: opts.argsRaw ?? "",
     cwd,
-    home: "/home/test-plan",
+    home,
     agencHome,
     appState: opts.appState,
   };
@@ -87,6 +91,27 @@ function planCtx(h: Harness) {
     agencHome: h.agencHome,
     sessionId: h.ctx.session.conversationId,
   };
+}
+
+/**
+ * The dashboard handles keys, saves the plan and repaints asynchronously, so
+ * tests wait for what it renders or writes instead of sleeping a fixed time.
+ * useInput refreshes its key handler in a passive effect that runs a tick after
+ * an async save's repaint, so yield once before the caller sends the next key.
+ */
+const until = async (check: () => void) => {
+  await vi.waitFor(check, { timeout: 5_000, interval: 10 });
+  await new Promise(resolve => setImmediate(resolve));
+};
+
+/** Latest full dashboard frame without ANSI. Every change repaints the whole screen. */
+function trackScreen(stdout: PassThrough): { text: string } {
+  const screen = { text: "" };
+  stdout.on("data", chunk => {
+    const frame = stripAnsi(String(chunk));
+    if (frame.includes("CURRENT PLAN")) screen.text = frame;
+  });
+  return screen;
 }
 
 beforeEach(() => {
@@ -448,18 +473,21 @@ it("keeps an added plan step private until Enter and drops it on Esc", async () 
   await planCommand.execute(h.ctx);
   const stdin = Object.assign(new PassThrough(), { isTTY: true, ref() {}, unref() {}, setRawMode() {} });
   const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false });
-  stdout.resume();
+  const screen = trackScreen(stdout);
   const root = await createRoot({ stdin: stdin as unknown as NodeJS.ReadStream, stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false });
   try {
     root.render(React.createElement(AppStateProvider, { initialState: getDefaultAppState(), children: setToolJSX.mock.calls[0][0].jsx }));
-    await new Promise(resolve => setTimeout(resolve, 50));
-    stdin.write("a"); await new Promise(resolve => setTimeout(resolve, 50));
+    await until(() => expect(screen.text).toContain("original step"));
+    stdin.write("a");
+    await until(() => expect(screen.text).toContain("new plan step█"));
     expect(getPlan(planCtx(h))).toBe("- [ ] original step\n");
-    stdin.write("\x1b"); await new Promise(resolve => setTimeout(resolve, 60));
+    stdin.write("\x1b");
+    await until(() => expect(screen.text).not.toContain("new plan step"));
     expect(getPlan(planCtx(h))).toBe("- [ ] original step\n");
-    stdin.write("a"); await new Promise(resolve => setTimeout(resolve, 50));
-    stdin.write("\r"); await new Promise(resolve => setTimeout(resolve, 50));
-    expect(getPlan(planCtx(h))).toBe("- [ ] original step\n- [ ] new plan step\n");
+    stdin.write("a");
+    await until(() => expect(screen.text).toContain("new plan step█"));
+    stdin.write("\r");
+    await until(() => expect(getPlan(planCtx(h))).toBe("- [ ] original step\n- [ ] new plan step\n"));
   } finally { root.unmount(); stdin.end(); stdout.end(); }
 });
 
@@ -471,15 +499,18 @@ it.each(["\n", "\r\n"])("editing a long plan heading preserves every untouched b
   await writePlan(planCtx(h), original);
   await planCommand.execute(h.ctx);
   const stdin = Object.assign(new PassThrough(), { isTTY: true, ref() {}, unref() {}, setRawMode() {} });
-  const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false }); stdout.resume();
+  const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false });
+  const screen = trackScreen(stdout);
   const root = await createRoot({ stdin: stdin as unknown as NodeJS.ReadStream, stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false });
   try {
     root.render(React.createElement(AppStateProvider, { initialState: getDefaultAppState(), children: setToolJSX.mock.calls[0][0].jsx }));
-    await new Promise(resolve => setTimeout(resolve, 50));
-    stdin.write("e"); await new Promise(resolve => setTimeout(resolve, 50));
-    stdin.write(" Preserve scratch.txt byte for byte."); await new Promise(resolve => setTimeout(resolve, 50));
-    stdin.write("\r"); await new Promise(resolve => setTimeout(resolve, 80));
-    expect(getPlan(planCtx(h))).toBe(original.replace(newline, ` Preserve scratch.txt byte for byte.${newline}`));
+    await until(() => expect(screen.text).toContain("Full invoice refactor"));
+    stdin.write("e");
+    await until(() => expect(screen.text).toContain("context █"));
+    stdin.write(" Preserve scratch.txt byte for byte.");
+    await until(() => expect(screen.text).toContain("byte for byte.█"));
+    stdin.write("\r");
+    await until(() => expect(getPlan(planCtx(h))).toBe(original.replace(newline, ` Preserve scratch.txt byte for byte.${newline}`)));
   } finally { root.unmount(); stdin.end(); stdout.end(); }
 });
 
@@ -490,19 +521,33 @@ it("adding and deleting a step preserve the full document, and stale edits refus
   await writePlan(planCtx(h), original);
   await planCommand.execute(h.ctx);
   const stdin = Object.assign(new PassThrough(), { isTTY: true, ref() {}, unref() {}, setRawMode() {} });
-  const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false }); stdout.resume();
+  const stdout = Object.assign(new PassThrough(), { columns: 180, rows: 50, isTTY: false });
+  const screen = trackScreen(stdout);
   const root = await createRoot({ stdin: stdin as unknown as NodeJS.ReadStream, stdout: stdout as unknown as NodeJS.WriteStream, patchConsole: false });
-  const key = async (text: string) => { stdin.write(text); await new Promise(resolve => setTimeout(resolve, 70)); };
   try {
     root.render(React.createElement(AppStateProvider, { initialState: getDefaultAppState(), children: setToolJSX.mock.calls[0][0].jsx }));
-    await new Promise(resolve => setTimeout(resolve, 50));
-    await key("a"); await key("\r");
-    expect(getPlan(planCtx(h))).toBe(original.replace("# Heading\n", "# Heading\n- [ ] new plan step\n"));
-    await key("d");
-    expect(getPlan(planCtx(h))).toBe(original);
+    await until(() => expect(screen.text).toContain("Heading"));
+    stdin.write("a");
+    await until(() => expect(screen.text).toContain("new plan step█"));
+    stdin.write("\r");
+    // The editor ignores keys until its save settles, so wait for the repaint that ends it, not just the file.
+    await until(() => {
+      expect(screen.text).not.toContain("█");
+      expect(getPlan(planCtx(h))).toBe(original.replace("# Heading\n", "# Heading\n- [ ] new plan step\n"));
+    });
+    stdin.write("d");
+    await until(() => {
+      expect(screen.text).not.toContain("new plan step");
+      expect(getPlan(planCtx(h))).toBe(original);
+    });
     const newer = original + "\nNew detail from another editor.\n";
     await writePlan(planCtx(h), newer);
-    await key("e"); await key(" user edit"); await key("\r");
+    stdin.write("e");
+    await until(() => expect(screen.text).toContain("one█"));
+    stdin.write(" user edit");
+    await until(() => expect(screen.text).toContain("one user edit█"));
+    stdin.write("\r");
+    await until(() => expect(screen.text).toContain("Failed to save plan"));
     expect(getPlan(planCtx(h))).toBe(newer);
   } finally { root.unmount(); stdin.end(); stdout.end(); }
 });
