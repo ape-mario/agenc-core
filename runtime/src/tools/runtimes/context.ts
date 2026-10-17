@@ -36,6 +36,11 @@ export interface ToolRuntimeCallContext {
 
 export interface ToolRuntimeAttemptContext extends ToolRuntimeCallContext {
   readonly approvalPolicy: ApprovalPolicy;
+  /**
+   * The policy before a permission-mode allow lowered this attempt to `never`: what a
+   * follow-up escalation request meets (an approval card in default mode).
+   */
+  readonly requestedApprovalPolicy?: ApprovalPolicy;
   readonly requestedSandboxMode: SandboxMode;
   readonly sandboxMode: SandboxMode;
   readonly approvalResolved: boolean;
@@ -83,6 +88,7 @@ export function buildToolRuntimeAttemptContext(
   call: ToolRuntimeCallContext,
   params: {
     readonly approvalPolicy: ApprovalPolicy;
+    readonly requestedApprovalPolicy?: ApprovalPolicy;
     readonly requestedSandboxMode: SandboxMode;
     readonly sandboxMode: SandboxMode;
     readonly approvalResolved: boolean;
@@ -94,6 +100,9 @@ export function buildToolRuntimeAttemptContext(
   return {
     ...call,
     approvalPolicy: params.approvalPolicy,
+    ...(params.requestedApprovalPolicy !== undefined
+      ? { requestedApprovalPolicy: params.requestedApprovalPolicy }
+      : {}),
     requestedSandboxMode: params.requestedSandboxMode,
     sandboxMode: params.sandboxMode,
     approvalResolved: params.approvalResolved,

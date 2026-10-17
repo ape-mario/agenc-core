@@ -243,12 +243,15 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
           (output.exitCode === null && !stillAlive);
         const execContent = formatUnifiedExecToolContent(output, config?.lightMode === true);
         const runtimeContext = readToolRuntimeContext(args);
+        // A permission-mode allow runs this attempt under `never`, but an escalation request
+        // still meets the session's own policy: read that one for what a retry can get.
+        const escalationPolicy = runtimeContext?.requestedApprovalPolicy ?? runtimeContext?.approvalPolicy;
         const denial = execSandboxDenialNotice({
           output: execContent,
           exitCode: output.exitCode,
           sandboxApplied: runtimeSandbox !== undefined,
           escalationAvailable: runtimeContext === undefined ||
-            sandboxEscalationAvailable(runtimeContext.approvalPolicy, {
+            sandboxEscalationAvailable(escalationPolicy ?? runtimeContext.approvalPolicy, {
               sandboxMode: runtimeContext.requestedSandboxMode,
               session: runtimeContext.invocation.session,
             }),
@@ -258,11 +261,11 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
           exitCode: output.exitCode,
           runtimeSandbox,
           escalationAvailable: runtimeContext !== undefined &&
-            sandboxEscalationAvailable(runtimeContext.approvalPolicy, {
+            sandboxEscalationAvailable(escalationPolicy ?? runtimeContext.approvalPolicy, {
               sandboxMode: runtimeContext.requestedSandboxMode,
               session: runtimeContext.invocation.session,
             }),
-          escalationWithoutAsking: runtimeContext?.approvalPolicy === "never",
+          escalationWithoutAsking: escalationPolicy === "never",
         });
         return {
           content: notice === null ? execContent : `${execContent}\n\n${notice}`,

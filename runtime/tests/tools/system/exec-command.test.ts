@@ -143,6 +143,8 @@ describe("exec_command tool", () => {
     overrides: Record<string, unknown>,
     options: {
       readonly approvalPolicy?: string;
+      /** The session's policy when a permission-mode allow ran this attempt under `never`. */
+      readonly requestedApprovalPolicy?: string;
       readonly sandboxMode?: string;
       readonly mode?: string;
       readonly added?: readonly string[];
@@ -164,6 +166,9 @@ describe("exec_command tool", () => {
       source: { type: "model" },
       submittedAtMs: 0,
       approvalPolicy: options.approvalPolicy ?? "never",
+      ...(options.requestedApprovalPolicy !== undefined
+        ? { requestedApprovalPolicy: options.requestedApprovalPolicy }
+        : {}),
       requestedSandboxMode: sandboxMode,
       sandboxMode,
       approvalResolved: options.approvalResolved ?? true,
@@ -345,6 +350,34 @@ describe("exec_command tool", () => {
       // Bypass: the user turned approvals off, so the notice says the retry runs without asking.
       expect(result.content).toContain('a retry with sandbox_permissions="require_escalated" runs without asking');
       expect(result.content).not.toContain("approval is unavailable");
+    });
+
+    // Default permissions: the permission mode allowed this sandboxed attempt, so it ran under
+    // `never`, but an escalated retry still gets an approval card. Both notices must offer it.
+    test("a default session whose attempt was already allowed is offered the approved retry", async () => {
+      const output = failedExecOutput("npm error getaddrinfo EAI_AGAIN registry.npmjs.org", 1);
+      const manager: UnifiedExecProcessManagerLike = {
+        maxTimeoutMs: 30_000,
+        execCommand: vi.fn(async () => output),
+        writeStdin: vi.fn(async () => output),
+        closeAll: vi.fn(async () => {}),
+      };
+      const tool = createExecCommandTool({ cwd: root, unifiedExecManager: manager });
+      const options = {
+        approvalPolicy: "never", requestedApprovalPolicy: "on_request", mode: "default",
+        sandboxMode: "workspace_write", platformSandbox: true, toolName: "exec_command",
+      };
+      const network = await tool.execute(contextArgs({ cmd: "npm install" }, options));
+      expect(network.content).toContain('retry it once with sandbox_permissions="require_escalated" and a short justification');
+      expect(network.content).not.toContain("approval is unavailable");
+      expect(network.content).not.toContain("Approvals are off");
+      const { tool: bindTool } = toolWith(BIND_DENIED);
+      const bind = await bindTool.execute(contextArgs({ cmd: "npm start", workdir: root }, options));
+      expect(bind.content).toContain("require_escalated");
+      expect(bind.content).not.toContain("Do not run this command again");
+      // A session whose own policy is never, outside bypass, still cannot escalate.
+      const never = await tool.execute(contextArgs({ cmd: "npm install" }, { ...options, requestedApprovalPolicy: "never" }));
+      expect(never.content).toContain("approval is unavailable");
     });
 
     // curl -s prints only its -w value when the lookup fails, so the exit status is the only signal.

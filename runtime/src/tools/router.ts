@@ -727,6 +727,7 @@ export class ToolRouter {
             runtimeCallContext,
             {
               approvalPolicy: effectiveApprovalPolicy,
+              requestedApprovalPolicy: opts.approvalPolicy ?? directDispatchApprovalPolicy(invocation),
               requestedSandboxMode,
               sandboxMode: sandbox,
               approvalResolved: dispatchContext.approvalResolved,
@@ -1303,6 +1304,7 @@ export class ToolRouter {
             runtimeCallContext,
             {
               approvalPolicy: effectiveApprovalPolicy,
+              requestedApprovalPolicy: opts.approvalPolicy,
               requestedSandboxMode: opts.sandboxMode,
               sandboxMode: sandbox,
               approvalResolved: dispatchContext.approvalResolved,
@@ -1804,6 +1806,7 @@ export function attachPreflightRuntimeContext(
       classification: call.classification,
     }, {
       approvalPolicy: params.approvalPolicy,
+      requestedApprovalPolicy: params.approvalPolicy,
       requestedSandboxMode: params.sandboxMode,
       sandboxMode: params.sandboxMode,
       approvalResolved: false,
