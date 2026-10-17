@@ -1507,7 +1507,9 @@ autostart = true
         }),
       ).resolves.toMatchObject({ pid: 5201, status: "started" });
       expect(signals).toEqual([{ pid, signal: "SIGTERM" }]);
-      expect(now).toBe(5_000);
+      // SIGTERM only after the daemon's whole shutdown window (agent stop,
+      // hard stop and a flush margin), so a slow but healthy stop is not cut.
+      expect(now).toBe(40_000);
     } finally {
       nowSpy.mockRestore();
       await rm(agencHome, { recursive: true, force: true });

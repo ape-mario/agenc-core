@@ -82,6 +82,11 @@ const AGENC_DAEMON_BUILD_SKEW_STOP_TIMEOUT_MS =
   DAEMON_AGENT_STOP_TIMEOUT_MS + DAEMON_AGENT_HARD_STOP_TIMEOUT_MS + 5_000;
 /** Say why startup pauses once the old daemon has been stopping this long. */
 const AGENC_DAEMON_SLOW_STOP_NOTICE_MS = 3_000;
+/**
+ * Linux only: once a daemon has had its whole shutdown window, SIGTERM gets
+ * this long before SIGKILL, never another full window.
+ */
+const AGENC_DAEMON_SIGTERM_GRACE_MS = 5_000;
 const AGENC_DAEMON_ORPHAN_STOP_TIMEOUT_MS = 1_000;
 const AGENC_DAEMON_FORCE_STOP_GRACE_MS = 2_000;
 const AGENC_DAEMON_STOP_POLL_MS = 50;
@@ -1301,7 +1306,7 @@ async function terminateRecordedAgenCDaemonInstance(params: {
     await waitForAgenCDaemonPidExit(
       params.host,
       params.expected.process,
-      params.gracefulTimeoutMs,
+      Math.min(params.gracefulTimeoutMs, AGENC_DAEMON_SIGTERM_GRACE_MS),
     )
   ) {
     return;
