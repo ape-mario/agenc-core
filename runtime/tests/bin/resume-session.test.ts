@@ -13,6 +13,9 @@ import {
   writeFileSync,
   utimesSync,
   writeSync,
+  renameSync,
+  statSync,
+  truncateSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,8 +29,10 @@ import {
 import { sanitizePath } from "../utils/sessionStoragePortable.js";
 import {
   __setResumeSessionTestHooksForTest,
+  reproveResumeSessionAllowingAppend,
   resolveLatestSessionId as resolveLatestSessionIdWithHome,
   resolveResumeSessionId as resolveResumeSessionIdWithHome,
+  type ResolvedResumeSession,
 } from "./resume-session.js";
 
 let workHome: string;
@@ -512,5 +517,88 @@ describe("resume-session CLI lookup", () => {
       reason: "source_unavailable",
     });
     expect(injected).toBe(true);
+  });
+});
+
+describe("append-only resume reproof", () => {
+  function appendLine(path: string, text: string): void {
+    const fd = openSync(path, "a");
+    try {
+      writeSync(fd, `${JSON.stringify({ type: "response_item", payload: { role: "assistant", content: text } })}\n`);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  function resolved(sessionId: string): ResolvedResumeSession {
+    const result = resolveResumeSessionId(workHome, sessionId);
+    if (result.kind !== "ok") throw new Error(`fixture did not resolve: ${result.kind}`);
+    return result;
+  }
+
+  it("accepts what a live daemon appended after the descriptor was resolved", () => {
+    const sessionId = "conv-appendok1";
+    const rolloutPath = writeRollout(workHome, sessionId, "2026-01-01T10-00-00-000Z", 1);
+    const before = resolved(sessionId);
+    appendLine(rolloutPath, "streamed after the terminal closed");
+    const after = reproveResumeSessionAllowingAppend(before, agencHome);
+    expect(after.rolloutPath).toBe(rolloutPath);
+    expect(after.sourceIno).toBe(before.sourceIno);
+    expect(Number(after.sourceSize)).toBe(statSync(rolloutPath).size);
+    expect(Number(after.sourceSize)).toBeGreaterThan(Number(before.sourceSize));
+  });
+
+  it("retries while appends land during the read, then reproves the grown source", () => {
+    const sessionId = "conv-appendrace1";
+    const rolloutPath = writeRollout(workHome, sessionId, "2026-01-01T10-00-00-000Z", 1);
+    const before = resolved(sessionId);
+    let appended = 0;
+    __setResumeSessionTestHooksForTest({
+      afterCandidateMetadataRead: (path) => {
+        if (appended >= 2) return;
+        appended += 1;
+        appendLine(path, `delta ${appended}`);
+      },
+    });
+    const after = reproveResumeSessionAllowingAppend(before, agencHome);
+    expect(appended).toBe(2);
+    expect(Number(after.sourceSize)).toBe(statSync(rolloutPath).size);
+  });
+
+  it("still refuses a rewritten past, a replaced file and a truncation", () => {
+    for (const change of ["rewritten", "replaced", "truncated"] as const) {
+      const sessionId = `conv-append${change}`;
+      const rolloutPath = writeRollout(workHome, sessionId, "2026-01-01T10-00-00-000Z", 1);
+      const before = resolved(sessionId);
+      const original = readFileSync(rolloutPath, "utf8");
+      if (change === "rewritten") {
+        writeFileSync(rolloutPath, original.replace(`seed for ${sessionId}`, "rewritten input") + "\n");
+      } else if (change === "replaced") {
+        renameSync(rolloutPath, `${rolloutPath}.old`);
+        writeFileSync(rolloutPath, `${original}\n`);
+      } else {
+        truncateSync(rolloutPath, Number(before.sourceSize) - 10);
+      }
+      expect(() => reproveResumeSessionAllowingAppend(before, agencHome), change)
+        .toThrow(/changed during authorization/);
+    }
+  });
+
+  it("gives up when the source never holds still", () => {
+    const sessionId = "conv-appendstorm1";
+    writeRollout(workHome, sessionId, "2026-01-01T10-00-00-000Z", 1);
+    const before = resolved(sessionId);
+    let appended = 0;
+    __setResumeSessionTestHooksForTest({
+      afterCandidateMetadataRead: (path) => {
+        appended += 1;
+        appendLine(path, `delta ${appended}`);
+      },
+    });
+    const started = Date.now();
+    expect(() => reproveResumeSessionAllowingAppend(before, agencHome)).toThrow(/changed during authorization/);
+    expect(appended).toBeGreaterThan(5);
+    expect(Date.now() - started).toBeLessThan(5_000);
   });
 });
