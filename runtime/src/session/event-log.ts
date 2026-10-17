@@ -417,6 +417,8 @@ export interface TokenCountEvent {
    * "priority" or "fast"), which bills at fast-mode rates.
    */
   readonly speed?: "fast";
+  /** What the provider charged for this call in USD (OpenRouter `usage.cost`). */
+  readonly providerCostUsd?: number;
 }
 
 export interface McpToolCallBeginEvent {
@@ -2035,6 +2037,9 @@ export function usageToTokenCountEvent(usage: LLMUsage): EventMsg {
         : {}),
       ...(usage.webSearchRequests !== undefined
         ? { webSearchRequests: usage.webSearchRequests }
+        : {}),
+      ...(usage.providerCostUsd !== undefined
+        ? { providerCostUsd: usage.providerCostUsd }
         : {}),
     },
   };

@@ -1747,6 +1747,9 @@ export async function streamModel(
           // Served speed, not requested speed: fast mode bills at its own
           // rates only when the provider says the turn ran fast.
           ...(response.usage.speed === "fast" ? { speed: "fast" as const } : {}),
+          ...(response.usage.providerCostUsd !== undefined
+            ? { providerCostUsd: response.usage.providerCostUsd }
+            : {}),
         },
       },
     });

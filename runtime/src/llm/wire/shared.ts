@@ -307,6 +307,7 @@ export function coerceUsage(usage: {
   readonly availability?: LLMUsage["availability"];
   readonly provenance?: LLMUsage["provenance"];
   readonly cacheWritesUnreported?: LLMUsage["cacheWritesUnreported"];
+  readonly providerCostUsd?: unknown;
 }): LLMUsage {
   const reportedPromptTokens = toOptionalNumber(usage.promptTokens);
   const reportedCompletionTokens = toOptionalNumber(usage.completionTokens);
@@ -346,6 +347,10 @@ export function coerceUsage(usage: {
     ...(usage.speed !== undefined ? { speed: usage.speed } : {}),
     ...(usage.cacheWritesUnreported !== undefined
       ? { cacheWritesUnreported: usage.cacheWritesUnreported }
+      : {}),
+    ...(typeof usage.providerCostUsd === "number" && Number.isFinite(usage.providerCostUsd) &&
+      usage.providerCostUsd >= 0
+      ? { providerCostUsd: usage.providerCostUsd }
       : {}),
   };
 }

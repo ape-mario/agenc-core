@@ -839,6 +839,7 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
       model: isString,
       provider: isString,
       speed: literal("fast"),
+      providerCostUsd: isNumber,
     },
   ),
   mcp_tool_call_begin: objectShape({
