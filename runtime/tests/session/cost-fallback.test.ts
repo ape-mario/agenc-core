@@ -7,8 +7,12 @@ import {
   type ModelCostEntry,
 } from "../../src/session/cost.js";
 
-// A Bedrock model AgenC has no price for yet.
-const WITH_UNPRICED_BEDROCK = { ...DEFAULT_MODEL_COSTS, "amazon-bedrock:future-bedrock-model": DEFAULT_UNKNOWN_MODEL_COST };
+// Hosted models AgenC has no price for yet.
+const WITH_UNPRICED_HOSTED = {
+  ...DEFAULT_MODEL_COSTS,
+  "amazon-bedrock:future-bedrock-model": DEFAULT_UNKNOWN_MODEL_COST,
+  "nvidia-nim:future-nim-model": DEFAULT_UNKNOWN_MODEL_COST,
+};
 
 test.each([
   ["anthropic", 1000, 0, 0.36],
@@ -27,16 +31,16 @@ test.each([
 });
 
 test.each([
-  ["nvidia-nim", "nvidia/llama-3.1-nemotron-70b-instruct", 500, 0, 0.21],
-  ["nvidia-nim", "nvidia/llama-3.1-nemotron-70b-instruct", 0, 500, 0.21],
-  ["nvidia-nim", "nvidia/llama-3.1-nemotron-70b-instruct", 300, 200, 0.21],
+  ["nvidia-nim", "future-nim-model", 500, 0, 0.21],
+  ["nvidia-nim", "future-nim-model", 0, 500, 0.21],
+  ["nvidia-nim", "future-nim-model", 300, 200, 0.21],
   ["amazon-bedrock", "future-bedrock-model", 300, 200, 0.285],
 ] as const)("uses provider cache semantics for matched %s/%s fallback with %i reads and %i writes", (provider, model, cachedInputTokens, cacheCreationInputTokens, costUsd) => {
   const result = computeUsdCostWithResolution({
     provider, model, inputTokens: 1000, outputTokens: 100,
     cachedInputTokens, cacheCreationInputTokens, reasoningOutputTokens: 0,
     webSearchRequests: 0, totalTokens: 1100, turns: 1,
-  }, WITH_UNPRICED_BEDROCK);
+  }, WITH_UNPRICED_HOSTED);
   expect(result).toMatchObject({ known: false, costEstimated: true });
   expect(result.matchedKey).toBeDefined();
   expect(result.costUsd).toBeCloseTo(costUsd, 9);
@@ -79,11 +83,15 @@ test.each([
 });
 
 test("does not borrow a native tariff for future Meta releases or subscription endpoints", () => {
-  for (const [provider, model] of [["meta", "muse-spark-1.4"], ["qwen-token-plan", "qwen3.8-max"], ["zai-coding-plan", "glm-5.3"]]) {
-    expect(computeUsdCostWithResolution({provider: provider!, model: model!, inputTokens: 1000, outputTokens: 1000,
-      cachedInputTokens: 500, cacheCreationInputTokens: 0, reasoningOutputTokens: 0,
-      webSearchRequests: 0, totalTokens: 2000, turns: 1}, DEFAULT_MODEL_COSTS))
-      .toMatchObject({known: false, costEstimated: true, costUsd: 0.75});
+  const usage = (provider: string, model: string) => ({provider, model, inputTokens: 1000, outputTokens: 1000,
+    cachedInputTokens: 500, cacheCreationInputTokens: 0, reasoningOutputTokens: 0,
+    webSearchRequests: 0, totalTokens: 2000, turns: 1});
+  expect(computeUsdCostWithResolution(usage("meta", "muse-spark-1.4"), DEFAULT_MODEL_COSTS))
+    .toMatchObject({known: false, costEstimated: true, costUsd: 0.75});
+  // Flat subscriptions bill nothing per call, never the pay-as-you-go tariff.
+  for (const [provider, model] of [["qwen-token-plan", "qwen3.8-max"], ["zai-coding-plan", "glm-5.3"]]) {
+    expect(computeUsdCostWithResolution(usage(provider!, model!), DEFAULT_MODEL_COSTS))
+      .toMatchObject({known: true, costUsd: 0});
   }
 });
 

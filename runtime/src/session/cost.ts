@@ -244,6 +244,53 @@ function bedrockCostEntries(): Record<string, ModelCostEntry> {
   ]));
 }
 
+/**
+ * Calls a flat subscription or a free tier already covers: nothing is billed
+ * per token, so a call's marginal cost is a known $0.
+ */
+const PLAN_INCLUDED: Readonly<ModelCostEntry> = Object.freeze({
+  inputUsdPer1K: 0, outputUsdPer1K: 0, label: "plan", localZeroCost: true,
+});
+const FREE_TIER: Readonly<ModelCostEntry> = Object.freeze({
+  inputUsdPer1K: 0, outputUsdPer1K: 0, label: "free", localZeroCost: true,
+});
+
+/**
+ * Ollama Cloud per-token rates (input, cached input, output per 1M), read
+ * 2026-10-17 from https://ollama.com/pricing. Cloud usage bills per token
+ * since 2026-08-31; plan credits pay for it first. The DeepSeek rows are the
+ * peak rate, off-peak costs half.
+ */
+const OLLAMA_CLOUD_RATES: Readonly<Record<string, readonly [number, number | undefined, number]>> = Object.freeze({
+  "deepseek-v4-pro:0813": [1.32, 0.044, 3.96],
+  "gemma4:31b": [0.14, 0.05, 0.4],
+  "glm-5.2": [1.4, 0.26, 4.4],
+  "glm-5.3": [1.4, 0.26, 4.4],
+  "glm-5.3-flash": [0.15, 0.03, 0.5],
+  "gpt-oss:120b": [0.15, 0.014, 0.6],
+  "gpt-oss:20b": [0.07, 0.035, 0.3],
+  "kimi-k2.6": [0.95, 0.16, 4],
+  "kimi-k2.7-code": [0.95, 0.19, 4],
+  "kimi-k3": [3, 0.3, 15],
+  "minimax-m2.7": [0.3, 0.06, 1.2],
+  "minimax-m3": [0.6, 0.12, 2.4],
+  "mistral-large-3:675b": [0.5, undefined, 1.5],
+  "nemotron-3-nano:30b": [0.06, undefined, 0.24],
+  "nemotron-3-super": [0.015, 0.015, 0.6],
+  "nemotron-3-ultra": [0.1, 0.1, 3],
+});
+
+function ollamaCloudCostEntries(): Record<string, ModelCostEntry> {
+  return Object.fromEntries(Object.entries(OLLAMA_CLOUD_RATES).map(([model, [input, cached, output]]) => [
+    `ollama-cloud:${model}`,
+    Object.freeze({
+      inputUsdPer1K: input / 1000,
+      outputUsdPer1K: output / 1000,
+      ...(cached === undefined ? {} : { cachedInputUsdPer1K: cached / 1000, cachedInputIncludedInInputTokens: true }),
+    }),
+  ]));
+}
+
 /** Copilot rates are independent of direct-provider fast/search charges.
  * https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing
  * Reviewed 2026-09-29. Published long-context billing threshold: 272K inputs.
@@ -252,6 +299,7 @@ function copilotCostAliases(
   model: string,
   [input, output, cachedInput, cacheWrite]: readonly [number, number, number, number],
   longContext?: readonly [number, number, number, number],
+  longContextAboveInputTokens = 272_000,
 ): Readonly<Record<string, ModelCostEntry>> {
   const rates = ([i, o, c, w]: readonly [number, number, number, number]): ModelCostEntry => ({
     inputUsdPer1K: i / 1000, outputUsdPer1K: o / 1000,
@@ -260,7 +308,7 @@ function copilotCostAliases(
   });
   const entry: ModelCostEntry = {
     ...rates([input, output, cachedInput, cacheWrite]),
-    ...(longContext === undefined ? {} : { longContext: { aboveInputTokens: 272_000, rates: rates(longContext) } }),
+    ...(longContext === undefined ? {} : { longContext: { aboveInputTokens: longContextAboveInputTokens, rates: rates(longContext) } }),
   };
   return Object.fromEntries([
     `github:${model}`, `github:copilot:${model}`, `github:github:copilot:${model}`,
@@ -984,6 +1032,9 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
     ...openAiCostAliases("gpt-5.5-pro", COST_TIER_GPT_5_5_PRO),
     ...openAiCostAliases("gpt-5.3-codex", COST_TIER_GPT_5_3_CODEX),
     ...openAiCostAliases("gpt-5.4", COST_TIER_GPT_5_4),
+    // OpenAI publishes no rate for the auto-review model; its 2026-04-30
+    // alignment post names GPT-5.4 Thinking as the reviewer.
+    ...openAiCostAliases("codex-auto-review", COST_TIER_GPT_5_4),
     ...openAiCostAliases("gpt-5.4-mini", COST_TIER_GPT_5_4_MINI),
     ...openAiCostAliases("gpt-5.4-nano", COST_TIER_GPT_5_4_NANO),
     ...openAiCostAliases("gpt-5.4-pro", COST_TIER_GPT_5_4_PRO),
@@ -1064,6 +1115,14 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
     ...copilotCostAliases("gpt-6-sol", [2, 10, 0.2, 2.5], [4, 15, 0.4, 5]),
     ...copilotCostAliases("gpt-6-luna", [0.1, 0.5, 0.01, 0.125], [0.2, 0.75, 0.02, 0.25]),
     ...copilotCostAliases("claude-opus-5.5", [4, 20, 0.2, 5]),
+    // Read 2026-10-17 from the same page. Rows without a cache-write price
+    // bill writes as input. Gemini 3.7 Flash is a promotional rate through
+    // 2026-12-31; Grok 4.6 bills above 200K input at its long-context rate.
+    ...copilotCostAliases("claude-haiku-4.5", [1, 5, 0.1, 1.25]),
+    ...copilotCostAliases("gemini-3.7-flash", [0.75, 3.75, 0.075, 0.75]),
+    ...copilotCostAliases("mai-code-1.1-flash", [0.2, 1.2, 0.02, 0.2]),
+    ...copilotCostAliases("kimi-k3", [3, 15, 0.3, 3]),
+    ...copilotCostAliases("grok-4.6", [2, 6, 0.5, 2], [4, 12, 1, 4], 200_000),
     // Groq published per-token prices, checked 2026-09-29.
     ...Object.fromEntries(VENICE_MODELS.flatMap(model => model.cost ? [[`venice:${model.model}`, model.cost]] : [])),
     // https://console.groq.com/docs/models
@@ -1087,7 +1146,12 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
     "cerebras:qwen-3.8-27b": COST_TIER_CEREBRAS_QWEN_38_27B,
     "cerebras:gemma-4-31b": COST_TIER_CEREBRAS_GEMMA_4_31B,
     // https://docs.z.ai/guides/overview/pricing (2026-09-29).
-    // GLM-5-Turbo has no published rate; keep the unknown-price fallback.
+    // Z.AI's pricing page has no GLM-5-Turbo row; this is the price OpenRouter
+    // lists for z-ai/glm-5-turbo, served by Z.AI (checked 2026-10-17).
+    "zai:glm-5-turbo": {
+      inputUsdPer1K: 0.0012, outputUsdPer1K: 0.004,
+      cachedInputUsdPer1K: 0.00024, cachedInputIncludedInInputTokens: true,
+    },
     "zai:glm-5.2": {
       inputUsdPer1K: 0.0014, outputUsdPer1K: 0.0044,
       cachedInputUsdPer1K: 0.00026, cachedInputIncludedInInputTokens: true,
@@ -1172,8 +1236,19 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
       return [entry.model, ...entry.aliases].map((model) => [`mistral:${model}`, rates]);
     })),
     "mistral-medium-latest": COST_TIER_MISTRAL_MEDIUM_3_5,
-    "nvidia-nim:nvidia/llama-3.1-nemotron-70b-instruct": DEFAULT_UNKNOWN_MODEL_COST,
+    // NVIDIA's hosted NIM endpoints are free to Developer Program members;
+    // production use is licensed per GPU, never billed per token.
+    // https://docs.api.nvidia.com/nim/docs/product (checked 2026-10-17)
+    "nvidia-nim": FREE_TIER,
     "nvidia/llama-3.1-nemotron-70b-instruct": DEFAULT_UNKNOWN_MODEL_COST,
+    // Flat subscriptions with no per-token overage, checked 2026-10-17:
+    // https://www.alibabacloud.com/help/en/model-studio/token-plan-personal-overview
+    // https://docs.z.ai/devpack/overview
+    "qwen-token-plan": PLAN_INCLUDED,
+    "zai-coding-plan": PLAN_INCLUDED,
+    // Served only through the Grok Build CLI, billed to the user's Grok plan.
+    "grok:grok-composer-2.5-fast": PLAN_INCLUDED,
+    ...ollamaCloudCostEntries(),
     // MiniMax pay-as-you-go (platform.minimax.io/docs/guides/pricing-paygo,
     // 2026-09-29, standard tier, prompts up to 512k): M3 $0.30/$1.20 per M
     // with $0.06 cache reads; M2.7 the same; the other M2 generations read

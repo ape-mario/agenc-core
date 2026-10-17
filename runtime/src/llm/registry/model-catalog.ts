@@ -19,7 +19,7 @@ import { MISTRAL_MODEL_CATALOG, resolveMistralChatModel } from "./mistral-models
 import { BEDROCK_CONVERSE_MODELS } from "./bedrock-converse-models.js";
 import { VENICE_MODELS } from "./venice-models.js";
 import { GROQ_MODELS } from "./groq-models.js";
-import { OLLAMA_CLOUD_MODELS } from "./ollama-cloud-models.js";
+import { OLLAMA_CLOUD_MODELS, OLLAMA_CLOUD_UNLISTED_MODELS } from "./ollama-cloud-models.js";
 import { NVIDIA_CURRENT_MODEL_CATALOG } from "./nvidia-current-models.js";
 import { OPENAI_CURRENT_MODEL_CATALOG } from "./openai-current-models.js";
 import { OPENAI_REASONING_MODELS } from "./openai-reasoning-models.js";
@@ -1168,7 +1168,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       ...("defaultEffort" in entry ? { defaultReasoningLevel: entry.defaultEffort } : {}),
       additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
       priority,
-      visibility: "list",
+      visibility: OLLAMA_CLOUD_UNLISTED_MODELS.has(entry.model) ? "none" : "list",
     })),
     ...zaiCatalogEntries(),
     ...kimiCatalogEntries(),
