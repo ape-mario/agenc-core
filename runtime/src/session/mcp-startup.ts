@@ -635,6 +635,9 @@ function tokenCountEventForSampling(
     ...(usage.webSearchRequests !== undefined
       ? { webSearchRequests: usage.webSearchRequests }
       : {}),
+    ...(usage.providerCostUsd !== undefined
+      ? { providerCostUsd: usage.providerCostUsd }
+      : {}),
     model,
   };
 }

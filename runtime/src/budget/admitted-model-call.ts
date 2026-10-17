@@ -349,6 +349,11 @@ function maximumTokenCostUsd(
   return tokenCost + outputTokens * entry.webSearchUsdPerRequest;
 }
 
+function withoutProviderCharge(usage: LLMResponse["usage"]): LLMResponse["usage"] {
+  const { providerCostUsd: _charge, ...rest } = usage;
+  return rest;
+}
+
 function usageCostUsd(
   model: string,
   provider: string,
@@ -398,6 +403,8 @@ function usageCostUsd(
     // Charge by the speed the provider reports it served, not the one
     // requested: a fast request served at standard speed bills standard.
     ...(usage.speed === "fast" ? { speed: "fast" as const } : {}),
+    // What the provider says it charged is the price of record.
+    ...(usage.providerCostUsd !== undefined ? { providerCostUsd: usage.providerCostUsd } : {}),
   };
   const resolved = computeUsdCostWithResolution(
     modelUsage,
@@ -983,7 +990,9 @@ export async function runAdmittedModelCall(
     const actualPrice = usageCostUsd(
       managedRoutePriced ? effectiveModel : actualModel,
       pricingProvider,
-      usage,
+      // A managed call is billed in AgenC credits, never at what the upstream
+      // provider charged the gateway.
+      requestedProvider === "agenc" ? withoutProviderCharge(usage) : usage,
       params.options,
     );
     if (actualPrice === null) {

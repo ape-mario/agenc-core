@@ -334,6 +334,12 @@ export interface LLMUsage {
    * speed that was requested.
    */
   readonly speed?: "fast" | "standard";
+  /**
+   * What the provider says it charged for this call, in USD (OpenRouter's
+   * `usage.cost`). Cost accounting uses it instead of a rate card: routing
+   * can serve the call from an endpoint whose price is not the catalog's.
+   */
+  readonly providerCostUsd?: number;
 }
 
 /**

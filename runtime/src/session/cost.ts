@@ -1145,7 +1145,8 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
     // OpenRouter catalog prices do not bound the endpoint selected by routing.
     // Retain paid rates in the conservative registry ceiling, but never settle
     // them as a known bill or use them directly for admission. Only explicit
-    // free routes with no additional charges are known zero. Response cost wins.
+    // free routes with no additional charges are known zero. The charge
+    // OpenRouter reports with each response (`providerCostUsd`) is the price.
     // https://openrouter.ai/docs/guides/routing/provider-selection
     ...Object.fromEntries(OPENROUTER_PRICING.flatMap((model) => {
       const input = Number(model.pricing.prompt);
@@ -1213,6 +1214,11 @@ export interface ModelUsage {
    * leaves it unset and records such requests as explicit cost instead.
    */
   readonly singleCall?: true;
+  /**
+   * What the provider charged for these tokens in USD (OpenRouter
+   * `usage.cost`). When set it is the cost, and no rate card is consulted.
+   */
+  readonly providerCostUsd?: number;
 }
 
 export interface TokenUsageDelta {
@@ -1227,6 +1233,11 @@ export interface TokenUsageDelta {
   readonly webSearchRequests?: number;
   readonly totalTokens?: number;
   readonly costUsd?: number;
+}
+
+/** A provider's reported charge for one call, when it is a usable amount. */
+function chargedUsd(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
 function emptyModelUsage(model: string, provider?: string): ModelUsage {
@@ -1317,6 +1328,10 @@ export function computeUsdCostWithResolution(
   registry: Readonly<Record<string, ModelCostEntry>>,
 ): CostResolution {
   const match = resolveModelCostEntry(usage, registry);
+  const charged = usage.providerCostUsd;
+  if (charged !== undefined && Number.isFinite(charged) && charged >= 0) {
+    return { costUsd: charged, known: true, ...(match ? { matchedKey: match.key } : {}) };
+  }
   const standardEntry = match?.entry ?? conservativeModelCost(registry);
   const { rates: selected, documented } = selectCallRates(
     standardEntry,
@@ -1815,6 +1830,11 @@ export interface SessionCostModelUsage {
   readonly totalTokens: number;
   readonly turns: number;
   readonly costUsd: number;
+  /**
+   * False when part of `costUsd` is an estimate. Records written before this
+   * field existed leave it out, and restore re-derives it from the registry.
+   */
+  readonly costKnown?: boolean;
 }
 
 export interface CostTotalsFile {
@@ -1875,6 +1895,7 @@ function coerceSessionModelUsage(
     totalTokens: normalizeCounter(row.totalTokens as number | undefined),
     turns: normalizeCounter(row.turns as number | undefined),
     costUsd: normalizeCost(row.costUsd as number | undefined),
+    ...(typeof row.costKnown === "boolean" ? { costKnown: row.costKnown } : {}),
   };
 }
 
@@ -2214,10 +2235,14 @@ export class CostSidecar implements Sidecar {
             turns: 0,
             singleCall: true,
             ...(msg.payload.speed === "fast" ? { speed: "fast" as const } : {}),
+            ...(chargedUsd(msg.payload.providerCostUsd) !== undefined
+              ? { providerCostUsd: chargedUsd(msg.payload.providerCostUsd) }
+              : {}),
           };
           const standardEntry = resolveModelCostEntry(callDelta, this.registry)?.entry;
           const callCost = computeUsdCostWithResolution(callDelta, this.registry);
           if (
+            callDelta.providerCostUsd !== undefined ||
             !callCost.known || (callDelta.cacheCreation1hInputTokens ?? 0) > 0 ||
             (standardEntry !== undefined &&
               selectCallRates(standardEntry, callPricingOf(callDelta, standardEntry)).rates !== standardEntry)
@@ -2228,7 +2253,7 @@ export class CostSidecar implements Sidecar {
             this.unknownCostModels.add(key);
           }
         }
-        if (!computeUsdCostWithResolution(usage, this.registry).known) {
+        if (this.registryPricedCostUnknown(key, usage)) {
           this.unknownCostModels.add(key);
         }
         if (this.budgetTracker) {
@@ -2305,6 +2330,7 @@ export class CostSidecar implements Sidecar {
       totalTokens: usage.totalTokens,
       turns: usage.turns,
       costUsd: this.getModelUsageCostUsd(usage),
+      costKnown: !this.unknownCostModels.has(usageKey(usage.model, usage.provider)),
     }));
   }
 
@@ -2482,9 +2508,27 @@ export class CostSidecar implements Sidecar {
       );
     }
 
-    if (!computeUsdCostWithResolution(usage, this.registry).known) {
+    if (this.registryPricedCostUnknown(key, usage)) {
       this.unknownCostModels.add(key);
     }
+  }
+
+  /**
+   * True when the tokens priced from the registry (those without an explicit
+   * or restored cost) have no known price. A model whose every call carried
+   * the provider's charge is fully known even when its rate card is not.
+   */
+  private registryPricedCostUnknown(key: string, usage: ModelUsage): boolean {
+    let rest = usage;
+    const restoredBaseline = this.restoredPerModelBaselines.get(key);
+    if (restoredBaseline !== undefined && this.restoredPerModelCostUsd.has(key)) {
+      rest = subtractModelUsage(rest, restoredBaseline);
+    }
+    const explicitUsage = this.explicitPerModelUsage.get(key);
+    if (explicitUsage !== undefined) rest = subtractModelUsage(rest, explicitUsage);
+    const used = rest.inputTokens + rest.outputTokens + rest.cachedInputTokens +
+      rest.cacheCreationInputTokens + rest.reasoningOutputTokens + rest.webSearchRequests + rest.totalTokens;
+    return used > 0 && !computeUsdCostWithResolution(rest, this.registry).known;
   }
 
   /**
@@ -2873,8 +2917,7 @@ export class CostSidecar implements Sidecar {
       this.perModel.set(key, usage);
       this.restoredPerModelBaselines.set(key, { ...usage });
       this.restoredPerModelCostUsd.set(key, row.costUsd);
-      const resolution = computeUsdCostWithResolution(usage, this.registry);
-      if (!resolution.known) {
+      if (!(row.costKnown ?? computeUsdCostWithResolution(usage, this.registry).known)) {
         this.unknownCostModels.add(key);
       }
       restoredModelCostUsd += row.costUsd;

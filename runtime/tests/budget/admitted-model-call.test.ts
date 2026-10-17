@@ -1166,6 +1166,53 @@ describe("runAdmittedModelCall", () => {
     }));
   });
 
+  test("settles a user's own OpenRouter key at the charge OpenRouter reported", async () => {
+    const state = harness({ maxCostUsd: 1 });
+    const model = "deepseek/deepseek-v4.1-flash";
+    await runAdmittedModelCall({
+      session: state.session,
+      provider: {
+        name: "openrouter",
+        getExecutionProfile: async () => ({ usageReporting: "authoritative" as const, supportsMaxOutputTokens: true }),
+      } as unknown as LLMProvider,
+      messages: [{ role: "user", content: "hello" }],
+      options: { model, maxOutputTokens: 200 },
+      stepId: "model:charged",
+      model,
+      providerName: "openrouter",
+      invoke: async () => response({ model, usage: { ...managedDeepSeekUsage, providerCostUsd: 0.0066 } }),
+    });
+    // The reservation stays conservative: the charge is only known afterwards.
+    expect(state.acquire).toHaveBeenCalledWith(expect.objectContaining({ costEstimated: true }), undefined);
+    expect(state.reconcile).toHaveBeenCalledWith("reservation-1", {
+      inputTokens: 22_116,
+      outputTokens: 5,
+      costUsd: 0.0066,
+    });
+  });
+
+  test("never settles a managed route at the upstream charge", async () => {
+    const state = harness({ maxCostUsd: 1 });
+    await runAdmittedModelCall({
+      session: state.session,
+      provider: routedProvider("deepseek/deepseek-v4.1-flash"),
+      messages: [{ role: "user", content: "hello" }],
+      options: { model: "deepseek/deepseek-v4.1-flash", maxOutputTokens: 64_000 },
+      stepId: "model:managed-charged",
+      model: "deepseek/deepseek-v4.1-flash",
+      providerName: "agenc",
+      invoke: async () => response({
+        model: "deepseek/deepseek-v4.1-flash",
+        usage: { ...managedDeepSeekUsage, providerCostUsd: 0.0001 },
+      }),
+    });
+    expect(state.reconcile).toHaveBeenCalledWith("reservation-1", {
+      inputTokens: 22_116,
+      outputTokens: 5,
+      costUsd: expect.closeTo(0.0066408, 12),
+    });
+  });
+
   test("voids and releases an acquired lease when routing evidence cannot be journaled", async () => {
     const state = harness({ maxCostUsd: 1 });
     const invoke = vi.fn(async () => response());

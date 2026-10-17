@@ -900,6 +900,26 @@ export function collectChatCompletionsRequestMetadata(
   };
 }
 
+/**
+ * What the provider charged for one call: `usage.cost`, in USD. With the
+ * user's own provider key (`is_byok`) it is only OpenRouter's fee, and the
+ * provider bills the key `cost_details.upstream_inference_cost` on top.
+ * Without both parts the charge is unknown.
+ * https://openrouter.ai/docs/use-cases/usage-accounting
+ */
+function chargedUsd(usage: Record<string, unknown>): number | undefined {
+  const cost = usage.cost;
+  if (typeof cost !== "number" || !Number.isFinite(cost) || cost < 0) return undefined;
+  if (usage.is_byok !== true) return cost;
+  const details = usage.cost_details;
+  const upstream = details !== null && typeof details === "object" && !Array.isArray(details)
+    ? (details as Record<string, unknown>).upstream_inference_cost
+    : undefined;
+  return typeof upstream === "number" && Number.isFinite(upstream) && upstream > 0
+    ? cost + upstream
+    : undefined;
+}
+
 export function parseChatCompletionsResponse(
   model: string,
   response: Record<string, unknown>,
@@ -1171,6 +1191,9 @@ export function parseChatCompletionsResponse(
       // served the request; Fast mode bills at its own rates.
       ...(request.providerCapabilityHints?.acceptsServiceTier === true
         ? { speed: openAiServedSpeed(response.service_tier) }
+        : {}),
+      ...(request.providerCapabilityHints?.reportsUsageCost === true
+        ? { providerCostUsd: chargedUsd(usageRecord) }
         : {}),
     }),
     model:

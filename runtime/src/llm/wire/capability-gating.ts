@@ -203,6 +203,12 @@ export interface ChatCompletionsCapabilityHints {
    */
   readonly acceptsStreamUsage?: boolean;
   /**
+   * The response's `usage.cost` is what the provider charged for the call
+   * in USD (OpenRouter reports it on every response, streamed or not).
+   * https://openrouter.ai/docs/use-cases/usage-accounting
+   */
+  readonly reportsUsageCost?: boolean;
+  /**
    * If `true`, tool JSON schemas are rewritten to the subset
    * llama.cpp's json-schema-to-grammar compiles. Grammar-constrained
    * servers (LM Studio, llama.cpp server, some custom proxies) build
@@ -430,8 +436,10 @@ export function chatCompletionsCapabilityHintsForProvider(
 
   return {
     acceptsReasoningEffort,
+    // The managed gateway prices calls itself; OpenRouter's charge to the
+    // gateway is not what the user pays.
     ...(slug === "openrouter" && options.managedGateway !== true
-      ? { reasoningEffortEnvelope: "openrouter" as const }
+      ? { reasoningEffortEnvelope: "openrouter" as const, reportsUsageCost: true }
       : {}),
     ...(slug === "openai" ? { gatesTemperatureOnOpenAiReasoning: true } : {}),
     ...(slug === "mistral" ? {
