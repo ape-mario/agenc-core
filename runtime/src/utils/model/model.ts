@@ -170,7 +170,7 @@ export function getDefaultOpusModel(): ModelName {
   }
   // NVIDIA NIM
   if (getAPIProvider() === 'nvidia-nim') {
-    return getActiveProviderModel() || 'nvidia/llama-3.1-nemotron-70b-instruct'
+    return getActiveProviderModel() || 'nvidia/nemotron-3-super-120b-a12b'
   }
   // MiniMax — flagship tier for "opus"-equivalent.
   if (getAPIProvider() === 'minimax') {
@@ -212,7 +212,7 @@ export function getDefaultSonnetModel(): ModelName {
   }
   // NVIDIA NIM
   if (getAPIProvider() === 'nvidia-nim') {
-    return getActiveProviderModel() || 'nvidia/llama-3.1-nemotron-70b-instruct'
+    return getActiveProviderModel() || 'nvidia/nemotron-3-super-120b-a12b'
   }
   // MiniMax — mid tier for "sonnet"-equivalent.
   if (getAPIProvider() === 'minimax') {
@@ -308,7 +308,7 @@ export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
     return getActiveProviderModel() || DEFAULT_XAI_MODEL
   }
   if (getAPIProvider() === 'nvidia-nim') {
-    return getActiveProviderModel() || 'nvidia/llama-3.1-nemotron-70b-instruct'
+    return getActiveProviderModel() || 'nvidia/nemotron-3-super-120b-a12b'
   }
   if (getAPIProvider() === 'minimax') {
     return getActiveProviderModel() || 'MiniMax-M2.5'
