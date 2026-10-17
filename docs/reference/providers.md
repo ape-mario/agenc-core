@@ -984,6 +984,27 @@ Kimi, Qwen, Z.AI, Meta, NVIDIA NIM and GitHub Copilot publish no
 zero-data-retention control for their APIs; treat them as retaining data per
 their terms.
 
+## DeepSeek
+
+Select `deepseek` and provide `DEEPSEEK_API_KEY`. The default model is
+`deepseek-flash`; since 2026-10-17 DeepSeek serves DeepSeek-V4.1-Flash-1017
+under that id, so no setting changes. It has a 1M-token context, image input,
+Low/High/Max effort (High by default) and up to 384K output tokens; AgenC asks
+for 64K per call by default. The retired names `deepseek-v4-flash` and
+`deepseek-v4-flash-vision-exp` still reach the same model. `deepseek-v4-pro`
+serves DeepSeek-V4-Pro-0813.
+
+Cost estimates use DeepSeek's peak rates: Flash $0.30 per million input tokens,
+$1.20 per million output tokens and $0.006 per million cached input tokens.
+DeepSeek charges half outside 01:00 to 04:00 and 06:00 to 10:00 UTC on
+weekdays, so real bills can be lower than the estimate.
+
+On OpenRouter the new model has its own id, `deepseek/deepseek-v4.1-flash-1017`;
+`deepseek/deepseek-v4.1-flash` stays on the September build.
+
+Sources: https://api-docs.deepseek.com/quick_start/pricing/ and
+https://api-docs.deepseek.com/news/news261017
+
 ## Ollama Cloud
 
 Select `ollama-cloud` and provide `OLLAMA_API_KEY` for direct hosted inference at

@@ -27,6 +27,7 @@ export const OPENROUTER_MODEL_IDS: readonly string[] = Object.freeze([
   "sakana/fugu-ultra-v2",
   "sakana/fugu-max",
   "inclusionai/ling-3.0-flash-vl",
+  "deepseek/deepseek-v4.1-flash-1017",
   "deepseek/deepseek-v4.1-flash",
   "inception/mercury-2.5",
   "nex-agi/nex-n2.5-pro",
