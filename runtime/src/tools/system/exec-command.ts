@@ -1301,13 +1301,16 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
           });
         }
         const runtimeContext = readToolRuntimeContext(args);
+        // A permission-mode allow runs this attempt under `never`, but an escalation request
+        // still meets the session's own policy: read that one for what a retry can get.
+        const escalationPolicy = runtimeContext?.requestedApprovalPolicy ?? runtimeContext?.approvalPolicy;
         const denial = execSandboxDenialNotice({
           output: execContent,
           exitCode: output.exitCode,
           sandboxApplied: runtimeSandbox !== undefined,
           escalationAvailable:
             runtimeContext === undefined ||
-            sandboxEscalationAvailable(runtimeContext.approvalPolicy, {
+            sandboxEscalationAvailable(escalationPolicy ?? runtimeContext.approvalPolicy, {
               sandboxMode: runtimeContext.requestedSandboxMode,
               session: runtimeContext.invocation.session,
             }),
@@ -1321,11 +1324,11 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
           command: cmd,
           runtimeSandbox,
           escalationAvailable: runtimeContext !== undefined &&
-            sandboxEscalationAvailable(runtimeContext.approvalPolicy, {
+            sandboxEscalationAvailable(escalationPolicy ?? runtimeContext.approvalPolicy, {
               sandboxMode: runtimeContext.requestedSandboxMode,
               session: runtimeContext.invocation.session,
             }),
-          escalationWithoutAsking: runtimeContext?.approvalPolicy === "never",
+          escalationWithoutAsking: escalationPolicy === "never",
         }) ?? (confinedWorktree === undefined
           ? null
           : worktreeWriteDenialNotice({

@@ -1,7 +1,7 @@
 import { effectivePermissionProfile } from "../../sandbox/engine/policy-transforms.js";
 import type { UnifiedExecRuntimeSandbox } from "../../unified-exec/types.js";
 
-const LOOKUP_FAILURE = /\bEAI_AGAIN\b|\bENETUNREACH\b|could not resolve (?:host|proxy)|temporary failure in name resolution|name or service not known|network is unreachable/iu;
+const LOOKUP_FAILURE = /\bEAI_AGAIN\b|\bENOTFOUND\b|\bENETUNREACH\b|could not resolve (?:host|proxy)|temporary failure in name resolution|name or service not known|network is unreachable/iu;
 // `curl -s` and `wget -q` print nothing when a lookup or connect fails, so only the exit status tells:
 // curl 6 (could not resolve host) and 7 (could not connect), wget 4 (network failure).
 const SILENT_CLIENT_EXITS: ReadonlyArray<readonly [RegExp, ReadonlySet<number>]> = [

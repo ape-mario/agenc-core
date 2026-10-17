@@ -13,6 +13,7 @@ const notice = (overrides: Partial<Parameters<typeof execNetworkFailureNotice>[0
 describe("network-disabled command failure guidance", () => {
   test("explains npm, curl, git and libc lookup failures without promising an approval", () => {
     for (const output of ["npm error getaddrinfo EAI_AGAIN registry.npmjs.org",
+      "npm error network request to https://registry.npmjs.org/left-pad failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org",
       "curl: (6) Could not resolve host: example.org",
       "fatal: unable to access https://example.org: Could not resolve host: example.org",
       "Temporary failure in name resolution", "[Errno -2] Name or service not known", "connect ENETUNREACH", "Network is unreachable"]) {
