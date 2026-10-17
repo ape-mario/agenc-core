@@ -1208,6 +1208,55 @@ autostart = true
     }
   });
 
+  it("waits for a Darwin daemon that needs more than a few seconds to stop after an update", async () => {
+    // The 0.19.11 update on a busy Mac: the old daemon needed more than the
+    // former 5 s to stop, so the first launch failed. The replacement now
+    // waits for the daemon's own shutdown budget and says why startup pauses.
+    const agencHome = await tempAgencHome();
+    const host = createHost(agencHome);
+    const pidPath = resolveAgenCDaemonPidPath(host.env, host.userHome);
+    const pid = 5306;
+    host.platform = "darwin";
+    host.runningPids.add(pid);
+    host.recordDaemon(pid, { buildTime: "1970-01-01T00:00:00.000Z" });
+    await writeAgenCDaemonPid(pidPath, pid);
+    let now = 0;
+    let stopRequestedAt: number | undefined;
+    host.requestDaemonShutdown = () => {
+      stopRequestedAt = now;
+    };
+    host.sleep = async (ms) => {
+      now += ms;
+      if (stopRequestedAt !== undefined && now - stopRequestedAt >= 8_000) host.runningPids.delete(pid);
+    };
+    const signals: NodeJS.Signals[] = [];
+    host.terminatePid = (_pid, signal = "SIGTERM") => {
+      signals.push(signal);
+    };
+    const stderr: string[] = [];
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+
+    try {
+      await expect(
+        ensureAgenCDaemonAutostart({
+          host,
+          io: {
+            stdout: { write: () => true },
+            stderr: { write: (text: string | Uint8Array) => { stderr.push(String(text)); return true; } },
+          },
+          findOrphanDaemonPids: () => [],
+          findSupersededDaemonPids: () => [],
+          isReady: ({ pid: readyPid }) => host.runningPids.has(readyPid),
+        }),
+      ).resolves.toMatchObject({ pid: 5201, status: "started" });
+      expect(signals).toEqual([]);
+      expect(stderr.filter((line) => line.includes("waiting for the previous daemon (pid 5306)"))).toHaveLength(1);
+    } finally {
+      nowSpy.mockRestore();
+      await rm(agencHome, { recursive: true, force: true });
+    }
+  });
+
   it("never signals a Darwin PID when self-shutdown acknowledges but survives", async () => {
     const agencHome = await tempAgencHome();
     const host = createHost(agencHome);
@@ -1240,7 +1289,7 @@ autostart = true
           isReady: () => true,
           findSupersededDaemonPids: () => [],
         }),
-      ).rejects.toThrow(/survived forced termination.*5305/u);
+      ).rejects.toThrow(/did not stop within 40 s of its shutdown request \(pid 5305\)/u);
       expect(signals).toEqual([]);
       expect(host.spawnedPids).toEqual([]);
     } finally {
