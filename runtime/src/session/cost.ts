@@ -458,7 +458,8 @@ const COST_TIER_DEEPSEEK_V4_PRO: Readonly<ModelCostEntry> = Object.freeze({
   cachedInputIncludedInInputTokens: true,
 });
 
-// Native API estimates use the published peak rates (2026-09-11). Off-peak
+// Native API estimates use the published peak rates (2026-09-11; unchanged for
+// V4.1-Flash-1017 and V4-Pro-0813 on 2026-10-17). Off-peak
 // calls cost half; these estimates are not authoritative managed-credit usage.
 // https://api-docs.deepseek.com/quick_start/pricing/
 const COST_TIER_DEEPSEEK_V41_FLASH_NATIVE: Readonly<ModelCostEntry> = Object.freeze({
