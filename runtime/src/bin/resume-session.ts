@@ -103,12 +103,15 @@ function resumeSourceRemainedStable(path: string, fd: number, before: BigIntStat
     realpathSync(path) === path;
 }
 
-/**
- * Daemon replacement drains the previous writer before publishing readiness.
- * Freeze its final append without authorizing a replacement or rewritten past.
- * The caller must still reprove this full descriptor immediately before RPC.
- */
-export function reproveResumeSessionAfterDaemonReady(
+/** An append landed between resolving and reading the source: worth another look. */
+class ResumeSourceStillGrowing extends Error {}
+
+/** A live writer leaves gaps between appends; this is how long a reproof looks for one. */
+const APPEND_REPROOF_WINDOW_MS = 2_000;
+const APPEND_REPROOF_RETRY_MS = 20;
+const APPEND_REPROOF_SLEEP_CELL = new Int32Array(new SharedArrayBuffer(4));
+
+function reproveAppendOnce(
   expected: ResolvedResumeSession,
   agencHome: string,
 ): ResolvedResumeSession {
@@ -116,6 +119,10 @@ export function reproveResumeSessionAfterDaemonReady(
     `canonical resume source for ${expected.sessionId} changed during authorization`,
   );
   const observed = resolveResumeSessionId(expected.cwd, expected.sessionId, agencHome);
+  if (observed.kind === "search_incomplete" && observed.reason === "source_unavailable") {
+    // Resolution refuses a source that changes while it is read; an append does that too.
+    throw new ResumeSourceStillGrowing();
+  }
   if (observed.kind !== "ok" || !sameResumeSourceIdentity(expected, observed)) {
     throw changed();
   }
@@ -132,18 +139,56 @@ export function reproveResumeSessionAfterDaemonReady(
   try {
     fd = openSync(observed.rolloutPath, fsConstants.O_RDONLY | noFollow);
     const before = fstatSync(fd, { bigint: true });
+    const sameFile = before.isFile() && before.nlink === 1n && hasSupportedFileIdentity(before) &&
+      before.dev.toString(10) === observed.sourceDev && before.ino.toString(10) === observed.sourceIno;
+    if (sameFile && before.size > BigInt(sourceBytes)) throw new ResumeSourceStillGrowing();
     if (!statMatchesResumeSource(before, observed)) throw changed();
     const digests = readResumeSourceDigests(fd, sourceBytes, prefixBytes);
-    if (!resumeSourceRemainedStable(observed.rolloutPath, fd, before) ||
-        digests.prefixSha256 !== expected.sourceSha256 ||
+    if (digests.prefixSha256 !== expected.sourceSha256 ||
         digests.sourceSha256 !== observed.sourceSha256) throw changed();
+    if (!resumeSourceRemainedStable(observed.rolloutPath, fd, before)) {
+      const after = fstatSync(fd, { bigint: true });
+      if (after.dev === before.dev && after.ino === before.ino && after.nlink === 1n &&
+          after.size > before.size) throw new ResumeSourceStillGrowing();
+      throw changed();
+    }
     return observed;
-  } catch {
+  } catch (error) {
+    if (error instanceof ResumeSourceStillGrowing) throw error;
     throw changed();
   } finally {
     if (fd !== undefined) closeSync(fd);
   }
 }
+
+/**
+ * The descriptor again, allowing only appends since `expected` was resolved: the same source and
+ * workspace identity and the same bytes up to the old size. A live daemon keeps appending to the
+ * session it runs (a terminal closed mid-reply), and a daemon replacement drains the previous
+ * writer before publishing readiness; neither authorizes a replacement or a rewritten past. An
+ * append that lands while the source is read only retries, for at most APPEND_REPROOF_WINDOW_MS.
+ * Before a cold resume the caller still reproves the exact descriptor immediately before RPC.
+ */
+export function reproveResumeSessionAllowingAppend(
+  expected: ResolvedResumeSession,
+  agencHome: string,
+): ResolvedResumeSession {
+  const deadline = Date.now() + APPEND_REPROOF_WINDOW_MS;
+  for (;;) {
+    try {
+      return reproveAppendOnce(expected, agencHome);
+    } catch (error) {
+      if (!(error instanceof ResumeSourceStillGrowing)) throw error;
+      if (Date.now() >= deadline) {
+        throw new Error(`canonical resume source for ${expected.sessionId} changed during authorization`);
+      }
+      Atomics.wait(APPEND_REPROOF_SLEEP_CELL, 0, 0, APPEND_REPROOF_RETRY_MS);
+    }
+  }
+}
+
+/** After daemon readiness the same rule applies: appends only. */
+export const reproveResumeSessionAfterDaemonReady = reproveResumeSessionAllowingAppend;
 
 export type ResumeSessionResolution =
   | ({ readonly kind: "ok" } & ResolvedResumeSession)
