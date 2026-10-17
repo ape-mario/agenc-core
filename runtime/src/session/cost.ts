@@ -172,6 +172,78 @@ type OpenAiRateRow = readonly [
   cacheWrite?: number,
 ];
 
+/**
+ * Amazon Bedrock on-demand Standard prices in US East (N. Virginia), per 1M
+ * tokens: input, output, then cache read and cache write where published.
+ * Read 2026-10-17 from https://aws.amazon.com/bedrock/pricing/ and the AWS
+ * Price List API (AmazonBedrock and AmazonBedrockFoundationModels offers for
+ * us-east-1). Models with no in-region invoke there carry the US cross-region
+ * rate, 10% above the global profile. Other regions can differ slightly.
+ * Bedrock reports cache reads and writes apart from input tokens.
+ */
+const BEDROCK_ON_DEMAND_RATES: Readonly<Record<string, readonly number[]>> = Object.freeze({
+  "amazon.nova-2-lite-v1:0": [0.33, 2.75, 0.0825, 0],
+  "amazon.nova-lite-v1:0": [0.06, 0.24, 0.015, 0],
+  "amazon.nova-micro-v1:0": [0.035, 0.14, 0.00875, 0],
+  "amazon.nova-pro-v1:0": [0.8, 3.2, 0.2, 0],
+  "anthropic.claude-sonnet-4-6": [3.3, 16.5, 0.33, 4.125],
+  "deepseek.v3-v1:0": [0.58, 1.68],
+  "deepseek.v3.2": [0.62, 1.85],
+  "google.gemma-3-12b-it": [0.09, 0.29],
+  "google.gemma-3-27b-it": [0.23, 0.38],
+  "google.gemma-3-4b-it": [0.04, 0.08],
+  "meta.llama3-1-70b-instruct-v1:0": [0.72, 0.72],
+  "meta.llama3-1-8b-instruct-v1:0": [0.22, 0.22],
+  "meta.llama4-maverick-17b-instruct-v1:0": [0.24, 0.97],
+  "minimax.minimax-m2.1": [0.3, 1.2],
+  "minimax.minimax-m2.5": [0.3, 1.2],
+  "minimax.minimax-m2": [0.3, 1.2],
+  "mistral.devstral-2-123b": [0.4, 2],
+  "mistral.magistral-small-2509": [0.5, 1.5],
+  "mistral.ministral-3-14b-instruct": [0.2, 0.2],
+  "mistral.ministral-3-8b-instruct": [0.15, 0.15],
+  "mistral.ministral-3-3b-instruct": [0.1, 0.1],
+  "mistral.mistral-large-3-675b-instruct": [0.5, 1.5],
+  "mistral.mistral-large-2402-v1:0": [4, 12],
+  "mistral.mistral-small-2402-v1:0": [1, 3],
+  "mistral.pixtral-large-2502-v1:0": [2, 6],
+  "moonshotai.kimi-k2.5": [0.6, 3],
+  "moonshot.kimi-k2-thinking": [0.6, 2.5],
+  "moonshotai.kimi-k3": [3.3, 16.5, 0.33, 4.125],
+  "nvidia.nemotron-nano-3-30b": [0.06, 0.24],
+  "nvidia.nemotron-super-3-120b": [0.15, 0.65],
+  "nvidia.nemotron-nano-12b-v2": [0.2, 0.6],
+  "nvidia.nemotron-nano-9b-v2": [0.06, 0.23],
+  "openai.gpt-oss-120b-1:0": [0.15, 0.6],
+  "openai.gpt-oss-20b-1:0": [0.07, 0.3],
+  "qwen.qwen3-235b-a22b-2507-v1:0": [0.22, 0.88],
+  "qwen.qwen3-32b-v1:0": [0.15, 0.6],
+  "qwen.qwen3-coder-30b-a3b-v1:0": [0.15, 0.6],
+  "qwen.qwen3-coder-480b-a35b-v1:0": [0.45, 1.8],
+  "qwen.qwen3-coder-next": [0.5, 1.2],
+  "qwen.qwen3-next-80b-a3b": [0.15, 1.2],
+  "qwen.qwen3-vl-235b-a22b": [0.53, 2.66],
+  "writer.palmyra-vision-7b": [0.15, 0.6],
+  "writer.palmyra-x4-v1:0": [2.5, 10],
+  "writer.palmyra-x5-v1:0": [0.6, 6],
+  "xai.grok-4.6": [2.2, 6.6, 0.55],
+  "zai.glm-4.7-flash": [0.07, 0.4],
+  "zai.glm-4.7": [0.6, 2.2],
+  "zai.glm-5": [1, 3.2],
+});
+
+function bedrockCostEntries(): Record<string, ModelCostEntry> {
+  return Object.fromEntries(Object.entries(BEDROCK_ON_DEMAND_RATES).map(([model, [input, output, cacheRead, cacheWrite]]) => [
+    `amazon-bedrock:${model}`,
+    Object.freeze({
+      inputUsdPer1K: input! / 1000,
+      outputUsdPer1K: output! / 1000,
+      ...(cacheRead === undefined ? {} : { cachedInputUsdPer1K: cacheRead / 1000 }),
+      ...(cacheWrite === undefined ? {} : { cacheCreationUsdPer1K: cacheWrite / 1000 }),
+    }),
+  ]));
+}
+
 /** Copilot rates are independent of direct-provider fast/search charges.
  * https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing
  * Reviewed 2026-09-29. Published long-context billing threshold: 272K inputs.
@@ -1115,7 +1187,7 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
     ...minimaxCostAliases("MiniMax-M2.1", COST_TIER_MINIMAX_M2),
     ...minimaxCostAliases("MiniMax-M2.1-highspeed", COST_TIER_MINIMAX_M2_HIGHSPEED),
     ...minimaxCostAliases("MiniMax-M2", COST_TIER_MINIMAX_M2),
-    "amazon-bedrock:amazon.nova-pro-v1:0": DEFAULT_UNKNOWN_MODEL_COST,
+    ...bedrockCostEntries(),
     "amazon.nova-pro-v1:0": DEFAULT_UNKNOWN_MODEL_COST,
     "agenc:agenc": DEFAULT_UNKNOWN_MODEL_COST,
     agenc: DEFAULT_UNKNOWN_MODEL_COST,
