@@ -1516,6 +1516,105 @@ autostart = true
     }
   });
 
+  it("gives Linux SIGTERM only 5 s after the full shutdown window, then SIGKILL", async () => {
+    // 54e64ef25: the longer first wait also applies on Linux, where only then
+    // AgenC signals. After that window SIGTERM gets the former 5 s, never
+    // another full 40 s, before SIGKILL.
+    const agencHome = await tempAgencHome();
+    const host = createHost(agencHome);
+    const pidPath = resolveAgenCDaemonPidPath(host.env, host.userHome);
+    const pid = 5315;
+    host.platform = "linux";
+    host.runningPids.add(pid);
+    host.recordDaemon(pid, {
+      buildTime: "1970-01-01T00:00:00.000Z",
+    });
+    await writeAgenCDaemonPid(pidPath, pid);
+    host.requestDaemonShutdown = () => {
+      // Acknowledged but deliberately hung through SIGTERM.
+    };
+    const signals: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+    let now = 0;
+    host.sleep = async (ms) => {
+      now += ms;
+    };
+    host.terminatePid = (targetPid, signal = "SIGTERM") => {
+      signals.push({ pid: targetPid, signal });
+      if (signal === "SIGKILL") host.runningPids.delete(targetPid);
+    };
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+
+    try {
+      await expect(
+        ensureAgenCDaemonAutostart({
+          host,
+          inspectLegacyDaemonProcess: (targetPid) => ({
+            pid: targetPid,
+            processStart: `test-process:${targetPid}:initial`,
+          }),
+          isReady: ({ pid: readyPid }) => host.runningPids.has(readyPid),
+          findOrphanDaemonPids: () => [],
+          findSupersededDaemonPids: () => [],
+        }),
+      ).resolves.toMatchObject({ pid: 5201, status: "started" });
+      expect(signals).toEqual([
+        { pid, signal: "SIGTERM" },
+        { pid, signal: "SIGKILL" },
+      ]);
+      expect(now).toBe(45_000);
+    } finally {
+      nowSpy.mockRestore();
+      await rm(agencHome, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when a Linux daemon survives SIGKILL after the short SIGTERM grace", async () => {
+    const agencHome = await tempAgencHome();
+    const host = createHost(agencHome);
+    const pidPath = resolveAgenCDaemonPidPath(host.env, host.userHome);
+    const pid = 5316;
+    host.platform = "linux";
+    host.runningPids.add(pid);
+    host.recordDaemon(pid, {
+      buildTime: "1970-01-01T00:00:00.000Z",
+    });
+    await writeAgenCDaemonPid(pidPath, pid);
+    host.requestDaemonShutdown = () => {};
+    const signals: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+    let now = 0;
+    host.sleep = async (ms) => {
+      now += ms;
+    };
+    host.terminatePid = (targetPid, signal = "SIGTERM") => {
+      signals.push({ pid: targetPid, signal });
+    };
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+
+    try {
+      await expect(
+        ensureAgenCDaemonAutostart({
+          host,
+          inspectLegacyDaemonProcess: (targetPid) => ({
+            pid: targetPid,
+            processStart: `test-process:${targetPid}:initial`,
+          }),
+          isReady: () => true,
+          findOrphanDaemonPids: () => [],
+          findSupersededDaemonPids: () => [],
+        }),
+      ).rejects.toThrow(/survived forced termination \(pid 5316\)/u);
+      expect(signals).toEqual([
+        { pid, signal: "SIGTERM" },
+        { pid, signal: "SIGKILL" },
+      ]);
+      expect(host.spawnedPids).toEqual([]);
+      expect(now).toBe(47_000);
+    } finally {
+      nowSpy.mockRestore();
+      await rm(agencHome, { recursive: true, force: true });
+    }
+  });
+
   it("starts a stopped daemon, waits for ready, and connects", async () => {
     const agencHome = await tempAgencHome();
     const host = createHost(agencHome);

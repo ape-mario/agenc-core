@@ -56,14 +56,47 @@ describe("the charge a provider reports for a call", () => {
     // Without the upstream part only OpenRouter's fee is known: no charge.
     expect(parseUsage("openrouter", openRouterUsage({ is_byok: true, cost_details: {} })).providerCostUsd)
       .toBeUndefined();
+    expect(parseUsage("openrouter", openRouterUsage({ is_byok: true, cost_details: null })).providerCostUsd)
+      .toBeUndefined();
+    expect(parseUsage("openrouter", openRouterUsage({ is_byok: true, cost_details: [] })).providerCostUsd)
+      .toBeUndefined();
+    expect(parseUsage("openrouter", openRouterUsage({
+      is_byok: true, cost_details: { upstream_inference_cost: 0 },
+    })).providerCostUsd).toBeUndefined();
+    expect(parseUsage("openrouter", openRouterUsage({
+      is_byok: true, cost_details: { upstream_inference_cost: -1 },
+    })).providerCostUsd).toBeUndefined();
+    // A string flag is not BYOK: OpenRouter's fee is the whole charge.
+    expect(parseUsage("openrouter", openRouterUsage({ is_byok: "true" })).providerCostUsd).toBe(1.358e-5);
   });
 
   test("is ignored when absent, malformed, from another provider or from the managed gateway", () => {
     expect(parseUsage("openrouter", openRouterUsage({ cost: undefined })).providerCostUsd).toBeUndefined();
     expect(parseUsage("openrouter", openRouterUsage({ cost: -1 })).providerCostUsd).toBeUndefined();
     expect(parseUsage("openrouter", openRouterUsage({ cost: "0.01" })).providerCostUsd).toBeUndefined();
+    expect(parseUsage("openrouter", openRouterUsage({ cost: Number.NaN })).providerCostUsd).toBeUndefined();
+    expect(parseUsage("openrouter", openRouterUsage({ cost: Number.POSITIVE_INFINITY })).providerCostUsd)
+      .toBeUndefined();
     expect(parseUsage("deepseek", openRouterUsage()).providerCostUsd).toBeUndefined();
     expect(parseUsage("openrouter", openRouterUsage(), true).providerCostUsd).toBeUndefined();
+  });
+
+  test("a free OpenRouter route is a known zero, not the conservative ceiling", () => {
+    expect(parseUsage("openrouter", openRouterUsage({ cost: 0 })).providerCostUsd).toBe(0);
+    const base = {
+      model: MODEL, provider: "openrouter", inputTokens: 5_000, outputTokens: 300, cachedInputTokens: 0,
+      cacheCreationInputTokens: 0, reasoningOutputTokens: 0, webSearchRequests: 0, totalTokens: 5_300,
+      turns: 1, singleCall: true as const,
+    };
+    expect(computeUsdCostWithResolution({ ...base, providerCostUsd: 0 }, DEFAULT_MODEL_COSTS))
+      .toMatchObject({ costUsd: 0, known: true });
+    const ceiling = computeUsdCostWithResolution(base, DEFAULT_MODEL_COSTS);
+    expect(ceiling.known).toBe(false);
+    expect(ceiling.costUsd).toBeGreaterThan(0.5);
+    expect(computeUsdCostWithResolution({ ...base, providerCostUsd: Number.NaN }, DEFAULT_MODEL_COSTS))
+      .toMatchObject({ known: false, costUsd: ceiling.costUsd });
+    expect(computeUsdCostWithResolution({ ...base, providerCostUsd: Number.POSITIVE_INFINITY }, DEFAULT_MODEL_COSTS))
+      .toMatchObject({ known: false, costUsd: ceiling.costUsd });
   });
 
   test("is the call's known price instead of the conservative ceiling", () => {
