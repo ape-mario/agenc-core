@@ -590,6 +590,14 @@ describe("classifyShellWorkspaceWritePolicy for a command behind a builtin or a 
     // Nested and stacked.
     "exec nohup sudo -u root nice -n 5 rm -rf .git",
     "env nohup timeout 5 rm -rf .git",
+    "busybox rm -rf .git",
+    "busybox -- rm -rf .git",
+    "/bin/busybox /bin/rm -rf .git",
+    "busybox sh -c 'rm -rf .git'",
+    "toybox rm -rf .git",
+    "toybox -- rm -rf .git",
+    "env busybox rm -rf .git",
+    "nohup busybox rm -rf .git",
     "echo x | xargs -I{} sh -c 'rm -rf .git {}'",
     // A function body's first command follows `{` in the segment that defines it.
     "function f { rm -rf .git; }; f",
@@ -617,6 +625,8 @@ describe("classifyShellWorkspaceWritePolicy for a command behind a builtin or a 
 
   it.each([
     ["nohup touch src/a.ts", ["/repo/src/a.ts"]],
+    ["busybox tee src/a.ts", ["/repo/src/a.ts"]],
+    ["toybox tee src/a.ts", ["/repo/src/a.ts"]],
     ["sudo -u www tee src/a.ts", ["/repo/src/a.ts"]],
     ["command cp /tmp/a.ts src/a.ts", ["/repo/src/a.ts"]],
     // GNU time writes its report to the -o file.
@@ -654,6 +664,8 @@ describe("classifyShellWorkspaceWritePolicy for a command behind a builtin or a 
     ["command -V sh", []],
     ["sudo -l rm", []],
     ["nohup --help", []],
+    ["busybox --help", []],
+    ["toybox --version", []],
     ["timeout --version", []],
     ["/usr/bin/time -V", []],
   ])("lets a wrapper run a command that writes nothing it refuses: %s", (command, targets) => {
@@ -666,6 +678,8 @@ describe("classifyShellWorkspaceWritePolicy for a command behind a builtin or a 
 
   it.each([
     "nohup -x rm -rf .git",
+    "busybox --frobnicate rm -rf .git",
+    "toybox --frobnicate rm -rf .git",
     "nice --frobnicate rm -rf .git",
     "timeout -Z 5 rm -rf .git",
     "stdbuf -$MODE rm -rf .git",
@@ -1469,6 +1483,10 @@ describe("classifyShellWorkspaceWritePolicy for braces, emptied roots, globbed c
   it.each([
     ["echo x >> ~/.bashrc", join(homedir(), ".bashrc")],
     ["tee -a ~/.zshrc", join(homedir(), ".zshrc")],
+    ["busybox tee ~/.bashrc", join(homedir(), ".bashrc")],
+    ["toybox tee -a ~/.zshrc", join(homedir(), ".zshrc")],
+    ["busybox sh -c 'echo x >> ~/.bashrc'", join(homedir(), ".bashrc")],
+    ["env busybox tee ~/.bashrc", join(homedir(), ".bashrc")],
     ["cp dotfiles/gitconfig ~/.gitconfig", join(homedir(), ".gitconfig")],
     ["mv profile ~/.profile", join(homedir(), ".profile")],
     ["install zprofile ~/.zprofile", join(homedir(), ".zprofile")],

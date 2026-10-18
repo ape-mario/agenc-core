@@ -1219,6 +1219,10 @@ const WRAPPER_PROGRAMS: readonly (readonly [string, CommandWrapper])[] = [
     numericAdjustment: true,
   }],
   ["nohup", { short: "", long: GNU_STANDARD_OPTIONS }],
+  // Multi-call binaries: the next word is the applet (`busybox tee ~/.bashrc`).
+  // A leading dash is BusyBox/toybox's own option and runs no applet.
+  ["busybox", { short: "", long: GNU_STANDARD_OPTIONS }],
+  ["toybox", { short: "", long: GNU_STANDARD_OPTIONS }],
   ["stdbuf", {
     short: "e:i:o:",
     long: { error: "e:", input: "i:", output: "o:", ...GNU_STANDARD_OPTIONS },
