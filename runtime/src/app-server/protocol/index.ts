@@ -64,10 +64,12 @@ export const JSON_RPC_VERSION = "2.0" as const;
  * 1.32 adds the optional `toolPolicy` on `agent.create`: a fixed tool
  * allowlist for the session, with an optional frozen permission mode.
  * 1.33 adds memory-only provider API key replacement for an idle session.
+ * 1.34 adds parent review of descendant effects, an optional effectSessionId
+ * owner selector, and owning-session metadata on pending effect reviews.
  * Clients that need any of the additive surfaces above must not negotiate an
  * older daemon.
  */
-export const AGENC_DAEMON_PROTOCOL_VERSION = "1.33.0" as const;
+export const AGENC_DAEMON_PROTOCOL_VERSION = "1.34.0" as const;
 export const AGENC_DAEMON_PROTOCOL_SCHEMA_ID =
   "urn:agenc:app-server:protocol" as const;
 export const AGENC_DAEMON_PROTOCOL_PACKAGE_NAME =
@@ -1863,6 +1865,7 @@ export interface SessionClearParams extends JsonObject {
  */
 export interface SessionResolveToolCallLegacyParams extends JsonObject {
   readonly sessionId: string;
+  readonly effectSessionId?: string;
   /** When omitted, review every eligible legacy effect in the session. */
   readonly toolCallId?: string;
   readonly reviewer?: string;
@@ -1892,6 +1895,8 @@ export interface SessionResolveToolCallAttempt extends JsonObject {
 /** Evidence-bearing resolution required for every durable effect record. */
 export interface SessionResolveToolCallEvidenceParams extends JsonObject {
   readonly sessionId: string;
+  /** Canonical owner, restricted to this attached session's descendant tree. */
+  readonly effectSessionId?: string;
   readonly toolCallId: string;
   readonly disposition:
     "confirmed_committed" | "confirmed_no_effect" | "remains_unknown";
@@ -1910,6 +1915,7 @@ export interface SessionResolveToolCallEvidenceParams extends JsonObject {
  */
 export interface SessionResolveToolCallAttestationParams extends JsonObject {
   readonly sessionId: string;
+  readonly effectSessionId?: string;
   readonly toolCallId: string;
   readonly disposition:
     "confirmed_committed" | "confirmed_no_effect" | "remains_unknown";
@@ -3951,6 +3957,9 @@ export interface DisplayAttachment extends JsonObject {
 }
 
 export interface PendingEffectReview extends JsonObject {
+  readonly sessionId?: string;
+  /** False for a descendant's review: its parent can still take prompts. */
+  readonly blocksSession?: boolean;
   readonly callId: string;
   readonly toolName: string;
   readonly description: string;
