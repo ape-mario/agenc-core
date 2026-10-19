@@ -299,6 +299,9 @@ Autostart retry cap, hard-kill connectability readiness, hydrating
 `daemon start`, and the TUI 10 s lost-turn probe:
 [daemon.md](daemon.md#recovery-after-a-disappeared-daemon).
 
+Routine permission-blocked explanations have no `AGENC_*` override:
+[agents.md](agents.md#permission-blocked-explanation).
+
 ## Browser, budget, heartbeat, sandbox, xAI tools
 
 These have their own pages. Short map:
