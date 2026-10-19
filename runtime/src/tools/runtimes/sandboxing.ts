@@ -1,3 +1,4 @@
+import { isRemoteControlAuthorityPath, protectRemoteControlAuthority } from "../../sandbox/remote-control-protection.js";
 import { realpathSync, statSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
@@ -309,6 +310,7 @@ export function permissionProfileForRuntimeContext(
 function basePermissionProfileForRuntimeContext(
   context: ToolRuntimeAttemptContext,
   options: RuntimeSandboxProfileOptions,
+  includeRemoteReservations = true,
 ): PermissionProfile {
   if (!sandboxModeRequiresPlatformIsolation(context.sandboxMode)) {
     return applyRuntimeAdditionalPermissions(
@@ -327,10 +329,13 @@ function basePermissionProfileForRuntimeContext(
         network,
       })
     : permissionProfileFromRuntimePermissions(fileSystem, network);
-  const protectedProfile = protectDaemonSocket(protectCronAuthority(protectDesktopAuthority(
+  const baseProtectedProfile = protectDaemonSocket(protectCronAuthority(protectDesktopAuthority(
     applyRuntimeAdditionalPermissions(profile, context, options.cwd),
     runtimeDesktopAuthorityRoot(context),
   )));
+  const protectedProfile = includeRemoteReservations
+    ? protectRemoteControlAuthority(baseProtectedProfile)
+    : baseProtectedProfile;
   return routineRunOptions(context.invocation.session) === undefined
     ? protectedProfile
     : confineRoutineProfile(protectedProfile);
@@ -417,6 +422,7 @@ export function enforceRuntimeSandboxAttempt(
     sessionTempRoot,
   );
   if (policy.kind === "danger_full_access" || policy.kind === "external_sandbox") {
+    if (toolMayMutate(input.tool)) enforceRemoteControlWritePaths(input.context, analyzeWrites(input.tool, input.args, cwd).targets, policy);
     return;
   }
   const shellAccess = analyzeShellRuntimeAccess(input.tool, input.args, cwd);
@@ -486,6 +492,7 @@ export function enforceRuntimeSandboxAttempt(
         denial: "filesystem", target, policy,
       });
     }
+    enforceRemoteControlWritePaths(input.context, [target], policy);
     if (overlapsDesktopAuthority(target, authorityRoot)) {
       throw new SandboxDeniedError("Desktop authority records are reserved for the native host", {
         denial: "filesystem", target, policy,
@@ -530,8 +537,10 @@ export function enforceRuntimeSandboxAttempt(
   // Only the existing file-tool plan/memory and fixed runtime-output exceptions
   // may bypass the home reservation. Evaluate them against the original profile
   // so operator denies and the other non-grantable reservations still win.
+  // Remote config targets were rejected above. Its kernel-only reservation of
+  // a missing leaf's parent must not swallow these native file exceptions.
   const fileToolProfile = shellAccess === null
-    ? basePermissionProfileForRuntimeContext(input.context, { cwd })
+    ? basePermissionProfileForRuntimeContext(input.context, { cwd }, false)
     : profile;
   for (const target of writes.targets) {
     if (
@@ -558,6 +567,31 @@ export function enforceRuntimeSandboxAttempt(
         },
       );
     }
+  }
+}
+
+const REMOTE_OWNER_ONLY = "Remote control configuration is owner-only and reserved for the native host; edit it outside the agent.";
+
+/** This owner boundary must reject before hooks, classifiers or approval UI. */
+export function remoteControlWriteRefusal(tool: Tool, args: Record<string, unknown>, context?: ToolRuntimeAttemptContext): string | undefined {
+  if (!toolMayMutate(tool)) return undefined;
+  const targets = analyzeWrites(tool, args, context === undefined ? process.cwd() : runtimeCwd(context)).targets;
+  return remoteControlWriteTarget(context, targets) === undefined ? undefined : REMOTE_OWNER_ONLY;
+}
+
+function remoteControlWriteTarget(context: ToolRuntimeAttemptContext | undefined, targets: readonly string[]): string | undefined {
+  const session = context?.invocation.session as { services?: { configStore?: { homeContext?: { path?: string }; managedPaths?: { root?: string } } } } | undefined;
+  const store = session?.services?.configStore;
+  return targets.find(target => isRemoteControlAuthorityPath(target, { home: store?.homeContext?.path, managedRoot: store?.managedPaths?.root, includeAncestors: true }));
+}
+
+function enforceRemoteControlWritePaths(context: ToolRuntimeAttemptContext, targets: readonly string[], policy: SandboxPolicy): void {
+  const target = remoteControlWriteTarget(context, targets);
+  if (target !== undefined) {
+    const message = policy.kind === "workspace_write"
+      ? `sandbox workspace_write blocked write outside workspace: ${target}. ${REMOTE_OWNER_ONLY}`
+      : REMOTE_OWNER_ONLY;
+    throw new SandboxDeniedError(message, { denial: "filesystem", target, policy });
   }
 }
 

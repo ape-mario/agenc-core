@@ -2926,6 +2926,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     () =>
       buildDefaultRegistry({
         surface: "daemon-tui",
+        remoteControlEnabled: () => configStore.current().remote_control?.enabled === true,
       }),
     [],
   );
