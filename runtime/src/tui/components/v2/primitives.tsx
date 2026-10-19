@@ -708,9 +708,9 @@ export function ChatBody({
   )
 }
 
-// The transcript surface (ActiveWorkSurface) adds paddingX={1} around the
-// welcome panel, so reserve 2 columns from the reported content width to avoid
-// overflowing the pane.
+// Isolated welcome panels reserve a column on either side. In the app,
+// ContentWidthProvider already accounts for the transcript padding; do not
+// subtract a second inset from that width.
 const WELCOME_INSET = 2
 
 function useWelcomeAvailableWidth(): number {
@@ -719,10 +719,8 @@ function useWelcomeAvailableWidth(): number {
   const { columns: terminalColumns } = useTerminalSize()
   // `TerminalFrameColumnsContext` intentionally defaults to 120 for isolated
   // primitives, but a real 44/80-col Ink viewport can be narrower than that.
-  // Clamp the fallback to the physical terminal so the brand row switches to
-  // its stacked compact form before Yoga starts wrapping the logo itself.
-  const available = contentWidth ?? Math.min(frameColumns, terminalColumns)
-  return Math.max(1, available - WELCOME_INSET)
+  // Clamp the fallback to the physical terminal before fitting the mark.
+  return Math.max(1, contentWidth ?? (Math.min(frameColumns, terminalColumns) - WELCOME_INSET))
 }
 
 // Portable fallback for terminals without a graphics protocol. These Braille
@@ -936,12 +934,23 @@ function WelcomeHintLine(): React.ReactNode {
   )
 }
 
+// Reserve ten rows outside the mark: name + gap (2), transcript top
+// padding (1), and prompt/footer chrome including a wrapped placeholder (7).
+// Hints cost another gap and row; drop them before shrinking the brand mark.
+export function welcomeColdPanelLayout(availableWidth: number, terminalRows: number): {
+  readonly compactLogo: boolean
+  readonly showHint: boolean
+} {
+  const fullWidth = Math.max(...AGENC_LOGO_MARK_LINES.map(line => stringWidth(line)))
+  const compactLogo = availableWidth < fullWidth || terminalRows < AGENC_LOGO_MARK_LINES.length + 10
+  const logoRows = compactLogo ? AGENC_LOGO_MARK_COMPACT_LINES.length : AGENC_LOGO_MARK_LINES.length
+  return { compactLogo, showHint: terminalRows >= logoRows + 12 }
+}
+
 export function WelcomeColdPanel(): React.ReactNode {
   const availableWidth = useWelcomeAvailableWidth()
   const { rows: terminalRows } = useTerminalSize()
-  // The full mark is 20x10 cells; short panes get the 12x6 mark.
-  const compactLogo = availableWidth < 96 || terminalRows < 24
-  const showHint = terminalRows >= 16
+  const { compactLogo, showHint } = welcomeColdPanelLayout(availableWidth, terminalRows)
 
   return (
     <Box
