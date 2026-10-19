@@ -721,7 +721,7 @@ and the decision recorded for audit keep their original spelling.
 
 | Mode | Intent |
 | --- | --- |
-| `unattended` | Background agents with no attached client; policy allow/deny/pause |
+| `unattended` | Background agents with no attached client; policy allow/deny/pause. A scheduled routine that would ask a person ends as `failed` with a fixed mode-specific `run.error`: [agents.md](agents.md#permission-blocked-explanation) |
 | `bubble` | Nested/child contexts that bubble denials to the parent |
 
 The daemon permission overlay classifies low / medium / destructive requests.

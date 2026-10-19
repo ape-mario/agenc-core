@@ -76,6 +76,7 @@ Everything past the launcher lives in the single runtime workspace
 | `app-server-protocol/`                                                   | Shared protocol constants (e.g. portal default local endpoint)                                                                                                                                                                                 |
 | `session/`                                                               | Session engine: turn loop, transcript, canonical append-only rollout journal + `index.json`, persist-before-publish events, resume, cost, autonomous mode. `session.transcript.v2` rebuilds closed-turn results from that rollout: [daemon.md](reference/daemon.md#closed-turn-results). Raw session `error` records are diagnostic, not closers: [daemon.md](reference/daemon.md#mid-turn-error-events). |
 | `agents/`                                                                | Background-agent state, registry, roles, mailbox, worktree isolation, multi-agent v2 tools, CSV jobs (`agents/jobs/`), `WorkflowTool` DAG (`agents/workflow-*.ts`), delegate/fork. Spawn preflight is confirmed no-effect only before `delegate()`: [agents.md](reference/agents.md#spawn_agent-preflight). Close/assign/send argument and identity refusals use `tool:agents.v2:validation`: [agents.md](reference/agents.md#agent-validation-refusals). Fork interrupt and tool-abort stay turn-scoped: [agents.md](reference/agents.md#turn-abort-containment). |
+| `routines/`                                                              | Daemon-owned scheduled routines (`routines-v1.json`). A permission-blocked unattended run fails with a fixed mode-specific `run.error`: [agents.md](reference/agents.md#permission-blocked-explanation). |
 | `workflow/`                                                              | M5 verified-change pipeline (`agenc run start`). Session bootstrap, child names, review repair, and `refs/agenc/runs/<runId>` are documented in [design/verified-change-workflow-m5.md](design/verified-change-workflow-m5.md). Not the `WorkflowTool` DAG. |
 | `auth/`                                                                  | Local and remote auth backends, native secure storage credential namespaces, BYOK precedence, provider auth selection, session auth metadata                                                                                                                                                   |
 | `llm/`                                                                   | Provider-neutral client/request shaping, provider-aware complete-request [token accounting](design/provider-aware-token-accounting.md), model catalog, retries, streaming, wire adapters, OAuth refresh. Grammar-safe, Gemini native JSON Schema, object-applicator roots that omit type, and LM Studio/openai-compatible ceiling shaping: [provider-tool-compat.md](provider-tool-compat.md#gemini-object-applicator-tool-roots). |
@@ -147,6 +148,7 @@ The daemon and runtime persist under one home. Relocate with an absolute
 | `sessions/` (project-scoped)                                       | Canonical append-only JSONL rollouts + advisory `index.json` (atomic tmp+fsync+rename). The daemon sweep deletes idle session dirs after `agent.retention.rollout_days` (default 30; 0 keeps every session): [session rollout retention](reference/daemon.md#session-rollout-retention). |
 | `derived-indexes/memory-v1.sqlite`                                 | Rebuildable full-corpus memory FTS cache (not source authority). See [memory.md](reference/memory.md).                               |
 | `whisper/`                                                         | Private Whisper model weights (`ggml-base.bin`, `ggml-small.bin`). Downloads use a 60 s idle clock: [whisper-local.md](whisper-local.md#download-idle-clock). |
+| `routines/routines-v1.json`                                        | Daemon-owned local routines and bounded run history. Permission-blocked runs store a fixed `run.error`: [agents.md](reference/agents.md#permission-blocked-explanation). |
 | logs / state DBs                                                   | SQLite state + logs databases under project/home layout                                                                              |
 
 Login tokens, provider BYOK keys, remote bearers, and persisted remote
@@ -181,6 +183,19 @@ or Anthropic native storage. See
 
 Optional trajectory export writes redacted rollout items via
 `AGENC_TRAJECTORY_EXPORT_PATH` or `AGENC_TRAJECTORY_EXPORT_DIR`.
+
+### Routine permission-blocked explanation
+
+A scheduled routine has nobody attached. A tool action that would ask a
+person ends the run as `failed` with a fixed `run.error` from
+`describePermissionDenial`. `default` and `plan` share the read-only
+string; `acceptEdits` and `bypassPermissions` each have their own.
+The executor path uses the launch snapshot; a Core
+`routine_permission_denied` terminal uses the stored routine's current
+mode. There is no env or `config.toml` override.
+
+Operator runbook:
+[agents.md](reference/agents.md#permission-blocked-explanation).
 
 ### Durable run event path
 

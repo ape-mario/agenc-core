@@ -62,7 +62,7 @@ history; the linked pages below are current product truth.
 | [reference/providers.md](reference/providers.md) | Built-in providers, defaults, API key envs, local context-window probes, Responses continuation, and overflow diagnostics |
 | [reference/slash-commands.md](reference/slash-commands.md) | TUI slash registry, including exact `/swarm` status/on/off semantics, `/compact`, and `/resolve` vs attested agent-validation refusals |
 | [reference/autonomy.md](reference/autonomy.md) | Budget + heartbeat + cron delivery (pinned webhook destinations) + hooks HTTP; autonomous keepalive stops after `compact_failed` |
-| [reference/agents.md](reference/agents.md) | Background agents, multi-agent v2 lifecycle/admission, spawn `task_name` normalization, spawn preflight no-effect, close/assign/send validation no-effect, deferred first message, worktree evidence, turn-scoped abort, and keep-alive `compact_failed` idle |
+| [reference/agents.md](reference/agents.md) | Background agents, multi-agent v2 lifecycle/admission, spawn `task_name` normalization, spawn preflight no-effect, close/assign/send validation no-effect, deferred first message, worktree evidence, turn-scoped abort, keep-alive `compact_failed` idle, and [routine permission-blocked explanations](reference/agents.md#permission-blocked-explanation) |
 | [reference/workflows.md](reference/workflows.md) | Version-2 agent DAG manifests, derived child agent names, scheduling, handoff artifacts, limits, result outcomes, and public SDK result-type sync |
 | [reference/memory.md](reference/memory.md) | Persona, AGENC.md, auto-memory paths, full-corpus index, privacy |
 | [reference/project-storage.md](reference/project-storage.md) | Versioned project keys, legacy data isolation, recovery and rollback |

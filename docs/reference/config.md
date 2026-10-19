@@ -1043,6 +1043,10 @@ In-flight tools finish before a local partial-result summary is emitted. No extr
 model call is spent generating that summary. Unknown usage retains its reserved
 amount. Provider-reported overruns remain subject to execution admission policy.
 
+A permission-blocked routine names the mode that refused it; there is no
+`config.toml` override for those strings:
+[agents.md](agents.md#permission-blocked-explanation).
+
 ## Remote control owner switch
 
 `remote_control` is a home/managed-only table. `remote_control.enabled` is a
