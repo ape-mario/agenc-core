@@ -8,7 +8,7 @@ import { stringWidth } from "./ink/stringWidth.js";
 import { stripUnderlineAnsi } from "./components/shell/OutputLine.js";
 import { selectAgenCTuiGlyphs } from "./glyphs.js";
 import { ResultLine } from "./components/v2/primitives.js";
-import { parseClampMarker, readableToolError, summarizeToolError } from "./tool-error-text.js";
+import { parseClampMarker, readableToolError, shellFailureReason, summarizeToolError } from "./tool-error-text.js";
 import { modelToolAliasTarget } from "../tools/model-tool-aliases.js";
 import { summarizeToolInput } from "./message-renderers/toolRowPreview.js";
 import { AskUserQuestionTool } from "../tools/ask-user-question/tui-tool.js";
@@ -549,15 +549,9 @@ export function BashOutputView({
   // The transcript shows one line per step; ctrl+o (verbose) shows the output.
   if (!verbose) {
     if (isFailure) {
-      // The reason is the last line of stderr when there is one (stdout may
-      // end with unrelated progress), else the last line of the output.
-      const lastLine = (text: string) =>
-        text
-          .split("\n")
-          .map((line) => stripAnsi(line).trim())
-          .filter((line) => line.length > 0 && parseClampMarker(line) === null)
-          .at(-1);
-      const tail = lastLine(stderrTrimmed) ?? lastLine(stdoutTrimmed);
+      // Prefer a diagnostic over runtime/version footers after a stack trace.
+      // Keep stderr authoritative; plain daemon exec results combine both streams.
+      const tail = shellFailureReason(stderrTrimmed) ?? shellFailureReason(stdoutTrimmed);
       return (
         <ResultLine failed>
           {`exit ${exitCode}${tail !== undefined ? `, ${tail}` : ""}`}
