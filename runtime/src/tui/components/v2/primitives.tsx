@@ -1818,7 +1818,7 @@ export function ApprovalCard({
           </Box>
         ) : null}
         {showNote ? (
-          <ThemedText color="inactive" wrap="truncate-end">
+          <ThemedText color="inactive" wrap="wrap">
             note · {note}
           </ThemedText>
         ) : null}

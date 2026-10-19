@@ -25,7 +25,7 @@ const fieldHints: Readonly<Record<string, Readonly<Record<string, string | null>
     max_output_tokens: "Token cap; head/tail truncation.",
     login: "Login shell if supported.", shell: "Default: user's shell.",
     tty: "Interactive PTY, required for persistent shells/write_stdin input. Unavailable in contained operations: use tty=false and non-interactive flags, or ask the user to use the app's Run button.",
-    detach: "Service in its own session; stdout/stderr logged. AgenC never stops it; survives command/session end. Wait yield_time_ms (default 2000) for early exit; return pid/log path. Only danger-full-access (--dangerously-bypass-approvals-and-sandbox), never tty.",
+    detach: "Service in its own session; stdout/stderr logged. AgenC never stops it; survives command/session end. Wait yield_time_ms (default 2000) for early exit; return pid/log path. Only outside the sandbox (danger-full-access or an approved require_escalated launch), never tty.",
     sandbox_permissions: "Escalation mode; scoped requests use additional_permissions.",
     additional_permissions: 'Request these scopes with sandbox_permissions="with_additional_permissions".',
     justification: "Why elevated execution is needed.",

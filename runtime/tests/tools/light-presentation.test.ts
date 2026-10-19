@@ -96,8 +96,8 @@ test("compact shell fields keep permission and process-lifecycle conditions", ()
   for (const text of ["required for persistent shells/write_stdin input", "Unavailable in contained operations",
     "tty=false and non-interactive flags", "ask the user", "Run button"]) expect(fields.tty!.description).toContain(text);
   for (const text of ["own session", "stdout/stderr logged", "AgenC never stops it", "survives command/session end",
-    "yield_time_ms (default 2000)", "early exit", "pid/log path", "Only danger-full-access",
-    "--dangerously-bypass-approvals-and-sandbox", "never tty"]) expect(fields.detach!.description).toContain(text);
+    "yield_time_ms (default 2000)", "early exit", "pid/log path", "Only outside the sandbox",
+    "approved require_escalated launch", "never tty"]) expect(fields.detach!.description).toContain(text);
   expect(fields.additional_permissions!.description).toContain('sandbox_permissions="with_additional_permissions"');
   expect(fields.justification!.description).toContain("Why elevated execution");
   expect(fields.prefix_rule!.description).toContain("approval caching");
@@ -243,4 +243,18 @@ test("the registry reports compact presentation for standard deferral only", () 
   expect(buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: true }).compactPresentation).toBe(true);
   expect(buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: false }).compactPresentation).toBe(false);
   expect(buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: true, lightMode: true }).compactPresentation).toBe(false);
+});
+
+
+test("initial Light shell summaries remain byte-identical to the pre-server-fix contract", () => {
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true });
+  const shell = registry.toLLMTools().find(t => t.function.name === "exec_command")!;
+  expect(shell.function.description).toBe("Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. Batch bounded independent reads. Yielded session_id exposes write_stdin; kill_process stops it. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens, sandbox escalation) are accepted; system.searchTools select:exec_command loads their schema.");
+  registry.discoverToolNames?.(["write_stdin", "exec_command"]);
+  const tools = registry.toLLMTools();
+  expect(tools.find(t => t.function.name === "write_stdin")!.function.description).toBe("Continue exec_command's session_id. Empty chars polls; input requires initial tty=true. Include command newlines; match the session's sandbox_permissions.");
+  const advanced = tools.find(t => t.function.name === "exec_command")!;
+  expect(advanced.function.description).not.toContain("allowLocalBinding");
+  expect(advanced.function.description).not.toContain("PID namespace");
+  expect((advanced.function.parameters.properties as Record<string, { description: string }>).detach!.description).toContain("approved require_escalated launch");
 });
