@@ -3113,6 +3113,7 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
       "objective",
       "resumeSessionId",
       "resumeRolloutPath",
+      "initialUserPromptText",
       "cwd",
       "model",
       "provider",
@@ -3269,7 +3270,8 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
     validated.resumeSessionId !== undefined &&
     (validated.initialContent !== undefined ||
       validated.deferInitialTurn !== undefined ||
-      validated.initialDisplayUserMessage !== undefined)
+      validated.initialDisplayUserMessage !== undefined ||
+      validated.initialUserPromptText !== undefined)
   ) {
     throw invalidParams(
       "agent.create param 'resumeSessionId' cannot be combined with initial turn content or metadata",
@@ -3286,7 +3288,8 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
   if (
     validated.deferInitialTurn === true &&
     (validated.initialContent !== undefined ||
-      validated.initialDisplayUserMessage !== undefined)
+      validated.initialDisplayUserMessage !== undefined ||
+      validated.initialUserPromptText !== undefined)
   ) {
     throw invalidParams(
       "agent.create param 'deferInitialTurn' cannot be combined with initial turn content or metadata",
@@ -4957,10 +4960,12 @@ function displayUserMessageFromMetadata(
   metadata: JsonObject | undefined,
 ): {
   readonly displayUserMessage?: string | null;
+  readonly userPromptText?: string;
 } {
   if (metadata === undefined) return {};
   const result: {
     displayUserMessage?: string | null;
+    userPromptText?: string;
   } = {};
   if ("displayUserMessage" in metadata) {
     const value = metadata.displayUserMessage;
@@ -4970,6 +4975,12 @@ function displayUserMessageFromMetadata(
       );
     }
     result.displayUserMessage = value;
+  }
+  if ("userPromptText" in metadata) {
+    if (typeof metadata.userPromptText !== "string") {
+      throw invalidParams(`${methodName} metadata 'userPromptText' must be a string`);
+    }
+    result.userPromptText = metadata.userPromptText;
   }
   return result;
 }

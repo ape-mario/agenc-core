@@ -863,6 +863,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         }
         const firstSubmitOptions: DaemonSessionSubmitOptions = {
           [DAEMON_USER_PROMPT_PREPARED]: true as const,
+          ...(params.initialUserPromptText !== undefined ? { userPromptText: params.initialUserPromptText } : {}),
           clientMessageId: `user-initial-${managedThread.threadId}`,
           displayUserMessage:
             params.initialDisplayUserMessage === undefined
@@ -2946,6 +2947,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       [DAEMON_USER_STOP_GENERATION]: userStopGenerationToRelease,
       [DAEMON_LOCAL_MCP_ACCESS]: params.localMcpAccess === true,
       [DAEMON_USER_PROMPT_PREPARED]: true as const,
+      ...(params.userPromptText !== undefined ? { userPromptText: params.userPromptText } : {}),
       displayUserMessage:
         params.displayUserMessage === undefined
           ? messageContentDisplayText(params.originalContent)
@@ -6253,7 +6255,7 @@ function installDaemonTurnDriverHooks(
       const ctx = baseCtx;
       const rootHumanTurnText =
         opts?.source !== "autonomous_tick" && opts?.displayUserMessage !== null
-          ? (opts?.displayUserMessage ?? promptDisplayText)
+          ? (opts?.userPromptText ?? opts?.displayUserMessage ?? promptDisplayText)
           : undefined;
       // displayUserMessage: null suppresses the run-turn user_message
       // emit. On the daemon path, submitAgentMessage above already
