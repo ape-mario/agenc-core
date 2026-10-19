@@ -90,6 +90,8 @@ export interface AdaptedTranscript {
    * `turn_start`.
    */
   readonly turnStreamedChars: number;
+  /** Authoritative per-attempt warning; cleared by output or a request boundary. */
+  readonly streamQuietWarning?: string | null;
   /**
    * Most recent provider-reported usage from a `token_count` event, in the
    * assistant-message usage-block shape the context-percentage derivation
@@ -342,7 +344,6 @@ const USER_VISIBLE_WARNING_CAUSES: ReadonlySet<string> = new Set([
   "schema_validation_failed",
   "malformed_tool_call",
   "daemon_connection_state",
-  "stream_idle_warning",
 ]);
 
 /**
@@ -1879,6 +1880,12 @@ function collapseRepeatedSystemLines(messages: any[]): any[] {
   return collapsed;
 }
 
+const STREAM_WARNING_RESET_EVENTS = new Set([
+  "turn_start", "turn_started", "turn_complete", "turn_completed",
+  "turn_failed", "turn_aborted", "history_cleared", "history_replaced",
+  "stream_error", "tool_call_started", "tool_input_block_start",
+]);
+
 export function adaptTranscriptEvents(
   events: readonly SessionTranscriptEvent[],
   startupMessages: readonly LLMMessage[] = [],
@@ -1906,6 +1913,7 @@ export function adaptTranscriptEvents(
   const provisionalTextUuids = new Set<string>();
   let realtimeStreamingText = "";
   let turnStreamedChars = 0;
+  let streamQuietWarning: string | null = null;
   let latestUsage: AdaptedTranscript["latestUsage"] = null;
   let sessionCostUsd = 0;
   let sessionUsage: AdmissionUsageSummary | null = null;
@@ -1988,6 +1996,16 @@ export function adaptTranscriptEvents(
     let blockIndex = 0;
     const nextUuid = (): string => `${event.key}:${blockIndex++}`;
 
+    if (STREAM_WARNING_RESET_EVENTS.has(event.type) ||
+      (event.type === "execution_admission" && payload.event === "dispatched") ||
+      ((event.type === "agent_message_delta" || event.type === "assistant_thinking_delta") &&
+        typeof payload.delta === "string" && payload.delta.length > 0) ||
+      (event.type === "tool_input_delta" &&
+        ((typeof payload.partialJson === "string" && payload.partialJson.length > 0) ||
+         (typeof payload.partial_json === "string" && payload.partial_json.length > 0))) ||
+      (event.type === "assistant_text" && typeof payload.content === "string" && payload.content.length > 0)) {
+      streamQuietWarning = null;
+    }
     switch (event.type) {
       case "session_usage":
         sessionUsage = latestSessionUsage(sessionUsage, event);
@@ -2839,6 +2857,19 @@ export function adaptTranscriptEvents(
         break;
       }
       case "warning": {
+        if (payload.cause === "stream_idle_resumed") {
+          streamQuietWarning = null;
+          break;
+        }
+        if (payload.cause === "stream_idle_warning") {
+          const effort = payloadRecord(payload.details).reasoningEffort;
+          const effortLabel = typeof effort === "string" &&
+            ["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(effort)
+              ? ` (${effort === "none" ? "effort off" : `${effort} effort`})`
+              : "";
+          streamQuietWarning = `${stringResult(payload.message)}${effortLabel}`;
+          break;
+        }
         // Allow-list of warning causes that surface to the user's
         // transcript. Every other cause stays in the daemon log and
         // observability sinks only — most of the 89 causes the
@@ -3218,6 +3249,7 @@ export function adaptTranscriptEvents(
     streamingToolUses,
     streamingThinking,
     turnStreamedChars,
+    streamQuietWarning,
     latestUsage,
     sessionCostUsd: sessionUsage?.costUsd ?? sessionCostUsd,
     sessionUsage,
