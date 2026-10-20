@@ -209,6 +209,16 @@ test("a context-length refusal of a calibrated DeepSeek request compacts the his
     expect(harness.store.readAll().some((item) => item.type === "compaction_committed")).toBe(true);
     expect(mainPrompts).toHaveLength(3);
     expect(mainPrompts[2]!).toBeLessThan(refusedPrompt);
+    // Every main request was admitted on an estimate at or above DeepSeek's
+    // count; the refused one only exceeded the provider's smaller limit.
+    const admitted = messages.flatMap((msg) => msg.type === "execution_admission" &&
+      msg.payload.event === "dispatched" && msg.payload.stepId.startsWith("model:") &&
+      typeof msg.payload.reservedTokens === "number"
+      ? [msg.payload.reservedTokens - Number((msg.payload.details as { maxOutputTokens?: number } | undefined)?.maxOutputTokens ?? 0)]
+      : []);
+    expect(admitted).toHaveLength(3);
+    admitted.forEach((accounted, index) => expect(accounted).toBeGreaterThanOrEqual(mainPrompts[index]!));
+    expect(admitted[1]! / mainPrompts[1]!).toBeLessThan(1.5);
   } finally {
     await session.shutdown().catch(() => undefined);
     harness.close();
