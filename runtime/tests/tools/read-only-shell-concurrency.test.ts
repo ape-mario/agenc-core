@@ -30,16 +30,26 @@ describe("read-only exec_command concurrency", () => {
   });
 
   test.each([
+    "ls | wc -l",
+    "cat README.md && cat package.json",
+    "find . -maxdepth 2 -type f -not -path './.git/*' -print | sort",
+    "for f in src/*.js; do printf '%s\\n' \"$f\"; cat \"$f\"; done",
+    "git status --short --branch",
+  ])("runs the read-only command line %s alongside other calls", (cmd) => {
+    expect(execCommandRunsConcurrently(call(cmd), cwd)).toBe(true);
+  });
+
+  test.each([
     "touch out.txt",
     "printf 'a\\n' > out.txt",
     "mkdir -p build",
-    "ls | wc -l",
-    "cat README.md && cat package.json",
-    "git status --short",
-    "git diff",
     "npm test",
     "rm -rf build",
-    "ls $HOME",
+    "sed -i s/a/b/ f",
+    "find . -delete",
+    "cat a; touch b",
+    "git commit -m x",
+    "python3 -c 'print(1)'",
   ])("keeps %s exclusive", (cmd) => {
     expect(execCommandRunsConcurrently(call(cmd), cwd)).toBe(false);
   });
@@ -141,5 +151,90 @@ describe("executor scheduling of exec_command calls from one response", () => {
     exec.close();
     expect(await drain(exec)).toEqual(["a", "b", "c"]);
     expect(Math.max(...Object.values(overlaps))).toBe(1);
+  });
+});
+
+describe("a read-only call that cannot take the read-only route", () => {
+  /**
+   * Router stand-in: calls named in `ordinary` miss the read-only route, as
+   * when its sandbox cannot be prepared, and run through the hook the
+   * executor hands to concurrently scheduled shell calls.
+   */
+  function routedHarness(ordinary: ReadonlySet<string>, durations: Record<string, number>) {
+    const tool: Tool = createExecCommandTool({ cwd });
+    const registry = {
+      tools: [tool],
+      toLLMTools: () => [],
+      dispatch: async () => ({ content: "unused" }),
+    } as unknown as ToolRegistry;
+    const timeline: string[] = [];
+    const concurrentDuring: Record<string, number[]> = {};
+    let active = 0;
+    const router = {
+      toolSupportsParallel: () => false,
+      async dispatchModelToolCall(
+        toolCall: LLMToolCall,
+        opts: { readonly runAloneOffReadOnlyRoute?: <T>(run: () => Promise<T>) => Promise<T> },
+      ): Promise<ToolDispatchResult> {
+        const run = async (): Promise<ToolDispatchResult> => {
+          active += 1;
+          timeline.push(`start:${toolCall.id}`);
+          (concurrentDuring[toolCall.id] ??= []).push(active);
+          await delay(durations[toolCall.id] ?? 1);
+          (concurrentDuring[toolCall.id] ??= []).push(active);
+          timeline.push(`end:${toolCall.id}`);
+          active -= 1;
+          return { content: `ran ${toolCall.id}` };
+        };
+        return ordinary.has(toolCall.id) && opts.runAloneOffReadOnlyRoute !== undefined
+          ? opts.runAloneOffReadOnlyRoute(run)
+          : run();
+      },
+    };
+    const exec = new StreamingToolExecutor({
+      registry,
+      liveToolDispatch: { router: router as never, options: {} as never },
+    });
+    return { exec, timeline, concurrentDuring };
+  }
+
+  test("waits for the other calls of its batch and runs alone, before later writes", async () => {
+    const { exec, timeline, concurrentDuring } = routedHarness(new Set(["b"]), { a: 30, b: 5, c: 30, d: 1 });
+    exec.addTool(block("a"), execCall("a", "ls -la"));
+    exec.addTool(block("b"), execCall("b", "cat README.md | wc -l"));
+    exec.addTool(block("c"), execCall("c", "cat package.json"));
+    exec.addTool(block("d"), execCall("d", "touch out.txt"));
+    exec.dispatchPending();
+    exec.close();
+    const seen = await drain(exec);
+    expect(concurrentDuring.b).toEqual([1, 1]);
+    expect(timeline.indexOf("start:b")).toBeGreaterThan(timeline.indexOf("end:a"));
+    expect(timeline.indexOf("start:b")).toBeGreaterThan(timeline.indexOf("end:c"));
+    expect(timeline.indexOf("start:d")).toBeGreaterThan(timeline.indexOf("end:b"));
+    expect(seen).toEqual(["a", "b", "c", "d"]);
+  });
+
+  test("two such calls take turns instead of waiting for each other", async () => {
+    const { exec, timeline, concurrentDuring } = routedHarness(new Set(["a", "b"]), { a: 10, b: 10, c: 10 });
+    exec.addTool(block("a"), execCall("a", "ls | wc -l"));
+    exec.addTool(block("b"), execCall("b", "cat README.md | wc -l"));
+    exec.addTool(block("c"), execCall("c", "pwd"));
+    exec.dispatchPending();
+    exec.close();
+    expect(await drain(exec)).toEqual(["a", "b", "c"]);
+    expect(concurrentDuring.a).toEqual([1, 1]);
+    expect(concurrentDuring.b).toEqual([1, 1]);
+    expect(timeline.filter((entry) => entry.startsWith("start:"))).toHaveLength(3);
+  });
+
+  test("calls that take the read-only route still overlap", async () => {
+    const { exec, concurrentDuring } = routedHarness(new Set(), { a: 20, b: 20, c: 20 });
+    exec.addTool(block("a"), execCall("a", "ls | wc -l"));
+    exec.addTool(block("b"), execCall("b", "cat README.md && cat package.json"));
+    exec.addTool(block("c"), execCall("c", "git status --short"));
+    exec.dispatchPending();
+    exec.close();
+    expect(await drain(exec)).toEqual(["a", "b", "c"]);
+    expect(Math.max(...Object.values(concurrentDuring).flat())).toBe(3);
   });
 });

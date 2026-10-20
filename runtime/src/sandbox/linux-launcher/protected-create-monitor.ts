@@ -35,6 +35,8 @@ export function startProtectedCreateMonitor(
   };
   scan();
   const interval = setInterval(scan, PROTECTED_CREATE_POLL_MS);
+  // The watched command keeps its owner alive; the poll itself never should.
+  interval.unref?.();
   return {
     stop(): boolean {
       clearInterval(interval);

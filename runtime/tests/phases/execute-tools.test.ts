@@ -3758,7 +3758,7 @@ describe("tool_call_started recovery category for the in-flight tool index", () 
     }, { file_path: "/tmp/x", content: "y" })).toBe("side-effecting");
   });
 
-  test("marks a literal read-only exec_command inspection idempotent and keeps other commands side-effecting", async () => {
+  test("marks a read-only exec_command idempotent and keeps other commands side-effecting", async () => {
     const shell = (): Tool => ({
       name: "exec_command", description: "fixture", inputSchema: { type: "object" },
       recoveryCategory: "side-effecting", execute: async () => ({ content: "ok" }),
@@ -3766,14 +3766,19 @@ describe("tool_call_started recovery category for the in-flight tool index", () 
     expect(await startedCategory(shell(), { cmd: "ls -la", workdir: "/tmp" })).toBe("idempotent");
     expect(await startedCategory(shell(), { cmd: "cat README.md" })).toBe("idempotent");
     expect(await startedCategory(shell(), { cmd: "touch x" })).toBe("side-effecting");
-    expect(await startedCategory(shell(), { cmd: "ls | wc -l" })).toBe("side-effecting");
+    expect(await startedCategory(shell(), { cmd: "ls | wc -l" })).toBe("idempotent");
+    expect(await startedCategory(shell(), { cmd: "printf x > out.txt" })).toBe("side-effecting");
     expect(await startedCategory(shell(), { cmd: "ls -la", detach: true })).toBe("side-effecting");
   });
 
-  test("sends no category for a tool without one", async () => {
+  test("sends no category for a tool without a valid one", async () => {
     expect(await startedCategory({
       name: "Custom", description: "fixture", inputSchema: { type: "object" },
       execute: async () => ({ content: "ok" }),
+    }, {})).toBeUndefined();
+    expect(await startedCategory({
+      name: "Legacy", description: "fixture", inputSchema: { type: "object" },
+      recoveryCategory: "read-only" as never, execute: async () => ({ content: "ok" }),
     }, {})).toBeUndefined();
   });
 });

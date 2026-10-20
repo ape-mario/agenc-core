@@ -10,7 +10,7 @@ import { spawnContainedProcess, terminateProcessTreeAndReport } from "../../util
 import { sessionProcessBoundaries } from "../../utils/session-process-boundary.js";
 import type { ProcessBrokerV3Outcome } from "../../utils/process-broker-protocol-v3.js";
 import { createLogger } from "../../utils/logger.js";
-import { attachProtectedCreateMonitor, startProtectedCreateMonitor } from "./protected-create-monitor.js";
+import { protectedCreateExitCode, startProtectedCreateMonitor } from "./protected-create-monitor.js";
 
 const logger = createLogger("warn", "[sandbox]");
 export interface SessionSandboxAvailability { startupFailed: boolean; }
@@ -198,9 +198,20 @@ export class SessionSandbox {
     let cleanupError: Error | undefined;
     let resolve!: () => void;
     const settled = new Promise<void>(r => { resolve = r; });
+    // The namespace leaves missing protected paths unmounted; the same
+    // created-path monitor as the per-command launcher watches them from
+    // before this command starts until it is over.
+    const protectedCreates = startProtectedCreateMonitor(this.protectedCreateTargets);
     const finish = (status: number | undefined, residual: boolean, failure?: Error): void => {
       if (this.active?.child !== child) return;
       this.active = undefined;
+      // The executor reports a command only once every process of it is
+      // reaped (or the namespace is gone): the final check cannot miss a
+      // protected path it created. Such a command fails, as in the launcher.
+      const protectedCreateViolation = protectedCreates.stop();
+      if (status !== undefined && (status & 127) === 0) {
+        status = protectedCreateExitCode((status >> 8) & 255, protectedCreateViolation) << 8;
+      }
       cleanupError = failure;
       outcome = status === undefined ? { kind: "unavailable", residual: "unknown" } : {
         kind: "reported", result: (status & 127) === 0
@@ -231,11 +242,6 @@ export class SessionSandbox {
           residualProcessesObserved: outcome?.kind === "reported" && outcome.residual === "observed" };
       },
     });
-    // The namespace leaves missing protected paths unmounted; the same
-    // created-path monitor as the per-command launcher watches them for this
-    // command. Its owner stops it once the executor reports every process of
-    // the command reaped, and fails a command that created one.
-    attachProtectedCreateMonitor(child, startProtectedCreateMonitor(this.protectedCreateTargets));
     // This publication is irreversible. Never replay a command after it.
     this.server.stdin.write(frame("R", payload));
     return child;

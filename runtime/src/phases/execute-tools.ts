@@ -271,7 +271,8 @@ function startedCallRecoveryCategory(
     (candidate) => candidate.name === call.name,
   );
   if (tool === undefined) return undefined;
-  if (tool.name !== "exec_command") return tool.recoveryCategory;
+  const declared = isRecoveryCategory(tool.recoveryCategory) ? tool.recoveryCategory : undefined;
+  if (tool.name !== "exec_command") return declared;
   let args: unknown;
   try {
     args = JSON.parse(call.arguments ?? "{}");
@@ -281,7 +282,12 @@ function startedCallRecoveryCategory(
   if (typeof args !== "object" || args === null || Array.isArray(args)) return undefined;
   return execCommandRunsConcurrently(args as Record<string, unknown>, cwd ?? process.cwd())
     ? "idempotent"
-    : tool.recoveryCategory;
+    : declared;
+}
+
+/** Only the journal's own categories; anything else sends no category. */
+function isRecoveryCategory(value: unknown): value is ToolRecoveryCategory {
+  return value === "idempotent" || value === "side-effecting" || value === "interactive";
 }
 
 function emitMalformedToolCallFailures(

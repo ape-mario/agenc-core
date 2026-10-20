@@ -413,6 +413,21 @@ export interface StreamingToolExecutorOptions {
 // StreamingToolExecutor
 // ─────────────────────────────────────────────────────────────────────
 
+/** Wait for `turn`, or reject with the abort reason; leaves no listener behind. */
+async function waitUnlessAborted(turn: Promise<void>, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw signal.reason ?? new Error("aborted");
+  let onAbort!: () => void;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason ?? new Error("aborted"));
+  });
+  signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    await Promise.race([turn, aborted]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}
+
 export class StreamingToolExecutor {
   private readonly registry: ToolRegistry;
   private readonly onProgress?: (event: ProgressEvent) => void;
@@ -919,6 +934,11 @@ export class StreamingToolExecutor {
   }
 
   private readonly concurrencyClassOverrides = new Map<string, ConcurrencyClass>();
+  /** Calls waiting for (or holding) a run alone; see runAlone. */
+  private readonly aloneWaiting = new Set<TrackedTool>();
+  private aloneTail: Promise<void> = Promise.resolve();
+  private aloneHolder: TrackedTool | undefined;
+  private settleListeners: Array<() => void> = [];
 
   private resolveModelToolName(toolName: string): string {
     if (modelToolAliasTarget(toolName) === undefined) return toolName;
@@ -1018,6 +1038,52 @@ export class StreamingToolExecutor {
       const r = this.wakeResolve;
       this.wakeResolve = null;
       r();
+    }
+    const listeners = this.settleListeners;
+    this.settleListeners = [];
+    for (const listener of listeners) listener();
+  }
+
+  private nextStateChange(signal: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(signal.reason ?? new Error("aborted"));
+        return;
+      }
+      const onAbort = (): void => reject(signal.reason ?? new Error("aborted"));
+      signal.addEventListener("abort", onAbort, { once: true });
+      this.settleListeners.push(() => {
+        signal.removeEventListener("abort", onAbort);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Run a call that was scheduled next to other calls of this response (it
+   * classified as read-only) on a path that may write: wait until no other
+   * call of the batch executes, keep new calls from starting meanwhile, and
+   * take turns with other such calls in arrival order. Calls waiting here do
+   * not count as executing for one another, so two of them cannot deadlock.
+   */
+  private async runAlone<T>(tool: TrackedTool, run: () => Promise<T>, signal: AbortSignal): Promise<T> {
+    this.aloneWaiting.add(tool);
+    const previous = this.aloneTail;
+    let releaseTurn!: () => void;
+    this.aloneTail = new Promise<void>((resolve) => { releaseTurn = resolve; });
+    try {
+      await waitUnlessAborted(previous, signal);
+      this.aloneHolder = tool;
+      while (this.tools.some((other) => other !== tool && other.status === "executing" &&
+          !this.aloneWaiting.has(other))) {
+        await this.nextStateChange(signal);
+      }
+      return await run();
+    } finally {
+      this.aloneWaiting.delete(tool);
+      if (this.aloneHolder === tool) this.aloneHolder = undefined;
+      releaseTurn();
+      void this.processQueue();
     }
   }
 
@@ -1349,6 +1415,8 @@ export class StreamingToolExecutor {
    */
   private async processQueue(opts: { readonly safeOnly?: boolean } = {}): Promise<void> {
     if (this.discarded) return;
+    // A call waiting to run alone, or running alone, holds back new calls.
+    if (this.aloneHolder !== undefined || this.aloneWaiting.size > 0) return;
     for (let i = 0; i < this.tools.length; i += 1) {
       const tool = this.tools[i]!;
       if (tool.status !== "queued") continue;
@@ -1508,6 +1576,12 @@ export class StreamingToolExecutor {
               abortController: childAbort,
               onProgress: (event) =>
                 this.emitProgress(tool.toolCall.id, event.chunk),
+              // A read-only shell call that runs beside others falls back to
+              // a run alone if it cannot take the read-only route.
+              ...(tool.isConcurrencySafe && executionCall.name === "exec_command"
+                ? { runAloneOffReadOnlyRoute: <T,>(run: () => Promise<T>) =>
+                    this.runAlone(tool, run, dispatchSignal) }
+                : {}),
               onHookAdditionalContext: (contexts) => {
                 tool.additionalContexts = [
                   ...(tool.additionalContexts ?? []),

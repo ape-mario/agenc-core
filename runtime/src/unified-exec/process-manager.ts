@@ -1865,10 +1865,11 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
               if (command.kind === "unavailable") notifyData("stderr",
                 "Command outcome unavailable after dispatch; cleanup is complete. Do not replay automatically.");
             }
-            // The command's whole process tree is gone: the created-path
-            // monitor's final check cannot miss anything it created. A
-            // protected path it created is removed and a clean exit fails,
-            // exactly as in the per-command launcher.
+            // A direct per-command launch's whole process tree is gone: the
+            // created-path monitor's final check cannot miss anything it
+            // created. A protected path it created is removed and a clean exit
+            // fails, exactly as in the per-command launcher. (The session
+            // sandbox runs its own check when the executor reports.)
             const protectedCreateViolation = stopAttachedProtectedCreateMonitor(child);
             if (state.exitCode !== null && state.exitCode !== undefined) {
               state = { ...state, exitCode: protectedCreateExitCode(state.exitCode, protectedCreateViolation) };
