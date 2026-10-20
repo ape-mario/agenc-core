@@ -5,18 +5,20 @@
  * few user messages need stays out of it. When the root human message of the
  * current turn asks how to undo, revert, roll back or restore work, the
  * producer sends the undo paths (/rewind checkpoints, their limits, Git
- * history) once, on the turn's first request. The retention ledger anchors the
- * reminder before that message and replays it in place on every later
- * request, so the cached prefix never moves and the text is not sent twice.
+ * history); when it mentions instruction files, it names AgenC's (AGENC.md).
+ * Each topic goes once, on the turn's first request. The retention ledger
+ * anchors the reminder before that message and replays it in place on every
+ * later request, so the cached prefix never moves and the text is not sent
+ * twice.
  *
- * Standard and lean heads keep the undo paths in their static head
- * (prompts/product-help.ts).
+ * Standard and lean heads keep both in their static head
+ * (prompts/product-help.ts, prompts/system-prompt.ts).
  *
  * @module
  */
 
 import type { LLMMessage } from "../../llm/types.js";
-import { AGENC_UNDO_PATHS } from "../product-help.js";
+import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_PATHS } from "../product-help.js";
 import type { AttachmentProducer } from "./orchestrator.js";
 
 /**
@@ -31,6 +33,20 @@ const UNDO_REQUEST =
 export function asksAboutUndo(text: string): boolean {
   return UNDO_REQUEST.test(text);
 }
+
+/** Instruction files, AgenC's or another assistant's, or the assistant's own instructions. */
+const INSTRUCTIONS_REQUEST =
+  /\b(?:AGENC\.md|AGENTS\.md|CLAUDE\.md|GEMINI\.md|instructions? files?|(?:your|project|custom|system) instructions|system prompt)\b/iu;
+
+/** Whether `text` is about instruction files. */
+export function asksAboutInstructionFiles(text: string): boolean {
+  return INSTRUCTIONS_REQUEST.test(text);
+}
+
+const TOPICS = [
+  { topic: "undo", matches: asksAboutUndo, text: AGENC_UNDO_PATHS },
+  { topic: "instructions", matches: asksAboutInstructionFiles, text: AGENC_INSTRUCTION_FILE },
+] as const;
 
 function contains(messages: readonly LLMMessage[], needle: string): boolean {
   return messages.some((message) => {
@@ -51,8 +67,9 @@ export const productHelpProducer: AttachmentProducer = async (opts) => {
       root.turnId !== provenance.turnId) {
     return [];
   }
-  if (!asksAboutUndo(root.text)) return [];
-  // Already in front of the model: retained from an earlier request or turn.
-  if (contains(opts.messages, AGENC_UNDO_PATHS)) return [];
-  return [{ kind: "product_help", topic: "undo" }];
+  // Each topic once: a copy already in front of the model (retained from an
+  // earlier request or turn) suppresses it.
+  return TOPICS
+    .filter(({ matches, text }) => matches(root.text) && !contains(opts.messages, text))
+    .map(({ topic }) => ({ kind: "product_help", topic }));
 };

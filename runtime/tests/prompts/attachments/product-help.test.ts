@@ -7,10 +7,10 @@ import { describe, expect, test } from "vitest";
 import type { LLMMessage } from "../../llm/types.js";
 import type { ToolPermissionContext } from "../../permissions/types.js";
 import { getAttachmentTrackingState } from "../../session/attachment-state.js";
-import { AGENC_UNDO_GUIDANCE, AGENC_UNDO_PATHS } from "../product-help.js";
+import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_GUIDANCE, AGENC_UNDO_PATHS } from "../product-help.js";
 import { attachmentsToMessages } from "./messages.js";
 import type { GetAttachmentsOptions } from "./orchestrator.js";
-import { asksAboutUndo, productHelpProducer } from "./product-help.js";
+import { asksAboutInstructionFiles, asksAboutUndo, productHelpProducer } from "./product-help.js";
 
 function makeOpts(text: string, partial?: Partial<GetAttachmentsOptions>): GetAttachmentsOptions {
   return {
@@ -74,7 +74,31 @@ describe("product-help attachment producer", () => {
 
   test.each(TASK_PROMPTS)("sends nothing for %j", async (text) => {
     expect(asksAboutUndo(text)).toBe(false);
+    expect(asksAboutInstructionFiles(text)).toBe(false);
     expect(await produce(text)).toEqual([]);
+  });
+
+  test.each([
+    "Add this rule to your instructions file: always run the linter.",
+    "What does AGENC.md say about tests?",
+    "Should this go in AGENTS.md or CLAUDE.md?",
+    "Update the project instructions with the new build command.",
+  ])("names AgenC's instruction file for %j", async (text) => {
+    expect(await produce(text)).toEqual([{ kind: "product_help", topic: "instructions" }]);
+    const [message] = attachmentsToMessages(await produce(text));
+    expect(message?.content).toBe(`<system-reminder>\n${AGENC_INSTRUCTION_FILE}\n</system-reminder>`);
+  });
+
+  test("a message about both sends both topics, each once", async () => {
+    const text = "How do I undo your edit to AGENC.md?";
+    expect(await produce(text)).toEqual([
+      { kind: "product_help", topic: "undo" },
+      { kind: "product_help", topic: "instructions" },
+    ]);
+    const retained: LLMMessage = { role: "user", content: `<system-reminder>\n${AGENC_INSTRUCTION_FILE}\n</system-reminder>`,
+      runtimeOnly: { mergeBoundary: "user_context" } };
+    expect(await produce(text, { messages: [retained, { role: "user", content: text }] }))
+      .toEqual([{ kind: "product_help", topic: "undo" }]);
   });
 
   test("renders the shared undo paths as one system reminder on the user channel", async () => {

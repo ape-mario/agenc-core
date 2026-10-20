@@ -58,7 +58,7 @@ describe("Light permission section", () => {
 
   test("workspace-write keeps where commands may write", () => {
     expect(section("acceptEdits", "workspace_write", false, true)).toBe([
-      "Permission mode: acceptEdits. Sandbox workspace-write: commands may read files and edit files in cwd and writable_roots; editing files elsewhere requires approval. Network access is restricted.",
+      "Permission mode: acceptEdits. Sandbox workspace-write: commands read anywhere and edit only in cwd and writable_roots unless approved. Network access is restricted.",
       "Approval policy on-failure: commands run in the sandbox; a command that fails there is escalated for user approval to run again without it.",
     ].join("\n"));
   });
@@ -93,7 +93,8 @@ describe("Light permission section", () => {
     const light = section("bypassPermissions", "danger_full_access", true, true)!;
     expect(light).toContain("do not provide sandbox_permissions; such commands are rejected");
     expect(light).toContain("Tool calls are pre-approved");
-    expect(light).toContain("the action rules above still apply to destructive, irreversible, shared-system or externally visible actions");
+    // The action rules the note points at list the actions that still need the user's request.
+    expect(light).toContain("the action rules above still apply.");
     expect(light).toContain("Ask one question (AskUserQuestion) only if the task is genuinely ambiguous");
     expect(light).toContain("when the work is done and verified, stop and report");
     expect(light).not.toContain("Executing actions with care");
@@ -225,7 +226,7 @@ describe("compact standard permission section", () => {
   test("bypass names the standard head's section for the action rules", () => {
     const text = compact("bypassPermissions", "danger_full_access")!;
     expect(text).toContain(LIGHT_APPROVAL_NEVER);
-    expect(text).toContain("the rules in 'Executing actions with care' still apply to destructive, irreversible, shared-system or externally visible actions");
+    expect(text).toContain("the rules in 'Executing actions with care' still apply.");
     expect(text).not.toContain("the action rules above");
     expect(compact("bypassPermissions", "workspace_write")).toContain(LIGHT_APPROVAL_BYPASS_ESCALATION);
   });

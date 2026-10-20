@@ -399,7 +399,7 @@ const LIGHT_SANDBOX_TEXT: Readonly<Record<SandboxPolicy, string>> = {
   danger_full_access:
     "Sandbox danger-full-access: no filesystem sandboxing; all commands are permitted.",
   workspace_write:
-    "Sandbox workspace-write: commands may read files and edit files in cwd and writable_roots; editing files elsewhere requires approval.",
+    "Sandbox workspace-write: commands read anywhere and edit only in cwd and writable_roots unless approved.",
   read_only: "Sandbox read-only: commands may only read files.",
   external_sandbox:
     "Sandbox external-sandbox: an external authority controls it, and AgenC does not widen or replace it.",
@@ -448,14 +448,16 @@ function bypassGrantsEscalation(
 /**
  * Light's head has no section titled 'Executing actions with care', so this
  * note refers to its action rules directly. Same terms as
- * BYPASS_AUTONOMY_NOTE.
+ * BYPASS_AUTONOMY_NOTE; the action rules it points at already list the
+ * destructive, irreversible, shared-system and externally visible actions that
+ * still need the user's request.
  */
 export const LIGHT_BYPASS_AUTONOMY_NOTE =
-  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the action rules above still apply to destructive, irreversible, shared-system or externally visible actions. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
+  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the action rules above still apply. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
 
 /** LIGHT_BYPASS_AUTONOMY_NOTE for a standard head, which names its action rules' section. */
 export const COMPACT_BYPASS_AUTONOMY_NOTE =
-  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the rules in 'Executing actions with care' still apply to destructive, irreversible, shared-system or externally visible actions. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
+  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the rules in 'Executing actions with care' still apply. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
 
 const LIGHT_APPROVAL_TEXT: Partial<Record<PermissionMode, string>> = {
   plan: LIGHT_APPROVAL_UNLESS_TRUSTED,

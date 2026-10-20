@@ -151,7 +151,7 @@ export interface CriticalSystemReminderAttachment {
  */
 export interface ProductHelpAttachment {
   readonly kind: "product_help";
-  readonly topic: "undo";
+  readonly topic: "undo" | "instructions";
 }
 
 /**

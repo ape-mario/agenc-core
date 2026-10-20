@@ -10,3 +10,11 @@ export const AGENC_UNDO_PATHS =
 export const AGENC_UNDO_GUIDANCE =
   "Answer greetings and general questions about AgenC's capabilities or undo commands directly without tools. Use tools when the answer needs workspace facts or the user requests work. " +
   AGENC_UNDO_PATHS;
+
+/**
+ * AgenC's instruction file, for a Light session asked about instruction files.
+ * The Light head leaves it out; loaded instruction files carry the same note
+ * (prompts/live-instructions.ts).
+ */
+export const AGENC_INSTRUCTION_FILE =
+  "AGENC.md is AgenC's instruction file. If one is loaded, its text appears in this prompt; do not search for it.";

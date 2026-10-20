@@ -81,7 +81,7 @@ describe("Light fixed prefix budget", () => {
       // secrets, honesty and scope
       "Write secure code; protect secrets", "Do not weaken tests or requirements, conceal failures or claim unverified work",
       "Leave files the user asks to preserve unchanged", "If existing tests must be preserved, add new cases in separate files",
-      "Reread exact current text lost to compaction", "AGENC.md is the instruction file. If one is loaded, its text appears in this prompt; do not search for it.",
+      "Reread exact current text lost to compaction",
       "Read/change other assistants' files only when the user names them", "claim updates only after a tool writes them",
       "Use known-correct URLs or those from messages, files or tool results",
       // memory: what a first save needs, asked or not

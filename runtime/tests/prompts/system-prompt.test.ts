@@ -65,7 +65,8 @@ import {
 } from "./system-prompt.js";
 import { LEAN_SYSTEM_PROMPT_ENV } from "./lean-system-prompt.js";
 import { LIGHT_FINISH, LIGHT_LIMITED_FINISH } from "./light-budget-prompt.js";
-import { AGENC_UNDO_PATHS } from "./product-help.js";
+import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_PATHS } from "./product-help.js";
+import { LIGHT_LOADED_INSTRUCTIONS_NOTE } from "./live-instructions.js";
 import { LIGHT_TASK_LIMITS_ENV } from "../tools/light-profile.js";
 import { getPermissionsSection } from "./permissions-prompt.js";
 
@@ -1505,7 +1506,6 @@ test.each([undefined, { name: "project-style", prompt: "OUTPUT_STYLE_SENTINEL: e
     expect(light.text).not.toContain("# Completing work without a human");
     expect(light.text).not.toContain("# Subagents");
     expect(light.text).not.toContain("# Session guidance");
-    expect(light.text).toContain("system.searchTools");
     expect(light.text).toContain(UNTRUSTED_TOOL_RESULT_BOUNDARY);
     expect(light.text).toContain("fixed time budget");
     expect(light.text).toContain("restore your best verified state");
@@ -1610,14 +1610,17 @@ test.each(["deepseek", "openai", "grok", "zai"])(
   },
 );
 
-test("Light says loaded AGENC.md instructions are already included, so the model does not search for them", async () => {
+test("Light names AGENC.md only where it applies, so the model does not search for it", async () => {
   const snapshot = await assembleSystemPromptSnapshot({
     profile: "light", ctx: fakeCtx(),
     session: { services: { runtimeOptions: { lightMode: true, nonInteractive: true } } } as unknown as Session,
   });
-  expect(snapshot.staticPrefix).toContain(
-    "AGENC.md is the instruction file. If one is loaded, its text appears in this prompt; do not search for it.",
-  );
+  // Told only that AGENC.md is the instruction file, models searched for it. Light
+  // names it with loaded instruction files (LIGHT_LOADED_INSTRUCTIONS_NOTE) and with
+  // a message about instruction files (product-help attachment), not in the head.
+  expect(snapshot.staticPrefix).not.toContain("AGENC.md is the instruction file");
+  expect(LIGHT_LOADED_INSTRUCTIONS_NOTE).toContain("AgenC's instruction files (AGENC.md) and are already in this prompt; do not search for them");
+  expect(AGENC_INSTRUCTION_FILE).toContain("do not search for it");
   expect(snapshot.staticPrefix).toContain("Read/change other assistants' files only when the user names them");
 });
 
