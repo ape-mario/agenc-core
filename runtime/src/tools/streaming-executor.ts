@@ -913,6 +913,7 @@ export class StreamingToolExecutor {
    * because the error path is closing the executor.
    */
   cancelQueued(reason: SyntheticErrorReason = "connection_lost"): void {
+    this.queuedCancelReason ??= reason;
     for (const tool of this.tools) {
       if (tool.status === "queued") {
         tool.error = new Error(reason);
@@ -939,6 +940,8 @@ export class StreamingToolExecutor {
   private aloneTail: Promise<void> = Promise.resolve();
   private aloneHolder: TrackedTool | undefined;
   private settleListeners: Array<() => void> = [];
+  /** Set by cancelQueued; a run-alone fallback that has not started refuses to start after it. */
+  private queuedCancelReason: SyntheticErrorReason | undefined;
 
   private resolveModelToolName(toolName: string): string {
     if (modelToolAliasTarget(toolName) === undefined) return toolName;
@@ -1065,6 +1068,9 @@ export class StreamingToolExecutor {
    * call of the batch executes, keep new calls from starting meanwhile, and
    * take turns with other such calls in arrival order. Calls waiting here do
    * not count as executing for one another, so two of them cannot deadlock.
+   * Like any call that is not concurrency-safe, the path starts only once the
+   * model response is complete (the executor is closed), and never after a
+   * dropped stream cancelled the queued calls.
    */
   private async runAlone<T>(tool: TrackedTool, run: () => Promise<T>, signal: AbortSignal): Promise<T> {
     this.aloneWaiting.add(tool);
@@ -1074,8 +1080,12 @@ export class StreamingToolExecutor {
     try {
       await waitUnlessAborted(previous, signal);
       this.aloneHolder = tool;
-      while (this.tools.some((other) => other !== tool && other.status === "executing" &&
-          !this.aloneWaiting.has(other))) {
+      for (;;) {
+        if (this.queuedCancelReason !== undefined) {
+          throw Object.assign(new Error(this.queuedCancelReason), { reason: this.queuedCancelReason });
+        }
+        if (this.closed && !this.tools.some((other) => other !== tool && other.status === "executing" &&
+            !this.aloneWaiting.has(other))) break;
         await this.nextStateChange(signal);
       }
       return await run();

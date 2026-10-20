@@ -248,6 +248,34 @@ describe("a read-only call that cannot take the read-only route", () => {
     expect(Math.max(...Object.values(concurrentDuring).flat())).toBe(3);
   });
 
+  test("its path waits for the complete response before it starts", async () => {
+    const { exec, timeline } = routedHarness(new Set(["b"]), { a: 5, b: 1 });
+    exec.addTool(block("a"), execCall("a", "ls -la"));
+    exec.addTool(block("b"), execCall("b", "cat README.md | wc -l"));
+    // Still streaming: read-only calls may start, a possibly writing path may not.
+    exec.dispatchPending({ safeOnly: true });
+    await delay(40);
+    expect(timeline).toEqual(["start:a", "end:a"]);
+    exec.close();
+    expect(await drain(exec)).toEqual(["a", "b"]);
+    expect(timeline).toEqual(["start:a", "end:a", "start:b", "end:b"]);
+  });
+
+  test("its path never starts after a dropped stream cancelled the queued calls", async () => {
+    const { exec, timeline } = routedHarness(new Set(["b"]), { a: 5, b: 1 });
+    exec.addTool(block("a"), execCall("a", "ls -la"));
+    exec.addTool(block("b"), execCall("b", "cat README.md | wc -l"));
+    exec.dispatchPending({ safeOnly: true });
+    await delay(40);
+    exec.cancelQueued("connection_lost");
+    exec.close();
+    const results = await collect(exec);
+    expect(results.map((result) => result.toolCall.id)).toEqual(["a", "b"]);
+    expect(results[0]!.result.isError).not.toBe(true);
+    expect(results[1]!.result.isError).toBe(true);
+    expect(timeline).toEqual(["start:a", "end:a"]);
+  });
+
   test("an interrupt while it waits to run alone cancels it before its path runs", async () => {
     const interrupt = new AbortController();
     const { exec, timeline } = routedHarness(new Set(["b"]), { a: 5_000, b: 1, c: 1 }, interrupt.signal);
