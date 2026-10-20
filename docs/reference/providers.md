@@ -726,6 +726,27 @@ skips the incremental delta. Chaining an unstored id used to reject
 every later request of a subscription conversation once tools or
 history made it an extension.
 
+### OpenAI prompt cache layout
+
+A Responses request on the platform API puts the static head of the system
+prompt in `instructions` and the session tail (workspace, memory directories,
+permission section) in the first input item, ahead of the conversation. Each
+request of a session therefore repeats the previous request byte for byte and
+adds only new history, so GPT-5.6 and later, which write the cache up to the
+last user message or tool output, read all of it back. When the tail changes
+(another permission mode, reloaded project instructions), that request is
+written to the cache again. The ChatGPT subscription backend rejects system
+input items and keeps the tail in `instructions`.
+
+GPT-5.6 and later use `prompt_cache_key` only to separate cache scopes: a
+request reads nothing that a request with another key wrote. On the platform
+API those models get one key per AgenC home (`agenc-` and 32 hex characters
+of a hash of the home path; the path itself is not sent), so a new session
+reads the instructions, tools and tail that the previous session of the same
+user wrote within the cache lifetime (at least 30 minutes). Older OpenAI
+models, the ChatGPT subscription backend and every other provider keep the
+conversation id as the key.
+
 Under a hard aggregate token or USD cap, admission still requires a
 provider-enforced `max_output_tokens` and authoritative usage. Without
 that cap, providers that reject an output ceiling (ChatGPT

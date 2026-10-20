@@ -42,6 +42,7 @@ import {
 import {
   openAiAcceptsSamplingTemperature,
   openAiModelDefaultsToNoReasoning,
+  openAiModelScopesPromptCacheByKey,
 } from "../registry/openai-reasoning-models.js";
 import { resolveRegisteredModelCatalogEntry } from "../registry/model-catalog.js";
 
@@ -409,6 +410,28 @@ function resolveResponsesFinishReason(
   return toolCalls.length > 0 ? "tool_calls" : normalizeFinishReason(status);
 }
 
+/**
+ * The `prompt_cache_key` a request carries. GPT-5.6 and later on the platform
+ * API get the user's cache scope, so a session reads what the previous
+ * session of the same user wrote; every other route (older models, the
+ * ChatGPT subscription backend, other Responses destinations) keeps the
+ * conversation key.
+ */
+function responsesPromptCacheKey(
+  input: OpenAIResponsesRequestOptions,
+): string | undefined {
+  const scope = input.options?.promptCacheScopeKey?.trim();
+  if (
+    scope !== undefined && scope.length > 0 &&
+    input.chatgptBackend !== true &&
+    openAiModelScopesPromptCacheByKey(input.model)
+  ) {
+    return scope;
+  }
+  const key = input.options?.promptCacheKey;
+  return key ? key : undefined;
+}
+
 export function buildOpenAIResponsesRequest(
   input: OpenAIResponsesRequestOptions,
 ): Record<string, unknown> {
@@ -418,10 +441,11 @@ export function buildOpenAIResponsesRequest(
     catalogEntry?.model.toLowerCase() === input.model.trim().toLowerCase() &&
     catalogEntry.supportsVerbosity;
   const fallbackVerbosity = !nativeVerbosity ? input.options?.modelVerbosity : undefined;
-  // Prefix-cache split: only the cross-turn-stable head of the system
-  // prompt goes into `instructions` (part of the cached prefix); the
-  // volatile tail is appended as the LAST input item below so the
-  // request prefix stays byte-identical across turns.
+  // Prefix-cache split: the static head of the system prompt goes into
+  // `instructions`; the session tail (workspace, memory directories,
+  // permission section) becomes the FIRST input item below. Both are the same
+  // on every request of a session, so each request extends the previous one
+  // byte for byte and the provider reads all of it from cache.
   const {
     staticPrefix: staticSystemPrompt,
     sessionSuffix: sessionSystemPrompt,
@@ -523,7 +547,17 @@ export function buildOpenAIResponsesRequest(
   }
 
   if (dynamicSystemPrompt !== undefined && input.chatgptBackend !== true) {
-    responseInput.push({
+    // The tail leads the input instead of trailing it. As the last item it
+    // moved behind the new history on every request, so the provider never
+    // cached it (GPT-5.6 and later write the cache up to the last user
+    // message or tool output, never through a trailing system item): 283
+    // uncached tokens on every Light call of the oa Luna race. First, it is
+    // part of the cached prefix from the first request on, and the end of a
+    // leading system item is a cache boundary, where the next session of the
+    // same workspace and permission mode starts reading. A changed tail
+    // (another permission mode, reloaded project instructions) changes this
+    // first item, so that one request is written to the cache again.
+    responseInput.unshift({
       type: "message",
       role: "system",
       content: [{ type: "input_text", text: dynamicSystemPrompt }],
@@ -564,8 +598,9 @@ export function buildOpenAIResponsesRequest(
   if (input.options?.parallelToolCalls !== undefined) {
     body.parallel_tool_calls = input.options.parallelToolCalls;
   }
-  if (input.options?.promptCacheKey) {
-    body.prompt_cache_key = normalizePromptCacheKey(input.options.promptCacheKey);
+  const promptCacheKey = responsesPromptCacheKey(input);
+  if (promptCacheKey !== undefined) {
+    body.prompt_cache_key = normalizePromptCacheKey(promptCacheKey);
   }
   if (input.options?.serviceTier !== undefined) {
     body.service_tier = input.options.serviceTier;

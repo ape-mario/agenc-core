@@ -85,6 +85,7 @@ import {
   type ProviderTraceSink,
 } from "../llm/provider-trace-sink.js";
 import { getAgencHomeDir } from "../session/session-store.js";
+import { promptCacheScopeKeyForHome } from "../llm/prompt-cache-key.js";
 import { resolveMainLoopReasoningEffort, supportsThinkingOffRecovery } from "../session/session-reasoning-effort.js";
 import type { Session } from "../session/session.js";
 import { disposeProviderStartupPrewarmHandle } from "../session/startup-prewarm.js";
@@ -238,6 +239,30 @@ function resolveSessionPromptCacheKey(session: Session): string | undefined {
 }
 
 /**
+ * The local user's prompt-cache scope for OpenAI sessions (see
+ * `promptCacheScopeKeyForHome`). The OpenAI Responses wire sends it in place
+ * of the conversation key to GPT-5.6 and later on the platform API, where a
+ * key only separates cache scopes: with one key per conversation the first
+ * request of every session re-wrote the instructions, tools and session tail
+ * that the previous session had just written (0 of 22 first calls read any
+ * cache in the oa Luna race, against 1,821 cached tokens on the same prefix
+ * through gateways that send no key).
+ */
+function resolveSessionPromptCacheScopeKey(session: Session): string | undefined {
+  if (session.services.provider.name !== "openai") return undefined;
+  const configuredHome = (
+    session.services as {
+      configStore?: { homeContext?: { path?: string } };
+    }
+  ).configStore?.homeContext?.path;
+  try {
+    return promptCacheScopeKeyForHome(getAgencHomeDir(configuredHome));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * One trace sink per session so the request sequence numbers the files of a
  * whole conversation. `null` caches "tracing is off" for the session; the env
  * gate is read once per session, not once per call.
@@ -282,6 +307,7 @@ export function buildProviderOptions(
   // Text cannot exit plan mode or grant approval to mutate the workspace.
   const systemPrompt = request.baseInstructions.trim();
   const promptCacheKey = resolveSessionPromptCacheKey(session);
+  const promptCacheScopeKey = resolveSessionPromptCacheScopeKey(session);
   const traceSink = resolveProviderTraceSink(session);
   return {
     signal,
@@ -292,6 +318,7 @@ export function buildProviderOptions(
     parallelToolCalls: request.parallelToolCalls,
     ...(systemPrompt.length > 0 ? { systemPrompt } : {}),
     ...(promptCacheKey !== undefined ? { promptCacheKey } : {}),
+    ...(promptCacheScopeKey !== undefined ? { promptCacheScopeKey } : {}),
     ...(traceSink !== undefined
       ? { trace: { onProviderTraceEvent: traceSink.onProviderTraceEvent } }
       : {}),

@@ -71,7 +71,7 @@ describe("buildOpenAIResponsesRequest", () => {
       const request = build(model);
       expect(request).not.toHaveProperty("text.verbosity");
       expect(request.instructions).toBe("STATIC_HEAD");
-      expect((request.input as Array<Record<string, unknown>>).at(-1)).toMatchObject({
+      expect((request.input as Array<Record<string, unknown>>)[0]).toMatchObject({
         role: "system", content: [{ text: expect.stringContaining("# Response Detail") }],
       });
       expect(request.max_output_tokens).toBe(4096);
@@ -91,7 +91,8 @@ describe("buildOpenAIResponsesRequest", () => {
       options: { systemPrompt: "STATIC_HEAD\n\n<!-- dynamic-boundary -->\n\nDYNAMIC_TAIL",
         reasoningEffort: "high", maxOutputTokens: 4096 },
     }));
-    expect(build(false)).toBe('{"model":"gpt-5","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]},{"type":"message","role":"system","content":[{"type":"input_text","text":"DYNAMIC_TAIL"}]}],"stream":false,"store":false,"instructions":"STATIC_HEAD","max_output_tokens":4096,"reasoning":{"effort":"high"}}');
+    // The session tail leads the direct input (append-only requests).
+    expect(build(false)).toBe('{"model":"gpt-5","input":[{"type":"message","role":"system","content":[{"type":"input_text","text":"DYNAMIC_TAIL"}]},{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]}],"stream":false,"store":false,"instructions":"STATIC_HEAD","max_output_tokens":4096,"reasoning":{"effort":"high"}}');
     expect(build(true)).toBe('{"model":"gpt-5","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]}],"stream":false,"store":false,"instructions":"STATIC_HEAD\\n\\nDYNAMIC_TAIL","include":["reasoning.encrypted_content"],"reasoning":{"effort":"high"}}');
   });
   test.each(["conv-123", "k".repeat(64), `review-${"a".repeat(64)}`])(
