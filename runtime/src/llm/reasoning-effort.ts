@@ -1,6 +1,8 @@
 /** Provider-scoped effort contract shared by session validation and wire gating.
- * Registered models retain their catalog levels and defaults. Hosted NIM
- * models have separate contracts, even when the model id names another vendor.
+ * Registered models retain their catalog levels and defaults, except that a
+ * DeepSeek model through a gateway defaults to DeepSeek's own high
+ * (model-family.ts). Hosted NIM models have separate contracts, even when the
+ * model id names another vendor.
  */
 import { resolveNvidiaCurrentModel } from "./registry/nvidia-current-models.js";
 import { supportsXaiReasoningEffortParam } from "./structured-output.js";
@@ -9,6 +11,7 @@ import { isAgenCDeepSeekModel, AGENC_DEEPSEEK_REASONING_LEVELS } from "./registr
 import { isNativeDeepSeekModel, DEEPSEEK_REASONING_LEVELS } from "./registry/deepseek-models.js";
 import { anthropicEffortLevels } from "../utils/model/anthropicThinkingControl.js";
 import { normalizeProviderIdentity } from "../provider-identity.js";
+import { gatewayFamilyDefaultEffort } from "./model-family.js";
 import {
   bedrockConverseEffortLevels,
   resolveRegisteredModelCatalogEntry,
@@ -213,7 +216,10 @@ export function resolveReasoningEffort(input: {
     (slug === "anthropic" && model !== undefined
       ? anthropicEffortLevels(model)
       : [...(reasoningEffortAllowedValues ?? [])]);
-  const defaultLevel = entry?.defaultReasoningLevel;
+  // A DeepSeek model through a gateway defaults to DeepSeek's own high
+  // (model-family.ts), so the status line shows what the session sends.
+  const defaultLevel = gatewayFamilyDefaultEffort(slug, model, levels, { managedGateway: input.managedGateway }) ??
+    entry?.defaultReasoningLevel;
   return {
     registered: entry !== undefined,
     levels,

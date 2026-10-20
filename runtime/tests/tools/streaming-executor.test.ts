@@ -966,6 +966,42 @@ describe("StreamingToolExecutor (I-65 + I-41)", () => {
     expect(seenIds).toEqual(["a", "b", "c"]);
     expect(peak).toBe(1);
   });
+
+  test("records concurrent results in submission order when a later call finishes first", async () => {
+    let active = 0;
+    let peak = 0;
+    const finished: string[] = [];
+    const readTool = testTool({
+      name: "FileRead",
+      isConcurrencySafe: () => true,
+    });
+    const exec = new StreamingToolExecutor({
+      ...mockGuardedDispatch(async (call) => {
+        active += 1;
+        peak = Math.max(peak, active);
+        // The first call is the slowest: it finishes last.
+        await delay(call.id === "a" ? 40 : call.id === "b" ? 20 : 1);
+        active -= 1;
+        finished.push(call.id);
+        return { content: `ok-${call.id}` };
+      }, [readTool]),
+    });
+
+    for (const id of ["a", "b", "c"]) {
+      exec.addTool(makeBlock(id, "FileRead"), makeCall(id, "FileRead"));
+    }
+    exec.dispatchPending();
+    exec.close();
+
+    const seenIds: string[] = [];
+    for await (const result of exec.getRemainingResults()) {
+      seenIds.push(result.toolCall.id);
+    }
+
+    expect(peak).toBe(3);
+    expect(finished).toEqual(["c", "b", "a"]);
+    expect(seenIds).toEqual(["a", "b", "c"]);
+  });
 });
 
 describe("StreamingToolExecutor AgenC behavior (T6)", () => {

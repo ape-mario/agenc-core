@@ -37,6 +37,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isRetryableStreamError } from "../session/run-turn.js";
 import { OpenAIProvider } from "../llm/providers/openai/adapter.js";
+import { promptCacheScopeKeyForHome } from "../llm/prompt-cache-key.js";
+import { getAgencHomeDir } from "../session/session-store.js";
 
 const streamedDispatchCalls: string[] = [];
 
@@ -599,6 +601,85 @@ describe("streamModel — live assistant text sanitization", () => {
     }
     expect(seen.map((options) => options?.promptCacheKey))
       .toEqual(["child-luna-session", "child-luna-session"]);
+  });
+
+  test("Luna sessions of one AgenC home share one cache scope, another home gets its own, and the tail leads", async () => {
+    // oa Luna race: with a key per conversation no first request read the
+    // prefix the previous session had just written, and the tail trailing
+    // the input was never cached.
+    const home = mkdtempSync(join(tmpdir(), "agenc-cache-scope-"));
+    const otherHome = mkdtempSync(join(tmpdir(), "agenc-cache-scope-"));
+    const bodies: Array<Record<string, unknown>> = [];
+    const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return openAiSseResponse([
+        `event: response.completed\ndata: ${JSON.stringify({ type: "response.completed", response: {
+          id: `resp_${bodies.length}`, status: "completed", model: "gpt-6-luna",
+          output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "ok" }] }],
+          usage: { input_tokens: 5, output_tokens: 1, total_tokens: 6 },
+        } })}\n\n`,
+      ]);
+    }) as typeof fetch;
+    try {
+      for (const [conversationId, sessionHome] of [
+        ["conv-first", home], ["conv-second", home], ["conv-other-home", otherHome],
+      ] as const) {
+        const provider = new OpenAIProvider({ apiKey: "sk-test", model: "gpt-6-luna", fetchImpl });
+        const { session } = mkSession(provider);
+        Object.assign(session, { conversationId });
+        (session.services as { configStore?: unknown }).configStore = {
+          current: () => ({}),
+          homeContext: { path: sessionHome },
+        };
+        const ctx = mkCtx("chat");
+        await streamModel(mkState(ctx), ctx, session, {
+          ...mkRequest([{ role: "user", content: "hello" }]),
+          baseInstructions: "STATIC_HEAD\n\n<!-- dynamic-boundary -->\n\nWorkspace: /workspace",
+        });
+      }
+      expect(bodies).toHaveLength(3);
+      const scope = promptCacheScopeKeyForHome(getAgencHomeDir(home));
+      const otherScope = promptCacheScopeKeyForHome(getAgencHomeDir(otherHome));
+      expect(scope).toMatch(/^agenc-[0-9a-f]{32}$/u);
+      expect(otherScope).not.toBe(scope);
+      expect(bodies.map((body) => body.prompt_cache_key)).toEqual([scope, scope, otherScope]);
+      for (const body of bodies) {
+        expect(body.instructions).toBe("STATIC_HEAD");
+        const input = body.input as Array<Record<string, unknown>>;
+        expect(input[0]).toEqual({
+          type: "message",
+          role: "system",
+          content: [{ type: "input_text", text: "Workspace: /workspace" }],
+        });
+        expect(input.at(-1)).toMatchObject({ type: "message", role: "user" });
+      }
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+      rmSync(otherHome, { recursive: true, force: true });
+    }
+  });
+
+  test("only OpenAI sessions carry the prompt cache scope", () => {
+    const home = mkdtempSync(join(tmpdir(), "agenc-cache-scope-"));
+    try {
+      const scopes = ["openai", "grok", "deepseek"].map((name) => {
+        const { session } = mkSession({ ...mkProvider(async () => ({
+          content: "ok", toolCalls: [], usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+          model: "test-model", finishReason: "stop",
+        })), name });
+        (session.services as { configStore?: unknown }).configStore = {
+          current: () => ({}),
+          homeContext: { path: home },
+        };
+        const options = buildProviderOptions(mkRequest([{ role: "user", content: "hello" }]), mkCtx("chat"),
+          new AbortController().signal, session);
+        expect(options.promptCacheKey).toBe("conv-stream");
+        return options.promptCacheScopeKey;
+      });
+      expect(scopes).toEqual([promptCacheScopeKeyForHome(getAgencHomeDir(home)), undefined, undefined]);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 
   test("the default twenty-minute stream watchdog aborts a stalled provider with a retryable stream_idle", async () => {

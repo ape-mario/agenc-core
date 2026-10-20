@@ -413,6 +413,21 @@ export interface StreamingToolExecutorOptions {
 // StreamingToolExecutor
 // ─────────────────────────────────────────────────────────────────────
 
+/** Wait for `turn`, or reject with the abort reason; leaves no listener behind. */
+async function waitUnlessAborted(turn: Promise<void>, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw signal.reason ?? new Error("aborted");
+  let onAbort!: () => void;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason ?? new Error("aborted"));
+  });
+  signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    await Promise.race([turn, aborted]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}
+
 export class StreamingToolExecutor {
   private readonly registry: ToolRegistry;
   private readonly onProgress?: (event: ProgressEvent) => void;
@@ -707,32 +722,35 @@ export class StreamingToolExecutor {
    * AgenC behavior (`StreamingToolExecutor.ts:412-440`):
    *   - Early-return if `discarded`.
    *   - Drain pending progress via `onProgress` before yielding results.
-   *   - Head-of-line stop: if the current tool is still `executing`
-   *     and not concurrency-safe, break to preserve submission order.
+   *   - Head-of-line stop: the first call without a result blocks every
+   *     later result, so results reach the transcript (and the next
+   *     request) in the order the model submitted the calls even when
+   *     concurrency-safe calls finish out of order.
    */
   *getCompletedResults(): Generator<StreamingToolResult, void> {
     if (this.discarded) return;
+    // Progress is per call; flush it for every call, including the ones a
+    // head-of-line stop keeps waiting (AgenC :418-422).
+    this.flushPendingProgress();
     for (const tool of this.tools) {
-      // Always flush pending progress first (AgenC :418-422).
+      if (tool.status === "yielded") continue;
+      if (tool.status !== "completed" || !tool.result) break;
+      tool.status = "yielded";
+      yield {
+        toolCall: tool.toolCall,
+        result: tool.result,
+        additionalContexts: tool.additionalContexts ?? [],
+        status: tool.error ? "synthetic_error" : "completed",
+        durationMs: tool.durationMs ?? 0,
+      };
+    }
+  }
+
+  private flushPendingProgress(): void {
+    for (const tool of this.tools) {
       while (tool.pendingProgress.length > 0) {
         const ev = tool.pendingProgress.shift();
         if (ev) this.onProgress?.(ev);
-      }
-      if (tool.status === "yielded") continue;
-      if (tool.status === "completed" && tool.result) {
-        tool.status = "yielded";
-        yield {
-          toolCall: tool.toolCall,
-          result: tool.result,
-          additionalContexts: tool.additionalContexts ?? [],
-          status: tool.error ? "synthetic_error" : "completed",
-          durationMs: tool.durationMs ?? 0,
-        };
-      } else if (tool.status === "executing" && !tool.isConcurrencySafe) {
-        // Head-of-line break (AgenC :436-438). A still-running
-        // exclusive tool blocks every downstream yield to preserve
-        // submission order.
-        break;
       }
     }
   }
@@ -753,22 +771,22 @@ export class StreamingToolExecutor {
         this.onProgress?.(ev);
         yield { kind: "progress", toolCall: tool.toolCall, progress: ev };
       }
+    }
+    for (const tool of this.tools) {
       if (tool.status === "yielded") continue;
-      if (tool.status === "completed" && tool.result) {
-        tool.status = "yielded";
-        yield {
-          kind: "result",
-          result: {
-            toolCall: tool.toolCall,
-            result: tool.result,
-            additionalContexts: tool.additionalContexts ?? [],
-            status: tool.error ? "synthetic_error" : "completed",
-            durationMs: tool.durationMs ?? 0,
-          },
-        };
-      } else if (tool.status === "executing" && !tool.isConcurrencySafe) {
-        break;
-      }
+      // Same submission-order stop as getCompletedResults.
+      if (tool.status !== "completed" || !tool.result) break;
+      tool.status = "yielded";
+      yield {
+        kind: "result",
+        result: {
+          toolCall: tool.toolCall,
+          result: tool.result,
+          additionalContexts: tool.additionalContexts ?? [],
+          status: tool.error ? "synthetic_error" : "completed",
+          durationMs: tool.durationMs ?? 0,
+        },
+      };
     }
   }
 
@@ -895,6 +913,7 @@ export class StreamingToolExecutor {
    * because the error path is closing the executor.
    */
   cancelQueued(reason: SyntheticErrorReason = "connection_lost"): void {
+    this.queuedCancelReason ??= reason;
     for (const tool of this.tools) {
       if (tool.status === "queued") {
         tool.error = new Error(reason);
@@ -916,6 +935,13 @@ export class StreamingToolExecutor {
   }
 
   private readonly concurrencyClassOverrides = new Map<string, ConcurrencyClass>();
+  /** Calls waiting for (or holding) a run alone; see runAlone. */
+  private readonly aloneWaiting = new Set<TrackedTool>();
+  private aloneTail: Promise<void> = Promise.resolve();
+  private aloneHolder: TrackedTool | undefined;
+  private settleListeners: Array<() => void> = [];
+  /** Set by cancelQueued; a run-alone fallback that has not started refuses to start after it. */
+  private queuedCancelReason: SyntheticErrorReason | undefined;
 
   private resolveModelToolName(toolName: string): string {
     if (modelToolAliasTarget(toolName) === undefined) return toolName;
@@ -1016,6 +1042,61 @@ export class StreamingToolExecutor {
       this.wakeResolve = null;
       r();
     }
+    const listeners = this.settleListeners;
+    this.settleListeners = [];
+    for (const listener of listeners) listener();
+  }
+
+  private nextStateChange(signal: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(signal.reason ?? new Error("aborted"));
+        return;
+      }
+      const onAbort = (): void => reject(signal.reason ?? new Error("aborted"));
+      signal.addEventListener("abort", onAbort, { once: true });
+      this.settleListeners.push(() => {
+        signal.removeEventListener("abort", onAbort);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Run a call that was scheduled next to other calls of this response (it
+   * classified as read-only) on a path that may write: wait until no other
+   * call of the batch executes, keep new calls from starting meanwhile, and
+   * take turns with other such calls in arrival order. Calls waiting here do
+   * not count as executing for one another, so two of them cannot deadlock.
+   * Like any call that is not concurrency-safe, the path starts only once the
+   * model response is complete (the executor is closed), and never after a
+   * dropped stream cancelled the queued calls.
+   */
+  private async runAlone<T>(tool: TrackedTool, run: () => Promise<T>, signal: AbortSignal): Promise<T> {
+    this.aloneWaiting.add(tool);
+    const previous = this.aloneTail;
+    let releaseTurn!: () => void;
+    this.aloneTail = new Promise<void>((resolve) => { releaseTurn = resolve; });
+    try {
+      await waitUnlessAborted(previous, signal);
+      this.aloneHolder = tool;
+      for (;;) {
+        if (this.queuedCancelReason !== undefined) {
+          throw Object.assign(new Error(this.queuedCancelReason), { reason: this.queuedCancelReason });
+        }
+        if (this.closed && !this.tools.some((other) => other !== tool && other.status === "executing" &&
+            !this.aloneWaiting.has(other))) break;
+        await this.nextStateChange(signal);
+      }
+      return await run();
+    } finally {
+      this.aloneWaiting.delete(tool);
+      if (this.aloneHolder === tool) this.aloneHolder = undefined;
+      // A cancelled waiter must still preserve its predecessor's barrier;
+      // otherwise the next waiter can overlap the active exclusive call.
+      void previous.then(releaseTurn);
+      void this.processQueue();
+    }
   }
 
   private hasUnfinishedTools(): boolean {
@@ -1028,17 +1109,16 @@ export class StreamingToolExecutor {
 
   /**
    * True when a drain pass (`getCompletedResults` / `getCompletedUpdates`)
-   * would flush or yield something now: pending progress on a tool the pass
-   * reaches, or a completed result ahead of the first executing exclusive
-   * tool. It walks the tools with the pass's own head-of-line rule, so a
-   * result the pass cannot yield yet never counts as work.
+   * would flush or yield something now: pending progress on any tool, or a
+   * completed result at the head of the unyielded calls. It applies the
+   * pass's own head-of-line rule, so a result the pass cannot yield yet
+   * never counts as work.
    */
   private hasDrainableWork(): boolean {
+    if (this.tools.some((tool) => tool.pendingProgress.length > 0)) return true;
     for (const tool of this.tools) {
-      if (tool.pendingProgress.length > 0) return true;
       if (tool.status === "yielded") continue;
-      if (tool.status === "completed" && tool.result) return true;
-      if (tool.status === "executing" && !tool.isConcurrencySafe) return false;
+      return tool.status === "completed" && tool.result !== undefined;
     }
     return false;
   }
@@ -1347,6 +1427,8 @@ export class StreamingToolExecutor {
    */
   private async processQueue(opts: { readonly safeOnly?: boolean } = {}): Promise<void> {
     if (this.discarded) return;
+    // A call waiting to run alone, or running alone, holds back new calls.
+    if (this.aloneHolder !== undefined || this.aloneWaiting.size > 0) return;
     for (let i = 0; i < this.tools.length; i += 1) {
       const tool = this.tools[i]!;
       if (tool.status !== "queued") continue;
@@ -1506,6 +1588,12 @@ export class StreamingToolExecutor {
               abortController: childAbort,
               onProgress: (event) =>
                 this.emitProgress(tool.toolCall.id, event.chunk),
+              // A read-only shell call that runs beside others falls back to
+              // a run alone if it cannot take the read-only route.
+              ...(tool.isConcurrencySafe && executionCall.name === "exec_command"
+                ? { runAloneOffReadOnlyRoute: <T,>(run: () => Promise<T>) =>
+                    this.runAlone(tool, run, dispatchSignal) }
+                : {}),
               onHookAdditionalContext: (contexts) => {
                 tool.additionalContexts = [
                   ...(tool.additionalContexts ?? []),

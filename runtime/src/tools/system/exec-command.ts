@@ -19,6 +19,7 @@ import { isCompletePrintedOutput, rememberPrintedOutput, stableWorkspaceText } f
 import type { BashToolConfig } from "./types.js";
 import { UnifiedExecError } from "../../unified-exec/types.js";
 import { UnifiedExecProcessManager } from "../../unified-exec/process-manager.js";
+import { execCommandRunsConcurrently } from "../read-only-shell-concurrency.js";
 import type {
   ExecCommandToolOutput,
   UnifiedExecProcessManagerLike,
@@ -977,7 +978,10 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
     isSearchOrReadCommand: (input: { cmd?: string }) =>
       isSearchOrReadBashCommand(input?.cmd ?? ""),
     supportsParallelToolCalls: false,
-    isConcurrencySafe: () => false,
+    // Read-only inspections from one response run side by side; everything
+    // else is exclusive and keeps submission order.
+    isConcurrencySafe: (input: Record<string, unknown>) =>
+      execCommandRunsConcurrently(input, config?.cwd ?? process.cwd()),
     interruptBehavior: () => "cancel",
     checkPermissions(input, context) {
       return sandboxAutoAllow(input as Record<string, unknown>, context, config);

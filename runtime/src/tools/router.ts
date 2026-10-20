@@ -235,6 +235,13 @@ export interface LiveToolDispatchOptions {
     idx: number,
   ) => void;
   readonly onHookAdditionalContext?: (contexts: readonly string[]) => void;
+  /**
+   * Set by the tool executor for a shell call it scheduled next to other calls
+   * of the same response because it classifies as read-only. If dispatch
+   * cannot run it on the read-only route (no-write, no-network sandbox), the
+   * ordinary run waits here until no other call of the batch executes.
+   */
+  readonly runAloneOffReadOnlyRoute?: <T>(run: () => Promise<T>) => Promise<T>;
 }
 
 export interface DirectToolDispatchOptions {
@@ -1341,7 +1348,7 @@ export class ToolRouter {
             spec.tool, dispatchArgs, opts.turn.cwd, opts.session.services.sandboxExecutionBroker,
             { owner: opts.session, ordinaryPathSandboxed: sandboxModeRequiresPlatformIsolation(sandbox) }));
           const executionTool = observationTool ?? spec.tool;
-          return runAdmittedToolCall({
+          const admitted = () => runAdmittedToolCall({
             session: opts.session,
             turnId: opts.turn.subId,
             callId: toolCall.id,
@@ -1375,6 +1382,11 @@ export class ToolRouter {
                 }),
               ),
           });
+          // A call scheduled next to others as read-only that cannot take the
+          // read-only route may write: it runs only once nothing else runs.
+          return observationTool === undefined && opts.runAloneOffReadOnlyRoute !== undefined
+            ? opts.runAloneOffReadOnlyRoute(admitted)
+            : admitted();
         },
       });
       markLoadedToolNamesDiscovered(

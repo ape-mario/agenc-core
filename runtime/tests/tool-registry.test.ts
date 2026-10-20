@@ -2139,7 +2139,12 @@ describe("Light presentation and deferred capability preservation", () => {
     ].sort());
     for (const presented of light.toLLMTools()) {
       const canonical = light.tools.find(tool => tool.name === presented.function.name)!;
-      expect(presented).toEqual(lightPresentation({ type: "function", function: { name: canonical.name, description: canonical.description, parameters: canonical.inputSchema } }, { leanExec: presented.function.name === "exec_command", leanSearch: presented.function.name === "system.searchTools" }));
+      expect(presented).toEqual(lightPresentation({ type: "function", function: { name: canonical.name, description: canonical.description, parameters: canonical.inputSchema } }, {
+        leanExec: presented.function.name === "exec_command",
+        leanSearch: presented.function.name === "system.searchTools",
+        leanRead: presented.function.name === "FileRead",
+        lightSession: true,
+      }));
     }
     expect(light.tools.find(tool => tool.name === "Write")?.requiresApproval).toBe(true);
     expect(light.tools.find(tool => tool.name === "Write")?.recoveryCategory).toBe("side-effecting");
@@ -2161,7 +2166,7 @@ describe("Light presentation and deferred capability preservation", () => {
     expect(normal.toLLMTools()).toEqual(normalBefore);
     await light.dispatch({ id: "load-full-read", name: "system.searchTools", arguments: '{"select":"FileRead"}' });
     const read = light.tools.find(tool => tool.name === "FileRead")!;
-    expect(light.toLLMTools().find(tool => tool.function.name === "FileRead")).toEqual(lightPresentation({ type: "function", function: { name: read.name, description: read.description, parameters: read.inputSchema } }));
+    expect(light.toLLMTools().find(tool => tool.function.name === "FileRead")).toEqual(lightPresentation({ type: "function", function: { name: read.name, description: read.description, parameters: read.inputSchema } }, { lightSession: true }));
   });
 
   test("loads search schemas on demand without changing canonical tools or other sessions", async () => {

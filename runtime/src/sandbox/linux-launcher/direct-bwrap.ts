@@ -89,6 +89,13 @@ interface DirectBwrapInput {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly env: Readonly<NodeJS.ProcessEnv>;
+  /**
+   * The caller runs the created-path monitor around the command (see
+   * protected-create-monitor.ts). Without it a plan that leaves missing
+   * protected paths unmounted is declined and the Node launcher, which runs
+   * the monitor itself, keeps the command.
+   */
+  readonly monitorProtectedCreates?: boolean;
 }
 
 export function prepareDirectBwrapPlan(input: DirectBwrapInput): PreparedDirectBwrap | undefined {
@@ -160,7 +167,13 @@ function preparePlan(input: DirectBwrapInput, namespaceInit: boolean, session = 
         extraWritableBindRoots: [], extraDeviceBindPaths: resolveSandboxDeviceBinds(env),
         inheritedReadOnlyCwd: false, chdirToCommandCwd: true,
       });
-    if (!bwrap.usesBubblewrap || bwrap.protectedCreateTargets.length !== 0) return undefined;
+    if (!bwrap.usesBubblewrap) return undefined;
+    // Missing protected paths that cannot get a placeholder mount need the
+    // created-path monitor: detect, remove, fail the command. The session
+    // sandbox runs it around each of its commands; a per-command launch gets
+    // such a plan only when its caller runs it, else the Node launcher does.
+    if (bwrap.protectedCreateTargets.length !== 0 && !session &&
+        input.monitorProtectedCreates !== true) return undefined;
     const artifact = namespaceInit ? prepareNamespaceInitArtifact(root, bwrap.args) : undefined;
     if (namespaceInit && artifact === undefined) return undefined;
     let sessionExecutable: { path: string; identity: string } | undefined;
@@ -197,7 +210,8 @@ function preparePlan(input: DirectBwrapInput, namespaceInit: boolean, session = 
         env: { ...env, AGENC_LINUX_SANDBOX_ACTIVE: "1" },
         command: options.command, executable,
         policyPaths: [...policyPaths, ...(permissions.fileSystem.reservedReadOnlyPaths ?? []),
-          options.sandboxPolicyCwd, options.commandCwd, options.sessionTempRoot] };
+          options.sandboxPolicyCwd, options.commandCwd, options.sessionTempRoot],
+        protectedCreateTargets: [...bwrap.protectedCreateTargets] };
     }
     const serialize = namespaceInit ? serializeProcessBrokerV3Payload : serializeProcessBrokerV2Payload;
     const payload = serialize({ program: launcher.program, args: sessionSandbox?.args ?? bwrap.args,
@@ -206,6 +220,8 @@ function preparePlan(input: DirectBwrapInput, namespaceInit: boolean, session = 
     const ownedSource = source;
     const plan = registerDirectBwrapPlan({ payload,
       ...(sessionSandbox === undefined ? {} : { sessionSandbox }),
+      ...(sessionSandbox === undefined && bwrap.protectedCreateTargets.length !== 0
+        ? { protectedCreateTargets: [...bwrap.protectedCreateTargets] } : {}),
       ...(artifact === undefined ? {} : { namespaceInitArtifact: artifact.target }), sourceFd: source?.fd, isCurrent,
       dispose: () => ownedSource?.dispose() });
     source = undefined;

@@ -117,6 +117,19 @@ describe("model catalog admission", () => {
       .toMatchObject({ provider: "venice", model });
   });
 
+  // Ollama Cloud's list is its live /api/tags answer, and several of its IDs
+  // are also native IDs elsewhere (kimi-k3 on Kimi, glm-5.3 on Z.AI). A pair
+  // that names Ollama Cloud stays on Ollama Cloud.
+  test.each([
+    [{ model_provider: "ollama-cloud", model: "kimi-k3" }, "kimi-k3"],
+    [{ model_provider: "ollama-cloud", model: "glm-5.3" }, "glm-5.3"],
+    [{ model_provider: "ollama-cloud", model: "muse-spark-open" }, "muse-spark-open"],
+    [{ model: "ollama-cloud:minimax-m3.1-flash" }, "minimax-m3.1-flash"],
+  ] as const)("keeps an explicit Ollama Cloud pair on Ollama Cloud: %o", (layer, model) => {
+    expect(resolveProviderModelSelection({}, current, layer, {}))
+      .toMatchObject({ provider: "ollama-cloud", model });
+  });
+
   test.each(["ollama", "lmstudio", "openai-compatible", "openrouter"])(
     "accepts a custom name on open provider %s", (provider) => {
       expect(resolveProviderModelSelection({}, current, {

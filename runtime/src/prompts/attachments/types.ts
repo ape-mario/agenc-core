@@ -146,6 +146,25 @@ export interface CriticalSystemReminderAttachment {
 }
 
 /**
+ * Built-in product help that Light keeps out of its fixed head: sent once,
+ * before the user message that asks for it (prompts/attachments/product-help.ts).
+ */
+export interface ProductHelpAttachment {
+  readonly kind: "product_help";
+  readonly topic: "undo" | "instructions";
+}
+
+/**
+ * Interactive Light's memory rules and directories, sent with a user message
+ * about memory or durable facts when the session's fixed prefix left them out
+ * (prompts/attachments/memory-on-request.ts).
+ */
+export interface MemoryOnRequestAttachment {
+  readonly kind: "memory_on_request";
+  readonly content: string;
+}
+
+/**
  * Output-style attachment (fires every turn when style is non-default).
  * Source: upstream attachment donor `attachments.ts:1598-1613`.
  */
@@ -369,6 +388,8 @@ export type Attachment =
   | AutoModeExitAttachment
   | DateChangeAttachment
   | CriticalSystemReminderAttachment
+  | ProductHelpAttachment
+  | MemoryOnRequestAttachment
   | OutputStyleAttachment
   | TokenUsageAttachment
   | BudgetUsdAttachment

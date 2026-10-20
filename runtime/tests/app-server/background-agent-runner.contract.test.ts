@@ -1,5 +1,7 @@
 import * as oneShotDurability from "../../src/durability/one-shot-durability.js";
 import { ModelRegistry, modelRegistryEntryToModelInfo } from "../../src/llm/model-registry.js";
+import { ModelMetadataResolver } from "../../src/llm/model-metadata.js";
+import { clearPublishedModelCatalogs } from "../../src/llm/registry/published-model-catalog.js";
 import { resolveSessionReasoningEffort } from "../../src/session/session-reasoning-effort.js";
 import { buildAnthropicMessagesRequest } from "../../src/llm/wire/messages-anthropic.js";
 import desktopEffortCatalog from "../llm/desktop-effort-catalog.json";
@@ -6942,6 +6944,47 @@ describe("AgenC delegate background-agent runner", () => {
       .rejects.toThrow("between turns");
     expect(h.sessionState.sessionConfiguration.collaborationMode.reasoningEffort).toBe("none");
     expect(recordedRuntimeSettingsEvents(h.rolloutItems)).toEqual(before);
+  });
+
+  it("reads Venice's live list before refusing an effort level the session has not seen yet", async () => {
+    // Seen live (jobs/pv, 2026-10-20): the daemon's start-up read of Venice's
+    // list timed out, so /effort low was refused for a model whose live row
+    // offers it until the first request read the list.
+    const agentId = "venice-live-effort";
+    const model = "regression-venice-live-effort";
+    const list = { data: [{
+      id: model, type: "text", model_spec: {
+        name: "Regression Live Effort", offline: false, availableContextTokens: 256000, maxCompletionTokens: 8192,
+        pricing: { input: { usd: 0.12 }, output: { usd: 0.36 } },
+        capabilities: { supportsFunctionCalling: true, supportsReasoning: true, supportsReasoningEffort: true,
+          reasoningEffortOptions: ["none", "low", "medium", "high"], defaultReasoningEffort: "low" },
+      },
+    }] };
+    const h = makeTopLevelRunner({ conversationId: agentId, canonicalRuntimeSettings: true });
+    h.sessionState.sessionConfiguration.provider.slug = "venice";
+    h.sessionState.sessionConfiguration.collaborationMode.model = model;
+    // The Venice provider reads its list before each request (and now on demand).
+    const getExecutionProfile = vi.fn(async () => {
+      await new ModelMetadataResolver({
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(list))),
+        env: { VENICE_API_KEY: "fixture" },
+      }).discoverVeniceModels({});
+      return undefined;
+    });
+    Object.assign(h.session.services, { provider: { getExecutionProfile } });
+    try {
+      await h.runner.startAgent({ objective: "work", cwd: process.cwd() });
+      await expect(h.runner.applyAgentConfig(agentId, { sessionId: "session_1", reasoningEffort: "low" }))
+        .resolves.toMatchObject({ applied: true });
+      expect(getExecutionProfile).toHaveBeenCalledTimes(1);
+      expect(h.sessionState.sessionConfiguration.collaborationMode.reasoningEffort).toBe("low");
+      // A level the live row does not offer is still refused, without another read.
+      await expect(h.runner.applyAgentConfig(agentId, { sessionId: "session_1", reasoningEffort: "max" }))
+        .rejects.toThrow("does not support this reasoning effort");
+      expect(h.sessionState.sessionConfiguration.collaborationMode.reasoningEffort).toBe("low");
+    } finally {
+      clearPublishedModelCatalogs();
+    }
   });
 
   describe("reasoning effort across a model switch", () => {

@@ -165,7 +165,14 @@ describe.each(AGENC_DEEPSEEK_MODELS)("AgenC $model promotion wire", ({ model, vi
       supportedReasoningLevels: ["low", "high", "max"], defaultReasoningLevel: "high", visibility: "none",
     });
     expect(deriveFlatCatalog().agenc ?? []).not.toContain(model);
-    expect(chatCompletionsCapabilityHintsForProvider("openrouter", model).acceptsParallelToolCalls).toBeUndefined();
+    // Direct OpenRouter follows the DeepSeek family (no parallel_tool_calls,
+    // as on DeepSeek's own API) but never the managed route's own contract.
+    const direct = chatCompletionsCapabilityHintsForProvider("openrouter", model);
+    expect(direct.acceptsParallelToolCalls).toBe(false);
+    expect(direct.maxToolDefinitions).toBeUndefined();
+    expect(direct.runtimeContextInToolResults).toBeUndefined();
+    expect(direct.includeToolNameAliases).toBeUndefined();
+    expect(direct.reportsUsageCost).toBe(true);
   });
 
   it("maps instruction and discovery names to the actual advertised callable aliases", () => {

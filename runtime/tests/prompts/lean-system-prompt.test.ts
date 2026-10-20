@@ -190,3 +190,16 @@ describe("lean system prompt", () => {
     expect(lean.staticPrefix.length).toBeLessThan(standard.staticPrefix.length * 0.75);
   });
 });
+
+describe("lean default follows the GPT family through gateways", () => {
+  test.each([
+    ["openrouter", "openai/gpt-6-luna", true],
+    ["venice", "openai-gpt-6-luna", true],
+    ["openrouter", "deepseek/deepseek-v4.1-flash-1017", false],
+    ["ollama-cloud", "gpt-oss:120b", false],
+  ] as const)("%s %s -> lean %s", (provider, model, lean) => {
+    expect(leanSystemPromptEnabled({}, provider, undefined, model)).toBe(lean);
+    expect(leanSystemPromptEnabled({ AGENC_LEAN_SYSTEM_PROMPT: "0" }, provider, undefined, model)).toBe(false);
+    expect(leanSystemPromptEnabled({}, provider, false, model)).toBe(false);
+  });
+});

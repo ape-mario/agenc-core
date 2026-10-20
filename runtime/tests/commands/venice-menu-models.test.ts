@@ -8,14 +8,16 @@ import { saveProviderKey } from "../auth/provider-keys.js";
 import type { EnvSnapshot } from "../config/env.js";
 import { resolveHomeContext, type HomeContext } from "../config/home.js";
 import type { ConfigStore } from "../config/store.js";
-import { VENICE_MODELS } from "../llm/registry/venice-models.js";
+import { VENICE_MODELS, VENICE_TOOL_CALLS_NOT_DELIVERED } from "../llm/registry/venice-models.js";
 import type { SlashCommandContext } from "./types.js";
 import { loadVeniceMenuModels, readVeniceMenuModels } from "./venice-menu-models.js";
 
 const fixture = JSON.parse(readFileSync(new URL("../llm/fixtures/venice-models.json", import.meta.url), "utf8")) as {
   readonly data: readonly { readonly id: string; readonly model_spec: { readonly capabilities: { readonly supportsFunctionCalling?: boolean } } }[];
 };
-const TOOL_MODELS = fixture.data.filter(model => model.model_spec.capabilities.supportsFunctionCalling === true).map(model => model.id);
+const TOOL_MODELS = fixture.data
+  .filter(model => model.model_spec.capabilities.supportsFunctionCalling === true && !VENICE_TOOL_CALLS_NOT_DELIVERED.has(model.id))
+  .map(model => model.id);
 
 const homes: string[] = [];
 const servers: Server[] = [];

@@ -210,7 +210,10 @@ describe("session sandbox", () => {
   it("keeps metadata fences and has no per-command descriptor growth", async () => {
     const descriptors = fs.readdirSync("/proc/self/fd").length;
     for (let i = 0; i < 16; i++) expect((await run("true")).code).toBe(0);
-    expect((await run("echo denied > .git/forbidden")).code).not.toBe(0);
+    // A narrowed .git keeps its code and pointer carve-outs: a missing one
+    // created here is removed and fails the command (created-path monitor).
+    expect((await run("mkdir .git/hooks && echo denied > .git/hooks/forbidden")).code).not.toBe(0);
+    expect(fs.existsSync(path.join(root, "work/.git/hooks"))).toBe(false);
     expect((await run("echo denied > .agents/forbidden")).code).not.toBe(0);
     await sandbox.close();
     expect(fs.readdirSync("/proc/self/fd").length).toBeLessThanOrEqual(descriptors);

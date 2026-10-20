@@ -521,6 +521,30 @@ export async function resolveMemoryPromptInputs(session: SystemPromptSessionSnap
   }
 }
 
+/**
+ * Interactive Light's memory rules and directories for the memory-on-request
+ * reminder (prompts/attachments/memory-on-request.ts), whatever the memory
+ * holds now: the session's fixed prefix left them out when its memory was empty
+ * at assembly. Undefined when memory is disabled or unavailable. Resolved from
+ * the same owner as resolveMemoryPromptInputs and the runtime sandbox.
+ */
+export async function resolveLightMemoryOnRequest(session: SystemPromptSessionSnapshot, cwd: string): Promise<string | undefined> {
+  try {
+    const owner = liveSessionMemoryOwner(session.services, cwd);
+    if (owner === undefined) return undefined;
+    const prompt = await loadMemoryPrompt(owner, session.services?.providerEnvironment);
+    if (prompt === null) return undefined;
+    if (prompt.onRequest !== undefined) return prompt.onRequest;
+    return prompt.instructions.length > 0 ? [prompt.instructions, prompt.directories].join("\n\n") : undefined;
+  } catch (error) {
+    logForDebugging(
+      `memory rules unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      { level: "debug" },
+    );
+    return undefined;
+  }
+}
+
 // Re-export for the env helper's use; kept internal so callers don't
 // depend on node:child_process directly.
 function readGitBranch(
@@ -1216,13 +1240,14 @@ export async function assembleSystemPrompt(
     promptEnvironment,
     envInfoInputs.provider,
     readConfiguredLeanSystemPrompt(session),
+    envInfoInputs.model,
   );
   const staticSections: Array<string | null> = light
     ? [
         lightBudgetWorkflow(
           opts.outputStyle != null,
-          lightEditsWithApplyPatch(envInfoInputs.provider),
-          lightStatesTaskLimits(envInfoInputs.provider, promptEnvironment),
+          lightEditsWithApplyPatch(envInfoInputs.provider, envInfoInputs.model),
+          lightStatesTaskLimits(envInfoInputs.provider, promptEnvironment, envInfoInputs.model),
         ),
         lightBudgetSystem(),
         lightBudgetActions(),

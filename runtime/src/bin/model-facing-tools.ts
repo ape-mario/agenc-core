@@ -73,6 +73,19 @@ import {
 import {
   resolveProviderBaseURLEnvironment,
 } from "../llm/registry/provider-ingress.js";
+import {
+  GATEWAY_SEARCH_MAX_OUTPUT_TOKENS,
+  GATEWAY_SEARCH_PROMPT_TOKENS_CEILING,
+  OLLAMA_WEB_SEARCH_USD_PER_REQUEST,
+  OPENROUTER_EXA_SEARCH_USD_PER_REQUEST,
+  runOllamaWebSearch,
+  runOpenRouterWebSearch,
+  runVeniceWebSearch,
+  VENICE_WEB_SEARCH_USD_PER_REQUEST,
+  type GatewaySearchOutcome,
+  type TokenRates,
+} from "../llm/providers/gateway-web-search.js";
+import { DEFAULT_MODEL_COSTS, resolveModelCostEntry } from "../session/cost.js";
 import type { Tool, ToolResult } from "../tools/types.js";
 import { validationErrorToolResult } from "../tools/results.js";
 import { isRuntimeInjectedArgKey } from "../tools/strict-args.js";
@@ -149,6 +162,14 @@ import {
   createImagineVideoTool,
   hasImagineVideoBackend,
 } from "../tools/system/imagine-video.js";
+import {
+  createImagineSpeechTool,
+  hasImagineSpeechBackend,
+} from "../tools/system/imagine-speech.js";
+import {
+  createImagineEditTool,
+  hasImagineEditBackend,
+} from "../tools/system/imagine-edit.js";
 import { getRuleByContentsForTool } from "../permissions/rules.js";
 import type {
   PermissionResult,
@@ -1304,14 +1325,106 @@ function resolveDeepSeekWebSearchBackend(
   return endpoint === undefined ? undefined : { endpoint, apiKey };
 }
 
+/** An Ollama Cloud, OpenRouter or Venice session's own search route. */
+interface GatewayWebSearchBackend {
+  readonly provider: "ollama-cloud" | "openrouter" | "venice";
+  readonly apiKey: string;
+  readonly baseURL: string;
+  readonly model: string;
+  readonly rates: TokenRates | undefined;
+}
+
+const GATEWAY_SEARCH_BASE_URLS: Readonly<Record<GatewayWebSearchBackend["provider"], string>> = {
+  "ollama-cloud": "https://ollama.com/v1",
+  openrouter: "https://openrouter.ai/api/v1",
+  venice: "https://api.venice.ai/api/v1",
+};
+
+/**
+ * The session's own provider search, used before the configured chain like
+ * DeepSeek's: an Ollama Cloud, OpenRouter or Venice session searches with its
+ * own key (never the managed route's, never another provider's). An explicit
+ * search endpoint or a named search provider keeps priority.
+ */
+function resolveGatewayWebSearchBackend(opts: ModelFacingToolOptions): GatewayWebSearchBackend | undefined {
+  const provider = currentSessionProvider(opts);
+  if (provider === undefined) return undefined;
+  const identity = readProviderIdentity(provider);
+  if (identity !== "ollama-cloud" && identity !== "openrouter" && identity !== "venice") return undefined;
+  if (configuredWebSearchEndpoint(opts) !== undefined) return undefined;
+  const mode = configuredSearchChain(requireModelFacingRequestEnvironment(opts), opts.toolsConfig).mode;
+  if (mode !== "auto" && mode !== "native") return undefined;
+  const factoryOptions = readProviderFactoryOptions(provider);
+  if (factoryOptions.extra?.managedGateway === true || factoryOptions.extra?.managedCredential === true) return undefined;
+  const apiKey = stringValue(factoryOptions.apiKey);
+  if (apiKey === undefined) return undefined;
+  const live = (opts.getSession()?.services as { providerService?: { current?: () => { model?: unknown } } } | undefined)
+    ?.providerService?.current?.();
+  const model = stringValue(live?.model) ?? stringValue(factoryOptions.model);
+  if (model === undefined) return undefined;
+  const baseURL = (stringValue(factoryOptions.baseURL) ?? GATEWAY_SEARCH_BASE_URLS[identity]).replace(/\/+$/, "");
+  // Ollama's search lives on ollama.com only; a session pointed elsewhere has no route.
+  if (identity === "ollama-cloud" && baseURL !== GATEWAY_SEARCH_BASE_URLS["ollama-cloud"]) return undefined;
+  const price = resolveModelCostEntry({ provider: identity, model }, DEFAULT_MODEL_COSTS)?.entry;
+  const rates = price === undefined
+    ? undefined
+    : { inputUsdPerToken: price.inputUsdPer1K / 1000, outputUsdPerToken: price.outputUsdPer1K / 1000 };
+  return { provider: identity, apiKey, baseURL, model, rates };
+}
+
+/** The most one gateway search can cost, or null when the session model has no price. */
+function gatewaySearchCeilingUsd(backend: GatewayWebSearchBackend): number | null {
+  if (backend.provider === "ollama-cloud") return OLLAMA_WEB_SEARCH_USD_PER_REQUEST;
+  if (backend.rates === undefined) return null;
+  const tokens = GATEWAY_SEARCH_PROMPT_TOKENS_CEILING * backend.rates.inputUsdPerToken +
+    GATEWAY_SEARCH_MAX_OUTPUT_TOKENS * backend.rates.outputUsdPerToken;
+  return (backend.provider === "openrouter" ? OPENROUTER_EXA_SEARCH_USD_PER_REQUEST : VENICE_WEB_SEARCH_USD_PER_REQUEST) + tokens;
+}
+
+async function runGatewayWebSearch(
+  backend: GatewayWebSearchBackend,
+  input: {
+    readonly query: string;
+    readonly maxResults: number;
+    readonly filters: WebSearchFilters;
+    readonly signal?: AbortSignal;
+  },
+): Promise<GatewaySearchOutcome> {
+  const common = {
+    apiKey: backend.apiKey,
+    query: input.query,
+    maxResults: input.maxResults,
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
+  };
+  if (backend.provider === "ollama-cloud") return await runOllamaWebSearch(common);
+  if (backend.provider === "openrouter") {
+    return await runOpenRouterWebSearch({
+      ...common,
+      baseURL: backend.baseURL,
+      model: backend.model,
+      allowedDomains: [...input.filters.allowedDomains],
+      blockedDomains: [...input.filters.blockedDomains],
+    });
+  }
+  return await runVeniceWebSearch({
+    ...common,
+    baseURL: backend.baseURL,
+    model: backend.model,
+    ...(backend.rates === undefined ? {} : { rates: backend.rates }),
+  });
+}
+
 /**
  * WebSearch's charge bound. A configured endpoint is unpriced; DeepSeek's
- * search is $0.00075 per successful request; the keyless chain is free. The
- * Grok native path reserves its own model call.
+ * search is $0.00075 per successful request; an Ollama Cloud, OpenRouter or
+ * Venice session's own search costs what its provider lists; the keyless
+ * chain is free. The Grok native path reserves its own model call.
  */
 function webSearchMaxCostUsd(opts: ModelFacingToolOptions): number | null {
   if (configuredWebSearchEndpoint(opts) !== undefined ||
       configuredSearchChain(requireModelFacingRequestEnvironment(opts), opts.toolsConfig).providers.length > 0) return null;
+  const gateway = resolveGatewayWebSearchBackend(opts);
+  if (gateway !== undefined) return gatewaySearchCeilingUsd(gateway);
   return resolveDeepSeekWebSearchBackend(opts) !== undefined
     ? DEEPSEEK_SEARCH_USD_PER_REQUEST
     : 0;
@@ -4099,9 +4212,13 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
         // answer falls through to the chain below, which says why.
         const deepseek = resolveDeepSeekWebSearchBackend(opts);
         // A paid fallback is unpriced. An early DeepSeek success still has an exact receipt.
-        const reportsDeepSeekCharge = deepseek !== undefined && endpoint === undefined && chain.providers.length === 0;
+        const gateway = resolveGatewayWebSearchBackend(opts);
+        const reportsDeepSeekCharge = (deepseek !== undefined || gateway !== undefined) &&
+          endpoint === undefined && chain.providers.length === 0;
         let deepseekBilled = false;
         let deepseekFallback: string | undefined;
+        // What the session's own provider search charged, when it ran.
+        let gatewayCharge = 0;
         const withDeepSeekCharge = (result: ToolResult, deepseekOnly = false): ToolResult =>
           reportsDeepSeekCharge || deepseekOnly
             ? {
@@ -4109,7 +4226,7 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
                 admissionUsage: {
                   inputTokens: 0,
                   outputTokens: 0,
-                  costUsd: deepseekBilled ? DEEPSEEK_SEARCH_USD_PER_REQUEST : 0,
+                  costUsd: (deepseekBilled ? DEEPSEEK_SEARCH_USD_PER_REQUEST : 0) + gatewayCharge,
                 },
               }
             : result;
@@ -4151,12 +4268,43 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
             });
           }
         }
+        // An Ollama Cloud, OpenRouter or Venice session searches with its own
+        // key first; a failure or an empty answer falls through to the chain.
+        let gatewayFallback: string | undefined;
+        if (gateway !== undefined) {
+          const filtered =
+            filters.allowedDomains.length > 0 || filters.blockedDomains.length > 0;
+          const outcome = await runGatewayWebSearch(gateway, {
+            query,
+            maxResults: filtered ? 10 : maxResults,
+            filters,
+            ...(effectSignal !== undefined ? { signal: effectSignal } : {}),
+          });
+          gatewayCharge = outcome.costUsd ?? 0;
+          const results = outcome.kind === "results"
+            ? filterWebSearchResults(outcome.hits, filters).slice(0, maxResults)
+            : [];
+          if (results.length > 0) {
+            return withDeepSeekCharge(json({
+              query,
+              source: `${gateway.provider}_web_search`,
+              provider: gateway.provider,
+              results,
+              ...(outcome.costUsd === undefined ? {} : { cost_usd: outcome.costUsd }),
+            }), true);
+          }
+          gatewayFallback = outcome.kind === "failed"
+            ? outcome.reason
+            : outcome.kind === "empty"
+              ? "no results"
+              : "no results matched the domain filters";
+        }
         const finish = (payload: Record<string, unknown>): ToolResult =>
-          withDeepSeekCharge(json(
-            deepseekFallback === undefined
-              ? payload
-              : { ...payload, deepseek_search_fallback: deepseekFallback },
-          ));
+          withDeepSeekCharge(json({
+            ...payload,
+            ...(deepseekFallback === undefined ? {} : { deepseek_search_fallback: deepseekFallback }),
+            ...(gatewayFallback === undefined ? {} : { provider_search_fallback: gatewayFallback }),
+          }));
         // 1. Explicitly configured endpoint (env or config-bridged).
         if (endpoint !== undefined && chain.mode === "auto") {
           const kind = webSearchEndpointKind(opts);
@@ -5520,6 +5668,13 @@ export function createModelFacingTools(
     scopedOpts.getSession() === null || hasImagineImageBackend(imagineOptions);
   const includeImagineVideo =
     scopedOpts.getSession() === null || hasImagineVideoBackend(imagineOptions);
+  // Always deferred (found through system.searchTools): an OpenRouter or
+  // Venice session speaks, and a Venice session edits or upscales images,
+  // with its own key; no other session can call them.
+  const includeImagineSpeech =
+    scopedOpts.getSession() === null || hasImagineSpeechBackend(imagineOptions);
+  const includeImagineEdit =
+    scopedOpts.getSession() === null || hasImagineEditBackend(imagineOptions);
 
   return [
     ...createMultiAgentV2RuntimeTools(scopedOpts),
@@ -5536,6 +5691,8 @@ export function createModelFacingTools(
           createImagineVideoTool(imagineOptions),
         ]
       : []),
+    ...(includeImagineSpeech ? [createImagineSpeechTool(imagineOptions)] : []),
+    ...(includeImagineEdit ? [createImagineEditTool(imagineOptions)] : []),
     createNotebookReadTool(scopedOpts),
     createNotebookEditTool(scopedOpts),
     createLspTool(scopedOpts),

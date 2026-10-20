@@ -160,6 +160,12 @@ export const autoModeProducer: AttachmentProducer = async (
   if (!isAutoFamilyMode(mode)) {
     return attachments;
   }
+  // A Light bypass session's permission instructions already say that tool
+  // calls are pre-approved and that the action rules still apply; the pulse
+  // would repeat them on the user channel.
+  if (opts.autonomyStatedInPermissions === true) {
+    return attachments;
+  }
 
   // Throttle on human turns. First emission in a (re-)entry always fires.
   if (opts.messages.length > 0) {

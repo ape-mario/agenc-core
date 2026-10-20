@@ -4,8 +4,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { ConfigStore } from "../../src/config/store.js";
 import { getProjectRoot, setProjectRoot } from "../../src/bootstrap/state.js";
-import { resolveMemoryPromptInputs } from "../../src/prompts/system-prompt.js";
-import { resolveAutoMemoryDirectory, resolveGlobalMemoryDirectory } from "../../src/services/extractMemories/memory-paths.js";
+import { resolveLightMemoryOnRequest, resolveMemoryPromptInputs } from "../../src/prompts/system-prompt.js";
+import {
+  resolveAutoMemoryDirectory,
+  resolveGlobalMemoryDirectory,
+  sessionDurableMemoryWriteRoots,
+} from "../../src/services/extractMemories/memory-paths.js";
 import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 import { clearCurrentRuntimeSession, setCurrentRuntimeSession } from "../../src/session/current-session.js";
 import type { Session } from "../../src/session/session.js";
@@ -77,8 +81,25 @@ describe("memory prompt owner context", () => {
     expect(prompt.memoryPrompt).toContain("HOST_MEMORY_CONSTRAINT");
     expect(prompt.memoryPrompt).toContain("ignore if asked");
     expect(prompt.memoryPrompt).not.toContain("Write to them directly");
+    // Interactive Light with empty memory keeps the rules out of its fixed
+    // prefix and resolves them for the memory-on-request reminder.
     const interactive = await owner("interactive", "", { lightMode: true });
-    expect((await resolveMemoryPromptInputs(interactive.session, interactive.cwd)).memoryInstructions).not.toBe("");
+    expect(await resolveMemoryPromptInputs(interactive.session, interactive.cwd))
+      .toEqual({ memoryInstructions: "", memoryPrompt: "" });
+    const onRequest = await resolveLightMemoryOnRequest(interactive.session, interactive.cwd);
+    expect(onRequest).toContain("# auto memory");
+    expect(onRequest).toContain((await resolveAutoMemoryDirectory(interactive.options)).path);
+    // It names the directories the runtime sandbox admits memory writes to.
+    const writeRoots = sessionDurableMemoryWriteRoots(interactive.session.services, interactive.cwd);
+    expect(writeRoots).toHaveLength(2);
+    for (const root of writeRoots!) expect(onRequest).toContain(root);
+    // Once an index has content the rules ride the fixed prefix again.
+    writeFileSync(join(await resolveGlobalMemoryDirectory(interactive.options), "MEMORY.md"), "- [Editor](editor.md): vim\n");
+    const withMemory = await resolveMemoryPromptInputs(interactive.session, interactive.cwd);
+    expect(withMemory.memoryInstructions).toContain("# auto memory");
+    expect(withMemory.memoryPrompt).toContain("# Memory directories");
+    expect(await resolveLightMemoryOnRequest(interactive.session, interactive.cwd))
+      .toBe([withMemory.memoryInstructions, withMemory.memoryPrompt].join("\n\n"));
   });
 
   test("Desktop presentation uses the captured client even when the shell environment differs", async () => {
@@ -102,5 +123,6 @@ describe("memory prompt owner context", () => {
   test("fails closed without an owning configuration store", async () => {
     expect(await resolveMemoryPromptInputs({ services: {} }, originalProjectRoot))
       .toEqual({ memoryInstructions: "", memoryPrompt: "" });
+    expect(await resolveLightMemoryOnRequest({ services: {} }, originalProjectRoot)).toBeUndefined();
   });
 });

@@ -18,7 +18,8 @@ import {
   getProjectMemoryPath,
 } from "../memory/paths.js";
 import { clearTieredInstructionsCacheForTesting } from "./agenc-md.js";
-import { resolveLiveInstructionEnvelope } from "./live-instructions.js";
+import { LIGHT_MEMORY_RECALL_RULES } from "../memory/memdir.js";
+import { LIGHT_LOADED_INSTRUCTIONS_NOTE, resolveLiveInstructionEnvelope } from "./live-instructions.js";
 import { getAttachmentTrackingState, resetRelevantMemoryBudget } from "../session/attachment-state.js";
 import type { Session } from "../session/session.js";
 import type { TurnContext } from "../session/turn-context.js";
@@ -194,6 +195,41 @@ describe("live instructions memory indexes", () => {
     const third = await resolveEnvelope(session);
     expect(third.text).toContain("two-space indent");
     expect(getAttachmentTrackingState(session).pendingInstructionUpdate).toBeUndefined();
+  });
+
+  it("interactive Light frames an index with its rules for existing memories", async () => {
+    installAuthority();
+    await writeEntrypoints("- [Editor](editor.md): user prefers vim keybindings\n", null);
+    const withOptions = (runtimeOptions: Record<string, unknown> | undefined) => ({
+      services: { configStore: store, ...(runtimeOptions === undefined ? {} : { runtimeOptions }) },
+      setProjectMemoryWarnings: vi.fn(),
+    }) as unknown as Session;
+
+    const light = await resolveEnvelope(withOptions({ remoteMode: false, lightMode: true, nonInteractive: false }));
+    expect(light.memoryText).toContain(`before acting on them. ${LIGHT_MEMORY_RECALL_RULES}`);
+    expect(light.memoryText).toContain("user prefers vim keybindings");
+    for (const other of [
+      await resolveEnvelope(withOptions(undefined)),
+      await resolveEnvelope(withOptions({ remoteMode: false, lightMode: true, nonInteractive: true })),
+    ]) {
+      expect(other.memoryText).toContain("Persistent memory index files are shown below");
+      expect(other.memoryText).not.toContain(LIGHT_MEMORY_RECALL_RULES);
+    }
+  });
+
+  it("Light names AgenC's instruction file where loaded instruction files appear", async () => {
+    installAuthority();
+    await writeFile(join(project, "AGENC.md"), "Use pnpm for every install.\n", "utf8");
+    const withOptions = (runtimeOptions: Record<string, unknown> | undefined) => ({
+      services: { configStore: store, ...(runtimeOptions === undefined ? {} : { runtimeOptions }) },
+      setProjectMemoryWarnings: vi.fn(),
+    }) as unknown as Session;
+    const light = await resolveEnvelope(withOptions({ remoteMode: false, lightMode: true }));
+    expect(light.workspaceText).toContain("Use pnpm for every install.");
+    expect(light.workspaceText).toContain(LIGHT_LOADED_INSTRUCTIONS_NOTE);
+    const standard = await resolveEnvelope(withOptions(undefined));
+    expect(standard.workspaceText).toContain("Use pnpm for every install.");
+    expect(standard.workspaceText).not.toContain(LIGHT_LOADED_INSTRUCTIONS_NOTE);
   });
 
   it("adds nothing when no index exists", async () => {
