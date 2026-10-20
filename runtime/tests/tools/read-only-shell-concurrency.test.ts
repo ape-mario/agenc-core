@@ -7,7 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
 import { execCommandRunsConcurrently } from "./read-only-shell-concurrency.js";
 import { createExecCommandTool } from "./system/exec-command.js";
-import { StreamingToolExecutor } from "./streaming-executor.js";
+import { StreamingToolExecutor, type StreamingToolResult } from "./streaming-executor.js";
 import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
 import type { LLMToolCall } from "../llm/types.js";
 import type { Tool } from "./types.js";
@@ -106,6 +106,12 @@ function harness(durations: Record<string, number>) {
   return { exec, timeline, overlaps, active: () => active };
 }
 
+async function collect(exec: StreamingToolExecutor): Promise<StreamingToolResult[]> {
+  const results: StreamingToolResult[] = [];
+  for await (const result of exec.getRemainingResults()) results.push(result);
+  return results;
+}
+
 async function drain(exec: StreamingToolExecutor): Promise<string[]> {
   const seen: string[] = [];
   for await (const result of exec.getRemainingResults()) seen.push(result.toolCall.id);
@@ -160,7 +166,7 @@ describe("a read-only call that cannot take the read-only route", () => {
    * when its sandbox cannot be prepared, and run through the hook the
    * executor hands to concurrently scheduled shell calls.
    */
-  function routedHarness(ordinary: ReadonlySet<string>, durations: Record<string, number>) {
+  function routedHarness(ordinary: ReadonlySet<string>, durations: Record<string, number>, abortSignal?: AbortSignal) {
     const tool: Tool = createExecCommandTool({ cwd });
     const registry = {
       tools: [tool],
@@ -174,13 +180,16 @@ describe("a read-only call that cannot take the read-only route", () => {
       toolSupportsParallel: () => false,
       async dispatchModelToolCall(
         toolCall: LLMToolCall,
-        opts: { readonly runAloneOffReadOnlyRoute?: <T>(run: () => Promise<T>) => Promise<T> },
+        opts: {
+          readonly runAloneOffReadOnlyRoute?: <T>(run: () => Promise<T>) => Promise<T>;
+          readonly signal?: AbortSignal;
+        },
       ): Promise<ToolDispatchResult> {
         const run = async (): Promise<ToolDispatchResult> => {
           active += 1;
           timeline.push(`start:${toolCall.id}`);
           (concurrentDuring[toolCall.id] ??= []).push(active);
-          await delay(durations[toolCall.id] ?? 1);
+          await delay(durations[toolCall.id] ?? 1, undefined, { signal: opts.signal });
           (concurrentDuring[toolCall.id] ??= []).push(active);
           timeline.push(`end:${toolCall.id}`);
           active -= 1;
@@ -194,6 +203,7 @@ describe("a read-only call that cannot take the read-only route", () => {
     const exec = new StreamingToolExecutor({
       registry,
       liveToolDispatch: { router: router as never, options: {} as never },
+      ...(abortSignal !== undefined ? { abortSignal } : {}),
     });
     return { exec, timeline, concurrentDuring };
   }
@@ -236,5 +246,39 @@ describe("a read-only call that cannot take the read-only route", () => {
     exec.close();
     expect(await drain(exec)).toEqual(["a", "b", "c"]);
     expect(Math.max(...Object.values(concurrentDuring).flat())).toBe(3);
+  });
+
+  test("an interrupt while it waits to run alone cancels it before its path runs", async () => {
+    const interrupt = new AbortController();
+    const { exec, timeline } = routedHarness(new Set(["b"]), { a: 5_000, b: 1, c: 1 }, interrupt.signal);
+    exec.addTool(block("a"), execCall("a", "ls -la"));
+    exec.addTool(block("b"), execCall("b", "cat README.md | wc -l"));
+    exec.addTool(block("c"), execCall("c", "touch out.txt"));
+    exec.dispatchPending();
+    exec.close();
+    await delay(20);
+    interrupt.abort("interrupt");
+    const results = await collect(exec);
+    expect(results.map((result) => result.toolCall.id)).toEqual(["a", "b", "c"]);
+    expect(results.map((result) => result.result.isError)).toEqual([true, true, true]);
+    // b never ran its (possibly writing) path and the later write never started.
+    expect(timeline).toEqual(["start:a"]);
+  });
+
+  test("an interrupt during side-by-side read-only calls ends each one and starts nothing after them", async () => {
+    const interrupt = new AbortController();
+    const { exec, timeline } = routedHarness(new Set(), { a: 5_000, b: 5_000, c: 5_000, d: 1 }, interrupt.signal);
+    exec.addTool(block("a"), execCall("a", "ls -la"));
+    exec.addTool(block("b"), execCall("b", "cat README.md"));
+    exec.addTool(block("c"), execCall("c", "wc -l data/orders.csv"));
+    exec.addTool(block("d"), execCall("d", "touch out.txt"));
+    exec.dispatchPending();
+    exec.close();
+    await delay(20);
+    interrupt.abort("interrupt");
+    const results = await collect(exec);
+    expect(results.map((result) => result.toolCall.id)).toEqual(["a", "b", "c", "d"]);
+    expect(results.map((result) => result.result.isError)).toEqual([true, true, true, true]);
+    expect(timeline).toEqual(["start:a", "start:b", "start:c"]);
   });
 });

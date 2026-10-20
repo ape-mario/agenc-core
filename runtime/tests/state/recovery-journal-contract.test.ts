@@ -972,6 +972,15 @@ describe("strict canonical journal contract", () => {
     ).toBe(false);
   });
 
+  it("validates the optional recovery category on tool_call_started", () => {
+    const started = { callId: "call-1", toolName: "exec_command", args: "{}" };
+    expect(isCanonicalEventPayload("tool_call_started", started)).toBe(true);
+    for (const recoveryCategory of ["idempotent", "side-effecting", "interactive"]) {
+      expect(isCanonicalEventPayload("tool_call_started", { ...started, recoveryCategory })).toBe(true);
+    }
+    expect(isCanonicalEventPayload("tool_call_started", { ...started, recoveryCategory: "read-only" })).toBe(false);
+  });
+
   it("accepts scalar warning details and leaves older warnings valid (#2499)", () => {
     const warning = { cause: "auto_compact_failed", message: "context_limit/in_turn: durable compaction commit failed" };
     expect(isCanonicalEventPayload("warning", warning)).toBe(true);
