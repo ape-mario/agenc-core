@@ -525,18 +525,14 @@ export async function resolveMemoryPromptInputs(session: SystemPromptSessionSnap
  * Interactive Light's memory rules and directories for the memory-on-request
  * reminder (prompts/attachments/memory-on-request.ts), whatever the memory
  * holds now: the session's fixed prefix left them out when its memory was empty
- * at assembly. Undefined when memory is disabled or unavailable.
+ * at assembly. Undefined when memory is disabled or unavailable. Resolved from
+ * the same owner as resolveMemoryPromptInputs and the runtime sandbox.
  */
 export async function resolveLightMemoryOnRequest(session: SystemPromptSessionSnapshot, cwd: string): Promise<string | undefined> {
   try {
-    const configStore = session.services?.configStore;
-    if (configStore === undefined) return undefined;
-    const prompt = await loadMemoryPrompt({
-      cwd,
-      configStore,
-      env: session.services?.userShell?.childEnvironment ?? session.services?.providerEnvironment ?? {},
-      runtimeOptions: { remoteMode: false, ...session.services?.runtimeOptions },
-    }, session.services?.providerEnvironment);
+    const owner = liveSessionMemoryOwner(session.services, cwd);
+    if (owner === undefined) return undefined;
+    const prompt = await loadMemoryPrompt(owner, session.services?.providerEnvironment);
     if (prompt === null) return undefined;
     if (prompt.onRequest !== undefined) return prompt.onRequest;
     return prompt.instructions.length > 0 ? [prompt.instructions, prompt.directories].join("\n\n") : undefined;
