@@ -129,6 +129,17 @@ function isSummarizerRequest(messages: readonly LLMMessage[]): boolean {
   }
 }
 
+/**
+ * The script's prompt counts are not DeepSeek's (it answered every request
+ * with the same fixed count). DeepSeek's reported prompt tokens now calibrate
+ * the estimate in both directions, so the scripted replies report none: the
+ * sizes and limits below were derived from the conservative estimate, which
+ * is what an uncalibrated request (a first call, a restart) still gets.
+ */
+function scriptedUsage(completionTokens: number): LLMResponse["usage"] {
+  return { promptTokens: 0, completionTokens, totalTokens: completionTokens, availability: "reported", provenance: "provider" };
+}
+
 function createHarness(script: readonly ScriptStep[]): Harness {
   const saved = new Map(COMPACTION_ENVIRONMENT_KEYS.map((key) => [key, process.env[key]]));
   const previousHome = process.env.AGENC_HOME;
@@ -155,7 +166,7 @@ function createHarness(script: readonly ScriptStep[]): Harness {
         content: JSON.stringify({ narrative: "Read the reading files in order; continue with the next unread file.",
           facts: [], open_actions: [] }),
         toolCalls: [],
-        usage: { promptTokens: 1_700, completionTokens: 700, totalTokens: 2_400, availability: "reported", provenance: "provider" },
+        usage: scriptedUsage(700),
         model: "deepseek-flash",
         finishReason: "stop",
       };
@@ -171,7 +182,7 @@ function createHarness(script: readonly ScriptStep[]): Harness {
     return {
       content: current.text ?? "",
       toolCalls: calls,
-      usage: { promptTokens: 10_000, completionTokens: 60, totalTokens: 10_060, availability: "reported", provenance: "provider" },
+      usage: scriptedUsage(60),
       model: "deepseek-flash",
       finishReason: calls.length > 0 ? "tool_calls" : "stop",
     };
