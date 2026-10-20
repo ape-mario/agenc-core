@@ -424,7 +424,7 @@ export const LIGHT_APPROVAL_NEVER =
 
 /** Light rendering of APPROVAL_POLICY_BYPASS_ESCALATION. */
 export const LIGHT_APPROVAL_BYPASS_ESCALATION =
-  "Approval policy never: bypass mode grants a request to leave the sandbox without asking. Use it only for GUI apps (open, xdg-open, osascript), blocked network, or one retry of an operation the user asked for that the sandbox refused on a protected path such as .git: call exec_command with sandbox_permissions \"require_escalated\" and a one-line justification. Keep file changes inside the workspace; do not write protected files another way or otherwise work around the sandbox.";
+  "Approval policy never: bypass mode grants leaving the sandbox without asking, only for GUI apps (open, xdg-open, osascript), blocked network or one retry of a requested operation the sandbox refused on a protected path such as .git: call exec_command with sandbox_permissions \"require_escalated\" and a one-line justification. Keep file changes in the workspace; never write protected files or work around the sandbox another way.";
 
 /**
  * Where the bypass escalation text applies. The same sessions get escalation
@@ -451,11 +451,11 @@ function bypassGrantsEscalation(
  * BYPASS_AUTONOMY_NOTE.
  */
 export const LIGHT_BYPASS_AUTONOMY_NOTE =
-  "Tool calls are pre-approved: do not ask for tool permission or plan approval, and do not pause to confirm local, reversible work. The action rules above still apply: destructive, irreversible, shared-system or externally visible actions need the user's explicit request. If the task is genuinely ambiguous, ask one question with AskUserQuestion; when the requested work is done and verified, stop and report.";
+  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the action rules above still apply to destructive, irreversible, shared-system or externally visible actions. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
 
 /** LIGHT_BYPASS_AUTONOMY_NOTE for a standard head, which names its action rules' section. */
 export const COMPACT_BYPASS_AUTONOMY_NOTE =
-  "Tool calls are pre-approved: do not ask for tool permission or plan approval, and do not pause to confirm local, reversible work. The rules in 'Executing actions with care' still apply: destructive, irreversible, shared-system or externally visible actions need the user's explicit request. If the task is genuinely ambiguous, ask one question with AskUserQuestion; when the requested work is done and verified, stop and report.";
+  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the rules in 'Executing actions with care' still apply to destructive, irreversible, shared-system or externally visible actions. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
 
 const LIGHT_APPROVAL_TEXT: Partial<Record<PermissionMode, string>> = {
   plan: LIGHT_APPROVAL_UNLESS_TRUSTED,

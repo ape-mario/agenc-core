@@ -184,8 +184,13 @@ function withOnlyFields(presented: LLMTool, fields: ReadonlySet<string>, pointer
  * after 1 s yielded and cost a write_stdin call; omitted, Light's 30 s default applies.
  */
 const LEAN_EXEC_FIELDS: ReadonlySet<string> = new Set(["cmd", "workdir", "timeoutMs"]);
+/**
+ * The escalation fields are left out of the list: every mode whose text lets the model request
+ * escalation names sandbox_permissions there (prompts/permissions-prompt.ts), and a sandbox notice
+ * that advises a retry loads the full schema (tools/exec-session-discovery.ts).
+ */
 const LEAN_EXEC_POINTER =
-  " Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens, sandbox escalation) are accepted; system.searchTools select:exec_command loads their schema.";
+  " Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens): system.searchTools select:exec_command loads them.";
 
 /**
  * The system.searchTools fields a Light session sees until it selects system.searchTools. Of 296

@@ -184,7 +184,7 @@ test("Light presents a lean exec_command until system.searchTools selects it", (
   const lean = registry.toLLMTools().find(t => t.function.name === "exec_command")!;
   expect(Object.keys(lean.function.parameters.properties as object).sort()).toEqual(["cmd", "timeoutMs", "workdir"]);
   expect(lean.function.parameters.required).toEqual(["cmd"]);
-  expect(lean.function.description).toContain("select:exec_command loads their schema");
+  expect(lean.function.description).toContain("select:exec_command loads them");
   registry.discoverToolNames?.(["exec_command"]);
   const full = registry.toLLMTools().find(t => t.function.name === "exec_command")!;
   const canonical = registry.tools.find(t => t.name === "exec_command")!;
@@ -259,7 +259,7 @@ test("standard sessions with deferral send compact core tools with the canonical
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: true });
   const lean = registry.toLLMTools().find(t => t.function.name === "exec_command")!;
   expect(Object.keys(lean.function.parameters.properties as object).sort()).toEqual(["cmd", "timeoutMs", "workdir"]);
-  expect(lean.function.description).toContain("select:exec_command loads their schema");
+  expect(lean.function.description).toContain("select:exec_command loads them");
   registry.discoverToolNames?.(["exec_command", "Grep"]);
   const wire = registry.toLLMTools();
   for (const item of wire) {
@@ -329,7 +329,7 @@ test("the registry reports compact presentation for standard deferral only", () 
 test("initial Light shell summaries carry no server guidance", () => {
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true });
   const shell = registry.toLLMTools().find(t => t.function.name === "exec_command")!;
-  expect(shell.function.description).toBe("Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens, sandbox escalation) are accepted; system.searchTools select:exec_command loads their schema.");
+  expect(shell.function.description).toBe("Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens): system.searchTools select:exec_command loads them.");
   registry.discoverToolNames?.(["write_stdin", "exec_command"]);
   const tools = registry.toLLMTools();
   expect(tools.find(t => t.function.name === "write_stdin")!.function.description).toBe("Continue exec_command's session_id; kill_process stops it. Empty chars polls; input requires initial tty=true. Include command newlines; match the session's sandbox_permissions.");
