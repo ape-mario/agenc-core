@@ -41,7 +41,11 @@ import { xaiSendsPriorityProcessing } from "../llm/providers/grok/priority-proce
 import { taskBudgetOf, prepareInteractiveTaskBudgetCall } from "../session/task-budget.js";
 import { AdmissionDeniedError } from "./admission-client.js";
 import { hitM4DurabilityFailpoint } from "../durability/failpoints.js";
-import { isLLMPreGenerationRejection, LLMManagedAdmissionError } from "../llm/errors.js";
+import {
+  isLLMPreGenerationRejection,
+  LLMContextWindowExceededError,
+  LLMManagedAdmissionError,
+} from "../llm/errors.js";
 import { oneShotFastModeActive } from "../one-shot-fast-mode.js";
 
 // A local-only count has no cache consumer. Match a SHA-256 revision's encoded
@@ -485,6 +489,18 @@ export const MIN_ADMISSIBLE_OUTPUT_TOKENS = 1_024;
  * Keep the complete input; only lower the requested output ceiling. A caller's
  * explicit smaller ceiling remains valid when it fits without clamping.
  */
+/** The provider's context-length refusal, when it is the error or one of its causes. */
+function contextWindowRefusalIn(
+  error: unknown,
+): LLMContextWindowExceededError | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    if (current instanceof LLMContextWindowExceededError) return current;
+    current = (current as { readonly cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
 export function fitOutputReservationToContext(
   accounting: Pick<TokenAccountingResult, "admissible" | "inputTokens" | "totalTokens">,
   contextWindowTokens: number,
@@ -1057,6 +1073,14 @@ export async function runAdmittedModelCall(
     if (lateCancellation !== undefined) throw lateCancellation;
     return response;
   } catch (error) {
+    // A context-length refusal of a request admitted on a calibrated estimate
+    // corrects that calibration before compaction retries the request.
+    if (dispatched && accountingResult !== undefined) {
+      const refusal = contextWindowRefusalIn(error);
+      if (refusal !== undefined) {
+        tokenAccountingService.recordContextOverflow(accountingResult, refusal.message);
+      }
+    }
     if (settled) {
       // Reconciliation/unknown-hold already reached an exactly-once terminal
       // state. Never overwrite it from a broad catch path.

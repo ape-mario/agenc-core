@@ -11,6 +11,7 @@ import {
   requireAdmissibleTokenAccounting,
   assertTokenAccountingWithinContext,
   MAX_TOKEN_ACCOUNTING_REQUEST_BYTES,
+  reportsCompletePromptTokens,
   tokenAccountingService,
   type TokenAccountingResult,
 } from "../../llm/token-accounting.js";
@@ -1639,6 +1640,16 @@ function createShrinkCounter(params: {
       ? { toolChoice: params.context.options.toolChoice }
       : {}),
   };
+  // Where provider reports lower the dispatch count (two-way calibration),
+  // measure in the conversation's calibration as the dispatch after a commit
+  // does: the uncalibrated count is about 2.4 times larger and would refuse a
+  // candidate that the calibrated dispatch check admits.
+  const calibrationScope = reportsCompletePromptTokens(params.providerName, params.model)
+    ? params.context.admissionSession?.conversationId
+    : undefined;
+  const endpointIdentity = calibrationScope === undefined || params.context.provider === undefined
+    ? undefined
+    : readProviderFactoryOptions(params.context.provider).baseURL;
   const count = async (messages: readonly RuntimeMessage[]) => {
     // Measure the projection the model would be sent, not the durable
     // history: inline images beyond the budget become placeholders on the
@@ -1646,6 +1657,8 @@ function createShrinkCounter(params: {
     const request = createTokenAccountingRequest({
       provider: params.providerName,
       model: params.model,
+      ...(calibrationScope ? { calibrationScope } : {}),
+      ...(endpointIdentity !== undefined ? { endpointIdentity } : {}),
       messages: boundContextImageBytes(
         messages.map(toLlmMessage),
         params.imageBudgetBytes,

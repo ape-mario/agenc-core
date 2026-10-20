@@ -7,7 +7,7 @@ import { fitOutputReservationToContext, runAdmittedModelCall } from "../../src/b
 import type { AdmissionAcquireInput } from "../../src/budget/admission-client.js";
 import { AdmissionDeniedError } from "../../src/budget/admission-client.js";
 import { createAllowAdmissionHarness } from "./admission-test-harness.js";
-import { LLMManagedAdmissionError, LLMManagedUsagePendingError, LLMRateLimitError, markLLMPreGenerationRejection } from "../../src/llm/errors.js";
+import { LLMContextWindowExceededError, LLMManagedAdmissionError, LLMManagedUsagePendingError, LLMRateLimitError, markLLMPreGenerationRejection } from "../../src/llm/errors.js";
 import type { AuthBackend } from "../../src/auth/backend.js";
 import { AgenCProvider } from "../../src/llm/providers/agenc/index.js";
 import { OllamaProvider } from "../../src/llm/providers/ollama/adapter.js";
@@ -1535,6 +1535,79 @@ describe("runAdmittedModelCall provider-usage calibration", () => {
     const next = await admittedCall(state, 1_048_576);
 
     expect(next.input).toBeGreaterThan(plain.input);
+  });
+});
+
+// Round 4 job te: DeepSeek reported 2.45x fewer prompt tokens than the conservative fallback in 6,580 recorded
+// requests, so a long session's effective window held about 42% of what the model accepts.
+describe("runAdmittedModelCall two-way calibration on DeepSeek", () => {
+  const messages = [{ role: "user" as const, content: `photonic geometry ${"x ".repeat(20_000)}` }];
+
+  function deepseekHarness(conversationId: string) {
+    const state = harness({});
+    Object.assign(state.provider, { name: "deepseek" });
+    Object.assign(state.session, { conversationId });
+    return state;
+  }
+
+  async function admittedCall(
+    state: ReturnType<typeof deepseekHarness>,
+    reportedPromptTokens: (admittedInputTokens: number) => number | Error,
+  ): Promise<number> {
+    await runAdmittedModelCall({
+      session: state.session,
+      provider: state.provider,
+      messages,
+      options: { maxOutputTokens: 4_096, contextWindowTokens: 1_048_576 },
+      stepId: `model:two-way:${state.acquire.mock.calls.length + 1}`,
+      model: "deepseek-flash",
+      providerName: "deepseek",
+      invoke: async () => {
+        const promptTokens = reportedPromptTokens(state.acquire.mock.calls.at(-1)![0].maxInputTokens);
+        if (promptTokens instanceof Error) throw promptTokens;
+        return response({
+          model: "deepseek-flash",
+          usage: {
+            promptTokens,
+            completionTokens: 50,
+            totalTokens: promptTokens + 50,
+            availability: "reported",
+            provenance: "provider",
+            cachedInputTokens: 0,
+            reasoningOutputTokens: 0,
+            webSearchRequests: 0,
+          },
+        });
+      },
+    });
+    return state.acquire.mock.calls.at(-1)![0].maxInputTokens;
+  }
+
+  test("a report lowers the next admitted input reservation of the same conversation only", async () => {
+    const state = deepseekHarness("two-way-deepseek");
+    const fallback = await admittedCall(state, (input) => Math.round(input / 2.45));
+    const ratio = Math.round(fallback / 2.45) / fallback;
+
+    const next = await admittedCall(state, (input) => input);
+
+    expect(next).toBe(Math.ceil(fallback * (ratio * 1.1)));
+    expect(next).toBeLessThan(fallback * 0.5);
+    const control = deepseekHarness("two-way-deepseek-control");
+    expect(await admittedCall(control, (input) => input)).toBe(fallback);
+  });
+
+  test("a context-length refusal re-anchors the conversation on the prompt size the provider reports", async () => {
+    const state = deepseekHarness("two-way-deepseek-refusal");
+    const fallback = await admittedCall(state, (input) => Math.round(input / 2.45));
+    const refused = Math.round(fallback * 0.8);
+
+    await expect(admittedCall(state, () => new LLMContextWindowExceededError(
+      "deepseek",
+      `This model's maximum context length is 65536 tokens. However, you requested ${refused + 4_096} tokens ` +
+        `(${refused} in the messages, 4096 in the completion).`,
+    ))).rejects.toBeInstanceOf(LLMContextWindowExceededError);
+
+    expect(await admittedCall(state, (input) => input)).toBe(Math.ceil(fallback * ((refused / fallback) * 1.1)));
   });
 });
 
