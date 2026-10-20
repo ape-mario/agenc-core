@@ -1671,6 +1671,7 @@ describe("Light's model-family tuning follows the model through gateways", () =>
   ])("other models through %s keep the default Light head", async (provider, model) => {
     const prompt = await head(provider, model);
     expect(prompt).toContain(LIGHT_FINISH);
-    expect(prompt).toContain("Edit the shortest unique text; Write complete files.");
+    expect(prompt).not.toContain("Edit and create files with apply_patch; put all hunks of one change in one patch.");
+    expect(prompt).toBe(await head("anthropic", "claude-haiku-5-5"));
   });
 });
