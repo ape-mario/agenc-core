@@ -17,7 +17,7 @@ import {
 import type { LLMMessage, LLMTool } from "../../src/llm/types.js";
 
 const HEADROOM = TOKEN_ACCOUNTING_ANCHORED_CALIBRATION_HEADROOM;
-// DeepSeek's measured prompt tokens per conservative-fallback token (round 4 job te: the fallback was 2.45x).
+// DeepSeek's prompt tokens per conservative-fallback token in recorded requests (the fallback was 2.45x).
 const DEEPSEEK_RATIO = 1 / 2.45;
 
 const SYSTEM_PROMPT = "You are AgenC, an autonomous coding agent. Use the tools to read and change files.\n".repeat(120);

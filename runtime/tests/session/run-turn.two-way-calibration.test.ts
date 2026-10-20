@@ -35,8 +35,8 @@ afterEach(() => {
 });
 
 /**
- * DeepSeek's own prompt count for a request: about 4.3 bytes of request JSON per token, the density measured on
- * round 4 receipts, where AgenC's conservative fallback was 2.45 times the count.
+ * DeepSeek's own prompt count for a request: about 4.3 bytes of request JSON per token, the density of recorded
+ * DeepSeek requests (2026-10-20), where AgenC's conservative fallback was 2.45 times the count.
  */
 function deepseekPromptTokens(messages: readonly LLMMessage[], options: LLMChatOptions | undefined): number {
   return Math.ceil(Buffer.byteLength(JSON.stringify({

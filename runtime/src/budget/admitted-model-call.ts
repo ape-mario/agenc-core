@@ -484,11 +484,6 @@ function isSameModelIdentity(reported: string, requested: string): boolean {
  */
 export const MIN_ADMISSIBLE_OUTPUT_TOKENS = 1_024;
 
-/**
- * Shared context-fit authority for admission and advisory-compaction preflight.
- * Keep the complete input; only lower the requested output ceiling. A caller's
- * explicit smaller ceiling remains valid when it fits without clamping.
- */
 /** The provider's context-length refusal, when it is the error or one of its causes. */
 function contextWindowRefusalIn(
   error: unknown,
@@ -501,6 +496,11 @@ function contextWindowRefusalIn(
   return undefined;
 }
 
+/**
+ * Shared context-fit authority for admission and advisory-compaction preflight.
+ * Keep the complete input; only lower the requested output ceiling. A caller's
+ * explicit smaller ceiling remains valid when it fits without clamping.
+ */
 export function fitOutputReservationToContext(
   accounting: Pick<TokenAccountingResult, "admissible" | "inputTokens" | "totalTokens">,
   contextWindowTokens: number,

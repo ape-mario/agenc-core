@@ -57,11 +57,13 @@ export const TOKEN_ACCOUNTING_CALIBRATION_MAX_SCOPES = 256;
  * {@link TOKEN_ACCOUNTING_ANCHORED_CALIBRATION_SAMPLES} reports. The part of the request the provider has already
  * measured is scaled by that ratio, and only what grew since the anchor keeps the conservative fallback rate, so a
  * large dense tool result is still bounded at two bytes per token while the history around it is not counted at
- * twice its size again. Measured on 6,580 DeepSeek receipts (round 4, job te): the fallback was 2.45x the provider's
- * count (p5 2.19, max 3.19); replaying the recorded sessions through this rule gave a median of 1.18x and a minimum
- * of 1.03x over 4,389 calibrated main and subagent calls. The headroom covers the drift of the ratio between
- * consecutive calls; the minimum factor bounds the damage of an implausibly low report (it keeps at least 30% of
- * the fallback, about six bytes per token).
+ * twice its size again. Measured on 6,580 recorded DeepSeek requests (2026-10-20): the fallback was 2.45x the
+ * provider's count (p5 2.19, max 3.19); replaying the recorded sessions through this rule gave a median of 1.18x and
+ * a minimum of 1.03x over 4,389 calibrated main and subagent calls. The headroom covers the drift of the ratio
+ * between consecutive calls; the minimum factor bounds the damage of an implausibly low report (it keeps at least
+ * 30% of the fallback, about six bytes per token). Content denser than the fallback's own floor (random base64 is
+ * about 1.4 bytes per DeepSeek token) is undercounted on growth exactly as a first call undercounts it; a refusal
+ * for context length then records the provider's own count (see `recordContextOverflow`) before compaction retries.
  */
 export const TOKEN_ACCOUNTING_ANCHORED_CALIBRATION_HEADROOM = 1.1;
 export const TOKEN_ACCOUNTING_ANCHORED_CALIBRATION_SAMPLES = 8;

@@ -1538,8 +1538,8 @@ describe("runAdmittedModelCall provider-usage calibration", () => {
   });
 });
 
-// Round 4 job te: DeepSeek reported 2.45x fewer prompt tokens than the conservative fallback in 6,580 recorded
-// requests, so a long session's effective window held about 42% of what the model accepts.
+// 6,580 recorded DeepSeek requests (2026-10-20): the conservative fallback was 2.45x the provider's prompt count, so a
+// long session's effective window held about 42% of what the model accepts.
 describe("runAdmittedModelCall two-way calibration on DeepSeek", () => {
   const messages = [{ role: "user" as const, content: `photonic geometry ${"x ".repeat(20_000)}` }];
 
