@@ -155,6 +155,16 @@ export interface ProductHelpAttachment {
 }
 
 /**
+ * Interactive Light's memory rules and directories, sent with a user message
+ * about memory or durable facts when the session's fixed prefix left them out
+ * (prompts/attachments/memory-on-request.ts).
+ */
+export interface MemoryOnRequestAttachment {
+  readonly kind: "memory_on_request";
+  readonly content: string;
+}
+
+/**
  * Output-style attachment (fires every turn when style is non-default).
  * Source: upstream attachment donor `attachments.ts:1598-1613`.
  */
@@ -379,6 +389,7 @@ export type Attachment =
   | DateChangeAttachment
   | CriticalSystemReminderAttachment
   | ProductHelpAttachment
+  | MemoryOnRequestAttachment
   | OutputStyleAttachment
   | TokenUsageAttachment
   | BudgetUsdAttachment

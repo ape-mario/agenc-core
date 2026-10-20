@@ -37,6 +37,7 @@ import { deferredToolsDeltaProducer } from "./deferred-tools-delta.js";
 import { mcpInstructionsDeltaProducer } from "./mcp-delta.js";
 import { outputStyleProducer } from "./output-style.js";
 import { productHelpProducer } from "./product-help.js";
+import { memoryOnRequestProducer } from "./memory-on-request.js";
 import { planModeProducer } from "./plan-mode.js";
 import { verifyPlanReminderProducer } from "./verify-plan-reminder.js";
 import { changedFilesProducer } from "./changed-files.js";
@@ -86,6 +87,12 @@ export interface GetAttachmentsOptions {
    * rides on every request, so the pulse would only repeat it.
    */
   readonly autonomyStatedInPermissions?: boolean;
+  /**
+   * Present for an interactive Light session whose fixed prefix carries no
+   * memory rules (its memory was empty when the prompt was assembled):
+   * resolves the rules and directories for the memory-on-request reminder.
+   */
+  readonly lightMemoryOnRequest?: () => Promise<string | undefined>;
   /**
    * Exact turn identity plus the authoritative root-human turn currently
    * bound to the session. The root turn can be absent or belong to another
@@ -222,6 +229,7 @@ const PRODUCERS: readonly AttachmentProducer[] = [
   instructionUpdateProducer,
   criticalReminderProducer,
   productHelpProducer,
+  memoryOnRequestProducer,
   outputStyleProducer,
   //
   // Phase 5 — Memory + file injections:

@@ -157,10 +157,40 @@ describe("memory prompt", () => {
       expect(unchanged?.directories).toContain("Read memory when requested; verify past claims against current files. Ignore memory if the user asks.");
       expect(unchanged?.directories.endsWith("\nOWNER_POLICY\nKeep exact.")).toBe(true);
     }
+    // Interactive Light with empty memory sends its rules on request only.
     const interactive = await memory.loadMemoryPrompt({ ...owner, runtimeOptions: { ...runtimeOptions, nonInteractive: false } });
-    expect(interactive?.instructions).toContain("# auto memory");
-    expect(interactive?.directories).toContain("# Memory directories");
+    expect(interactive?.instructions).toBe("");
+    expect(interactive?.directories).toBe("");
+    expect(interactive?.onRequest).toContain("# auto memory");
+    expect(interactive?.onRequest).toContain("# Memory directories");
+    expect(interactive?.onRequest?.endsWith("\nOWNER_POLICY\nKeep exact.")).toBe(true);
     expect(await memory.loadMemoryPrompt({ ...owner, settings: { userSettings: { autoMemoryEnabled: false } } })).toBeNull();
+  });
+
+  it("interactive Light keeps memory rules out of its fixed prefix only while both indexes are empty", async () => {
+    const env = { HOME: tempRoot, AGENC_HOME: join(tempRoot, "home") };
+    const cwd = join(tempRoot, "repo");
+    const configStore = new ConfigStore({ home: env.AGENC_HOME, env, cwd });
+    const owner = { cwd, env, configStore, runtimeOptions: { remoteMode: false, lightMode: true, nonInteractive: false } };
+    const globalDir = (await resolveGlobalMemoryDirectory(owner))!;
+    const projectDir = (await resolveAutoMemoryDirectory(owner)).path!;
+    const empty = await memory.loadMemoryPrompt(owner);
+    expect(empty).toEqual({ instructions: "", directories: "",
+      onRequest: memory.buildLightMemoryOnRequestText(projectDir, undefined, globalDir) });
+    expect(empty!.onRequest).toContain(memory.LIGHT_MEMORY_RULES_MARKER);
+    // A whitespace-only index has no content either.
+    writeFileSync(join(projectDir, "MEMORY.md"), "  \n");
+    expect((await memory.loadMemoryPrompt(owner))!.instructions).toBe("");
+    // Content in either index puts the rules back in the fixed prefix.
+    for (const directory of [projectDir, globalDir]) {
+      writeFileSync(join(directory, "MEMORY.md"), "- [Editor](editor.md): prefers vim\n");
+      const withMemory = await memory.loadMemoryPrompt(owner);
+      expect(withMemory!.instructions).toBe(memory.buildLightMemoryInstructionLines().join("\n"));
+      expect(withMemory!.directories).toContain(`- Project: \`${projectDir}\``);
+      expect(withMemory!.onRequest).toBeUndefined();
+      rmSync(join(directory, "MEMORY.md"));
+    }
+    expect(await memory.memoryIndexesHaveContent([globalDir, projectDir])).toBe(false);
   });
 
   it("interactive Light keeps the first-save rules in its head and the rules for existing memories with the index", async () => {
@@ -169,6 +199,10 @@ describe("memory prompt", () => {
     const configStore = new ConfigStore({ home: env.AGENC_HOME, env, cwd });
     const owner = { cwd, env, configStore,
       runtimeOptions: { remoteMode: false, lightMode: true, nonInteractive: false, coworkMemoryExtraGuidelines: "OWNER_POLICY" } };
+    // With memory the rules ride the fixed prefix (empty memory: see the test above).
+    const globalDir = (await resolveGlobalMemoryDirectory(owner))!;
+    mkdirSync(globalDir, { recursive: true });
+    writeFileSync(join(globalDir, "MEMORY.md"), "- [Editor](editor.md): prefers vim\n");
     const light = await memory.loadMemoryPrompt(owner);
     const standard = await memory.loadMemoryPrompt({ ...owner, runtimeOptions: { ...owner.runtimeOptions, lightMode: false } });
     const instructions = light!.instructions;

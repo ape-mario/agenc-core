@@ -9,6 +9,7 @@ import type { PermissionMode } from "../../src/permissions/types.js";
 import { assembleBaseInstructionsForModel } from "../../src/prompts/system-prompt.js";
 import { LIGHT_BYPASS_AUTONOMY_NOTE } from "../../src/prompts/permissions-prompt.js";
 import { AGENC_UNDO_PATHS } from "../../src/prompts/product-help.js";
+import { LIGHT_MEMORY_RULES_MARKER } from "../../src/memory/memdir.js";
 import { permissionInstructionsStateLightAutonomy } from "../../src/session/permission-instructions.js";
 import { runTurn } from "../../src/session/run-turn.js";
 import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
@@ -125,5 +126,29 @@ describe("Light fixed request prefix", () => {
     expect(reminderIndex).toBeGreaterThan(0);
     expect(text(asked.messages[reminderIndex + 1]!)).toContain("How do I undo what you just did?");
     for (const request of requests.slice(2)) expect(count(request, AGENC_UNDO_PATHS)).toBe(1);
+  });
+
+  test("with empty memory the rules and directories arrive once, with the first message about memory", async () => {
+    const light = await scriptedSession("bypassPermissions", true);
+    await light.turn("turn-1", "Fix the failing test.");
+    await light.turn("turn-2", "Remember that I prefer tabs over spaces.");
+    await light.turn("turn-3", "Also note that down: we use pnpm here.");
+    const requests = light.requests;
+    expect(requests).toHaveLength(6);
+    for (let index = 1; index < requests.length; index += 1) {
+      expect(requests[index]!.systemPrompt).toBe(requests[index - 1]!.systemPrompt);
+      expect(requests[index]!.messages.slice(0, requests[index - 1]!.messages.length)).toEqual(requests[index - 1]!.messages);
+    }
+    // The fixed prefix carries no memory rules or directories.
+    expect(requests[0]!.systemPrompt).not.toContain(LIGHT_MEMORY_RULES_MARKER);
+    expect(requests[0]!.systemPrompt).not.toContain("# Memory directories");
+    for (const request of requests.slice(0, 2)) expect(count(request, LIGHT_MEMORY_RULES_MARKER)).toBe(0);
+    // The memory request brings them once, right before the message, with the paths.
+    const asked = requests[2]!;
+    const index = asked.messages.findIndex((message) => text(message).includes(LIGHT_MEMORY_RULES_MARKER));
+    expect(index).toBeGreaterThan(0);
+    expect(text(asked.messages[index]!)).toContain("# Memory directories");
+    expect(text(asked.messages[index + 1]!)).toContain("Remember that I prefer tabs over spaces.");
+    for (const request of requests.slice(2)) expect(count(request, LIGHT_MEMORY_RULES_MARKER)).toBe(1);
   });
 });

@@ -297,6 +297,8 @@ import {
 } from "./run-turn-compaction.js";
 import { fitToolResultsToBudget, type ContextFitResult } from "./request-context-fit.js";
 import { permissionInstructionsStateLightAutonomy } from "./permission-instructions.js";
+import { LIGHT_MEMORY_RULES_MARKER } from "../memory/memdir.js";
+import { resolveLightMemoryOnRequest } from "../prompts/system-prompt.js";
 import { logForDebugging } from "../utils/debug.js";
 
 // Declarations that moved to the run-turn-* sibling modules. Re-exported so
@@ -952,6 +954,13 @@ async function prepareSamplingRequestBoundary(
       permissionContext,
       state.modelInstructions,
     ),
+    // An interactive Light session whose prompt was assembled with empty
+    // memory has no memory rules in its fixed prefix (memory/memdir.ts).
+    ...(session.services.runtimeOptions?.lightMode === true &&
+      session.services.runtimeOptions.nonInteractive !== true &&
+      !state.modelInstructions.includes(LIGHT_MEMORY_RULES_MARKER)
+      ? { lightMemoryOnRequest: () => resolveLightMemoryOnRequest(session, ctx.cwd) }
+      : {}),
     admittedMemorySelector: createAdmittedMemorySelector(session),
     // Producers hold only an opaque session key, so what they decide is
     // invisible to an operator unless they can report it. Routed to the

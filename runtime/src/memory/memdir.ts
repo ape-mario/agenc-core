@@ -12,6 +12,7 @@ import { isLightPrintRun, lightPrintMemoryContext } from "../prompts/light-print
  * head, `directories` carry the two memory paths and live in the dynamic tail.
  */
 import { feature } from 'bun:bundle'
+import { lstat, readFile } from 'node:fs/promises'
 import { join } from 'path'
 import { getFsImplementation } from '../utils/fsOperations.js'
 import { resolveAutoMemoryDirectory, resolveGlobalMemoryDirectory, type ResolveAutoMemoryDirectoryOptions } from '../services/extractMemories/memory-paths.js'
@@ -122,6 +123,12 @@ export interface MemoryPromptSections {
   readonly instructions: string
   /** Memory directory paths (and per-session guidance) for the dynamic tail. */
   readonly directories: string
+  /**
+   * Interactive Light with no memory yet: both halves are empty and this text
+   * (instructions and directories together) is sent only with a user message
+   * that is about memory or durable facts (prompts/attachments/memory-on-request.ts).
+   */
+  readonly onRequest?: string
 }
 
 /**
@@ -230,6 +237,40 @@ export function buildLightMemoryInstructionLines(): string[] {
  */
 export const LIGHT_MEMORY_RECALL_RULES =
   'Read a topic file only when needed and an index only to update it; search the memory directory with grep. Update a topic instead of duplicating it; to forget, delete its file and index line; fix or delete stale memories. Ignore memory if asked.'
+
+/** Opening words of Light's memory rules; their presence means the rules are in front of the model. */
+export const LIGHT_MEMORY_RULES_MARKER =
+  'Save durable facts in the global (user, all projects) or project (this repository) memory directory'
+
+/** Interactive Light's memory rules and directories as one block, for the on-request reminder. */
+export function buildLightMemoryOnRequestText(
+  projectMemoryDir: string,
+  extraGuidelines: readonly string[] | undefined,
+  globalMemoryDir: string,
+): string {
+  return [
+    buildLightMemoryInstructionLines().join('\n'),
+    buildLightMemoryDirectoryLines(projectMemoryDir, extraGuidelines, globalMemoryDir).join('\n'),
+  ].join('\n\n')
+}
+
+/**
+ * Whether either memory index (`MEMORY.md`) has content, read the way the live
+ * instruction loader injects it (prompts/live-instructions.ts): missing, empty,
+ * non-regular and symlinked entrypoints contribute nothing.
+ */
+export async function memoryIndexesHaveContent(directories: readonly string[]): Promise<boolean> {
+  for (const directory of directories) {
+    try {
+      const path = join(directory, ENTRYPOINT_NAME)
+      if (!(await lstat(path)).isFile()) continue
+      if ((await readFile(path, 'utf8')).trim().length > 0) return true
+    } catch {
+      // Missing or unreadable: no content.
+    }
+  }
+  return false
+}
 
 /**
  * Interactive Light's directory block: the two paths and the existence rule.
@@ -449,6 +490,18 @@ export async function loadMemoryPrompt(
       directories: isLightPrintRun(owner.runtimeOptions, presentationEnvironment)
         ? lightPrintMemoryContext(autoDir, globalDir, extraGuidelines)
         : lightMemoryContext(autoDir, globalDir, extraGuidelines),
+    }
+  }
+  // Interactive Light resends its fixed prefix on every model call. A session
+  // whose memory is still empty sends the rules and directories only with a
+  // message about memory or durable facts; the background extractor keeps
+  // saving project facts either way. Decided once per assembly, so the prefix
+  // stays byte-stable for the session.
+  if (light && !(await memoryIndexesHaveContent([globalDir, autoDir]))) {
+    return {
+      instructions: '',
+      directories: '',
+      onRequest: buildLightMemoryOnRequestText(autoDir, extraGuidelines, globalDir),
     }
   }
   return light

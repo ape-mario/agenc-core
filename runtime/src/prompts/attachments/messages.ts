@@ -118,6 +118,9 @@ function renderAttachment(attachment: Attachment): LLMMessage | null {
     case "product_help": {
       return userContextMessage(wrapSystemReminder(PRODUCT_HELP[attachment.topic]));
     }
+    case "memory_on_request": {
+      return userContextMessage(wrapSystemReminder(sanitizeSystemReminderContent(attachment.content)));
+    }
     case "output_style": {
       const style = sanitizeSystemReminderContent(attachment.style);
       return userContextMessage(

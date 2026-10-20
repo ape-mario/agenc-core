@@ -521,6 +521,34 @@ export async function resolveMemoryPromptInputs(session: SystemPromptSessionSnap
   }
 }
 
+/**
+ * Interactive Light's memory rules and directories for the memory-on-request
+ * reminder (prompts/attachments/memory-on-request.ts), whatever the memory
+ * holds now: the session's fixed prefix left them out when its memory was empty
+ * at assembly. Undefined when memory is disabled or unavailable.
+ */
+export async function resolveLightMemoryOnRequest(session: SystemPromptSessionSnapshot, cwd: string): Promise<string | undefined> {
+  try {
+    const configStore = session.services?.configStore;
+    if (configStore === undefined) return undefined;
+    const prompt = await loadMemoryPrompt({
+      cwd,
+      configStore,
+      env: session.services?.userShell?.childEnvironment ?? session.services?.providerEnvironment ?? {},
+      runtimeOptions: { remoteMode: false, ...session.services?.runtimeOptions },
+    }, session.services?.providerEnvironment);
+    if (prompt === null) return undefined;
+    if (prompt.onRequest !== undefined) return prompt.onRequest;
+    return prompt.instructions.length > 0 ? [prompt.instructions, prompt.directories].join("\n\n") : undefined;
+  } catch (error) {
+    logForDebugging(
+      `memory rules unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      { level: "debug" },
+    );
+    return undefined;
+  }
+}
+
 // Re-export for the env helper's use; kept internal so callers don't
 // depend on node:child_process directly.
 function readGitBranch(
