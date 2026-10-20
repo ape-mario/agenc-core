@@ -1092,7 +1092,9 @@ export class StreamingToolExecutor {
     } finally {
       this.aloneWaiting.delete(tool);
       if (this.aloneHolder === tool) this.aloneHolder = undefined;
-      releaseTurn();
+      // A cancelled waiter must still preserve its predecessor's barrier;
+      // otherwise the next waiter can overlap the active exclusive call.
+      void previous.then(releaseTurn);
       void this.processQueue();
     }
   }

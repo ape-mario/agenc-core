@@ -7,7 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
 import { execCommandRunsConcurrently } from "./read-only-shell-concurrency.js";
 import { createExecCommandTool } from "./system/exec-command.js";
-import { StreamingToolExecutor, type StreamingToolResult } from "./streaming-executor.js";
+import { StreamingToolExecutor, type StreamingToolResult, type TrackedTool } from "./streaming-executor.js";
 import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
 import type { LLMToolCall } from "../llm/types.js";
 import type { Tool } from "./types.js";
@@ -166,7 +166,7 @@ describe("a read-only call that cannot take the read-only route", () => {
    * when its sandbox cannot be prepared, and run through the hook the
    * executor hands to concurrently scheduled shell calls.
    */
-  function routedHarness(ordinary: ReadonlySet<string>, durations: Record<string, number>, abortSignal?: AbortSignal) {
+  function routedHarness(ordinary: ReadonlySet<string>, durations: Record<string, number | Promise<void>>, abortSignal?: AbortSignal) {
     const tool: Tool = createExecCommandTool({ cwd });
     const registry = {
       tools: [tool],
@@ -189,7 +189,12 @@ describe("a read-only call that cannot take the read-only route", () => {
           active += 1;
           timeline.push(`start:${toolCall.id}`);
           (concurrentDuring[toolCall.id] ??= []).push(active);
-          await delay(durations[toolCall.id] ?? 1, undefined, { signal: opts.signal });
+          const duration = durations[toolCall.id] ?? 1;
+          if (typeof duration === "number") {
+            await delay(duration, undefined, { signal: opts.signal });
+          } else {
+            await duration;
+          }
           (concurrentDuring[toolCall.id] ??= []).push(active);
           timeline.push(`end:${toolCall.id}`);
           active -= 1;
@@ -246,6 +251,36 @@ describe("a read-only call that cannot take the read-only route", () => {
     exec.close();
     expect(await drain(exec)).toEqual(["a", "b", "c"]);
     expect(Math.max(...Object.values(concurrentDuring).flat())).toBe(3);
+  });
+
+  test("cancelling a waiting fallback preserves the active fallback's exclusive turn", async () => {
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const { exec, timeline, concurrentDuring } = routedHarness(
+      new Set(["a", "b", "c"]), { a: firstGate, b: 1, c: 1 },
+    );
+    exec.addTool(block("a"), execCall("a", "ls | wc -l"));
+    exec.addTool(block("b"), execCall("b", "cat README.md | wc -l"));
+    exec.addTool(block("c"), execCall("c", "cat package.json | wc -l"));
+    exec.dispatchPending();
+    exec.close();
+    const results = collect(exec);
+    try {
+      await expect.poll(() => timeline).toEqual(["start:a"]);
+      // The drain watchdog can cancel one waiting call without cancelling
+      // its active predecessor or the other waiting calls.
+      const waiting = (exec as unknown as { tools: TrackedTool[] }).tools.find((tool) => tool.id === "b")!;
+      waiting.drainCancel!.abort(new Error("isolated tool timeout"));
+      await expect.poll(() => waiting.finalized).toBe(true);
+      await delay(0);
+      expect(timeline).toEqual(["start:a"]);
+    } finally {
+      releaseFirst();
+      await results;
+    }
+    expect(timeline).toEqual(["start:a", "end:a", "start:c", "end:c"]);
+    expect(concurrentDuring.c).toEqual([1, 1]);
+    expect((await results).map((result) => result.result.isError === true)).toEqual([false, true, false]);
   });
 
   test("its path waits for the complete response before it starts", async () => {
