@@ -53,7 +53,9 @@ function presentProperty(schema: unknown, hint: string | null | undefined): unkn
 
 /** Adapt the earlier Light summaries without hiding accepted arguments. */
 export function lightPresentation(tool: LLMTool, options: { readonly leanExec?: boolean } = {}): LLMTool {
-  const presented = lightPresentationCanonical(tool);
+  const presented = tool.function.name === "Edit" && (tool.function.parameters.properties as Record<string, unknown> | undefined)?.edits !== undefined
+    ? tool
+    : lightPresentationCanonical(tool);
   if (options.leanExec !== true || tool.function.name !== "exec_command") return presented;
   return withOnlyFields(presented, LEAN_EXEC_FIELDS, LEAN_EXEC_POINTER);
 }

@@ -74,6 +74,7 @@ import {
 } from "./tools/system/file-read.js";
 import {
   createFileEditTool,
+  createFileBatchEditTool,
   createFileMultiEditTool,
   FILE_EDIT_TOOL_NAME,
   FILE_MULTI_EDIT_TOOL_NAME,
@@ -1104,6 +1105,14 @@ export function buildToolRegistry(
       ),
     ),
   );
+  const legacyBuiltinEdit = defaultBuiltinTools.find(tool => tool.name === FILE_EDIT_TOOL_NAME);
+  const batchBuiltinEdit = configuredTools([tagTool(createFileBatchEditTool({
+    lightMode: options.lightMode,
+    allowedPaths: [options.workspaceRoot],
+  }))])[0];
+  function usesBatchEdit(): boolean {
+    return options.lightMode === true && options.getSession?.()?.services?.provider?.name === "deepseek";
+  }
   // Direct shell RPCs select one daemon-owned builtin by name. Reserve both
   // names even when the canonical tool is disabled or unavailable so an
   // extension cannot become the physical execution target by collision.
@@ -1218,6 +1227,7 @@ export function buildToolRegistry(
       // The supplied TOML policy is live, including nested per-tool defaults.
       // Snapshot its value rather than its object identity or array references.
       [JSON.stringify(options.toolsConfig)],
+      [usesBatchEdit()],
     ];
   }
 
@@ -1266,7 +1276,9 @@ export function buildToolRegistry(
     );
     const withoutManagedMcpCollisions = (tools: readonly Tool[]): Tool[] =>
       preserveTrustedRuntimeOwnedTools(tools).filter(tool => !managedMcpNames.has(tool.name));
-    const baseSpecs = withoutManagedMcpCollisions(staticTools).map(specForTool);
+    const baseSpecs = withoutManagedMcpCollisions(staticTools.map(tool =>
+      usesBatchEdit() && tool === legacyBuiltinEdit && batchBuiltinEdit !== undefined ? batchBuiltinEdit : tool,
+    )).map(specForTool);
     const directMcpTools = mcpTools.filter(
       (tool) => tool.metadata?.deferred !== true,
     );
