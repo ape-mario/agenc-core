@@ -1,3 +1,6 @@
+import { prepareShellObservation } from "./side-effect-free-shell.js";
+import { autoFixPostToolHookIsInactive } from "../services/autoFix/autoFixHook.js";
+import { toolStage, withToolTiming } from "./stage-timing.js";
 import { interruptedExecReport } from "./interrupted-exec-report.js";
 import { readPendingPhysicalSettlement } from "./physical-settlement.js";
 import { stripModelSuppliedAgenCInternalArgs } from "./internal-args.js";
@@ -99,7 +102,7 @@ import type {
   PostToolUseHook,
   PreToolUseHook,
 } from "./hooks.js";
-import { runPreToolUseHooks } from "./hooks.js";
+import { runPreToolUseHooks as untimedPreHooks } from "./hooks.js";
 import { isWorkflowApprovalSession } from "../permissions/approval-failure.js";
 import { clearApprovalResponseKey } from "../permissions/approval-response-key.js";
 import {
@@ -143,6 +146,8 @@ import {
   createWorkspaceOperationLifetime,
   runWithWorkspaceOperationLifetime,
 } from "../workspace/tool-operation-lifetime.js";
+
+const runPreToolUseHooks: typeof untimedPreHooks = (...args) => toolStage("hooks", () => untimedPreHooks(...args));
 
 export interface ToolCall {
   readonly toolName: ToolName;
@@ -842,6 +847,14 @@ export class ToolRouter {
     toolCall: LLMToolCall,
     opts: LiveToolDispatchOptions,
   ): Promise<ToolDispatchResult> {
+    return withToolTiming(opts.session, toolCall.id, toolCall.name, () =>
+      this.dispatchModelToolCallTimed(toolCall, opts));
+  }
+
+  private async dispatchModelToolCallTimed(
+    toolCall: LLMToolCall,
+    opts: LiveToolDispatchOptions,
+  ): Promise<ToolDispatchResult> {
     const canonicalName = modelToolAliasTarget(toolCall.name) === undefined ? toolCall.name
       : resolveModelToolAlias(toolCall.name, this.getSpecs().map(spec => spec.tool.name));
     if (canonicalName !== toolCall.name) toolCall = { ...toolCall, name: canonicalName };
@@ -1323,11 +1336,15 @@ export class ToolRouter {
               invocation: dispatchInvocation,
             },
           );
+          const observationTool = await toolStage("sandbox_broker", () => prepareShellObservation(
+            spec.tool, dispatchArgs, opts.turn.cwd, opts.session.services.sandboxExecutionBroker));
+          const executionTool = observationTool ?? spec.tool;
           return runAdmittedToolCall({
             session: opts.session,
             turnId: opts.turn.subId,
             callId: toolCall.id,
-            tool: spec.tool,
+            tool: executionTool,
+            requireDurable: Boolean(opts.postHooks?.some(hook => !autoFixPostToolHookIsInactive(hook)) || opts.failureHooks?.length),
             args: dispatchArgs,
             signal: toolAbortController.signal,
             ...(orchestrateDispatchAttempt > 1
@@ -1337,7 +1354,7 @@ export class ToolRouter {
               executeToolDispatch(
                 rawDispatchOptions(dispatchRawArgs, {
                   ...withoutPermissionEvaluator(opts),
-                  tool: spec.tool,
+                  tool: executionTool,
                   parsedArgs: dispatchArgs,
                   invocation: dispatchInvocation,
                   preHooks: [],
