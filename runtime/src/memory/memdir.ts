@@ -12,6 +12,7 @@ import { isLightPrintRun, lightPrintMemoryContext } from "../prompts/light-print
  * head, `directories` carry the two memory paths and live in the dynamic tail.
  */
 import { feature } from 'bun:bundle'
+import { lstat, readFile } from 'node:fs/promises'
 import { join } from 'path'
 import { getFsImplementation } from '../utils/fsOperations.js'
 import { resolveAutoMemoryDirectory, resolveGlobalMemoryDirectory, type ResolveAutoMemoryDirectoryOptions } from '../services/extractMemories/memory-paths.js'
@@ -122,6 +123,12 @@ export interface MemoryPromptSections {
   readonly instructions: string
   /** Memory directory paths (and per-session guidance) for the dynamic tail. */
   readonly directories: string
+  /**
+   * Interactive Light with no memory yet: both halves are empty and this text
+   * (instructions and directories together) is sent only with a user message
+   * that is about memory or durable facts (prompts/attachments/memory-on-request.ts).
+   */
+  readonly onRequest?: string
 }
 
 /**
@@ -201,21 +208,68 @@ export function buildMemoryInstructionLines(): string[] {
 }
 
 /**
- * Interactive Light's rendering of {@link buildMemoryInstructionLines}: the
- * same save, forget, format, index and recall rules in fewer words. Light
- * resends its head on every model call, where these rules were the largest
- * part not about safety. Light lists no Grep tool, so recall names grep on the
- * memory directory instead of the Grep tool call.
+ * Interactive Light's rendering of {@link buildMemoryInstructionLines}. Light
+ * resends its head on every model call, so the head keeps what a first save
+ * needs at any moment, asked or not: what to save and never save, where, the
+ * file format, the index line and the no-probing rule. The rules about
+ * memories that already exist (recall, search with grep, read an index only to
+ * update it, update instead of duplicating, forget, fix stale memories, ignore
+ * memory on request) travel with the injected index
+ * ({@link LIGHT_MEMORY_RECALL_RULES}), which is present exactly when an index
+ * has content: at session start, or after a save through the instruction
+ * update reminder. An index that outgrows its cap says so in its own
+ * truncation warning.
  */
 export function buildLightMemoryInstructionLines(): string[] {
   return [
     `# ${AUTO_MEM_DISPLAY_NAME}`,
     '',
-    `File memory: one markdown file per fact plus a \`${ENTRYPOINT_NAME}\` index, in the global (user, all projects) or project (this repository) directory under "Memory directories".`,
-    '- Save at once when asked to remember; to forget, delete the file and its index line. Also save who the user is and how they work, feedback they gave or confirmed (with the reason), project context not in the code (decisions and why, deadlines, incidents, owners) and pointers to external systems. Never save code patterns, file paths, git history, fix recipes, AGENC.md content or in-progress task state; from an activity log save only the non-obvious.',
-    `- \`<topic>.md\`: frontmatter \`name\`, \`description\` (one specific line for judging relevance) and \`type\` (${MEMORY_TYPES.join(', ')}), then the fact; feedback and project add **Why:** and **How to apply:** lines. Then add \`- [Title](topic.md): one-line hook\` to that directory's \`${ENTRYPOINT_NAME}\` (one line per file, under 150 characters, no frontmatter; first ${MAX_ENTRYPOINT_LINES} lines load). Update a topic's file instead of duplicating it.`,
-    '- Indexes are injected when non-empty; do not list or probe memory paths. Recall from injected indexes and attached memories; read a topic file only when needed, or grep the memory directory. Read an index only to update it. Verify past claims before acting; fix or delete stale memories. Ignore memory if asked.',
+    'Save durable facts in the global (user, all projects) or project (this repository) memory directory: at once when asked to remember, and unasked for who the user is, how they work, feedback they gave or confirmed, and project context or external pointers not in the code. Never save code patterns, paths, git history, fix recipes, AGENC.md content or task state; from an activity log save only the non-obvious.',
+    `- One \`<topic>.md\` per fact: frontmatter \`name\`, \`description\` (one specific line) and \`type\` (${MEMORY_TYPES.slice(0, -1).join(', ')} or ${MEMORY_TYPES[MEMORY_TYPES.length - 1]}), then the fact, plus **Why:** and **How to apply:** lines for feedback and project. Index it as \`- [Title](topic.md): hook\` (under 150 characters) in that directory's \`${ENTRYPOINT_NAME}\`, which has no frontmatter.`,
+    '- Indexes are injected when non-empty; do not probe memory paths.',
   ]
+}
+
+/**
+ * Interactive Light's rules for memories that already exist, appended to the
+ * framing of the injected memory indexes (prompts/live-instructions.ts), which
+ * only exists when an index has content.
+ */
+export const LIGHT_MEMORY_RECALL_RULES =
+  'Read a topic file only when needed and an index only to update it; search the memory directory with grep. Update a topic instead of duplicating it; to forget, delete its file and index line; fix or delete stale memories. Ignore memory if asked.'
+
+/** Opening words of Light's memory rules; their presence means the rules are in front of the model. */
+export const LIGHT_MEMORY_RULES_MARKER =
+  'Save durable facts in the global (user, all projects) or project (this repository) memory directory'
+
+/** Interactive Light's memory rules and directories as one block, for the on-request reminder. */
+export function buildLightMemoryOnRequestText(
+  projectMemoryDir: string,
+  extraGuidelines: readonly string[] | undefined,
+  globalMemoryDir: string,
+): string {
+  return [
+    buildLightMemoryInstructionLines().join('\n'),
+    buildLightMemoryDirectoryLines(projectMemoryDir, extraGuidelines, globalMemoryDir).join('\n'),
+  ].join('\n\n')
+}
+
+/**
+ * Whether either memory index (`MEMORY.md`) has content, read the way the live
+ * instruction loader injects it (prompts/live-instructions.ts): missing, empty,
+ * non-regular and symlinked entrypoints contribute nothing.
+ */
+export async function memoryIndexesHaveContent(directories: readonly string[]): Promise<boolean> {
+  for (const directory of directories) {
+    try {
+      const path = join(directory, ENTRYPOINT_NAME)
+      if (!(await lstat(path)).isFile()) continue
+      if ((await readFile(path, 'utf8')).trim().length > 0) return true
+    } catch {
+      // Missing or unreadable: no content.
+    }
+  }
+  return false
 }
 
 /**
@@ -228,10 +282,9 @@ export function buildLightMemoryDirectoryLines(
   globalMemoryDir: string,
 ): string[] {
   return [
-    '# Memory directories',
+    '# Memory directories (both exist: Write there directly, without mkdir)',
     `- Global: \`${globalMemoryDir}\``,
     `- Project: \`${projectMemoryDir}\``,
-    'Both exist: Write there directly, without mkdir or existence checks.',
     ...(extraGuidelines !== undefined && extraGuidelines.length > 0
       ? ['', ...extraGuidelines]
       : []),
@@ -437,6 +490,18 @@ export async function loadMemoryPrompt(
       directories: isLightPrintRun(owner.runtimeOptions, presentationEnvironment)
         ? lightPrintMemoryContext(autoDir, globalDir, extraGuidelines)
         : lightMemoryContext(autoDir, globalDir, extraGuidelines),
+    }
+  }
+  // Interactive Light resends its fixed prefix on every model call. A session
+  // whose memory is still empty sends the rules and directories only with a
+  // message about memory or durable facts; the background extractor keeps
+  // saving project facts either way. Decided once per assembly, so the prefix
+  // stays byte-stable for the session.
+  if (light && !(await memoryIndexesHaveContent([globalDir, autoDir]))) {
+    return {
+      instructions: '',
+      directories: '',
+      onRequest: buildLightMemoryOnRequestText(autoDir, extraGuidelines, globalDir),
     }
   }
   return light

@@ -1463,10 +1463,13 @@ export function buildToolRegistry(
       const leanExec = searchVisible && !discoveredToolNames.has("exec_command");
       const leanGrep = searchVisible && !discoveredToolNames.has("Grep");
       const leanSearch = !discoveredToolNames.has(SYSTEM_SEARCH_TOOLS_NAME);
+      const leanRead = searchVisible && !discoveredToolNames.has("FileRead");
       const tools = visible.map((spec) => {
         const tool = toolToLLMTool(spec.tool);
         if (spec.tool.metadata?.source !== "builtin") return tool;
-        if (options.lightMode === true) return lightPresentation(tool, { leanExec, leanSearch });
+        if (options.lightMode === true) {
+          return lightPresentation(tool, { leanExec, leanSearch, leanRead, lightSession: true });
+        }
         // Standard sessions with the default deferral send compact wording for
         // the core tools (same fields, same schema) and the lean exec_command
         // and Grep until system.searchTools selects them.

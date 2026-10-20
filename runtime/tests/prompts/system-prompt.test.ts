@@ -65,6 +65,8 @@ import {
 } from "./system-prompt.js";
 import { LEAN_SYSTEM_PROMPT_ENV } from "./lean-system-prompt.js";
 import { LIGHT_FINISH, LIGHT_LIMITED_FINISH } from "./light-budget-prompt.js";
+import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_PATHS } from "./product-help.js";
+import { LIGHT_LOADED_INSTRUCTIONS_NOTE } from "./live-instructions.js";
 import { LIGHT_TASK_LIMITS_ENV } from "../tools/light-profile.js";
 import { getPermissionsSection } from "./permissions-prompt.js";
 
@@ -658,7 +660,6 @@ describe("assembleSystemPrompt", () => {
   test.each([
     ["standard", "deepseek"],
     ["standard", "openai"],
-    ["light", "deepseek"],
   ] as const)("%s/%s includes the built-in undo paths independent of Git", async (profile, provider) => {
     const prompt = await assembleSystemPromptSnapshot({ session: fakeSession, ctx: fakeCtx(), profile, provider });
     expect(prompt.staticPrefix).toContain("capabilities");
@@ -672,6 +673,18 @@ describe("assembleSystemPrompt", () => {
     expect(prompt.staticPrefix).toContain("manual");
     expect(prompt.staticPrefix).toContain("Git");
   });
+
+  test.each(["deepseek", "openai"] as const)(
+    "light/%s answers AgenC questions without tools and leaves the undo paths to the product-help reminder",
+    async (provider) => {
+      const prompt = await assembleSystemPromptSnapshot({ session: fakeSession, ctx: fakeCtx(), profile: "light", provider });
+      expect(prompt.staticPrefix).toContain("answer without tools when no workspace facts are needed, including greetings and questions about AgenC");
+      // Light resends its head on every request; the /rewind facts arrive with a
+      // message that asks about undoing (prompts/attachments/product-help.ts).
+      expect(prompt.text).not.toContain("/rewind");
+      expect(prompt.text).not.toContain(AGENC_UNDO_PATHS);
+    },
+  );
 
   test("places response detail after the cache boundary beside output style without changing the static head", async () => {
     const build = (modelVerbosity: "low" | "medium" | "high" | undefined) => assembleSystemPrompt({
@@ -1493,7 +1506,6 @@ test.each([undefined, { name: "project-style", prompt: "OUTPUT_STYLE_SENTINEL: e
     expect(light.text).not.toContain("# Completing work without a human");
     expect(light.text).not.toContain("# Subagents");
     expect(light.text).not.toContain("# Session guidance");
-    expect(light.text).toContain("system.searchTools");
     expect(light.text).toContain(UNTRUSTED_TOOL_RESULT_BOUNDARY);
     expect(light.text).toContain("fixed time budget");
     expect(light.text).toContain("restore your best verified state");
@@ -1598,14 +1610,18 @@ test.each(["deepseek", "openai", "grok", "zai"])(
   },
 );
 
-test("Light says loaded AGENC.md instructions are already included, so the model does not search for them", async () => {
+test("Light names AGENC.md only where it applies, so the model does not search for it", async () => {
   const snapshot = await assembleSystemPromptSnapshot({
     profile: "light", ctx: fakeCtx(),
     session: { services: { runtimeOptions: { lightMode: true, nonInteractive: true } } } as unknown as Session,
   });
-  expect(snapshot.staticPrefix).toContain(
-    "AGENC.md is the instruction file. If one is loaded, its text appears in this prompt; do not search for it.",
-  );
+  // Told only that AGENC.md is the instruction file, models searched for it. Light
+  // names it with loaded instruction files (LIGHT_LOADED_INSTRUCTIONS_NOTE) and, when
+  // none is loaded, with a message about instruction files (product-help attachment),
+  // not in the head.
+  expect(snapshot.staticPrefix).not.toContain("AGENC.md is the instruction file");
+  expect(LIGHT_LOADED_INSTRUCTIONS_NOTE).toContain("AgenC's instruction files (AGENC.md) and are already in this prompt; do not search for them");
+  expect(AGENC_INSTRUCTION_FILE).toContain("none is loaded in this session, so there is nothing to search for");
   expect(snapshot.staticPrefix).toContain("Read/change other assistants' files only when the user names them");
 });
 
@@ -1615,5 +1631,7 @@ test.each([["openai", true], ["deepseek", false]])("Light names apply_patch as t
     session: { services: { runtimeOptions: { lightMode: true, nonInteractive: true } } } as unknown as Session,
   });
   expect(snapshot.staticPrefix.includes("Edit and create files with apply_patch; put all hunks of one change in one patch.")).toBe(applyPatch);
-  expect(snapshot.staticPrefix.includes("Edit the shortest unique text; Write complete files.")).toBe(!applyPatch);
+  // With Edit and Write the editing rules are the tools' own descriptions
+  // ("Keep oldText short and unique", "Create/replace complete files").
+  expect(snapshot.staticPrefix).not.toContain("Edit the shortest unique text; Write complete files.");
 });

@@ -16,7 +16,24 @@ test("DeepSeek Light advertises native batch Edit without another initial tool",
   const edit = tools.find(t => t.function.name === "Edit")!;
   expect(edit.function.parameters.required).toEqual(["path", "edits"]);
   expect(edit.function.description).toContain("All match the original");
-  expect(registry.tools.find(t => t.name === "Edit")?.inputSchema).toEqual(edit.function.parameters);
+  // Light presents the executed schema without its validation-only constraints
+  // and path hints; the executor still enforces them.
+  const executed = registry.tools.find(t => t.name === "Edit")!.inputSchema as {
+    properties: Record<string, unknown>;
+    required: string[];
+  };
+  const presented = edit.function.parameters as { properties: Record<string, unknown> };
+  expect(Object.keys(presented.properties)).toEqual(Object.keys(executed.properties));
+  expect(executed.required).toEqual(edit.function.parameters.required);
+  expect(executed.properties.edits).toMatchObject({
+    type: "array",
+    minItems: 1,
+    items: { properties: { oldText: { type: "string", minLength: 1 }, newText: { type: "string" } } },
+  });
+  expect(presented.properties.edits).toMatchObject({
+    type: "array",
+    items: { properties: { oldText: { type: "string" }, newText: { type: "string" } }, required: ["oldText", "newText"] },
+  });
 });
 test.each(["openai", "zai", "anthropic", "qwen"])("other providers retain their canonical editor: %s", provider => {
   const session = owner(provider);

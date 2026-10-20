@@ -182,9 +182,11 @@ function normalizeSelections(args: Record<string, unknown>): readonly string[] {
   const parsedQuery = parseToolSearchQuery(toOptionalString(args.query));
   return [
     ...parsedQuery.selections,
+    // A string may list several names separated by commas, as select: in a
+    // query does; Light presents select as a string (tools/light-presentation.ts).
     ...(
       typeof args.select === "string"
-        ? [args.select]
+        ? args.select.split(",")
         : Array.isArray(args.select)
           ? args.select.filter((entry): entry is string => typeof entry === "string")
           : []

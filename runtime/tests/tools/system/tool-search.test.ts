@@ -155,6 +155,20 @@ describe("system.searchTools", () => {
     expect(result.content).not.toContain("unrelated.tool");
   });
 
+  test("a select string lists several tools separated by commas, as select: in a query does", async () => {
+    const discovered: string[][] = [];
+    const tool = createToolSearchTool({
+      allowedPaths: [process.cwd()], persistenceRootDir: process.cwd(),
+      getToolCatalog: () => [deferredCatalogEntry("system.deepTool"), deferredCatalogEntry("system.other")],
+      onDiscoverTools: names => discovered.push([...names]),
+    });
+    const payload = JSON.parse((await tool.execute({ select: "system.deepTool, system.other" })).content);
+    expect(payload.loaded).toEqual(["system.deepTool", "system.other"]);
+    expect(discovered).toEqual([["system.deepTool", "system.other"]]);
+    const byQuery = JSON.parse((await tool.execute({ query: "select:system.deepTool,system.other" })).content);
+    expect(byQuery.loaded).toEqual(payload.loaded);
+  });
+
   test("deduplicates canonical selection aliases and reports missing identities without browsing", async () => {
     const name = "mcp.qa-helper.lookup_marker";
     const discovered: string[][] = [];
