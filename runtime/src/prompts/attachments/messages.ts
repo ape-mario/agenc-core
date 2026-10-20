@@ -20,6 +20,7 @@ import { renderMcpInstructionsDeltaSection } from "../mcp-instructions-framing.j
 import { renderUntrustedWorkspaceData } from "../untrusted-workspace-content.js";
 import { formatContextPressureReminder } from "../../utils/messages.js";
 import { sanitizeSystemReminderContent } from "./system-reminder-sanitizer.js";
+import { AGENC_UNDO_PATHS } from "../product-help.js";
 import type { Attachment } from "./types.js";
 import { relevantMemoryFingerprint } from "./relevant-memory-fingerprint.js";
 
@@ -113,6 +114,9 @@ function renderAttachment(attachment: Attachment): LLMMessage | null {
       return userContextMessage(
         `<system-reminder>\n${content}\n</system-reminder>`,
       );
+    }
+    case "product_help": {
+      return userContextMessage(wrapSystemReminder(PRODUCT_HELP[attachment.topic]));
     }
     case "output_style": {
       const style = sanitizeSystemReminderContent(attachment.style);
@@ -359,6 +363,11 @@ function renderAttachment(attachment: Attachment): LLMMessage | null {
     }
   }
 }
+
+/** Text of each `product_help` topic (prompts/attachments/product-help.ts). */
+const PRODUCT_HELP: Readonly<Record<Extract<Attachment, { kind: "product_help" }>["topic"], string>> = {
+  undo: AGENC_UNDO_PATHS,
+};
 
 /** Opening sentences of the `instruction_update` reminder. */
 export const INSTRUCTION_UPDATE_WORKSPACE_HEADER =

@@ -9,7 +9,7 @@ import type { TurnContext } from "../session/turn-context.js";
 import {
   redactSecrets,
 } from "../memory/index.js";
-import { ENTRYPOINT_NAME, truncateEntrypointContent } from "../memory/memdir.js";
+import { ENTRYPOINT_NAME, LIGHT_MEMORY_RECALL_RULES, truncateEntrypointContent } from "../memory/memdir.js";
 import {
   resolveAutoMemoryDirectory,
   resolveGlobalMemoryDirectory,
@@ -200,7 +200,14 @@ async function loadMemoryEntrypointsText(session: Session, cwd: string): Promise
     );
   }
   if (blocks.length === 0) return "";
-  return [PERSISTENT_MEMORY_CONTEXT_PROMPT, ...blocks].join("\n\n");
+  // Interactive Light keeps its recall rules here instead of in the head it
+  // resends on every request (memory/memdir.ts buildLightMemoryInstructionLines):
+  // they only apply once an index has content.
+  const runtimeOptions = session.services.runtimeOptions;
+  const framing = runtimeOptions?.lightMode === true && runtimeOptions.nonInteractive !== true
+    ? `${PERSISTENT_MEMORY_CONTEXT_PROMPT} ${LIGHT_MEMORY_RECALL_RULES}`
+    : PERSISTENT_MEMORY_CONTEXT_PROMPT;
+  return [framing, ...blocks].join("\n\n");
 }
 
 function instructionPathKey(path: string): string {

@@ -10,19 +10,41 @@ function withoutDescriptions(value: unknown): unknown {
     .map(([key, child]) => [key, withoutDescriptions(child)]));
 }
 
+/**
+ * The canonical contract as a Light session's own registry presents it (tools/light-presentation.ts):
+ * FileRead's line window shows only its numeric form and Edit's size keywords stay off the wire.
+ * Execution validates against the canonical schema either way.
+ */
+function lightSessionContract(name: string, schema: unknown): unknown {
+  const presented = withoutDescriptions(schema) as { properties?: Record<string, unknown> };
+  if (name === "FileRead") {
+    return { ...presented, properties: { ...presented.properties, offset: { type: "number" }, limit: { type: "number" } } };
+  }
+  if (name !== "Edit") return presented;
+  const strip = (value: unknown): unknown => Array.isArray(value) ? value.map(strip)
+    : value === null || typeof value !== "object" ? value
+    : Object.fromEntries(Object.entries(value).filter(([key]) => key !== "minItems" && key !== "minLength")
+      .map(([key, child]) => [key, strip(child)]));
+  return strip(presented);
+}
+
 test("all eight Light schemas retain the canonical contract and source schema", () => {
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true });
-  // Selecting exec_command or system.searchTools loads its full schema; the lean defaults are
-  // covered separately below.
-  registry.discoverToolNames?.(["Edit", "Write", "Grep", "Glob", "write_stdin", "exec_command", "system.searchTools"]);
+  // Selecting exec_command, FileRead or system.searchTools loads its full schema; the lean
+  // defaults are covered separately below.
+  registry.discoverToolNames?.(["Edit", "Write", "Grep", "Glob", "write_stdin", "exec_command", "system.searchTools", "FileRead"]);
   const wire = registry.toLLMTools();
   expect(wire.map(t => t.function.name).sort()).toEqual([
     "Edit", "FileRead", "Glob", "Grep", "Write", "exec_command", "system.searchTools", "write_stdin",
   ]);
   for (const item of wire) {
     const canonical = registry.tools.find(t => t.name === item.function.name)!;
-    expect(withoutDescriptions(item.function.parameters)).toEqual(withoutDescriptions(canonical.inputSchema));
+    expect(withoutDescriptions(item.function.parameters), item.function.name)
+      .toEqual(lightSessionContract(item.function.name, canonical.inputSchema));
   }
+  // The canonical FileRead still accepts a numeric string window.
+  const read = registry.tools.find(t => t.name === "FileRead")!;
+  expect((read.inputSchema.properties as Record<string, unknown>).offset).toHaveProperty("anyOf");
   const before = JSON.stringify(registry.tools.map(t => t.inputSchema));
   registry.toLLMTools();
   expect(JSON.stringify(registry.tools.map(t => t.inputSchema))).toBe(before);
@@ -74,14 +96,21 @@ test("compact descriptions retain retrieval, mutation and process lifecycle cons
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true });
   registry.discoverToolNames?.(["Edit", "Write", "Grep", "Glob", "write_stdin"]);
   const description = (name: string) => registry.toLLMTools().find(t => t.function.name === name)!.function.description;
+  // The lean FileRead keeps the line window rules and says how to load the rest.
   expect(description("FileRead")).toMatch(/2000 lines.*25000 tokens/);
-  expect(description("FileRead")).toMatch(/PDFs >10 pages require pages.*max 20/);
-  expect(description("FileRead")).toContain("Display-only numbers are sparse unless dense_line_numbers");
+  expect(description("FileRead")).toContain("Line numbers are sparse and display-only");
+  expect(description("FileRead")).toContain("PDF pages and dense line numbers: system.searchTools select:FileRead");
   expect(description("Edit")).toContain("FileRead first");
   expect(description("Edit")).toContain("replace_all replaces every match (default false)");
   expect(description("Write")).toContain("existing files require FileRead first");
   expect(description("exec_command")).toContain("leftovers stop on return, yielded processes at session end");
   expect(description("write_stdin")).toContain("input requires initial tty=true");
+  // What a yielded session offers is said where it appears: write_stdin loads on a yield.
+  expect(description("write_stdin")).toContain("kill_process stops it");
+  expect(description("exec_command")).not.toContain("kill_process");
+  registry.discoverToolNames?.(["FileRead"]);
+  expect(description("FileRead")).toMatch(/PDFs >10 pages require pages.*max 20/);
+  expect(description("FileRead")).toContain("Display-only numbers are sparse unless dense_line_numbers");
   expect(description("Grep")).toContain("no fallback");
   const grep = registry.toLLMTools().find(t => t.function.name === "Grep")!;
   const limit = (grep.function.parameters.properties as Record<string, { description: string }>).head_limit;
@@ -163,12 +192,45 @@ test("Light presents a lean exec_command until system.searchTools selects it", (
   expect(full.function.description).not.toContain("select:exec_command");
 });
 
+test("Light presents a lean FileRead until system.searchTools selects it", () => {
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true });
+  const lean = registry.toLLMTools().find(t => t.function.name === "FileRead")!;
+  expect(Object.keys(lean.function.parameters.properties as object).sort()).toEqual(["file_path", "limit", "offset"]);
+  expect(lean.function.parameters.required).toEqual(["file_path"]);
+  // No path hint (the head says "Use workspace-relative paths") and no numeric-string alternative.
+  expect(lean.function.parameters.properties).toEqual({ file_path: { type: "string" }, offset: { type: "number" }, limit: { type: "number" } });
+  expect(lean.function.description).toContain("select:FileRead");
+  registry.discoverToolNames?.(["FileRead"]);
+  const full = registry.toLLMTools().find(t => t.function.name === "FileRead")!;
+  expect(Object.keys(full.function.parameters.properties as object).sort())
+    .toEqual(["dense_line_numbers", "file_path", "limit", "offset", "pages"]);
+  expect(full.function.description).not.toContain("select:FileRead");
+  // Edit and Write in a Light session carry no path hint either; standard sessions keep it.
+  const write = registry.toLLMTools().find(t => t.function.name === "Write")!;
+  expect((write.function.parameters.properties as Record<string, unknown>).file_path).toEqual({ type: "string" });
+  const standardRead = buildToolRegistry({ workspaceRoot: "/tmp", deferRareTools: true }).toLLMTools()
+    .find(t => t.function.name === "FileRead")!;
+  expect((standardRead.function.parameters.properties as Record<string, { description?: string }>).file_path.description)
+    .toBe("Workspace/absolute path; not an agent-tree ID.");
+});
+
+test("DeepSeek Light presents the batch Edit without path hint or size keywords", () => {
+  const edit = providerRegistry("deepseek").toLLMTools().find(t => t.function.name === "Edit")!;
+  const properties = edit.function.parameters.properties as Record<string, unknown>;
+  expect(properties.path).toEqual({ type: "string" });
+  expect(JSON.stringify(edit.function.parameters)).not.toMatch(/minItems|minLength/);
+  expect(edit.function.parameters.required).toEqual(["path", "edits"]);
+  expect(edit.function.description).toContain("Keep oldText short and unique in the original file");
+});
+
 test("Light presents system.searchTools with query and select until it selects itself", () => {
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true });
   const lean = registry.toLLMTools().find(t => t.function.name === "system.searchTools")!;
   expect(Object.keys(lean.function.parameters.properties as object).sort()).toEqual(["query", "select"]);
+  // select shows its string form; a comma-separated string selects several tools.
+  expect((lean.function.parameters.properties as Record<string, unknown>).select).toEqual({ type: "string" });
   expect(lean.function.description).toContain("not files or code");
-  expect(lean.function.description).toContain("select:system.searchTools adds its filters");
+  expect(lean.function.description).not.toContain("adds its filters");
   registry.discoverToolNames?.(["system.searchTools"]);
   const full = registry.toLLMTools().find(t => t.function.name === "system.searchTools")!;
   const canonical = registry.tools.find(t => t.name === "system.searchTools")!;
@@ -264,13 +326,13 @@ test("the registry reports compact presentation for standard deferral only", () 
 });
 
 
-test("initial Light shell summaries remain byte-identical to the pre-server-fix contract", () => {
+test("initial Light shell summaries carry no server guidance", () => {
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true });
   const shell = registry.toLLMTools().find(t => t.function.name === "exec_command")!;
-  expect(shell.function.description).toBe("Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. Batch bounded independent reads. Yielded session_id exposes write_stdin; kill_process stops it. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens, sandbox escalation) are accepted; system.searchTools select:exec_command loads their schema.");
+  expect(shell.function.description).toBe("Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens, sandbox escalation) are accepted; system.searchTools select:exec_command loads their schema.");
   registry.discoverToolNames?.(["write_stdin", "exec_command"]);
   const tools = registry.toLLMTools();
-  expect(tools.find(t => t.function.name === "write_stdin")!.function.description).toBe("Continue exec_command's session_id. Empty chars polls; input requires initial tty=true. Include command newlines; match the session's sandbox_permissions.");
+  expect(tools.find(t => t.function.name === "write_stdin")!.function.description).toBe("Continue exec_command's session_id; kill_process stops it. Empty chars polls; input requires initial tty=true. Include command newlines; match the session's sandbox_permissions.");
   const advanced = tools.find(t => t.function.name === "exec_command")!;
   expect(advanced.function.description).not.toContain("allowLocalBinding");
   expect(advanced.function.description).not.toContain("PID namespace");

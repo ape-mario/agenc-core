@@ -18,6 +18,7 @@ import {
   getProjectMemoryPath,
 } from "../memory/paths.js";
 import { clearTieredInstructionsCacheForTesting } from "./agenc-md.js";
+import { LIGHT_MEMORY_RECALL_RULES } from "../memory/memdir.js";
 import { resolveLiveInstructionEnvelope } from "./live-instructions.js";
 import { getAttachmentTrackingState, resetRelevantMemoryBudget } from "../session/attachment-state.js";
 import type { Session } from "../session/session.js";
@@ -194,6 +195,26 @@ describe("live instructions memory indexes", () => {
     const third = await resolveEnvelope(session);
     expect(third.text).toContain("two-space indent");
     expect(getAttachmentTrackingState(session).pendingInstructionUpdate).toBeUndefined();
+  });
+
+  it("interactive Light frames an index with its rules for existing memories", async () => {
+    installAuthority();
+    await writeEntrypoints("- [Editor](editor.md): user prefers vim keybindings\n", null);
+    const withOptions = (runtimeOptions: Record<string, unknown> | undefined) => ({
+      services: { configStore: store, ...(runtimeOptions === undefined ? {} : { runtimeOptions }) },
+      setProjectMemoryWarnings: vi.fn(),
+    }) as unknown as Session;
+
+    const light = await resolveEnvelope(withOptions({ remoteMode: false, lightMode: true, nonInteractive: false }));
+    expect(light.memoryText).toContain(`before acting on them. ${LIGHT_MEMORY_RECALL_RULES}`);
+    expect(light.memoryText).toContain("user prefers vim keybindings");
+    for (const other of [
+      await resolveEnvelope(withOptions(undefined)),
+      await resolveEnvelope(withOptions({ remoteMode: false, lightMode: true, nonInteractive: true })),
+    ]) {
+      expect(other.memoryText).toContain("Persistent memory index files are shown below");
+      expect(other.memoryText).not.toContain(LIGHT_MEMORY_RECALL_RULES);
+    }
   });
 
   it("adds nothing when no index exists", async () => {

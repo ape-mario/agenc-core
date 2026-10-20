@@ -36,6 +36,7 @@ import { instructionUpdateProducer } from "./instruction-update.js";
 import { deferredToolsDeltaProducer } from "./deferred-tools-delta.js";
 import { mcpInstructionsDeltaProducer } from "./mcp-delta.js";
 import { outputStyleProducer } from "./output-style.js";
+import { productHelpProducer } from "./product-help.js";
 import { planModeProducer } from "./plan-mode.js";
 import { verifyPlanReminderProducer } from "./verify-plan-reminder.js";
 import { changedFilesProducer } from "./changed-files.js";
@@ -78,6 +79,13 @@ export interface GetAttachmentsOptions {
   readonly lightMode?: boolean;
   /** Captured print-session presentation; never changes approval policy. */
   readonly lightPrint?: boolean;
+  /**
+   * The permission instructions sent with this request already carry Light's
+   * bypass autonomy note (prompts/permissions-prompt.ts LIGHT_BYPASS_AUTONOMY_NOTE),
+   * which says what the auto-mode pulse says. The session tail that holds it
+   * rides on every request, so the pulse would only repeat it.
+   */
+  readonly autonomyStatedInPermissions?: boolean;
   /**
    * Exact turn identity plus the authoritative root-human turn currently
    * bound to the session. The root turn can be absent or belong to another
@@ -213,6 +221,7 @@ const PRODUCERS: readonly AttachmentProducer[] = [
   dateChangeProducer,
   instructionUpdateProducer,
   criticalReminderProducer,
+  productHelpProducer,
   outputStyleProducer,
   //
   // Phase 5 — Memory + file injections:

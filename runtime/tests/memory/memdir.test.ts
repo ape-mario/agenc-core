@@ -163,7 +163,7 @@ describe("memory prompt", () => {
     expect(await memory.loadMemoryPrompt({ ...owner, settings: { userSettings: { autoMemoryEnabled: false } } })).toBeNull();
   });
 
-  it("interactive Light sends the same memory rules in fewer words, with grep for recall", async () => {
+  it("interactive Light keeps the first-save rules in its head and the rules for existing memories with the index", async () => {
     const env = { HOME: tempRoot, AGENC_HOME: join(tempRoot, "home") };
     const cwd = join(tempRoot, "repo");
     const configStore = new ConfigStore({ home: env.AGENC_HOME, env, cwd });
@@ -173,26 +173,35 @@ describe("memory prompt", () => {
     const standard = await memory.loadMemoryPrompt({ ...owner, runtimeOptions: { ...owner.runtimeOptions, lightMode: false } });
     const instructions = light!.instructions;
     expect(instructions.startsWith("# auto memory")).toBe(true);
+    // Everything a first save needs, asked or unasked (proactive saving).
     for (const rule of [
-      "one markdown file per fact plus a `MEMORY.md` index", "global (user, all projects)", "project (this repository)",
-      "Save at once when asked to remember", "to forget, delete the file and its index line",
-      "who the user is and how they work", "feedback they gave or confirmed (with the reason)",
-      "project context not in the code (decisions and why, deadlines, incidents, owners)", "pointers to external systems",
-      "Never save code patterns, file paths, git history, fix recipes, AGENC.md content or in-progress task state",
-      "activity log", "frontmatter `name`, `description`", "`type` (user, feedback, project, reference)",
-      "**Why:** and **How to apply:**", "`- [Title](topic.md): one-line hook`", "under 150 characters, no frontmatter",
-      "first 200 lines load", "instead of duplicating", "Indexes are injected when non-empty",
-      "do not list or probe memory paths", "read a topic file only when needed",
-      "grep the memory directory", "Read an index only to update it", "Verify past claims before acting",
-      "fix or delete stale memories", "Ignore memory if asked",
+      "global (user, all projects)", "project (this repository) memory directory",
+      "at once when asked to remember", "unasked for who the user is, how they work",
+      "feedback they gave or confirmed", "project context or external pointers not in the code",
+      "Never save code patterns, paths, git history, fix recipes, AGENC.md content or task state",
+      "from an activity log save only the non-obvious",
+      "One `<topic>.md` per fact", "frontmatter `name`, `description` (one specific line)",
+      "`type` (user, feedback, project or reference)",
+      "**Why:** and **How to apply:** lines for feedback and project",
+      "Index it as `- [Title](topic.md): hook` (under 150 characters) in that directory's `MEMORY.md`, which has no frontmatter",
+      "Indexes are injected when non-empty", "do not probe memory paths",
     ]) expect(instructions, rule).toContain(rule);
+    // Rules about memories that already exist ride with the injected index.
+    for (const rule of [
+      "Read a topic file only when needed and an index only to update it", "search the memory directory with grep",
+      "Update a topic instead of duplicating it", "to forget, delete its file and index line",
+      "fix or delete stale memories", "Ignore memory if asked",
+    ]) {
+      expect(memory.LIGHT_MEMORY_RECALL_RULES, rule).toContain(rule);
+      expect(instructions, rule).not.toContain(rule);
+    }
     expect(instructions).not.toContain("Grep with pattern=");
     expect(instructions).not.toContain(tempRoot);
-    expect(instructions.length).toBeLessThan(standard!.instructions.length * 0.85);
+    expect(instructions.length).toBeLessThan(standard!.instructions.length * 0.6);
     const directories = light!.directories;
     expect(directories).toContain(`- Global: \`${await resolveGlobalMemoryDirectory(owner)}\``);
     expect(directories).toContain(`- Project: \`${(await resolveAutoMemoryDirectory(owner)).path}\``);
-    expect(directories).toContain("Write there directly, without mkdir or existence checks");
+    expect(directories).toContain("both exist: Write there directly, without mkdir");
     expect(directories.endsWith("\nOWNER_POLICY")).toBe(true);
     expect(directories.length).toBeLessThan(standard!.directories.length);
     // Standard sessions keep the full wording.
