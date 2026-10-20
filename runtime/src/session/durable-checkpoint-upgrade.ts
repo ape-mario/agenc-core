@@ -16,6 +16,7 @@ import {
   DURABLE_ROLLOUT_SCHEMA_VERSION,
   LEGACY_DURABLE_CHECKPOINT_VERSION,
   DurableCheckpointReadError,
+  IncrementalCheckpointPrefixValidatorV4,
   MAX_CHECKPOINT_PREFIX_MESSAGES,
   computeCheckpointPrefixHashV4,
   readTurnCheckpoint,
@@ -53,6 +54,10 @@ const LEGACY_CHECKPOINT_PREFIX_PASSES = 20;
 // A v2/v3 promotion validates the frozen v2 digest (13), computes the v3
 // digest (6), and validates the generated v4 checkpoint (13).
 const INTEGRITY_CHECKPOINT_UPGRADE_PREFIX_PASSES = 32;
+// An incremental current-schema validation passes each message it has not
+// validated yet through every gate once (13) and traverses the whole prefix
+// twice: the identity check of the validated messages and the digest replay.
+const INCREMENTAL_CHECKPOINT_PREFIX_PASSES = 2;
 // Canonical rollback reduction can scan the history, scan backward across
 // contextual pre-turn rows, and copy the retained prefix. Reserve all three
 // possible passes before invoking it so adversarial rollback streams cannot
@@ -134,6 +139,49 @@ export function planLegacyDurableCheckpointUpgrade(params: {
   const maxHistoryDerivationWork = positiveWorkLimit(
     params.maxHistoryDerivationWork ?? MAX_CHECKPOINT_UPGRADE_HISTORY_WORK,
   );
+  // Current-schema checkpoints of one history are validated incrementally:
+  // every message passes each gate once instead of once per checkpoint.
+  const incremental = new IncrementalCheckpointPrefixValidatorV4({
+    expectedRunId: params.runId,
+    projection: params.projection,
+    projectionId: checkpointProjectionId(`${params.projectionId}\0incremental`),
+    sourceKey: params.sourceKey,
+  });
+  const plan = (): DurableCheckpointUpgradeOutcome => {
+    try {
+      return planCheckpointUpgrade(params, maxHistoryDerivationWork, incremental);
+    } finally {
+      incremental.close();
+    }
+  };
+  const schema = findSourceSchemaVersion(params.items);
+  if (schema.mixed || schema.version !== DURABLE_ROLLOUT_SCHEMA_VERSION) return plan();
+  // The planner's projection rows are scratch state. For a current-schema
+  // rollout (no hash upgrades, so planning is short) one enclosing
+  // transaction makes every per-checkpoint projection transaction a savepoint
+  // of a single commit instead of a durable commit, and an fsync, each. If it
+  // cannot be opened, every validation runs on its own as before.
+  const attempt: { started: boolean; outcome?: DurableCheckpointUpgradeOutcome } = {
+    started: false,
+  };
+  try {
+    params.projection.runAtomically(() => {
+      attempt.started = true;
+      attempt.outcome = plan();
+    });
+  } catch (error) {
+    // A failure while planning propagates as it always has. A failure to
+    // commit the scratch rows after planning finished leaves its outcome.
+    if (attempt.started && attempt.outcome === undefined) throw error;
+  }
+  return attempt.outcome ?? plan();
+}
+
+function planCheckpointUpgrade(
+  params: Parameters<typeof planLegacyDurableCheckpointUpgrade>[0],
+  maxHistoryDerivationWork: number,
+  incremental: IncrementalCheckpointPrefixValidatorV4,
+): DurableCheckpointUpgradeOutcome {
   const sourceSchemaInfo = findSourceSchemaVersion(params.items);
   if (sourceSchemaInfo.mixed) {
     return invalid(
@@ -264,12 +312,31 @@ export function planLegacyDurableCheckpointUpgrade(params: {
           : readable.sourceVersion === DURABLE_CHECKPOINT_READ_VERSION
             ? CURRENT_CHECKPOINT_PREFIX_PASSES
             : INTEGRITY_CHECKPOINT_UPGRADE_PREFIX_PASSES;
-      const reservedWork = reserveHistoryDerivationWork(
-        historyDerivationWork,
-        persistedMessageCount,
-        prefixPasses,
-        maxHistoryDerivationWork,
-      );
+      // Charge what the validation will actually traverse: an incremental
+      // validation only passes new messages through the gates.
+      const incrementalWork =
+        readable.version === DURABLE_CHECKPOINT_READ_VERSION
+          ? incremental.plannedWork(
+              readable.checkpoint,
+              history,
+              CURRENT_CHECKPOINT_PREFIX_PASSES,
+              INCREMENTAL_CHECKPOINT_PREFIX_PASSES,
+            )
+          : undefined;
+      const reservedWork =
+        incrementalWork !== undefined
+          ? reserveHistoryDerivationWork(
+              historyDerivationWork,
+              incrementalWork,
+              1,
+              maxHistoryDerivationWork,
+            )
+          : reserveHistoryDerivationWork(
+              historyDerivationWork,
+              persistedMessageCount,
+              prefixPasses,
+              maxHistoryDerivationWork,
+            );
       if (reservedWork === undefined) {
         return {
           status: "deferred",
@@ -302,14 +369,42 @@ export function planLegacyDurableCheckpointUpgrade(params: {
           );
         }
       } else {
-        let sourceValidation = validateCheckpointPrefix({
-          checkpoint: readable.checkpoint,
-          expectedRunId: params.runId,
-          messages: history,
-          projection: params.projection,
-          projectionId: checkpointProjectionId(params.projectionId),
-          sourceKey: params.sourceKey,
-        });
+        let sourceValidation =
+          incrementalWork !== undefined && readable.version === DURABLE_CHECKPOINT_READ_VERSION
+            ? incremental.validate(readable.checkpoint, history)
+            : undefined;
+        if (sourceValidation === undefined) {
+          if (incrementalWork !== undefined) {
+            // The plan and the validation decline alike; should they ever
+            // differ, the full validation is charged in full first.
+            const fullWork = reserveHistoryDerivationWork(
+              historyDerivationWork,
+              persistedMessageCount,
+              prefixPasses,
+              maxHistoryDerivationWork,
+            );
+            if (fullWork === undefined) {
+              return {
+                status: "deferred",
+                failure: {
+                  kind: "operational_deferral",
+                  code: "history_derivation_work_limit",
+                  itemIndex,
+                  reason: `checkpoint validation would exceed the aggregate history-derivation work limit of ${maxHistoryDerivationWork} message visits`,
+                },
+              };
+            }
+            historyDerivationWork = fullWork;
+          }
+          sourceValidation = validateCheckpointPrefix({
+            checkpoint: readable.checkpoint,
+            expectedRunId: params.runId,
+            messages: history,
+            projection: params.projection,
+            projectionId: checkpointProjectionId(params.projectionId),
+            sourceKey: params.sourceKey,
+          });
+        }
         // A checkpoint written without the recovery results counts fewer
         // messages than the persisted prefix it describes, so the persisted
         // view fails its digest or ends inside a call's results. The
@@ -497,6 +592,7 @@ export function planLegacyDurableCheckpointUpgrade(params: {
     if (historyUpdate.status !== "updated") return historyUpdate;
     if (historyUpdate.history !== history) {
       resumeRecovery.historyReplaced();
+      incremental.reset();
     }
     history = historyUpdate.history;
     historyDerivationWork = historyUpdate.historyDerivationWork;
