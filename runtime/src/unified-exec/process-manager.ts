@@ -2,6 +2,7 @@ import { OneShotProcessServer, OneShotProcessServerCleanupError } from "./one-sh
 import { oneShotFastModeActive } from "../one-shot-fast-mode.js";
 import { SessionSandbox, SessionSandboxCleanupError, type SessionSandboxAvailability } from "../sandbox/linux-launcher/session-sandbox.js";
 import { prepareDirectBwrapV3Plan } from "../sandbox/linux-launcher/direct-bwrap.js";
+import { protectedCreateExitCode, stopAttachedProtectedCreateMonitor } from "../sandbox/linux-launcher/protected-create-monitor.js";
 import { prepareLinuxSandboxProbeHint } from "../sandbox/linux-launcher/probe-cache.js";
 import {
   spawn,
@@ -1780,8 +1781,11 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
         ...(params.allowDirectBwrap && params.runtimeSandbox !== undefined ? {
           directBwrap: {
             protocol: "v3",
+            // settleContainedProcess runs the created-path monitor's final
+            // check for a plan that leaves protected paths unmounted.
             prepare: () => prepareDirectBwrapV3Plan({ program: params.program,
-              args: probeHint?.args ?? params.args, cwd: params.cwd, env: params.env }),
+              args: probeHint?.args ?? params.args, cwd: params.cwd, env: params.env,
+              monitorProtectedCreates: true }),
             validateAdmission: () => {
               this.assertSandboxAuthorityAdmission(params.sandboxAuthorityGeneration);
               this.assertOwnerAdmission(params.ownerId, params.ownerBinding);
@@ -1861,6 +1865,14 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
               if (command.kind === "unavailable") notifyData("stderr",
                 "Command outcome unavailable after dispatch; cleanup is complete. Do not replay automatically.");
             }
+            // The command's whole process tree is gone: the created-path
+            // monitor's final check cannot miss anything it created. A
+            // protected path it created is removed and a clean exit fails,
+            // exactly as in the per-command launcher.
+            const protectedCreateViolation = stopAttachedProtectedCreateMonitor(child);
+            if (state.exitCode !== null && state.exitCode !== undefined) {
+              state = { ...state, exitCode: protectedCreateExitCode(state.exitCode, protectedCreateViolation) };
+            }
             if (spawnError !== undefined) {
               notifyData("stderr", spawnError.message);
             }
@@ -1869,6 +1881,7 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
           (error) => {
             const cleanupFailure =
               error instanceof Error ? error : new Error(String(error));
+            stopAttachedProtectedCreateMonitor(child);
             probeHint?.invalidate();
             entry.cleanupFailure = cleanupFailure;
             this.poisonSandboxAuthority(cleanupFailure);

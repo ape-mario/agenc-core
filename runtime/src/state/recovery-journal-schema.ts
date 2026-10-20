@@ -876,11 +876,14 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
     { callId: isString, command: isString },
     { reason: isString },
   ),
-  tool_call_started: objectShape({
-    callId: isString,
-    toolName: isString,
-    args: isString,
-  }),
+  tool_call_started: objectShape(
+    {
+      callId: isString,
+      toolName: isString,
+      args: isString,
+    },
+    { recoveryCategory: isToolRecoveryCategory },
+  ),
   tool_input_block_start: objectShape({
     callId: isString,
     index: isNonNegativeInteger,

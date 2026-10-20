@@ -707,32 +707,35 @@ export class StreamingToolExecutor {
    * AgenC behavior (`StreamingToolExecutor.ts:412-440`):
    *   - Early-return if `discarded`.
    *   - Drain pending progress via `onProgress` before yielding results.
-   *   - Head-of-line stop: if the current tool is still `executing`
-   *     and not concurrency-safe, break to preserve submission order.
+   *   - Head-of-line stop: the first call without a result blocks every
+   *     later result, so results reach the transcript (and the next
+   *     request) in the order the model submitted the calls even when
+   *     concurrency-safe calls finish out of order.
    */
   *getCompletedResults(): Generator<StreamingToolResult, void> {
     if (this.discarded) return;
+    // Progress is per call; flush it for every call, including the ones a
+    // head-of-line stop keeps waiting (AgenC :418-422).
+    this.flushPendingProgress();
     for (const tool of this.tools) {
-      // Always flush pending progress first (AgenC :418-422).
+      if (tool.status === "yielded") continue;
+      if (tool.status !== "completed" || !tool.result) break;
+      tool.status = "yielded";
+      yield {
+        toolCall: tool.toolCall,
+        result: tool.result,
+        additionalContexts: tool.additionalContexts ?? [],
+        status: tool.error ? "synthetic_error" : "completed",
+        durationMs: tool.durationMs ?? 0,
+      };
+    }
+  }
+
+  private flushPendingProgress(): void {
+    for (const tool of this.tools) {
       while (tool.pendingProgress.length > 0) {
         const ev = tool.pendingProgress.shift();
         if (ev) this.onProgress?.(ev);
-      }
-      if (tool.status === "yielded") continue;
-      if (tool.status === "completed" && tool.result) {
-        tool.status = "yielded";
-        yield {
-          toolCall: tool.toolCall,
-          result: tool.result,
-          additionalContexts: tool.additionalContexts ?? [],
-          status: tool.error ? "synthetic_error" : "completed",
-          durationMs: tool.durationMs ?? 0,
-        };
-      } else if (tool.status === "executing" && !tool.isConcurrencySafe) {
-        // Head-of-line break (AgenC :436-438). A still-running
-        // exclusive tool blocks every downstream yield to preserve
-        // submission order.
-        break;
       }
     }
   }
@@ -753,22 +756,22 @@ export class StreamingToolExecutor {
         this.onProgress?.(ev);
         yield { kind: "progress", toolCall: tool.toolCall, progress: ev };
       }
+    }
+    for (const tool of this.tools) {
       if (tool.status === "yielded") continue;
-      if (tool.status === "completed" && tool.result) {
-        tool.status = "yielded";
-        yield {
-          kind: "result",
-          result: {
-            toolCall: tool.toolCall,
-            result: tool.result,
-            additionalContexts: tool.additionalContexts ?? [],
-            status: tool.error ? "synthetic_error" : "completed",
-            durationMs: tool.durationMs ?? 0,
-          },
-        };
-      } else if (tool.status === "executing" && !tool.isConcurrencySafe) {
-        break;
-      }
+      // Same submission-order stop as getCompletedResults.
+      if (tool.status !== "completed" || !tool.result) break;
+      tool.status = "yielded";
+      yield {
+        kind: "result",
+        result: {
+          toolCall: tool.toolCall,
+          result: tool.result,
+          additionalContexts: tool.additionalContexts ?? [],
+          status: tool.error ? "synthetic_error" : "completed",
+          durationMs: tool.durationMs ?? 0,
+        },
+      };
     }
   }
 
@@ -1028,17 +1031,16 @@ export class StreamingToolExecutor {
 
   /**
    * True when a drain pass (`getCompletedResults` / `getCompletedUpdates`)
-   * would flush or yield something now: pending progress on a tool the pass
-   * reaches, or a completed result ahead of the first executing exclusive
-   * tool. It walks the tools with the pass's own head-of-line rule, so a
-   * result the pass cannot yield yet never counts as work.
+   * would flush or yield something now: pending progress on any tool, or a
+   * completed result at the head of the unyielded calls. It applies the
+   * pass's own head-of-line rule, so a result the pass cannot yield yet
+   * never counts as work.
    */
   private hasDrainableWork(): boolean {
+    if (this.tools.some((tool) => tool.pendingProgress.length > 0)) return true;
     for (const tool of this.tools) {
-      if (tool.pendingProgress.length > 0) return true;
       if (tool.status === "yielded") continue;
-      if (tool.status === "completed" && tool.result) return true;
-      if (tool.status === "executing" && !tool.isConcurrencySafe) return false;
+      return tool.status === "completed" && tool.result !== undefined;
     }
     return false;
   }

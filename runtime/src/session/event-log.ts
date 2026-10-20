@@ -1204,6 +1204,12 @@ export type EventMsg =
         readonly callId: string;
         readonly toolName: string;
         readonly args: string;
+        /**
+         * How a crash during this call is recovered. The daemon's in-flight
+         * tool index records it; idempotent rows are observer state and
+         * commit without their own fsync.
+         */
+        readonly recoveryCategory?: ToolRecoveryCategory;
       };
     }
   | {
