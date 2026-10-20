@@ -17,13 +17,17 @@ import { normalizeProviderIdentity } from "../../provider-identity.js";
 import { oneShotFastModeActive } from "../../one-shot-fast-mode.js";
 import { MISTRAL_MODEL_CATALOG, resolveMistralChatModel } from "./mistral-models.js";
 import { BEDROCK_CONVERSE_MODELS } from "./bedrock-converse-models.js";
-import { VENICE_MODELS } from "./venice-models.js";
+import { VENICE_MODELS, veniceCatalogEntry } from "./venice-models.js";
 import { GROQ_MODELS } from "./groq-models.js";
-import { OLLAMA_CLOUD_MODELS, OLLAMA_CLOUD_UNLISTED_MODELS } from "./ollama-cloud-models.js";
+import { OLLAMA_CLOUD_MODELS, ollamaCloudCatalogEntry } from "./ollama-cloud-models.js";
+import {
+  PUBLISHED_CATALOG_PROVIDERS,
+  publishedModelCatalogEntry,
+} from "./published-model-catalog.js";
 import { NVIDIA_CURRENT_MODEL_CATALOG } from "./nvidia-current-models.js";
 import { OPENAI_CURRENT_MODEL_CATALOG } from "./openai-current-models.js";
 import { OPENAI_REASONING_MODELS } from "./openai-reasoning-models.js";
-import { OPENROUTER_MODELS } from "./openrouter-models.js";
+import { OPENROUTER_MODELS, openRouterCatalogEntry } from "./openrouter-models.js";
 import { OPENROUTER_MODEL_IDS } from "./openrouter-model-ids.js";
 import { frozenLazyArray } from "./catalog-array.js";
 import { DEEPSEEK_MODELS, DEEPSEEK_MODEL_ALIASES } from "./deepseek-models.js";
@@ -53,6 +57,13 @@ export interface RegisteredModelCatalogEntry {
   readonly maxOutputTokensCappedDefault?: boolean;
   readonly inputModalities: readonly ModelInputModality[];
   readonly supportsToolUse: boolean;
+  /**
+   * The model thinks (returns reasoning) whether or not its effort can be
+   * chosen. Rows that leave it out fall back to the provider's own rule.
+   */
+  readonly supportsThinking?: boolean;
+  /** The provider has announced this model's retirement (YYYY-MM-DD). */
+  readonly retiresOn?: string;
   readonly supportsParallelToolCalls: boolean;
   readonly supportsStructuredOutput: boolean;
   readonly supportsStructuredOutputWithTools?: boolean;
@@ -733,7 +744,8 @@ const OPENAI_FRIENDLY_PERSONALITY =
   "You optimize for team morale and being a supportive teammate as much as code quality.";
 const OPENAI_PRAGMATIC_PERSONALITY =
   "You are a deeply pragmatic, effective software engineer.";
-const OPENAI_PERSONALITY_MESSAGES: ModelMessages = Object.freeze({
+/** GPT-family personality instructions; gateways serving the same model reuse them (model-registry.ts). */
+export const OPENAI_PERSONALITY_MESSAGES: ModelMessages = Object.freeze({
   instructionsTemplate:
     `${PERSONALITY_PLACEHOLDER}\n\n${BASE_INSTRUCTIONS_PLACEHOLDER}`,
   instructionsVariables: Object.freeze({
@@ -892,28 +904,7 @@ const ANTHROPIC_UNCURATED_ENTRIES: readonly RegisteredModelCatalogEntry[] = ([
 
 let openRouterCatalog: readonly RegisteredModelCatalogEntry[] | undefined;
 function openRouterCatalogEntries(): readonly RegisteredModelCatalogEntry[] {
-  return openRouterCatalog ??= Object.freeze(OPENROUTER_MODELS.map((entry, index): RegisteredModelCatalogEntry => ({
-      provider: "openrouter",
-      model: entry.model,
-      displayName: entry.label,
-      contextWindow: entry.context,
-      maxContextWindow: entry.context,
-      ...(entry.output !== undefined ? { maxOutputTokens: entry.output } : {}),
-      inputModalities: entry.modalities,
-      supportsToolUse: true,
-      supportsParallelToolCalls: entry.parameters.includes("parallel_tool_calls"),
-      supportsStructuredOutput: entry.parameters.includes("structured_outputs"),
-      supportsSearchTool: false,
-      supportsVerbosity: entry.parameters.includes("verbosity"),
-      webSearchToolType: "none",
-      supportsReasoningSummaries: entry.parameters.includes("include_reasoning"),
-      defaultReasoningSummary: "none",
-      supportedReasoningLevels: entry.efforts,
-      ...(entry.defaultEffort !== undefined ? { defaultReasoningLevel: entry.defaultEffort } : {}),
-      additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority: index + 100,
-      visibility: "list",
-    })));
+  return openRouterCatalog ??= Object.freeze(OPENROUTER_MODELS.map((entry, index) => openRouterCatalogEntry(entry, index)));
 }
 
 const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
@@ -1089,28 +1080,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       priority: 0,
       visibility: "list",
     },
-    ...VENICE_MODELS.map((entry, priority): RegisteredModelCatalogEntry => ({
-      provider: "venice",
-      model: entry.model,
-      displayName: entry.displayName,
-      contextWindow: entry.contextWindow,
-      maxContextWindow: entry.contextWindow,
-      maxOutputTokens: entry.maxOutputTokens,
-      inputModalities: entry.supportsVision ? TEXT_IMAGE_MODALITIES : TEXT_MODALITIES,
-      supportsToolUse: true,
-      supportsParallelToolCalls: false,
-      supportsStructuredOutput: entry.supportsStructuredOutput,
-      supportsSearchTool: false,
-      supportsVerbosity: false,
-      webSearchToolType: "none",
-      supportsReasoningSummaries: false,
-      defaultReasoningSummary: "none",
-      supportedReasoningLevels: entry.supportedReasoningLevels,
-      defaultReasoningLevel: entry.defaultReasoningLevel,
-      additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority,
-      visibility: "list",
-    })),
+    ...VENICE_MODELS.map((entry, priority) => veniceCatalogEntry(entry, priority)),
     ...GROQ_MODELS.map((entry, priority): RegisteredModelCatalogEntry => ({
       provider: "groq",
       model: entry.model,
@@ -1153,31 +1123,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       priority,
       visibility: "list",
     })),
-    ...OLLAMA_CLOUD_MODELS.map((entry, priority): RegisteredModelCatalogEntry => ({
-      provider: "ollama-cloud",
-      model: entry.model,
-      displayName: entry.label,
-      contextWindow: entry.contextWindow,
-      maxContextWindow: entry.contextWindow,
-      maxOutputTokens: 16_384,
-      maxOutputTokensUpperLimit: 32_768,
-      maxOutputTokensCappedDefault: true,
-      inputModalities: entry.vision ? TEXT_IMAGE_MODALITIES : TEXT_MODALITIES,
-      supportsToolUse: entry.tools,
-      supportsParallelToolCalls: true,
-      supportsStructuredOutput: false,
-      supportsStructuredOutputWithTools: false,
-      supportsSearchTool: false,
-      supportsVerbosity: false,
-      webSearchToolType: "none",
-      supportsReasoningSummaries: false,
-      defaultReasoningSummary: "none",
-      supportedReasoningLevels: entry.efforts,
-      ...("defaultEffort" in entry ? { defaultReasoningLevel: entry.defaultEffort } : {}),
-      additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
-      priority,
-      visibility: OLLAMA_CLOUD_UNLISTED_MODELS.has(entry.model) ? "none" : "list",
-    })),
+    ...OLLAMA_CLOUD_MODELS.map((entry, priority) => ollamaCloudCatalogEntry(entry, priority)),
     ...zaiCatalogEntries(),
     ...kimiCatalogEntries(),
     ...minimaxCatalogEntries(),
@@ -1807,6 +1753,10 @@ export function resolveRegisteredModelCatalogEntry(input: {
   readonly provider: string | undefined;
   readonly model: string | undefined;
 }): RegisteredModelCatalogEntry | undefined {
+  // A provider's own current list (Venice, Ollama Cloud, OpenRouter) wins
+  // over the bundled snapshot once discovery has read it in this process.
+  const published = publishedCatalogEntry(input);
+  if (published !== undefined) return published;
   if (!oneShotFastModeActive()) return resolveRegisteredModelCatalogEntryUncached(input);
   // This resolver reads only the bundled immutable catalog and these two
   // route fields. Config capability overrides are applied by its callers.
@@ -1816,6 +1766,16 @@ export function resolveRegisteredModelCatalogEntry(input: {
   if (fastCatalogEntries.size >= 64) fastCatalogEntries.clear();
   fastCatalogEntries.set(key, entry);
   return entry;
+}
+
+function publishedCatalogEntry(input: {
+  readonly provider: string | undefined;
+  readonly model: string | undefined;
+}): RegisteredModelCatalogEntry | undefined {
+  const provider = modelCatalogProviderIdentity(input.provider);
+  const model = input.model?.trim() ?? "";
+  if (!PUBLISHED_CATALOG_PROVIDERS.has(provider) || model.length === 0) return undefined;
+  return publishedModelCatalogEntry(provider, model);
 }
 
 function resolveRegisteredModelCatalogEntryUncached(input: {
@@ -1870,6 +1830,10 @@ function resolveRegisteredModelCatalogEntryUncached(input: {
   const exact = findExactModel(model, candidates) ??
     findNamespacedSuffix(model, candidates, true);
   if (exact !== undefined) return exact;
+  // Venice and Ollama Cloud publish every model with its own capabilities
+  // and limits. A model their list has not been read for must not borrow a
+  // neighbour's by name prefix (minimax-m3.1-flash is not minimax-m3).
+  if (provider === "venice" || provider === "ollama-cloud") return undefined;
   const fallback = findNamespacedSuffix(model, candidates) ??
     findLongestPrefix(model, candidates);
   // Newly documented models do not grant their highest tier to unknown variants.

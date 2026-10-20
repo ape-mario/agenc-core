@@ -5,11 +5,12 @@ import {
   supportsXaiStructuredOutputs,
   supportsXaiStructuredOutputsWithTools,
 } from "./structured-output.js";
-import { resolveModelCapabilityHints } from "./registry/model-catalog.js";
+import {
+  resolveModelCapabilityHints,
+  resolveRegisteredModelCatalogEntry,
+} from "./registry/model-catalog.js";
 import { supportsGrokServerSideTools } from "./provider-native-search.js";
 import { normalizeProviderIdentity } from "../provider-identity.js";
-import { VENICE_MODELS } from "./registry/venice-models.js";
-import { ollamaCloudModel } from "./registry/ollama-cloud-models.js";
 import { isOpenAiReasoningFamilyModel } from "./registry/openai-reasoning-models.js";
 import { isRegisteredMetaChatModel } from "./registry/meta-models.js";
 
@@ -110,6 +111,27 @@ function isVisionishOllamaModel(model: string): boolean {
   return /(?:llava|bakllava|vision|(?:^|[-_.:])vl(?:$|[-_.:])|qwen(?:2\.?5)?-vl|minicpm-v|moondream|llama3(?:\.2)?-vision|gemma3)/i.test(
     model,
   );
+}
+
+/**
+ * Per-model flags read from the registered catalog row, which is the
+ * provider's published live row once discovery has read it (Venice, Ollama
+ * Cloud, OpenRouter) and the bundled snapshot row otherwise.
+ */
+function catalogRow(provider: string, model: string) {
+  return resolveRegisteredModelCatalogEntry({ provider, model });
+}
+
+function catalogThinks(provider: string): (model: string) => boolean {
+  return (model) => catalogRow(provider, model)?.supportsThinking === true;
+}
+
+function catalogSeesImages(provider: string): (model: string) => boolean {
+  return (model) => catalogRow(provider, model)?.inputModalities.includes("image") === true;
+}
+
+function catalogTakesEffort(provider: string): (model: string) => boolean {
+  return (model) => (catalogRow(provider, model)?.supportedReasoningLevels.length ?? 0) > 0;
 }
 
 function resolveCapabilityFlag(value: CapabilityFlagValue, model: string): boolean {
@@ -414,8 +436,10 @@ const PROVIDER_CAPABILITIES: Readonly<Record<string, ProviderCapabilityDefinitio
     acceptsReasoningEffort: isOpenAiReasoningFamilyModel,
   },
   openrouter: {
-    // Routed upstreams vary by model/provider and the runtime does not have a
-    // catalog handshake here, so model-switch checks must fail closed.
+    // Image input and effort come from the model's catalog row (hints); a
+    // model no row knows keeps these fail-closed defaults for switch checks.
+    // Thinking follows the row: OpenRouter lists `reasoning` for models that
+    // think, and the chat wire drops another model's reasoning on replay.
     supportsToolUse: true,
     supportsPromptCaching: false,
     supportsContextEdits: false,
@@ -425,27 +449,29 @@ const PROVIDER_CAPABILITIES: Readonly<Record<string, ProviderCapabilityDefinitio
     supportsStructuredOutput: false,
     supportsStructuredOutputWithTools: false,
     supportsProviderNativeWebSearch: false,
-    supportsExtendedThinking: false,
+    supportsExtendedThinking: catalogThinks("openrouter"),
     acceptsImageHistory: false,
     acceptsAudioHistory: false,
-    acceptsThinkingHistory: false,
+    acceptsThinkingHistory: catalogThinks("openrouter"),
     acceptsReasoningEffort: false,
   },
   venice: {
+    // Venice publishes each model's capabilities with its live list; the
+    // bundled snapshot answers only until that list has been read.
     supportsToolUse: true,
     supportsPromptCaching: false,
     supportsContextEdits: false,
-    supportsImageInput: model => VENICE_MODELS.find(entry => entry.model === model)?.supportsVision === true,
+    supportsImageInput: catalogSeesImages("venice"),
     supportsAudioInput: false,
     supportsAudioOutput: false,
-    supportsStructuredOutput: model => VENICE_MODELS.find(entry => entry.model === model)?.supportsStructuredOutput === true,
+    supportsStructuredOutput: model => catalogRow("venice", model)?.supportsStructuredOutput === true,
     supportsStructuredOutputWithTools: false,
     supportsProviderNativeWebSearch: false,
-    supportsExtendedThinking: model => VENICE_MODELS.find(entry => entry.model === model)?.supportsReasoning === true,
-    acceptsImageHistory: model => VENICE_MODELS.find(entry => entry.model === model)?.supportsVision === true,
+    supportsExtendedThinking: catalogThinks("venice"),
+    acceptsImageHistory: catalogSeesImages("venice"),
     acceptsAudioHistory: false,
-    acceptsThinkingHistory: false,
-    acceptsReasoningEffort: model => (VENICE_MODELS.find(entry => entry.model === model)?.supportedReasoningLevels.length ?? 0) > 0,
+    acceptsThinkingHistory: catalogThinks("venice"),
+    acceptsReasoningEffort: catalogTakesEffort("venice"),
   },
   groq: {
     supportsToolUse: true,
@@ -489,11 +515,12 @@ const PROVIDER_CAPABILITIES: Readonly<Record<string, ProviderCapabilityDefinitio
   },
   "ollama-cloud": {
     ...HOSTED_CHAT_COMPATIBLE_CAPABILITIES,
-    supportsImageInput: model => ollamaCloudModel(model)?.vision === true,
-    acceptsImageHistory: model => ollamaCloudModel(model)?.vision === true,
-    supportsExtendedThinking: model => ollamaCloudModel(model)?.thinking === true,
-    acceptsThinkingHistory: model => ollamaCloudModel(model)?.thinking === true,
-    acceptsReasoningEffort: model => (ollamaCloudModel(model)?.efforts.length ?? 0) > 0,
+    supportsToolUse: model => catalogRow("ollama-cloud", model)?.supportsToolUse !== false,
+    supportsImageInput: catalogSeesImages("ollama-cloud"),
+    acceptsImageHistory: catalogSeesImages("ollama-cloud"),
+    supportsExtendedThinking: catalogThinks("ollama-cloud"),
+    acceptsThinkingHistory: catalogThinks("ollama-cloud"),
+    acceptsReasoningEffort: catalogTakesEffort("ollama-cloud"),
   },
   cerebras: {
     ...HOSTED_CHAT_COMPATIBLE_CAPABILITIES,

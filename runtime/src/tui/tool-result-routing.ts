@@ -315,6 +315,9 @@ const WEB_SEARCH_SOURCE_LABELS: Readonly<Record<string, string>> = {
   custom: "Custom search",
   deepseek_search: "DeepSeek search",
   grok_web_search: "Grok web search",
+  "ollama-cloud_web_search": "Ollama web search",
+  openrouter_web_search: "OpenRouter web search",
+  venice_web_search: "Venice web search",
   duckduckgo_html: "DuckDuckGo",
   duckduckgo_instant_answer: "DuckDuckGo",
 };

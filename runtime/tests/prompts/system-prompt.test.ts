@@ -1635,3 +1635,42 @@ test.each([["openai", true], ["deepseek", false]])("Light names apply_patch as t
   // ("Keep oldText short and unique", "Create/replace complete files").
   expect(snapshot.staticPrefix).not.toContain("Edit the shortest unique text; Write complete files.");
 });
+
+describe("Light's model-family tuning follows the model through gateways", () => {
+  const lightSession = (env: Record<string, string> = {}) =>
+    ({ services: { runtimeOptions: { lightMode: true, nonInteractive: true }, providerEnvironment: env } }) as unknown as Session;
+  const head = async (provider: string, model: string, env?: Record<string, string>) =>
+    (await assembleSystemPromptSnapshot({ profile: "light", ctx: fakeCtx(), session: lightSession(env), provider,
+      promptIdentity: { provider, model } })).staticPrefix;
+
+  test.each([
+    ["openrouter", "deepseek/deepseek-v4.1-flash-1017"],
+    ["ollama-cloud", "deepseek-v4.1-flash:1017"],
+    ["venice", "deepseek-v4-1-flash-1017"],
+  ])("DeepSeek through %s gets the head DeepSeek's own API gets, task limits included", async (provider, model) => {
+    const prompt = await head(provider, model);
+    expect(prompt).toContain(LIGHT_LIMITED_FINISH);
+    expect(prompt).not.toContain(LIGHT_FINISH);
+    expect(prompt).toBe(await head("deepseek", "deepseek-flash"));
+    expect(await head(provider, model, { [LIGHT_TASK_LIMITS_ENV]: "0" })).toContain(LIGHT_FINISH);
+  });
+
+  test.each([
+    ["openrouter", "openai/gpt-6-luna"],
+    ["venice", "openai-gpt-6-luna"],
+  ])("GPT through %s gets the head OpenAI's own API gets, apply_patch included", async (provider, model) => {
+    const prompt = await head(provider, model);
+    expect(prompt).toContain("Edit and create files with apply_patch; put all hunks of one change in one patch.");
+    expect(prompt).toBe(await head("openai", "gpt-6-luna"));
+  });
+
+  test.each([
+    ["openrouter", "z-ai/glm-5.3"],
+    ["ollama-cloud", "gpt-oss:120b"],
+    ["venice", "zai-org-glm-5-2"],
+  ])("other models through %s keep the default Light head", async (provider, model) => {
+    const prompt = await head(provider, model);
+    expect(prompt).toContain(LIGHT_FINISH);
+    expect(prompt).toContain("Edit the shortest unique text; Write complete files.");
+  });
+});

@@ -61,3 +61,46 @@ test("an explicit editor override retains its schema and executor", () => {
   expect(registry.toLLMTools().find(t => t.function.name === "Edit")?.function.parameters).toEqual(override.inputSchema);
   expect(registry.tools.find(t => t.name === "Edit")?.execute).toBe(override.execute);
 });
+
+function gatewayOwner(provider: string, model: string) {
+  const session = owner(provider);
+  Object.assign(session.services, { providerService: { current: () => ({ provider, model }) } });
+  return session;
+}
+test.each([
+  ["openrouter", "deepseek/deepseek-v4.1-flash-1017"],
+  ["ollama-cloud", "deepseek-v4.1-flash:1017"],
+  ["venice", "deepseek-v4-1-flash-1017"],
+])("a DeepSeek model through %s gets the batch Edit DeepSeek's own API gets", (provider, model) => {
+  const session = gatewayOwner(provider, model);
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, getSession: () => session });
+  const tools = registry.toLLMTools();
+  expect(tools.map(t => t.function.name).sort()).toEqual(["Edit", "FileRead", "Write", "exec_command", "system.searchTools"]);
+  expect(tools.find(t => t.function.name === "Edit")?.function.parameters.required).toEqual(["path", "edits"]);
+});
+test.each([
+  ["openrouter", "openai/gpt-6-luna"],
+  ["venice", "openai-gpt-6-luna"],
+])("a GPT model through %s starts Light with apply_patch like OpenAI's own API", (provider, model) => {
+  const session = gatewayOwner(provider, model);
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, getSession: () => session });
+  expect(registry.toLLMTools().map(t => t.function.name).sort()).toEqual(["FileRead", "apply_patch", "exec_command", "system.searchTools"]);
+});
+test.each([
+  ["openrouter", "z-ai/glm-5.3"],
+  ["ollama-cloud", "gpt-oss:120b"],
+  ["venice", "zai-org-glm-5-2"],
+])("other gateway models keep the canonical Light editors: %s %s", (provider, model) => {
+  const session = gatewayOwner(provider, model);
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, getSession: () => session });
+  const tools = registry.toLLMTools();
+  expect(tools.map(t => t.function.name).sort()).toEqual(["Edit", "FileRead", "Write", "exec_command", "system.searchTools"]);
+  expect(tools.find(t => t.function.name === "Edit")?.function.parameters.required).toEqual(["file_path", "old_string", "new_string"]);
+});
+test("a model switch on the same gateway rebuilds the presented editor", () => {
+  const session = gatewayOwner("openrouter", "z-ai/glm-5.3");
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, getSession: () => session });
+  expect(registry.toLLMTools().find(t => t.function.name === "Edit")?.function.parameters.required).toEqual(["file_path", "old_string", "new_string"]);
+  Object.assign(session.services, { providerService: { current: () => ({ provider: "openrouter", model: "deepseek/deepseek-v4.1-flash-1017" }) } });
+  expect(registry.toLLMTools().find(t => t.function.name === "Edit")?.function.parameters.required).toEqual(["path", "edits"]);
+});

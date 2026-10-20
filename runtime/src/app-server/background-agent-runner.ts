@@ -431,6 +431,8 @@ export {
 } from "./background-agent-runner/tool-recovery.js";
 
 const DAEMON_USER_STOP_GENERATION: unique symbol = Symbol("agenc.daemon-user-stop-generation");
+/** Providers whose effort levels come with their live model lists (published-model-catalog). */
+const LIVE_EFFORT_LEVEL_PROVIDERS: ReadonlySet<string> = new Set(["venice", "ollama-cloud"]);
 type DaemonHumanSessionSubmitOptions = DaemonSessionSubmitOptions & {
   readonly [DAEMON_USER_STOP_GENERATION]?: number;
 };
@@ -4613,7 +4615,16 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           ? previousSettings.reasoningEffort
           : normalizeRuntimeSetting(params.reasoningEffort, RUN_RUNTIME_REASONING_EFFORTS, "reasoning effort");
         if (params.reasoningEffort !== undefined && level !== null) {
-          const effort = resolveReasoningEffort({ provider: previousSettings.provider, model: previousSettings.model });
+          const effortModel = { provider: previousSettings.provider, model: previousSettings.model };
+          let effort = resolveReasoningEffort(effortModel);
+          if (!effort.levels.includes(level) && LIVE_EFFORT_LEVEL_PROVIDERS.has(effortModel.provider)) {
+            // Venice and Ollama Cloud publish a model's levels with their live
+            // lists. When the session could not read the list yet (a slow
+            // network at start), its provider reads it now, before refusing.
+            await session.services.provider?.getExecutionProfile?.({ model: effortModel.model })
+              .catch(() => undefined);
+            effort = resolveReasoningEffort(effortModel);
+          }
           if (!effort.levels.includes(level)) {
             throw new Error("The selected model does not support this reasoning effort");
           }

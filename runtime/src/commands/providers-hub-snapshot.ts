@@ -1,4 +1,5 @@
 import { withSecureStorageDisplaySnapshot } from "../utils/secureStorage/index.js";
+import { modelCapabilityTags } from "./model-capability-tags.js";
 /**
  * Data for the `/providers` screen: every built-in provider with one plain
  * status ("key saved", "env DEEPSEEK_API_KEY", "running", "not set"), how it
@@ -75,6 +76,8 @@ export type ProvidersHubModelRow = {
   readonly displayModel: string;
   readonly current: boolean;
   readonly isDefault: boolean;
+  /** Capability tags such as "vision · thinking · free" (model-capability-tags). */
+  readonly tags?: string;
 };
 
 function plainStatus(row: ProviderMenuRow, keySaved: boolean): string {
@@ -283,5 +286,6 @@ export function readProvidersHubModels(
       displayModel: row.displayModel,
       current: row.status === "current",
       isDefault: row.status === "default",
+      tags: modelCapabilityTags(provider, row.displayModel),
     }));
 }

@@ -29,7 +29,7 @@ import { prepareModelToolArgs, validateToolPreflight } from "./tools/execution.j
 
 import type { LLMTool, LLMToolCall } from "./llm/types.js";
 import { lightPresentation, standardPresentation } from "./tools/light-presentation.js";
-import { LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES, LIGHT_INITIAL_TOOL_NAMES, lightEditsWithApplyPatch } from "./tools/light-profile.js";
+import { LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES, LIGHT_INITIAL_TOOL_NAMES, lightEditsWithApplyPatch, lightUsesBatchEdit } from "./tools/light-profile.js";
 import type { FunctionCallOutputContentItem } from "./tools/context.js";
 import type {
   Tool,
@@ -1117,8 +1117,27 @@ export function buildToolRegistry(
     lightMode: options.lightMode,
     allowedPaths: [options.workspaceRoot],
   }))])[0];
+  /**
+   * The provider instance's name and, when the session's binding is for that
+   * provider, the bound model: a gateway's model id names the family Light
+   * tunes for (light-profile.ts).
+   */
+  function sessionModelIdentity(): { readonly provider: string | undefined; readonly model: string | undefined } {
+    const services = options.getSession?.()?.services;
+    const provider = services?.provider?.name;
+    let model: string | undefined;
+    try {
+      const binding = services?.providerService?.current();
+      model = binding !== undefined && binding.provider === provider ? binding.model : undefined;
+    } catch {
+      model = undefined;
+    }
+    return { provider, model };
+  }
   function usesBatchEdit(): boolean {
-    return options.lightMode === true && options.getSession?.()?.services?.provider?.name === "deepseek";
+    if (options.lightMode !== true) return false;
+    const identity = sessionModelIdentity();
+    return lightUsesBatchEdit(identity.provider, identity.model);
   }
   // Direct shell RPCs select one daemon-owned builtin by name. Reserve both
   // names even when the canonical tool is disabled or unavailable so an
@@ -1350,10 +1369,11 @@ export function buildToolRegistry(
     if (options.lightMode === true && !specs.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME)) {
       return specs;
     }
+    const lightIdentity = options.lightMode === true ? sessionModelIdentity() : { provider: undefined, model: undefined };
     return specs.filter(
       (spec) =>
         (options.lightMode === true
-          ? (lightEditsWithApplyPatch(options.getSession?.()?.services?.provider?.name)
+          ? (lightEditsWithApplyPatch(lightIdentity.provider, lightIdentity.model)
             ? LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES : LIGHT_INITIAL_TOOL_NAMES).has(spec.tool.name) ||
             (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined) ||
             // A policy that opts out of MCP deferral wants its allowlisted MCP
@@ -1497,7 +1517,8 @@ export function buildToolRegistry(
     toLLMTools(): LLMTool[] {
       const router = buildRouter();
       if (!oneShotFastModeActive()) return buildPresentedTools(router);
-      const provider = options.getSession?.()?.services?.provider?.name;
+      const identity = sessionModelIdentity();
+      const provider = `${identity.provider ?? ""}\u0000${identity.model ?? ""}`;
       const discovered = [...discoveredToolNames];
       const memo = presentationMemo;
       if (memo?.router === router && memo.provider === provider &&

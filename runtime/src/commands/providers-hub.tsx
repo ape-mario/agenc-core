@@ -206,8 +206,8 @@ function ModelsView({
       {...(note === undefined ? {} : {
         detail: <ThemedText color="warning" wrap="wrap">{note}</ThemedText>,
       })}
-      columns={[3, 44, 20]}
-      headers={["", "model", ""]}
+      columns={[3, 44, 8, 38]}
+      headers={["", "model", "", "capabilities"]}
       items={entries}
       activeIndex={activeIndex}
       renderRow={(entry, _index, active) => {
@@ -218,6 +218,7 @@ function ModelsView({
               {entryLabel(entry, row)}
             </ThemedText>,
             <ThemedText key="note" color="inactive"> </ThemedText>,
+            <ThemedText key="tags" color="inactive"> </ThemedText>,
           ];
         }
         return [
@@ -229,6 +230,9 @@ function ModelsView({
           </ThemedText>,
           <ThemedText key="note" color="inactive" wrap="truncate-end">
             {entry.row.current ? "in use" : entry.row.isDefault ? "default" : ""}
+          </ThemedText>,
+          <ThemedText key="tags" color="muted3" wrap="truncate-end">
+            {entry.row.tags ?? ""}
           </ThemedText>,
         ];
       }}

@@ -171,7 +171,13 @@ describe("provider metadata identity", () => {
     });
 
     expect(resolved.contextWindow).toBe(32768);
+    // Discovery also reads Ollama's own list; both requests stay on
+    // ollama.com with the Ollama key and nothing else.
     expect(calls).toEqual([{
+      url: "https://ollama.com/api/tags",
+      method: "GET",
+      authorization: "Bearer ollama-cloud-key",
+    }, {
       url: "https://ollama.com/api/show",
       method: "POST",
       body: JSON.stringify({ model: "unlisted-model" }),

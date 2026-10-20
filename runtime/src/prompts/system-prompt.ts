@@ -1240,13 +1240,14 @@ export async function assembleSystemPrompt(
     promptEnvironment,
     envInfoInputs.provider,
     readConfiguredLeanSystemPrompt(session),
+    envInfoInputs.model,
   );
   const staticSections: Array<string | null> = light
     ? [
         lightBudgetWorkflow(
           opts.outputStyle != null,
-          lightEditsWithApplyPatch(envInfoInputs.provider),
-          lightStatesTaskLimits(envInfoInputs.provider, promptEnvironment),
+          lightEditsWithApplyPatch(envInfoInputs.provider, envInfoInputs.model),
+          lightStatesTaskLimits(envInfoInputs.provider, promptEnvironment, envInfoInputs.model),
         ),
         lightBudgetSystem(),
         lightBudgetActions(),

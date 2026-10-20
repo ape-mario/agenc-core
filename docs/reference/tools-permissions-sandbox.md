@@ -623,7 +623,8 @@ JSON decoded to a readable reason. Expanded transcript mode retains details.
 
 A refusal names only the editing tools the session has, read from the
 session's own tool registry, and prefers the ones in the model's tool list:
-an OpenAI Light session, which lists apply_patch, is pointed at apply_patch.
+a GPT-family Light session (OpenAI, or a GPT model through OpenRouter or
+Venice), which lists apply_patch, is pointed at apply_patch.
 When the session's editing tools are not listed yet, the refusal names them
 and says that `system.searchTools` with `select:` loads them. A session with
 none of Edit, Write, MultiEdit or apply_patch (the read-only `verification`,
