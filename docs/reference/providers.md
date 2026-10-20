@@ -740,11 +740,13 @@ input items and keeps the tail in `instructions`.
 
 GPT-5.6 and later use `prompt_cache_key` only to separate cache scopes: a
 request reads nothing that a request with another key wrote. On the platform
-API those models get one key per AgenC home (`agenc-` and 32 hex characters
-of a hash of the home path; the path itself is not sent), so a new session
+API those models get one key per AgenC home: `agenc-` and 32 hex characters
+of a random id generated once and kept in `<AgenC home>/prompt-cache-scope`
+(mode 0600; regenerated only when missing or malformed). A new session then
 reads the instructions, tools and tail that the previous session of the same
-user wrote within the cache lifetime (at least 30 minutes). Older OpenAI
-models, the ChatGPT subscription backend and every other provider keep the
+home wrote within the cache lifetime (at least 30 minutes), and separate homes
+keep separate scopes. The id is not sent anywhere else. Older OpenAI models,
+the ChatGPT subscription backend and every other provider keep the
 conversation id as the key.
 
 Under a hard aggregate token or USD cap, admission still requires a

@@ -15,14 +15,22 @@
  * the session tail as the first input item, history appended after it, and
  * the user's cache scope as the key on GPT-5.6 and later.
  */
-import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { buildOpenAIResponsesRequest } from "../../../src/llm/wire/responses-openai.js";
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY_MARKER } from "../../../src/llm/wire/shared.js";
-import { promptCacheScopeKeyForHome } from "../../../src/llm/prompt-cache-key.js";
+import {
+  PROMPT_CACHE_SCOPE_FILE,
+  promptCacheScopeKeyForHome,
+} from "../../../src/llm/prompt-cache-key.js";
 import { openAiModelScopesPromptCacheByKey } from "../../../src/llm/registry/openai-reasoning-models.js";
 import type { LLMMessage, LLMTool } from "../../../src/llm/types.js";
 
+const SCOPE = "agenc-0123456789abcdef0123456789abcdef";
 const STATIC_HEAD = "You are AgenC. Follow user scope.";
 const SESSION_TAIL = "Workspace: /workspace\n\nPermission mode: bypassPermissions.";
 const SYSTEM_PROMPT = `${STATIC_HEAD}\n\n${SYSTEM_PROMPT_DYNAMIC_BOUNDARY_MARKER}\n\n${SESSION_TAIL}`;
@@ -73,7 +81,7 @@ function request(
     options: {
       systemPrompt,
       promptCacheKey: "conv-abc123",
-      promptCacheScopeKey: promptCacheScopeKeyForHome("/home/user/.agenc"),
+      promptCacheScopeKey: SCOPE,
       ...extra.options,
     },
   });
@@ -144,7 +152,7 @@ describe("OpenAI Responses requests of one session are append-only", () => {
 });
 
 describe("prompt_cache_key on the OpenAI Responses wire", () => {
-  const scope = promptCacheScopeKeyForHome("/home/user/.agenc");
+  const scope = SCOPE;
 
   it("sends the user's cache scope to GPT-5.6 and later on the platform API", () => {
     for (const model of ["gpt-6-luna", "gpt-6-sol", "gpt-6.1-sol", "gpt-5.6-terra", "openai/gpt-6-luna",
@@ -176,11 +184,80 @@ describe("prompt_cache_key on the OpenAI Responses wire", () => {
     expect(keyless).not.toHaveProperty("prompt_cache_key");
   });
 
-  it("derives one stable scope per AgenC home without sending the path", () => {
-    expect(promptCacheScopeKeyForHome("/home/user/.agenc")).toBe(scope);
-    expect(promptCacheScopeKeyForHome("/home/user/.agenc/")).toBe(scope);
-    expect(promptCacheScopeKeyForHome("/home/other/.agenc")).not.toBe(scope);
-    expect(scope).toMatch(/^agenc-[0-9a-f]{32}$/u);
-    expect(scope).not.toContain("home");
+});
+
+describe("the prompt cache scope of an AgenC home", () => {
+  const homes: string[] = [];
+  function home(): string {
+    const path = mkdtempSync(join(tmpdir(), "agenc-scope-home-"));
+    homes.push(path);
+    return path;
+  }
+  afterEach(() => {
+    for (const path of homes.splice(0)) rmSync(path, { recursive: true, force: true });
+  });
+
+  it("is generated once and reused by every later session of the home", () => {
+    const agencHome = home();
+    const first = promptCacheScopeKeyForHome(agencHome);
+    expect(first).toMatch(/^agenc-[0-9a-f]{32}$/u);
+    const file = join(agencHome, PROMPT_CACHE_SCOPE_FILE);
+    expect(readFileSync(file, "utf8")).toBe(`${first!.slice("agenc-".length)}\n`);
+    if (process.platform !== "win32") expect(statSync(file).mode & 0o777).toBe(0o600);
+    // Later sessions (and later processes) read the same file.
+    expect(promptCacheScopeKeyForHome(agencHome)).toBe(first);
+    expect(promptCacheScopeKeyForHome(`${agencHome}/`)).toBe(first);
+    // No temporary file is left behind.
+    expect(readdirSync(agencHome)).toEqual([PROMPT_CACHE_SCOPE_FILE]);
+  });
+
+  it("differs between homes", () => {
+    const keys = [home(), home(), home()].map((path) => promptCacheScopeKeyForHome(path));
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it("carries no path-derived data: the same path gets a new random id once the file is gone", () => {
+    const agencHome = home();
+    const first = promptCacheScopeKeyForHome(agencHome)!;
+    const pathHash = createHash("sha256").update(agencHome).digest("hex");
+    const saltedPathHash = createHash("sha256")
+      .update(`agenc-prompt-cache-scope-v1\0${agencHome}`)
+      .digest("hex");
+    for (const digest of [pathHash, saltedPathHash]) {
+      expect(first).not.toContain(digest.slice(0, 32));
+      expect(digest).not.toContain(first.slice("agenc-".length));
+    }
+    for (const segment of agencHome.split("/").filter((part) => part.length > 0)) {
+      expect(first).not.toContain(segment);
+    }
+    rmSync(join(agencHome, PROMPT_CACHE_SCOPE_FILE));
+    const second = promptCacheScopeKeyForHome(agencHome);
+    expect(second).toMatch(/^agenc-[0-9a-f]{32}$/u);
+    expect(second).not.toBe(first);
+  });
+
+  it("keeps a valid id verbatim and replaces only a malformed one", () => {
+    const agencHome = home();
+    const file = join(agencHome, PROMPT_CACHE_SCOPE_FILE);
+    writeFileSync(file, "fedcba9876543210fedcba9876543210\n", { mode: 0o600 });
+    expect(promptCacheScopeKeyForHome(agencHome)).toBe("agenc-fedcba9876543210fedcba9876543210");
+    writeFileSync(file, "not an id\n");
+    const replaced = promptCacheScopeKeyForHome(agencHome);
+    expect(replaced).toMatch(/^agenc-[0-9a-f]{32}$/u);
+    expect(readFileSync(file, "utf8")).toBe(`${replaced!.slice("agenc-".length)}\n`);
+    expect(promptCacheScopeKeyForHome(agencHome)).toBe(replaced);
+  });
+
+  it("leaves an existing file it cannot read alone and gives no scope", () => {
+    const agencHome = home();
+    const file = join(agencHome, PROMPT_CACHE_SCOPE_FILE);
+    mkdirSync(file);
+    expect(promptCacheScopeKeyForHome(agencHome)).toBeUndefined();
+    expect(statSync(file).isDirectory()).toBe(true);
+    expect(readdirSync(agencHome)).toEqual([PROMPT_CACHE_SCOPE_FILE]);
+  });
+
+  it("gives no scope when the home cannot hold the file", () => {
+    expect(promptCacheScopeKeyForHome(join(home(), "missing", "home"))).toBeUndefined();
   });
 });
