@@ -95,7 +95,7 @@ describe("Light permission section", () => {
     expect(light).toContain("Tool calls are pre-approved");
     // The action rules the note points at list the actions that still need the user's request.
     expect(light).toContain("the action rules above still apply.");
-    expect(light).toContain("Ask one question (AskUserQuestion) only if the task is genuinely ambiguous");
+    expect(light).toContain("Ask one question (AskUserQuestion) only if the task is genuinely ambiguous, else make reasonable assumptions");
     expect(light).toContain("when the work is done and verified, stop and report");
     expect(light).not.toContain("Executing actions with care");
     expect(section("default", "workspace_write", false, true)).not.toContain("pre-approved");

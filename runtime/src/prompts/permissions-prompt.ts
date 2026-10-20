@@ -450,12 +450,17 @@ function bypassGrantsEscalation(
  * note refers to its action rules directly. Same terms as
  * BYPASS_AUTONOMY_NOTE; the action rules it points at already list the
  * destructive, irreversible, shared-system and externally visible actions that
- * still need the user's request.
+ * still need the user's request. A Light session whose permissions carry this
+ * note gets no auto-mode reminder (prompts/attachments/auto-mode.ts), so the
+ * note keeps that reminder's "make reasonable assumptions".
  */
 export const LIGHT_BYPASS_AUTONOMY_NOTE =
-  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the action rules above still apply. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
+  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the action rules above still apply. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous, else make reasonable assumptions; when the work is done and verified, stop and report.";
 
-/** LIGHT_BYPASS_AUTONOMY_NOTE for a standard head, which names its action rules' section. */
+/**
+ * LIGHT_BYPASS_AUTONOMY_NOTE for a standard head, which names its action rules' section. Standard
+ * sessions keep the auto-mode reminder, so this note leaves its assumptions sentence to it.
+ */
 export const COMPACT_BYPASS_AUTONOMY_NOTE =
   "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the rules in 'Executing actions with care' still apply. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
 

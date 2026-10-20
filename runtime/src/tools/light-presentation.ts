@@ -107,8 +107,9 @@ const LIGHT_SESSION_FIELDS: Readonly<Record<string, Readonly<Record<string, unkn
 
 /**
  * A Light session's own wording where the shared Light text repeats the head or speaks about a
- * state the session may never reach. The head already says "Batch independent calls"; what a
- * yielded session offers is said by write_stdin, which loads when exec_command yields one.
+ * state the session may never reach. The head already says "Put independent tool calls in one
+ * response"; what a yielded session offers is said by write_stdin, which loads when exec_command
+ * yields one.
  */
 const LIGHT_SESSION_DESCRIPTIONS: Readonly<Record<string, string>> = {
   exec_command: "Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach.",
