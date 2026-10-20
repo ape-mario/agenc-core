@@ -1616,11 +1616,12 @@ test("Light names AGENC.md only where it applies, so the model does not search f
     session: { services: { runtimeOptions: { lightMode: true, nonInteractive: true } } } as unknown as Session,
   });
   // Told only that AGENC.md is the instruction file, models searched for it. Light
-  // names it with loaded instruction files (LIGHT_LOADED_INSTRUCTIONS_NOTE) and with
-  // a message about instruction files (product-help attachment), not in the head.
+  // names it with loaded instruction files (LIGHT_LOADED_INSTRUCTIONS_NOTE) and, when
+  // none is loaded, with a message about instruction files (product-help attachment),
+  // not in the head.
   expect(snapshot.staticPrefix).not.toContain("AGENC.md is the instruction file");
   expect(LIGHT_LOADED_INSTRUCTIONS_NOTE).toContain("AgenC's instruction files (AGENC.md) and are already in this prompt; do not search for them");
-  expect(AGENC_INSTRUCTION_FILE).toContain("do not search for it");
+  expect(AGENC_INSTRUCTION_FILE).toContain("none is loaded in this session, so there is nothing to search for");
   expect(snapshot.staticPrefix).toContain("Read/change other assistants' files only when the user names them");
 });
 

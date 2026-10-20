@@ -12,9 +12,18 @@ export const AGENC_UNDO_GUIDANCE =
   AGENC_UNDO_PATHS;
 
 /**
- * AgenC's instruction file, for a Light session asked about instruction files.
- * The Light head leaves it out; loaded instruction files carry the same note
- * (prompts/live-instructions.ts).
+ * Light's framing of loaded instruction files (prompts/live-instructions.ts),
+ * where it names them instead of in the head it resends on every request.
+ */
+export const LIGHT_LOADED_INSTRUCTIONS_NOTE =
+  "They are AgenC's instruction files (AGENC.md) and are already in this prompt; do not search for them.";
+
+/**
+ * AgenC's instruction file, for a Light session asked about instruction files
+ * while none is loaded. The Light head leaves it out; loaded instruction files
+ * say where they are themselves (prompts/live-instructions.ts
+ * LIGHT_LOADED_INSTRUCTIONS_NOTE). Told only that its text would appear in the
+ * prompt if one were loaded, a model still searched the workspace for it.
  */
 export const AGENC_INSTRUCTION_FILE =
-  "AGENC.md is AgenC's instruction file. If one is loaded, its text appears in this prompt; do not search for it.";
+  "AGENC.md is AgenC's instruction file; none is loaded in this session, so there is nothing to search for.";

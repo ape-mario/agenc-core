@@ -42,6 +42,7 @@ import {
   type RunInstructionSourceEvidence,
 } from "./instruction-evidence.js";
 import { sanitizeSystemReminderContent } from "./attachments/system-reminder-sanitizer.js";
+import { LIGHT_LOADED_INSTRUCTIONS_NOTE } from "./product-help.js";
 
 export type { LiveInstructionPolicy } from "./instruction-evidence.js";
 
@@ -114,8 +115,7 @@ function instructionEvidence(
  * request: told only that AGENC.md is the instruction file, models searched for
  * it (prompts/light-budget-prompt.ts).
  */
-export const LIGHT_LOADED_INSTRUCTIONS_NOTE =
-  "They are AgenC's instruction files (AGENC.md) and are already in this prompt; do not search for them.";
+export { LIGHT_LOADED_INSTRUCTIONS_NOTE };
 
 function frameWorkspaceGuidance(content: string, light = false): string {
   if (content.trim().length === 0) return "";

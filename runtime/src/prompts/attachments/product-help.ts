@@ -5,7 +5,9 @@
  * few user messages need stays out of it. When the root human message of the
  * current turn asks how to undo, revert, roll back or restore work, the
  * producer sends the undo paths (/rewind checkpoints, their limits, Git
- * history); when it mentions instruction files, it names AgenC's (AGENC.md).
+ * history); when it mentions instruction files and none is loaded, it names
+ * AgenC's (AGENC.md) and says none is loaded. Loaded instruction files already
+ * say where they are (prompts/live-instructions.ts).
  * Each topic goes once, on the turn's first request. The retention ledger
  * anchors the reminder before that message and replays it in place on every
  * later request, so the cached prefix never moves and the text is not sent
@@ -18,7 +20,7 @@
  */
 
 import type { LLMMessage } from "../../llm/types.js";
-import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_PATHS } from "../product-help.js";
+import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_PATHS, LIGHT_LOADED_INSTRUCTIONS_NOTE } from "../product-help.js";
 import type { AttachmentProducer } from "./orchestrator.js";
 
 /**
@@ -57,6 +59,14 @@ function contains(messages: readonly LLMMessage[], needle: string): boolean {
   });
 }
 
+/**
+ * Loaded instruction files say where they are: in the instructions sent with
+ * this request, or in an instruction update reminder already in the history.
+ */
+function instructionFilesLoaded(opts: Parameters<AttachmentProducer>[0]): boolean {
+  return opts.lightInstructionFilesLoaded === true || contains(opts.messages, LIGHT_LOADED_INSTRUCTIONS_NOTE);
+}
+
 export const productHelpProducer: AttachmentProducer = async (opts) => {
   if (opts.lightMode !== true) return [];
   // Only the human's own message decides; a synthetic follow-up or a
@@ -70,6 +80,7 @@ export const productHelpProducer: AttachmentProducer = async (opts) => {
   // Each topic once: a copy already in front of the model (retained from an
   // earlier request or turn) suppresses it.
   return TOPICS
-    .filter(({ matches, text }) => matches(root.text) && !contains(opts.messages, text))
+    .filter(({ topic, matches, text }) => matches(root.text) && !contains(opts.messages, text) &&
+      !(topic === "instructions" && instructionFilesLoaded(opts)))
     .map(({ topic }) => ({ kind: "product_help", topic }));
 };

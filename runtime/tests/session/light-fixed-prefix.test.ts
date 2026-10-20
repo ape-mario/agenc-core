@@ -8,7 +8,7 @@ import type { LLMChatOptions, LLMMessage, LLMResponse } from "../../src/llm/type
 import type { PermissionMode } from "../../src/permissions/types.js";
 import { assembleBaseInstructionsForModel } from "../../src/prompts/system-prompt.js";
 import { LIGHT_BYPASS_AUTONOMY_NOTE } from "../../src/prompts/permissions-prompt.js";
-import { AGENC_UNDO_PATHS } from "../../src/prompts/product-help.js";
+import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_PATHS, LIGHT_LOADED_INSTRUCTIONS_NOTE } from "../../src/prompts/product-help.js";
 import { LIGHT_MEMORY_RULES_MARKER } from "../../src/memory/memdir.js";
 import { permissionInstructionsStateLightAutonomy } from "../../src/session/permission-instructions.js";
 import { runTurn } from "../../src/session/run-turn.js";
@@ -30,7 +30,7 @@ function count(request: RecordedRequest, needle: string): number {
 }
 
 /** One tool round, then a final answer, for every turn. */
-async function scriptedSession(mode: PermissionMode, light: boolean) {
+async function scriptedSession(mode: PermissionMode, light: boolean, extraInstructions = "") {
   const requests: RecordedRequest[] = [];
   const provider = mkProvider();
   let step = 0;
@@ -66,8 +66,9 @@ async function scriptedSession(mode: PermissionMode, light: boolean) {
     permissionContext: session.permissionModeRegistry.current(),
     profile: light ? "light" : "standard",
   });
+  const instructions = [extraInstructions, baseInstructions].filter(part => part.length > 0).join("\n\n");
   const turn = async (subId: string, message: string) =>
-    drain(runTurn(session, { ...context, subId, baseInstructions }, message));
+    drain(runTurn(session, { ...context, subId, baseInstructions: instructions }, message));
   return { session, context, requests, turn };
 }
 
@@ -126,6 +127,19 @@ describe("Light fixed request prefix", () => {
     expect(reminderIndex).toBeGreaterThan(0);
     expect(text(asked.messages[reminderIndex + 1]!)).toContain("How do I undo what you just did?");
     for (const request of requests.slice(2)) expect(count(request, AGENC_UNDO_PATHS)).toBe(1);
+  });
+
+  test("a question about instruction files says none is loaded, unless loaded files already say where they are", async () => {
+    const question = "What does AGENC.md say about tests?";
+    const none = await scriptedSession("bypassPermissions", true);
+    await none.turn("turn-1", question);
+    expect(count(none.requests[0]!, AGENC_INSTRUCTION_FILE)).toBe(1);
+    // Loaded instruction files ride the instructions with their own note.
+    const loaded = await scriptedSession("bypassPermissions", true,
+      `<workspace_instructions trust="untrusted" authority="guidance_only">\n\nGuidance. ${LIGHT_LOADED_INSTRUCTIONS_NOTE}\n\nRun npm test.\n\n</workspace_instructions>`);
+    await loaded.turn("turn-1", question);
+    expect(loaded.requests[0]!.systemPrompt).toContain(LIGHT_LOADED_INSTRUCTIONS_NOTE);
+    for (const request of loaded.requests) expect(count(request, AGENC_INSTRUCTION_FILE)).toBe(0);
   });
 
   test("with empty memory the rules and directories arrive once, with the first message about memory", async () => {

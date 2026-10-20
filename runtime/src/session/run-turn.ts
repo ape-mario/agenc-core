@@ -141,6 +141,7 @@ import { getAttachments } from "../prompts/attachments/orchestrator.js";
 import { getAttachmentTrackingState } from "./attachment-state.js";
 import {
   frameWorkspaceAgentRoleGuidance,
+  LIGHT_LOADED_INSTRUCTIONS_NOTE,
   resolveLiveInstructionEnvelope,
   type LiveInstructionPolicy,
 } from "../prompts/live-instructions.js";
@@ -961,6 +962,7 @@ async function prepareSamplingRequestBoundary(
       !state.modelInstructions.includes(LIGHT_MEMORY_RULES_MARKER)
       ? { lightMemoryOnRequest: () => resolveLightMemoryOnRequest(session, ctx.cwd) }
       : {}),
+    lightInstructionFilesLoaded: state.modelInstructions.includes(LIGHT_LOADED_INSTRUCTIONS_NOTE),
     admittedMemorySelector: createAdmittedMemorySelector(session),
     // Producers hold only an opaque session key, so what they decide is
     // invisible to an operator unless they can report it. Routed to the

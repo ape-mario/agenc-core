@@ -7,7 +7,12 @@ import { describe, expect, test } from "vitest";
 import type { LLMMessage } from "../../llm/types.js";
 import type { ToolPermissionContext } from "../../permissions/types.js";
 import { getAttachmentTrackingState } from "../../session/attachment-state.js";
-import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_GUIDANCE, AGENC_UNDO_PATHS } from "../product-help.js";
+import {
+  AGENC_INSTRUCTION_FILE,
+  AGENC_UNDO_GUIDANCE,
+  AGENC_UNDO_PATHS,
+  LIGHT_LOADED_INSTRUCTIONS_NOTE,
+} from "../product-help.js";
 import { attachmentsToMessages } from "./messages.js";
 import type { GetAttachmentsOptions } from "./orchestrator.js";
 import { asksAboutInstructionFiles, asksAboutUndo, productHelpProducer } from "./product-help.js";
@@ -87,6 +92,24 @@ describe("product-help attachment producer", () => {
     expect(await produce(text)).toEqual([{ kind: "product_help", topic: "instructions" }]);
     const [message] = attachmentsToMessages(await produce(text));
     expect(message?.content).toBe(`<system-reminder>\n${AGENC_INSTRUCTION_FILE}\n</system-reminder>`);
+  });
+
+  test("loaded instruction files already say where they are: no instruction-file reminder", async () => {
+    const text = "What does AGENC.md say about tests? And how do I undo your last edit?";
+    // The instructions sent with this request carry them (session/run-turn.ts).
+    expect(await produce(text, { lightInstructionFilesLoaded: true }))
+      .toEqual([{ kind: "product_help", topic: "undo" }]);
+    // An instruction update in the history carries them.
+    const update: LLMMessage = { role: "user", content: `<system-reminder>\n${LIGHT_LOADED_INSTRUCTIONS_NOTE}\n</system-reminder>`,
+      runtimeOnly: { mergeBoundary: "user_context" } };
+    expect(await produce(text, { messages: [update, { role: "user", content: text }] }))
+      .toEqual([{ kind: "product_help", topic: "undo" }]);
+    // None loaded: the reminder says so.
+    expect(await produce(text, { lightInstructionFilesLoaded: false })).toEqual([
+      { kind: "product_help", topic: "undo" },
+      { kind: "product_help", topic: "instructions" },
+    ]);
+    expect(AGENC_INSTRUCTION_FILE).toContain("none is loaded in this session");
   });
 
   test("a message about both sends both topics, each once", async () => {
