@@ -50,6 +50,7 @@ import {
 import { sessionQuerySourceForTurn } from "./run-turn-queued-commands.js";
 import { buildSamplingRequestContract } from "./run-turn-sampling-request.js";
 import { usesLocalToolProfile } from "../llm/wire/capability-gating.js";
+import { reportsCompletePromptTokens } from "../llm/token-accounting.js";
 import {
   describeCompactionDecline,
   ladderAppliesToDecline,
@@ -1058,8 +1059,9 @@ function getActiveContextTokenUsage(
       ? state
       : { ...state, messagesForQuery: [...messages] };
   const request = buildSamplingRequestContract(accountingState, session, ctx);
+  const accountingProvider = ctx.provider ?? session.services.provider;
   return estimateMessagesTokens(toAgenCRuntimeMessages(request.input), {
-    provider: ctx.provider ?? session.services.provider,
+    provider: accountingProvider,
     options: {
       mainLoopModel: ctx.modelInfo.slug,
       ...(request.contextWindowTokens !== undefined
@@ -1081,6 +1083,13 @@ function getActiveContextTokenUsage(
     // headroom-reserving proactive threshold. Output remains fully accounted
     // by hard admission and can be clamped there; no request limit changes.
     inputOnly: options.includeOutput !== true,
+    // The dispatch gate compares a calibrated count with the same limit. Where
+    // reports lower that count (two-way calibration), the uncalibrated estimate
+    // is about 2.4 times larger and would escalate a commit that already fits.
+    ...(session.conversationId &&
+      reportsCompletePromptTokens(accountingProvider.name, ctx.modelInfo.slug)
+      ? { calibrationScope: session.conversationId }
+      : {}),
   });
 }
 
