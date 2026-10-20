@@ -152,7 +152,7 @@ describe("two-way calibration from DeepSeek reported prompt tokens", () => {
     expect(next.inputTokens).toBe(Math.ceil(fallback * ((anchor.reported / anchor.basis) * HEADROOM)));
   });
 
-  test("the first request and every other conversation, system prompt, endpoint or model keep the conservative fallback", async () => {
+  test("the first request and every other conversation, request shape, endpoint or model keep the conservative fallback", async () => {
     const service = new TokenAccountingService();
     const first = await service.count(request(HISTORY));
     expect(first.inputTokens).toBe(fallbackOf(HISTORY));
@@ -161,7 +161,9 @@ describe("two-way calibration from DeepSeek reported prompt tokens", () => {
     for (const overrides of [
       { calibrationScope: "conv-b" },
       { calibrationScope: undefined },
+      // A tool-free side call (the compaction summarizer, a classifier) of the same conversation.
       { options: { systemPrompt: "You summarize transcripts.", maxOutputTokens: 8_192 } },
+      { options: { systemPrompt: SYSTEM_PROMPT, maxOutputTokens: 8_192 } },
       { endpointIdentity: "https://other.example/v1" },
       { model: "deepseek-pro" },
     ] satisfies Partial<CreateTokenAccountingRequestOptions>[]) {
@@ -169,6 +171,27 @@ describe("two-way calibration from DeepSeek reported prompt tokens", () => {
       expect(other.inputTokens).toBe(fallbackOf(HISTORY, overrides));
       expect(other.calibration).toBeUndefined();
     }
+  });
+
+  test("a system prompt the runtime extends within the conversation keeps the calibration", async () => {
+    const service = new TokenAccountingService();
+    const anchor = await reportAt(service, HISTORY, DEEPSEEK_RATIO);
+    // A compaction appends its continuation note to the agent turn's instructions.
+    const extended = {
+      options: {
+        systemPrompt: `${SYSTEM_PROMPT}\n\nCompaction continuation: resume the unfinished step using retained tool results.`,
+        tools: TOOLS,
+        maxOutputTokens: 8_192,
+      },
+    };
+    const fallback = fallbackOf(HISTORY, extended);
+
+    const next = await service.count(request(HISTORY, extended));
+
+    expect(next.calibration?.anchorBasisInputTokens).toBe(anchor.basis);
+    expect(next.inputTokens).toBe(Math.ceil(
+      anchor.basis * ((anchor.reported / anchor.basis) * HEADROOM) + (fallback - anchor.basis),
+    ));
   });
 
   test("the ratio is the largest of the newest reports, so an old dense request ages out", async () => {

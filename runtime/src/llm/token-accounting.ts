@@ -48,7 +48,7 @@ export const TOKEN_ACCOUNTING_CALIBRATION_MAX_SCOPES = 256;
 /**
  * Two-way calibration from reported prompt tokens, for providers whose report counts the whole prompt (see
  * {@link reportsCompletePromptTokens}). The conservative fallback for those requests stays the first-call bound,
- * but once a request of the same conversation and system prompt has been reported, the estimate is anchored on
+ * but once a request of the same conversation and request shape has been reported, the estimate is anchored on
  * that report instead of the fallback alone:
  *
  *   estimate = min(fallback, anchorFallback) x ratio x headroom + max(0, fallback - anchorFallback)
@@ -241,7 +241,7 @@ export interface TokenAccountingCalibration {
   readonly basisInputTokens: number;
   readonly headroom: number;
   /**
-   * Present when the estimate is anchored on a reported request of the same conversation and system prompt (two-way
+   * Present when the estimate is anchored on a reported request of the same conversation and request shape (two-way
    * calibration): that request's uncalibrated fallback. Growth beyond it is counted at the fallback rate.
    */
   readonly anchorBasisInputTokens?: number;
@@ -452,7 +452,7 @@ export class TokenAccountingService {
   readonly #abandonedDigests = new Set<string>();
   readonly #metrics = new Map<string, MutableTokenAccountingMetric>();
   readonly #calibrationFactors = new Map<string, number>();
-  /** Reported requests per conversation, provider, model, endpoint and system prompt; newest last. */
+  /** Reported requests per conversation, provider, model, endpoint and request shape; newest last. */
   readonly #anchoredSamples = new Map<string, readonly AnchoredCalibrationSample[]>();
   readonly #calibrationBases = new WeakMap<
     TokenAccountingResult,
@@ -1099,17 +1099,20 @@ function calibrationKeyFor(
 }
 
 /**
- * Two-way calibration is kept per system prompt as well: side calls of a conversation (the compaction summarizer,
- * classifiers, memory selection) have their own prompts and densities, and must not become the anchor that the
- * conversation's next main request is measured against.
+ * Two-way calibration is kept per request shape as well: agent turns carry their tool catalog, while the
+ * conversation's side calls (the compaction summarizer, classifiers, memory selection) are tool-free and have their own
+ * densities, so a side call must not become the anchor that the next agent turn is measured against. The system prompt
+ * is deliberately not part of the key: the runtime extends it within a conversation (a compaction appends its
+ * continuation note and frames durable summaries), and a key that changed there would drop the calibration exactly
+ * when the history sits near the compaction threshold.
  */
 function anchoredCalibrationKeyFor(
   key: string,
   request: TokenAccountingRequest,
 ): string {
-  const systemPrompt = request.options.systemPrompt ?? "";
-  const digest = createHash("sha256").update(systemPrompt, "utf8").digest("hex");
-  return `${key}\0${digest}`;
+  const agentTurn = (request.options.tools?.length ?? 0) > 0 ||
+    (request.providerNativeTools?.length ?? 0) > 0;
+  return `${key}\0${agentTurn ? "agent-turn" : "tool-free"}`;
 }
 
 function withAnchoredCalibration(

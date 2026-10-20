@@ -113,6 +113,8 @@ function read(path: string, limit?: number) {
 interface Harness {
   readonly store: RolloutStore;
   readonly requests: LLMMessage[][];
+  /** The prompt count the scripted provider reported for each agent-turn request, in order. */
+  readonly promptTokens: number[];
   readonly summarizerCalls: number;
   run(): Promise<void>;
   close(): void;
@@ -130,17 +132,25 @@ function isSummarizerRequest(messages: readonly LLMMessage[]): boolean {
 }
 
 /**
- * The script's prompt counts are not DeepSeek's (it answered every request
- * with the same fixed count). DeepSeek's reported prompt tokens now calibrate
- * the estimate in both directions, so the scripted replies report none: the
- * sizes and limits below were derived from the conservative estimate, which
- * is what an uncalibrated request (a first call, a restart) still gets.
+ * By default the script reports no prompt count: its sizes and limits were
+ * derived from the conservative estimate, which is what an uncalibrated
+ * request (a first call, a restart) still gets, and DeepSeek's reported prompt
+ * tokens calibrate the estimate in both directions. `deepseekCounts` instead
+ * answers every request with DeepSeek's own count: about 4.3 bytes of request
+ * JSON per token, the density of recorded DeepSeek requests (2026-10-20).
  */
-function scriptedUsage(completionTokens: number): LLMResponse["usage"] {
-  return { promptTokens: 0, completionTokens, totalTokens: completionTokens, availability: "reported", provenance: "provider" };
+function scriptedUsage(completionTokens: number, promptTokens = 0): LLMResponse["usage"] {
+  return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, availability: "reported", provenance: "provider" };
 }
 
-function createHarness(script: readonly ScriptStep[]): Harness {
+function deepseekPromptTokens(messages: readonly LLMMessage[], options: unknown): number {
+  const chat = options as { systemPrompt?: string; tools?: unknown[] } | undefined;
+  return Math.ceil(Buffer.byteLength(JSON.stringify({
+    system: chat?.systemPrompt ?? "", tools: chat?.tools ?? [], messages,
+  }), "utf8") / 4.3);
+}
+
+function createHarness(script: readonly ScriptStep[], options: { readonly deepseekCounts?: boolean } = {}): Harness {
   const saved = new Map(COMPACTION_ENVIRONMENT_KEYS.map((key) => [key, process.env[key]]));
   const previousHome = process.env.AGENC_HOME;
   process.env.AGENC_AUTO_COMPACT_WINDOW = WINDOW;
@@ -157,21 +167,24 @@ function createHarness(script: readonly ScriptStep[]): Harness {
     originator: "small-window-compaction", agencVersion: "0.19.11", model: "deepseek-flash", modelProvider: "deepseek" });
 
   const requests: LLMMessage[][] = [];
+  const promptTokensByRequest: number[] = [];
   let step = 0;
   let summarizerCalls = 0;
-  const respond = async (messages: LLMMessage[]): Promise<LLMResponse> => {
+  const respond = async (messages: LLMMessage[], chatOptions?: unknown): Promise<LLMResponse> => {
+    const promptTokens = options.deepseekCounts === true ? deepseekPromptTokens(messages, chatOptions) : 0;
     if (isSummarizerRequest(messages)) {
       summarizerCalls += 1;
       return {
         content: JSON.stringify({ narrative: "Read the reading files in order; continue with the next unread file.",
           facts: [], open_actions: [] }),
         toolCalls: [],
-        usage: scriptedUsage(700),
+        usage: scriptedUsage(700, promptTokens),
         model: "deepseek-flash",
         finishReason: "stop",
       };
     }
     requests.push(messages.map((message) => ({ ...message })));
+    promptTokensByRequest.push(promptTokens);
     const current = script[Math.min(step, script.length - 1)]!;
     step += 1;
     const calls = (current.calls ?? []).map((call, index) => ({
@@ -182,12 +195,12 @@ function createHarness(script: readonly ScriptStep[]): Harness {
     return {
       content: current.text ?? "",
       toolCalls: calls,
-      usage: scriptedUsage(60),
+      usage: scriptedUsage(60, promptTokens),
       model: "deepseek-flash",
       finishReason: calls.length > 0 ? "tool_calls" : "stop",
     };
   };
-  const chat = vi.fn<LLMProvider["chat"]>(async (messages) => respond(messages));
+  const chat = vi.fn<LLMProvider["chat"]>(async (messages, chatOptions) => respond(messages, chatOptions));
   const provider = {
     name: "deepseek",
     getExecutionProfile: async () => ({
@@ -213,6 +226,7 @@ function createHarness(script: readonly ScriptStep[]): Harness {
     cwd,
     provider,
     registry: fileReadRegistry(),
+    ...(options.deepseekCounts === true ? { model: "deepseek-flash" } : {}),
     modelInfo,
     services: { providerEnvironment: { AGENC_AUTO_COMPACT_WINDOW: WINDOW } },
   });
@@ -228,6 +242,7 @@ function createHarness(script: readonly ScriptStep[]): Harness {
   return {
     store,
     requests,
+    promptTokens: promptTokensByRequest,
     get summarizerCalls() { return summarizerCalls; },
     run: async () => {
       const base = mkCtx();
@@ -452,5 +467,44 @@ describe("mid-turn compaction on a 32k effective window (gate scenario 7)", () =
     expect(harness.requests).toHaveLength(2);
     // Both exact results are durable even though the turn could not go on.
     expect(durableToolResults(rows).size).toBe(2);
+  });
+});
+
+describe("gate scenario 7 on a 32k window with DeepSeek's own prompt counts", () => {
+  test("sequential reads keep their calibration across compactions: no tier refused, every estimate an upper bound", async () => {
+    harness = createHarness([
+      ...Array.from({ length: 8 }, (_, index) => ({
+        text: index === 0 ? "I'll read each file in order." : `Part-${index - 1} marker \`${marker(index - 1)}\`. Continuing.`,
+        calls: [read(`part-${index}.txt`)],
+      })),
+      { text: `Part-7 marker \`${marker(7)}\`. READING_COMPLETE` },
+    ], { deepseekCounts: true });
+    await harness.run();
+    const rows = harness.store.readAll();
+
+    expect(terminalOf(rows)).toEqual(expect.objectContaining({ type: "turn_complete" }));
+    expect(harness.requests).toHaveLength(9);
+    expect(committedAccounting(rows).length).toBeGreaterThanOrEqual(1);
+    // Keyed on the instructions, the calibration was lost when the first commit
+    // appended its continuation note: the post-commit check saw the 2.4x fallback,
+    // escalated to the aggressive tier, and that tier refused (no_shrink).
+    expect(rows.filter((row) => row.type === "compaction_failed")).toEqual([]);
+    expect(eventsOf(rows, "warning").map((warning) => String(warning.message))
+      .filter((message) => message.includes("history still above the limit"))).toEqual([]);
+    // Every agent-turn request was admitted on an estimate at or above DeepSeek's
+    // count; after the first one, none needed the fallback's 2.4x.
+    const admitted = rows.flatMap((row) => {
+      if (row.type !== "event_msg" || row.payload.msg.type !== "execution_admission") return [];
+      const payload = row.payload.msg.payload as {
+        event?: string; stepId?: string; reservedTokens?: number; details?: { maxOutputTokens?: number };
+      };
+      return payload.event === "dispatched" && payload.stepId?.startsWith("model:") && typeof payload.reservedTokens === "number"
+        ? [payload.reservedTokens - (payload.details?.maxOutputTokens ?? 0)] : [];
+    });
+    expect(admitted).toHaveLength(harness.promptTokens.length);
+    admitted.forEach((accounted, index) => expect(accounted).toBeGreaterThanOrEqual(harness!.promptTokens[index]!));
+    expect(admitted[0]! / harness.promptTokens[0]!).toBeGreaterThan(2);
+    admitted.slice(1).forEach((accounted, index) =>
+      expect(accounted / harness!.promptTokens[index + 1]!).toBeLessThan(2));
   });
 });
