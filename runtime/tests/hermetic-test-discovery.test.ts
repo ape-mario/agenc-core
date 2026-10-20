@@ -87,6 +87,7 @@ const KERNEL_TEST_FILES = [
   "tests/sandbox/linux-launcher/local-binding.kernel.test.ts",
   "tests/sandbox/linux-launcher/session-sandbox.kernel.test.ts",
   "tests/sandbox/readonly-delegation.kernel.test.ts",
+  "tests/unified-exec/protected-create-session.kernel.test.ts",
   "tests/unified-exec/session-sandbox.kernel.test.ts",
   "tests/utils/process-broker-v2-lifecycle.kernel.test.ts",
 ] as const;

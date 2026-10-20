@@ -41,7 +41,7 @@ function run(cmd: string, extra: Record<string, unknown> = {}) {
   return manager.execCommand({ cmd, login: false, runtimeSandbox: policy, yield_time_ms: 2000, ...extra });
 }
 
-describe.runIf(process.platform === "linux")("protected-create targets in the warm session sandbox", () => {
+describe("protected-create targets in the warm session sandbox", () => {
   it("runs workspace-write commands in one namespace and fails the one that creates a protected path", async () => {
     const launch = vi.spyOn(supervised, "spawnContainedProcess");
     const spawn = vi.spyOn(SessionSandbox.prototype, "spawn");
@@ -126,7 +126,7 @@ describe.runIf(process.platform === "linux")("protected-create targets in the wa
   });
 });
 
-describe.runIf(process.platform === "linux")("read-only commands that run side by side", () => {
+describe("read-only commands that run side by side", () => {
   it("each take a warm namespace of their own, reused by the next batch", async () => {
     const readOnly: UnifiedExecRuntimeSandbox = { ...policy, preference: "require", permissionProfile: permissionProfileFromRuntimePermissions(
       restrictedFileSystemPolicy([{ path: { kind: "special", value: { kind: "root" } }, access: "read" }]), "disabled") };
