@@ -74,15 +74,21 @@ describe.runIf(process.platform === "linux")("protected-create targets in the wa
   });
 
   it("rebuilds the namespace for a protected path created outside it instead of removing it", async () => {
+    const launch = vi.spyOn(supervised, "spawnContainedProcess");
+    const spawn = vi.spyOn(SessionSandbox.prototype, "spawn");
     const first = await run(namespace);
     fs.mkdirSync(path.join(work, ".agenc"));
     fs.writeFileSync(path.join(work, ".agenc", "config.toml"), "kept\n");
-    const result = await run(`cat .agenc/config.toml; touch .agenc/new 2>/dev/null && echo writable || echo protected; ${namespace}`);
+    const result = await run("cat .agenc/config.toml; touch .agenc/new 2>/dev/null && echo writable || echo protected");
+    expect(first.exitCode).toBe(0);
     expect(result.exitCode).toBe(0);
-    const lines = result.stdout.trim().split("\n");
-    expect(lines[0]).toBe("kept");
-    expect(lines[1]).toBe("protected");
-    expect(lines[2]).not.toBe(first.stdout.trim());
+    expect(result.stdout.trim().split("\n")).toEqual(["kept", "protected"]);
+    // Both commands ran in a session namespace and the second one needed a new
+    // launch: the namespace was rebuilt around the existing path. (Comparing
+    // pid namespace numbers cannot show this: the kernel may give the closed
+    // namespace's number to its replacement.)
+    for (const spawned of spawn.mock.results) expect(await spawned.value).toBeDefined();
+    expect(launch).toHaveBeenCalledTimes(2);
     expect(fs.readFileSync(path.join(work, ".agenc", "config.toml"), "utf8")).toBe("kept\n");
     expect(fs.existsSync(path.join(work, ".agenc", "new"))).toBe(false);
   });
