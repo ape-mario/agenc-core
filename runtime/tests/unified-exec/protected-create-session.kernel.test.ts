@@ -17,6 +17,7 @@ import { SessionSandbox } from "../../src/sandbox/linux-launcher/session-sandbox
 import * as supervised from "../../src/utils/supervisedProcess.js";
 import { permissionProfileFromRuntimePermissions, restrictedFileSystemPolicy } from "../../src/sandbox/engine/index.js";
 import type { UnifiedExecRuntimeSandbox } from "../../src/unified-exec/types.js";
+import { prepareReadOnlyInspectionInvocation } from "../../src/permissions/readonly-inspection.js";
 
 let base: string, work: string, manager: UnifiedExecProcessManager, policy: UnifiedExecRuntimeSandbox;
 beforeEach(() => {
@@ -118,3 +119,27 @@ describe.runIf(process.platform === "linux")("protected-create targets in the wa
     expect(fs.existsSync(path.join(work, ".agenc"))).toBe(false);
   });
 });
+
+describe.runIf(process.platform === "linux")("read-only commands that run side by side", () => {
+  it("each take a warm namespace of their own, reused by the next batch", async () => {
+    const readOnly: UnifiedExecRuntimeSandbox = { ...policy, preference: "require", permissionProfile: permissionProfileFromRuntimePermissions(
+      restrictedFileSystemPolicy([{ path: { kind: "special", value: { kind: "root" } }, access: "read" }]), "disabled") };
+    const inspect = () => {
+      const directInvocation = prepareReadOnlyInspectionInvocation(
+        { command: "readlink", args: ["/proc/self/ns/pid"], cwd: work, readPaths: [work] }, readOnly);
+      return manager.execCommand({ cmd: "readlink /proc/self/ns/pid", runtimeSandbox: readOnly, directInvocation,
+        workdir: work, yield_time_ms: 2000 });
+    };
+    const launch = vi.spyOn(supervised, "spawnContainedProcess");
+    const first = await Promise.all([inspect(), inspect(), inspect()]);
+    const second = await Promise.all([inspect(), inspect(), inspect()]);
+    for (const result of [...first, ...second]) expect(result.exitCode).toBe(0);
+    // Three namespaces were started once (one launch each); the second batch
+    // reused them instead of falling back to per-command launches.
+    expect(launch).toHaveBeenCalledTimes(3);
+    const namespaces = new Set(first.map(result => result.stdout));
+    expect(namespaces.size).toBe(3);
+    expect(new Set(second.map(result => result.stdout))).toEqual(namespaces);
+  });
+});
+

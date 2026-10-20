@@ -75,6 +75,11 @@ export class SessionSandbox {
   /** Missing protected paths of the current namespace, watched per command. */
   private protectedCreateTargets: readonly string[] = [];
 
+  /** Running a command, starting or closing: a new command cannot use it now. */
+  get busy(): boolean {
+    return this.active !== undefined || this.starting || this.closing;
+  }
+
   private watchAbort(signal?: AbortSignal): void {
     this.detachAbort?.();
     this.detachAbort = undefined;

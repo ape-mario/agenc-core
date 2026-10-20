@@ -418,9 +418,21 @@ function normalizeOwnerId(ownerId: string | undefined): string | undefined {
  * inspection's fixed one, so it has a third slot for the same reason.
  */
 type SessionSandboxSlot = "shell" | "inspection" | "inspection-shell";
-function sessionSandboxKey(ownerId: string | undefined, slot: SessionSandboxSlot): string {
-  return slot === "shell" ? ownerId ?? "" : `${ownerId ?? ""}\u0000${slot}`;
+function sessionSandboxKey(ownerId: string | undefined, slot: SessionSandboxSlot, index = 0): string {
+  const base = slot === "shell" ? ownerId ?? "" : `${ownerId ?? ""}\u0000${slot}`;
+  return index === 0 ? base : `${base}\u0000#${index}`;
 }
+/** Every session sandbox key of one owner: its shell, read-only slots and their pool members. */
+function isOwnerSessionSandboxKey(key: string, ownerId: string | undefined): boolean {
+  const owner = ownerId ?? "";
+  return key === owner || key.startsWith(`${owner}\u0000`);
+}
+/**
+ * Warm namespaces per read-only slot. Read-only calls from one response run
+ * side by side; each takes an idle warm namespace instead of a cold
+ * per-command launch. Workspace-write commands run one at a time and keep one.
+ */
+const READ_ONLY_SESSION_SANDBOX_POOL = 3;
 
 function makeDeferredExit(): {
   readonly promise: Promise<ExitState>;
@@ -613,15 +625,45 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
   // Retain failed startup admission across policy drains, Stop and opt-out.
   // Only closing the owner lifetime (or disposing this manager) resets it.
   private readonly sessionSandboxAvailability = new Map<string, SessionSandboxAvailability>();
-  private sessionSandboxFor(ownerId: string | undefined, slot: SessionSandboxSlot): SessionSandbox {
-    const key = sessionSandboxKey(ownerId, slot);
+  private sessionSandboxFor(ownerId: string | undefined, slot: SessionSandboxSlot, index = 0): SessionSandbox {
+    const key = sessionSandboxKey(ownerId, slot, index);
     let sandbox = this.sessionSandboxes.get(key);
     if (!sandbox) {
-      let availability = this.sessionSandboxAvailability.get(key);
-      if (!availability) { availability = { startupFailed: false }; this.sessionSandboxAvailability.set(key, availability); }
+      // Pool members share their slot's startup availability.
+      const availabilityKey = sessionSandboxKey(ownerId, slot);
+      let availability = this.sessionSandboxAvailability.get(availabilityKey);
+      if (!availability) { availability = { startupFailed: false }; this.sessionSandboxAvailability.set(availabilityKey, availability); }
       sandbox = new SessionSandbox(availability); this.sessionSandboxes.set(key, sandbox);
     }
     return sandbox;
+  }
+  /** Namespaces a launch is starting in; a concurrent launch takes another one. */
+  private readonly sessionSandboxesInUse = new Set<SessionSandbox>();
+  /**
+   * Run in an idle warm namespace of the slot: the first pool member that is
+   * neither running a command nor taken by a concurrent launch. A member that
+   * declines (policy or startup) sends the command to the per-command
+   * launcher, as does a pool with every member busy.
+   */
+  private async spawnInSessionSandbox(
+    ownerId: string | undefined,
+    slot: SessionSandboxSlot,
+    input: { readonly program: string; readonly args: readonly string[]; readonly cwd: string; readonly env: Record<string, string> },
+    validateAdmission: () => void,
+    signal: AbortSignal | undefined,
+  ): Promise<ChildProcessWithoutNullStreams | undefined> {
+    const members = slot === "shell" ? 1 : READ_ONLY_SESSION_SANDBOX_POOL;
+    for (let index = 0; index < members; index += 1) {
+      const sandbox = this.sessionSandboxFor(ownerId, slot, index);
+      if (sandbox.busy || this.sessionSandboxesInUse.has(sandbox)) continue;
+      this.sessionSandboxesInUse.add(sandbox);
+      try {
+        return await sandbox.spawn(input, validateAdmission, signal);
+      } finally {
+        this.sessionSandboxesInUse.delete(sandbox);
+      }
+    }
+    return undefined;
   }
   private async closeSessionSandboxes(): Promise<void> {
     const outcomes = await Promise.allSettled([this.sessionSandboxes, this.oneShotServers].flatMap(map =>
@@ -1407,8 +1449,8 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
         Promise.resolve().then(async () => {
           await this.oneShotServers.get(lifetime.ownerId)?.close();
           this.oneShotServers.delete(lifetime.ownerId);
-          for (const slot of ["shell", "inspection"] as const) {
-            const key = sessionSandboxKey(lifetime.ownerId, slot);
+          for (const key of [...this.sessionSandboxes.keys()]) {
+            if (!isOwnerSessionSandboxKey(key, lifetime.ownerId)) continue;
             await this.sessionSandboxes.get(key)?.close();
             this.sessionSandboxes.delete(key);
           }
@@ -1424,8 +1466,9 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
       }
       // Keep settled yielded entries for status/output collection and pruning.
       lifetime.closed = true;
-      this.sessionSandboxAvailability.delete(sessionSandboxKey(lifetime.ownerId, "shell"));
-      this.sessionSandboxAvailability.delete(sessionSandboxKey(lifetime.ownerId, "inspection"));
+      for (const key of [...this.sessionSandboxAvailability.keys()]) {
+        if (isOwnerSessionSandboxKey(key, lifetime.ownerId)) this.sessionSandboxAvailability.delete(key);
+      }
     });
     return lifetime.closeTask;
   }
@@ -1682,8 +1725,8 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
 
     if (this.sessionSandboxes.size > 0 &&
         (params.runtimeSandbox === undefined || params.runtimeSandbox.persistentSession === false)) {
-      for (const slot of ["shell", "inspection"] as const) {
-        const key = sessionSandboxKey(params.ownerId, slot);
+      for (const key of [...this.sessionSandboxes.keys()]) {
+        if (!isOwnerSessionSandboxKey(key, params.ownerId)) continue;
         const previousSandbox = this.sessionSandboxes.get(key);
         if (previousSandbox) {
           await previousSandbox.close();
@@ -1760,7 +1803,7 @@ export class UnifiedExecProcessManager implements UnifiedExecProcessManagerLike 
         : undefined;
       const persistent = oneShot ?? (params.allowDirectBwrap && params.runtimeSandbox !== undefined &&
         params.runtimeSandbox.persistentSession !== false
-        ? await this.sessionSandboxFor(params.ownerId, params.sessionSlot).spawn({ program: params.program, args: params.args,
+        ? await this.spawnInSessionSandbox(params.ownerId, params.sessionSlot, { program: params.program, args: params.args,
             cwd: params.cwd, env: params.env }, () => {
             this.assertSandboxAuthorityAdmission(params.sandboxAuthorityGeneration);
             this.assertOwnerAdmission(params.ownerId, params.ownerBinding);
