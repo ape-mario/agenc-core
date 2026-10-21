@@ -9,7 +9,7 @@ import {
   parseOllamaCloudTags,
   type OllamaCloudModelRow,
 } from "./registry/ollama-cloud-models.js";
-import { EndpointMetadataCache, type EndpointMetadataScope } from "./endpoint-metadata-cache.js";
+import { EndpointMetadataCache, endpointMetadataForTransport, type EndpointMetadataScope } from "./endpoint-metadata-cache.js";
 import {
   readProviderConfig,
 } from "../config/resolve-provider.js";
@@ -209,6 +209,7 @@ export class ModelMetadataResolver {
   private readonly onWarn?: (msg: string) => void;
   private readonly publicCatalogs?: PublicModelCatalogCache;
   private readonly endpointCatalogs?: EndpointMetadataCache;
+  private readonly veniceCatalogs?: EndpointMetadataCache;
   private endpointRevision = -1;
   private inFlightJson = new Map<
     string,
@@ -228,6 +229,7 @@ export class ModelMetadataResolver {
     this.onWarn = options.onWarn;
     this.publicCatalogs = options.publicCatalogs;
     this.endpointCatalogs = options.endpointCatalogs;
+    this.veniceCatalogs = options.endpointCatalogs ?? (options.fetchImpl ? endpointMetadataForTransport(options.fetchImpl) : undefined);
   }
 
   /** Observe authority changes even when an upper-level model cache has a hit. */
@@ -252,6 +254,7 @@ export class ModelMetadataResolver {
 
   private endpointScope(params: LookupParams): EndpointMetadataScope | undefined {
     const provider = normalizeMetadataProviderIdentity(params.provider);
+    if (provider === "venice") return undefined;
     return this.endpointCatalogs?.observe(provider, this.endpointConfiguration(params));
   }
 
@@ -455,19 +458,28 @@ export class ModelMetadataResolver {
   async discoverVeniceModels(config: AgenCConfig): Promise<readonly VeniceModel[] | undefined> {
     const params = { provider: "venice", model: "", config };
     this.cacheRevision(params);
-    const scope = this.endpointScope(params);
     const baseUrl = providerBaseUrl(config, "venice", this.env);
     const headers = authHeaders("venice", config, this.credentialEnvironment("venice"));
-    // Do not turn listing the offline catalog into an unauthenticated request.
-    if (!baseUrl || !headers?.Authorization) return undefined;
-    const response = await this.fetchEndpointJson(params, baseUrl, modelsUrlFromBaseUrl(baseUrl), {
-      headers,
-      timeoutMs: this.veniceListTimeoutMs,
-    });
-    if (scope !== undefined && !this.endpointCatalogs!.matchesConfiguration(scope, this.endpointConfiguration(params))) {
+    // No key or transport: use the bundled catalog without a network request.
+    if (!baseUrl || !headers?.Authorization || !this.veniceCatalogs) return undefined;
+    const cache = this.veniceCatalogs;
+    const configuration = { baseUrl, headers };
+    const scope = cache.observe("venice", configuration);
+    const url = modelsUrlFromBaseUrl(baseUrl);
+    const response = await cache.get(scope, {
+      baseUrl, url, method: "GET", headers, timeoutMs: this.veniceListTimeoutMs,
+    }, async () => {
+      const result = await this.fetchJsonUncached(url, { headers, timeoutMs: this.veniceListTimeoutMs });
+      // A broken/empty list must not discard the last successful limits.
+      return parseVeniceModels(result).length > 0 ? result : undefined;
+    }, { staleWhileRevalidate: true });
+    if (!cache.matchesConfiguration(scope, {
+      baseUrl: providerBaseUrl(config, "venice", this.env),
+      headers: authHeaders("venice", config, this.credentialEnvironment("venice")),
+    })) {
       throw new Error("Provider metadata configuration changed during discovery; retry with the current configuration");
     }
-    if (response === undefined || !Array.isArray(asRecord(response)?.data)) return undefined;
+    if (response === undefined) return undefined;
     if (response !== this.veniceResponse) {
       this.veniceResponse = response;
       this.veniceModels = parseVeniceModels(response);

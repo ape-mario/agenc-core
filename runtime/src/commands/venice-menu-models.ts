@@ -121,7 +121,7 @@ export async function loadVeniceMenuModels(
   if (known !== undefined) return { source: "live", models: known };
   const pending = inFlight.get(lookup.identity);
   if (pending !== undefined) return await pending;
-  const request = discover(lookup, options.fetchImpl ?? globalThis.fetch.bind(globalThis));
+  const request = discover(lookup, options.fetchImpl ?? globalThis.fetch);
   inFlight.set(lookup.identity, request);
   try {
     return await request;

@@ -1081,8 +1081,8 @@ connection; `OLLAMA_BASE_URL` never reroutes the Cloud key. No local Ollama
 installation is required.
 
 The checked-in Cloud metadata comes from Ollama's `/api/tags` and `/api/show`
-on 2026-09-11. Desktop refreshes model IDs from `/v1/models`; an empty successful
-listing stays empty. Unknown additions can use text/tools and native context
+on 2026-10-20, rechecked on 2026-10-21. Runtime discovery refreshes IDs from
+`/api/tags` and capabilities from `/api/show`. Unknown additions can use text/tools and native context
 metadata, but do not inherit unverified image or effort settings from another
 provider. Cloud model IDs retain their tags (for example `gpt-oss:120b`).
 
@@ -1093,6 +1093,13 @@ have no effort control. DeepSeek models reserve 64k output tokens a call with
 DeepSeek's own 393,216 ceiling (Cloud refuses more); for other models the 16k
 default and 32k recovery budget are AgenC output budgets, not advertised Cloud
 limits. Cloud quota and model availability depend on the Ollama account.
+
+An Ollama Cloud session uses its own key for `web_fetch` through Ollama's
+`/api/web_fetch` API. Successful fetches cost $0.001 each (balance-verified
+2026-10-21). URL permission checks and private-address rejection still apply.
+A provider failure falls back to guarded direct fetching and is named in the
+result. Ollama returns page text, title and links; it does not report the
+origin HTTP status or the final redirected URL.
 
 Sources: https://docs.ollama.com/cloud and
 https://docs.ollama.com/api/openai-compatibility.
@@ -1137,6 +1144,14 @@ Authenticated `GET /models` discovery offers online text models with
 `availableContextTokens` and `maxCompletionTokens` for limits, and maps
 reasoning, supported effort levels, vision, and USD pricing per million
 tokens. Core stores rates per thousand tokens.
+
+Sessions in the same process reuse a successful list for ten minutes, scoped
+to the endpoint, credential and transport. Expired lists refresh in the
+background; failed or malformed refreshes keep the last known limits and
+retry later. They do not reset a known context window to the conservative
+fallback. The TUI loads live effort data when a gateway model is selected,
+so its status line does not depend on opening `/effort` first.
+
 
 Each model's price comes from that list: `input`, `output`, `cache_input`, and
 the `extended` rates above `context_token_threshold` input tokens. Budget

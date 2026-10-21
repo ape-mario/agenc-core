@@ -1,3 +1,4 @@
+import { useSessionEffortCatalog } from "../hooks/useSessionEffortCatalog.js";
 import { isEffectReviewRequired } from "../../session/effect-review-gate.js";
 import { usePendingEffectReviews } from "../hooks/usePendingEffectReviews.js";
 import { EffectReviewCard } from "./EffectReviewCard.js";
@@ -2766,19 +2767,6 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   // "high effort" in the status line: the level the session runs at, or the
   // model's default when none is chosen. Follows /effort and model switches.
   const statusEffortValue = useAppState((state) => state.effortValue);
-  const statusEffortLabel = useMemo(() => {
-    const selection = readSessionSelection(props.session, { includePending: true });
-    if (selection.provider === "unknown" || selection.model === "unknown") return null;
-    const context = Object.freeze({ ...remoteAuthSessionContext, provider: selection.provider });
-    if (!modelSupportsEffortForContext(selection.model, context)) return null;
-    // The chosen level, else the default the daemon runs ("effort off" for a
-    // native none); nothing when no truthful default is known.
-    return getSessionEffortLabelForContext(
-      selection.model,
-      statusEffortValue as never,
-      context,
-    );
-  }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel]);
   const notifiedUnsupportedEfforts = useRef(new Set<string>());
   useEffect(() => {
     const selection = readSessionSelection(props.session, { includePending: true });
@@ -3266,6 +3254,22 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       setToolJSX,
     ],
   );
+  const effortSelection = readSessionSelection(props.session, { includePending: true });
+  const effortCatalogRevision = useSessionEffortCatalog(props.session, effortSelection.provider,
+    effortSelection.model, () => createSlashCommandContext(""));
+  const statusEffortLabel = useMemo(() => {
+    const selection = readSessionSelection(props.session, { includePending: true });
+    if (selection.provider === "unknown" || selection.model === "unknown") return null;
+    const context = Object.freeze({ ...remoteAuthSessionContext, provider: selection.provider });
+    if (!modelSupportsEffortForContext(selection.model, context)) return null;
+    // The chosen level, else the default the daemon runs ("effort off" for a
+    // native none); nothing when no truthful default is known.
+    return getSessionEffortLabelForContext(
+      selection.model,
+      statusEffortValue as never,
+      context,
+    );
+  }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel, effortCatalogRevision]);
   const runLocalControlCommand = useCallback(async (parsed: ParsedSlashCommand): Promise<void> => {
     cancelTransientResult(true);
     try {

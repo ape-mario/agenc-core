@@ -1,3 +1,4 @@
+import { endpointMetadataForTransport } from "../../endpoint-metadata-cache.js";
 import { veniceFetch } from "./transport.js";
 import { LLMProviderError } from "../../errors.js";
 import { OpenAIProvider } from "../openai/adapter.js";
@@ -34,7 +35,8 @@ export class VeniceProvider extends OpenAIProvider {
     });
     this.#model = config.model;
     this.#catalogConfig = { providers: { venice: { base_url: config.baseURL } } };
-    this.#metadata = new ModelMetadataResolver({ fetchImpl, env: { VENICE_API_KEY: config.apiKey } });
+    this.#metadata = new ModelMetadataResolver({ fetchImpl, env: { VENICE_API_KEY: config.apiKey },
+      endpointCatalogs: endpointMetadataForTransport(config.fetchImpl ?? fetch) });
   }
 
   async #refresh(): Promise<readonly VeniceModel[] | undefined> {

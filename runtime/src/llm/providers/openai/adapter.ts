@@ -1,3 +1,4 @@
+import { ToolArgumentProgress } from "./tool-argument-progress.js";
 import { oneShotFastModeActive } from "../../../one-shot-fast-mode.js";
 import { deepSeekReasoningOnlyReplayProvenance } from "../../deepseek-reasoning-only-replay.js";
 import { openAiModelRequiresResponses, openAiModelRequiresBufferedResponse } from "../../registry/openai-current-models.js";
@@ -2164,6 +2165,7 @@ export class OpenAIProvider implements LLMProvider {
         number,
         { id: string; name: string; arguments: string }
       >();
+      const toolArgumentProgress = new Map<number, ToolArgumentProgress>();
       // Provider index -> accumulator slot. MiniMax models on Ollama Cloud
       // stream parallel calls that all carry index 0 and distinct ids; a new
       // id at an index already holding a call starts a new call.
@@ -2359,6 +2361,9 @@ export class OpenAIProvider implements LLMProvider {
                 fn.arguments,
               );
               if (argumentDelta.length > 0) {
+                const progress = toolArgumentProgress.get(index) ?? new ToolArgumentProgress();
+                progress.push(argumentDelta, this.name);
+                toolArgumentProgress.set(index, progress);
                 existing.arguments += argumentDelta;
                 bufferedToolProgress ||= argumentDelta.trim().length > 0;
               }
