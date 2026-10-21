@@ -1408,6 +1408,17 @@ try {
   } else {
     Join-Path $installDir ($nodeBinRel -replace "/", "\")
   }
+  # The private Node must be the exact Node the release manifest's build record
+  # names, so a pinned older release keeps installing after this installer pins
+  # a newer Node. A local manifest has no verified build record and uses the
+  # installer's pin.
+  $privateNodeVersion = if ($legacy) {
+    ""
+  } elseif ($manifestTrust -ne "explicitLocal") {
+    ([string]$manifest.build.nodeVersion).Substring(1)
+  } else {
+    $SupportedNodeVersion
+  }
 
   $provenanceExpectationBase64 = ""
   if ($manifestTrust -eq "official") {
@@ -2673,11 +2684,13 @@ main().catch((error) => {
   if (-not $legacy) {
     & $privateNodeBin -e (ConvertTo-NativeArgument @'
 const allowOverride = process.argv[1] === "true";
-if (process.versions.node !== "26.5.0" || process.versions.modules !== "147" ||
+const expectedVersion = process.argv[2];
+if (!/^\d+\.\d+\.\d+$/.test(expectedVersion) ||
+    process.versions.node !== expectedVersion || process.versions.modules !== "147" ||
     process.versions.napi !== "10" || (!allowOverride && (
       process.platform !== "win32" || process.arch !== "x64"
     ))) process.exit(1);
-'@) ([string][bool]($env:AGENC_INSTALL_PLATFORM -or $env:AGENC_INSTALL_ARCH)).ToLowerInvariant()
+'@) ([string][bool]($env:AGENC_INSTALL_PLATFORM -or $env:AGENC_INSTALL_ARCH)).ToLowerInvariant() $privateNodeVersion
     if ($LASTEXITCODE -ne 0) { Fail "installed private Node.js identity is invalid" }
   }
 
