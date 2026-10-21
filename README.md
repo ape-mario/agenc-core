@@ -243,6 +243,7 @@ Common session flags:
 --no-tui
 --bare
 --light
+--standard
 -c, --continue
 -r, --resume <session-id>
 --profile <name>
@@ -254,9 +255,9 @@ Common session flags:
 --image <file|url|data-url>
 ```
 
-Light mode is experimental and off by default. Use `agenc --light` (or `agenc -p --light "your task"`) for a new session that starts with eight tools for reading, editing, writing, shell execution, polling, file/content search, and tool discovery. It reduces the tool descriptions sent initially; lower total token use, faster completion, and equivalent task performance are not guaranteed.
+New sessions start in Light mode. A Light session starts with five tools: tool search, file read, edit, write and shell. GPT-family models and DeepSeek Flash get `apply_patch` in place of edit and write. Other enabled tools load through `system.searchTools` when a task needs them, and agent and skill catalogs appear when their tools are loaded. If policy disables tool search, the remaining permitted tools stay visible. Light uses a shorter system prompt and shorter tool descriptions, and every call is still validated against the tool's full schema.
 
-Light keeps the standard system instructions and complete parameter documentation. Other enabled tools are discovered through `system.searchTools`; agent and skill catalogs appear when their tools are loaded. If policy disables discovery, the remaining permitted tools stay visible. Project instructions, memory, approvals, sandboxing, hooks, deadlines, and completion checks remain in effect. The mode belongs to the session, survives resume, and is inherited by child agents; changing the default affects new sessions only. Normal remains the default, and `--bare` retains its separate startup behavior.
+To start in standard mode, pass `--standard` (`agenc --standard`, or `agenc -p --standard "your task"`) or set `light_mode = false` in `config.toml`. A flag wins over the config, so `--light` still works and overrides `light_mode = false`. Project instructions, memory, approvals, sandboxing, hooks, deadlines, and completion checks work the same in both modes. The mode belongs to the session: it survives resume, child agents inherit it, and sessions started before Light became the default keep the mode they started with. The status line shows `standard` for a standard session and no label for Light. `--bare` keeps its separate startup behavior.
 
 ### Daemon and agents
 
