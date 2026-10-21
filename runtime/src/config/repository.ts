@@ -1576,7 +1576,7 @@ async function loadLayeredConfigInternal(
   }
 
   if (
-    config.model_provider === "gemini" &&
+    ["gemini", "venice", "ollama-cloud"].includes(config.model_provider ?? "") &&
     provenance.reasoning_effort?.scope === "default"
   ) {
     const { reasoning_effort: _defaultEffort, ...providerDefaults } = config;
