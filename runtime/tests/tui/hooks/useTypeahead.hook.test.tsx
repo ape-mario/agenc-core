@@ -530,17 +530,19 @@ describe("useTypeahead hook paths", () => {
   });
 
   test("keeps the selected slash command when commands reload and clamps when removed", async () => {
-    const commands = [command("help"), command("history"), command("logout")];
+    // A bare '/' lists built-in commands, so the reload fixture uses them.
+    const builtin = (name: string) => ({ ...command(name), type: "local" });
+    const commands = [builtin("help"), builtin("history"), builtin("logout")];
     const rendered = await renderHookHarness({ commands, input: "/" });
     try {
       await waitFor(() => rendered.getSnapshot().suggestions.length === 3, "commands");
       harness.keybindings["autocomplete:next"]?.();
       await waitFor(() => rendered.getSnapshot().suggestionsState.selectedSuggestion === 1, "selection");
       const selectedId = rendered.getSnapshot().suggestions[1]!.id;
-      rendered.rerender({ commands: [command("about"), ...commands] });
+      rendered.rerender({ commands: [builtin("about"), ...commands] });
       await waitFor(() => rendered.getSnapshot().suggestions.length === 4, "reload");
       expect(rendered.getSnapshot().suggestions[rendered.getSnapshot().suggestionsState.selectedSuggestion]!.id).toBe(selectedId);
-      rendered.rerender({ commands: [command("help"), command("logout")] });
+      rendered.rerender({ commands: [builtin("help"), builtin("logout")] });
       await waitFor(() => rendered.getSnapshot().suggestions.length === 2, "removal");
       expect(rendered.getSnapshot().suggestionsState.selectedSuggestion).toBe(1);
     } finally {
