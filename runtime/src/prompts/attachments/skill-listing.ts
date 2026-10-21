@@ -15,6 +15,13 @@ import {
 /** Relevance lines per root-human turn, small enough to keep in the prompt. */
 const RELEVANCE_LIMIT = 12;
 
+/**
+ * Ceiling of a Light session's listing: about a dozen lines at the
+ * 120-character description cap, as many as one relevance reminder names.
+ * Later human turns still get a relevance reminder for skills it left out.
+ */
+export const LIGHT_SKILL_LISTING_MAX_CHARS = 2_000;
+
 function messageCarriesText(message: LLMMessage, needle: string): boolean {
   if (typeof message.content === "string") {
     return message.content.includes(needle);
@@ -73,11 +80,16 @@ async function bundledRegistrySkills(
  * continuations must not drain another batch of matching skills on each sample.
  * An absent listing is restored even after compaction or durable resume, when
  * the in-memory ledger and authoritative root-human provenance may be absent.
+ *
+ * A Light session starts without the Skill tool; system.searchTools loads it,
+ * as the listing's guidance says. Until it is loaded, the listing names only
+ * installed skills (not the bundled ones), within LIGHT_SKILL_LISTING_MAX_CHARS,
+ * and a session without an installed skill gets none.
  */
 export const skillListingProducer: AttachmentProducer = async (opts, tracking) => {
   if (opts.subagentDepth > 0) return [];
-  if (opts.lightMode === true &&
-      !opts.loadedTools.some(tool => tool.function.name === "Skill")) return [];
+  const lightBeforeSkill = opts.lightMode === true &&
+    !opts.loadedTools.some(tool => tool.function.name === "Skill");
   if (!opts.skillsManager) return [];
   // A session whose policy leaves out the Skill tool cannot load anything the
   // listing would name.
@@ -107,11 +119,13 @@ export const skillListingProducer: AttachmentProducer = async (opts, tracking) =
     (root) => root.droppedCount > 0,
   );
   const known = new Set(skills.map((skill) => skill.name));
-  const bundled = (await bundledRegistrySkills(opts.toolPolicy, opts.config)).filter(
-    (skill) => !known.has(skill.name),
-  );
+  const catalog = lightBeforeSkill
+    ? skills.filter((skill) => skill.loadedFrom !== "bundled" && skill.disableModelInvocation !== true)
+    : [...skills, ...(await bundledRegistrySkills(opts.toolPolicy, opts.config)).filter(
+      (skill) => !known.has(skill.name),
+    )];
   if (opts.signal.aborted) return [];
-  const catalog = [...skills, ...bundled];
+  if (lightBeforeSkill && catalog.length === 0) return [];
   if (listingPresent) {
     // Recheck after awaiting catalog loading: concurrent preparations of one
     // human turn may have claimed its evaluation while this one was waiting.
@@ -133,6 +147,7 @@ export const skillListingProducer: AttachmentProducer = async (opts, tracking) =
     // What the user just asked for decides which skills get the budget when
     // the installed catalog does not fit.
     opts.userInput,
+    lightBeforeSkill ? LIGHT_SKILL_LISTING_MAX_CHARS : undefined,
   );
   for (const name of listedNames) tracking.listedSkillNames.add(name);
   // What the model was shown is otherwise unrecoverable: the listing is an
