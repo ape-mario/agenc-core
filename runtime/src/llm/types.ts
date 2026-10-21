@@ -334,6 +334,12 @@ export interface LLMUsage {
    * speed that was requested.
    */
   readonly speed?: "fast" | "standard";
+  /**
+   * What the provider says it charged for this call, in USD (OpenRouter's
+   * `usage.cost`). Cost accounting uses it instead of a rate card: routing
+   * can serve the call from an endpoint whose price is not the catalog's.
+   */
+  readonly providerCostUsd?: number;
 }
 
 /**
@@ -764,6 +770,14 @@ export interface LLMChatOptions {
    * conversation state is implied.
    */
   readonly promptCacheKey?: string;
+  /**
+   * Stable prompt-cache scope of the local user (the same for every session
+   * of one AgenC home). Wires whose provider keys the cache by scope rather
+   * than by conversation (OpenAI GPT-5.6 and later on the platform API) send
+   * it instead of `promptCacheKey`, so a new session reads the prefix the
+   * previous one wrote. Pure optimization, like `promptCacheKey`.
+   */
+  readonly promptCacheScopeKey?: string;
   /**
    * For fire-and-forget fork turns, avoid writing the fork's tail into
    * provider prompt cache while preserving cache reads from the shared prefix.

@@ -72,6 +72,20 @@ describe("summarizeResultText", () => {
 });
 
 describe("summarizeToolError", () => {
+  it("keeps the Node diagnostic in the daemon error-result projection", () => {
+    const raw = "exec_command error\nevalmachine.<anonymous>:113\n  els.input.focus();\n            ^\n\nTypeError: els.input.focus is not a function\n    at evalmachine.<anonymous>:113:13\n\nNode.js v26.5.0\n\n[exec exit_code=1 wall_time=0.1230s tokens=253]";
+    const projected = formatStructuredToolResult("exec_command", "tool_call_completed", { result: raw, isError: true });
+    expect(summarizeToolError(projected.map(block => block.text).join("\n")))
+      .toBe("exit 1, TypeError: els.input.focus is not a function");
+    expect(projected[0]!.text).toContain("Node.js v26.5.0");
+  });
+
+  it("preserves actionable sandbox guidance after a Python traceback", () => {
+    const guidance = "[sandbox] The sandbox blocks local servers. Retry this command once with sandbox_permissions=\"require_escalated\" and a justification.";
+    expect(summarizeToolError(`Traceback (most recent call last):\nPermissionError: [Errno 1] Operation not permitted\n\n${guidance}\n\n[exec exit_code=1]`))
+      .toBe(`exit 1, ${guidance}`);
+  });
+
   it("drops protocol wrappers and machine prefixes", () => {
     expect(
       summarizeToolError(

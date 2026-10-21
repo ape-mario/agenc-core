@@ -35,6 +35,7 @@ import { isQwenCoder30BModel } from "../registry/qwen-coder-30b.js";
 import { resolveQwenCurrentModel } from "../registry/qwen-current-models.js";
 import { isAgenCDeepSeekModel, AGENC_DEEPSEEK_V41_MODEL } from "../registry/agenc-deepseek.js";
 import { isNativeDeepSeekModel } from "../registry/deepseek-models.js";
+import { gatewayFamilyDefaultEffort, gatewayModelFamily } from "../model-family.js";
 
 export interface ChatCompletionsCapabilityHints {
   /**
@@ -52,6 +53,13 @@ export interface ChatCompletionsCapabilityHints {
    * accept flag alone would forward values the destination rejects.
    */
   readonly reasoningEffortAllowedValues?: ReadonlySet<string>;
+  /**
+   * Effort sent when the session sets none. A DeepSeek model runs at high on
+   * DeepSeek's own API by default; gateways default it differently (Ollama
+   * Cloud serves V4 Pro at low, some OpenRouter hosts do not reason unless
+   * asked), so the gateway gets DeepSeek's default explicitly.
+   */
+  readonly defaultReasoningEffort?: string;
   /** OpenRouter accepts its own nested reasoning envelope. */
   readonly reasoningEffortEnvelope?: "openrouter";
   /**
@@ -90,7 +98,9 @@ export interface ChatCompletionsCapabilityHints {
    * The provider caches prompt prefixes per account, across sessions, with no
    * cache key. The wire moves the per-session tail of the system prompt after
    * the setup reminders so the head, tools and stable reminders are one prefix
-   * sessions share (`AGENC_SHARED_PREFIX_TAIL=0` turns this off).
+   * sessions share (`AGENC_SHARED_PREFIX_TAIL=0` turns this off). A DeepSeek
+   * model through a gateway gets the same layout, so it sees the prompt it
+   * sees on DeepSeek's own API.
    */
   readonly sharesPromptPrefixAcrossSessions?: boolean;
   /** Explain encoded function aliases when instructions use canonical names. */
@@ -101,6 +111,13 @@ export interface ChatCompletionsCapabilityHints {
    * unchanged before the corresponding tool results are submitted.
    */
   readonly replaysReasoningContent?: boolean;
+  /**
+   * Replay the provider's structured `reasoning_details` array (OpenRouter,
+   * Venice) unchanged instead of a reasoning text field. GPT models return
+   * their reasoning only as encrypted items there; replaying the summary text
+   * would not restore it. Requires `replaysReasoningContent`.
+   */
+  readonly replaysReasoningDetails?: boolean;
   /** Opt-in native DeepSeek retention of empty-visible assistant reasoning. */
   readonly preservesReasoningOnlyMessages?: boolean;
   /** Provider-specific assistant reasoning field used for parse and replay. */
@@ -202,6 +219,37 @@ export interface ChatCompletionsCapabilityHints {
    * field and tear down the stream on encounter.
    */
   readonly acceptsStreamUsage?: boolean;
+  /**
+   * The response's `usage.cost` is what the provider charged for the call
+   * in USD (OpenRouter reports it on every response, streamed or not).
+   * https://openrouter.ai/docs/use-cases/usage-accounting
+   */
+  readonly reportsUsageCost?: boolean;
+  /**
+   * Venice reports each call's charge as a top-level `cost` object
+   * (`{usd, diem}`) beside `usage`, streamed or not.
+   * https://docs.venice.ai/api-reference/endpoint/chat/completions
+   */
+  readonly reportsTopLevelCost?: boolean;
+  /**
+   * Request fields that carry the session's prompt-cache key. OpenRouter keeps
+   * requests with one `prompt_cache_key` on the host that served their first
+   * cache hit (its prompt cache lives on that host); Venice routes
+   * `prompt_cache_key` to a warm server. OpenRouter's `session_id` is not
+   * used: it pins a session to whichever host served its first request,
+   * whether that host caches or not.
+   * https://openrouter.ai/docs/features/prompt-caching
+   * https://docs.venice.ai/overview/guides/prompt-caching
+   */
+  readonly promptCacheKeyFields?: readonly ("session_id" | "prompt_cache_key")[];
+  /**
+   * What the cache key groups. `conversation` (default) is the session's own
+   * key. `prefix` groups every request with the same model and leading system
+   * message, as DeepSeek's own API shares one account-wide prefix cache across
+   * sessions: a new session then lands where that prefix is already cached
+   * instead of on a cold host or server.
+   */
+  readonly promptCacheKeyScope?: "conversation" | "prefix";
   /**
    * If `true`, tool JSON schemas are rewritten to the subset
    * llama.cpp's json-schema-to-grammar compiles. Grammar-constrained
@@ -335,6 +383,22 @@ export function filterToolsForLocalProfile<
 }
 
 /**
+ * DeepSeek's default effort (high) for a gateway route that accepts it, as
+ * gatewayFamilyDefaultEffort decides: on Ollama Cloud and Venice, which send
+ * `none` for Off, and elsewhere only where the route offers no `none` level,
+ * since there an unset effort cannot be a deliberate opt-out.
+ */
+function deepSeekGatewayDefaultEffort(
+  slug: string,
+  model: string | undefined,
+): { readonly defaultReasoningEffort?: string } {
+  const levels = resolveReasoningEffort({ provider: slug, model }).chatLevels;
+  return levels !== undefined && gatewayFamilyDefaultEffort(slug, model, levels) !== undefined
+    ? { defaultReasoningEffort: "high" }
+    : {};
+}
+
+/**
  * Resolve the capability hints for a given provider slug + model.
  * Each adapter calls this when building a chat-completions request so
  * the wire layer can strip fields the destination provider rejects.
@@ -348,6 +412,11 @@ export function chatCompletionsCapabilityHintsForProvider(
   const isManagedDeepSeek = options.managedGateway === true &&
     slug === "openrouter" && isAgenCDeepSeekModel(model);
   const isNativeDeepSeek = slug === "deepseek" && isNativeDeepSeekModel(model);
+  // A gateway serving DeepSeek or GPT by its id gets that family's request
+  // shape where the gateway documents the equivalent field (model-family.ts).
+  // The managed AgenC route keeps its own reviewed contract.
+  const gatewayFamily = options.managedGateway === true ? undefined : gatewayModelFamily(slug, model);
+  const deepSeekDefaultEffort = gatewayFamily === "deepseek" ? deepSeekGatewayDefaultEffort(slug, model) : {};
   const normalizedModel = model?.trim().toLowerCase() ?? "";
   const reasoningContentProvenance =
     slug.length > 0 && normalizedModel.length > 0
@@ -430,8 +499,39 @@ export function chatCompletionsCapabilityHintsForProvider(
 
   return {
     acceptsReasoningEffort,
+    // The managed gateway prices calls itself; OpenRouter's charge to the
+    // gateway is not what the user pays.
     ...(slug === "openrouter" && options.managedGateway !== true
-      ? { reasoningEffortEnvelope: "openrouter" as const }
+      ? {
+          reasoningEffortEnvelope: "openrouter" as const,
+          reportsUsageCost: true,
+          // OpenRouter returns reasoning as `reasoning` (and structured
+          // `reasoning_details`); `reasoning_content` is its accepted alias.
+          reasoningContentField: "reasoning" as const,
+          reasoningContentFallbackField: "reasoning_content" as const,
+          ...(gatewayFamily === "deepseek" ? {
+            // DeepSeek's own API: reasoning goes back on later requests, the
+            // session tail follows the setup reminders, no
+            // parallel_tool_calls field is sent (the model emits several
+            // calls on its own), and sessions share the cached prefix: one
+            // prompt_cache_key per model and leading system message.
+            replaysReasoningContent: true,
+            acceptsParallelToolCalls: false,
+            sharesPromptPrefixAcrossSessions: true,
+            promptCacheKeyFields: ["prompt_cache_key"] as const,
+            promptCacheKeyScope: "prefix" as const,
+            ...deepSeekDefaultEffort,
+          } : {}),
+          ...(gatewayFamily === "openai" ? {
+            // OpenAI's own API replays the encrypted reasoning items; through
+            // OpenRouter they arrive in reasoning_details. The cache key is
+            // the session's own, as on OpenAI's API, which separates cache
+            // reuse by key.
+            replaysReasoningContent: true,
+            replaysReasoningDetails: true,
+            promptCacheKeyFields: ["prompt_cache_key"] as const,
+          } : {}),
+        }
       : {}),
     ...(slug === "openai" ? { gatesTemperatureOnOpenAiReasoning: true } : {}),
     ...(slug === "mistral" ? {
@@ -461,6 +561,14 @@ export function chatCompletionsCapabilityHintsForProvider(
       replaysReasoningContent: true,
       reasoningContentField: "reasoning_content" as const,
       omitsToolControlsWithoutTools: true,
+      reportsTopLevelCost: true,
+      promptCacheKeyFields: ["prompt_cache_key"] as const,
+      ...(gatewayFamily === "deepseek"
+        ? { sharesPromptPrefixAcrossSessions: true, promptCacheKeyScope: "prefix" as const, ...deepSeekDefaultEffort }
+        : {}),
+      // GPT's reasoning comes back encrypted in reasoning_details; the
+      // reasoning_content text is only its summary.
+      ...(gatewayFamily === "openai" ? { replaysReasoningDetails: true } : {}),
     } : {}),
     ...(slug === "groq" ? {
       acceptsDirectImageInput: acceptsToolResultImages,
@@ -476,7 +584,11 @@ export function chatCompletionsCapabilityHintsForProvider(
       reasoningContentFallbackField: "reasoning_content" as const,
       acceptsParallelToolCalls: false,
       omitsToolControlsWithoutTools: true,
-      includeToolNameAliases: true,
+      // DeepSeek models get the prompt DeepSeek's own API gets: the shared
+      // prefix layout and no alias block (they call encoded names natively).
+      ...(gatewayFamily === "deepseek"
+        ? { sharesPromptPrefixAcrossSessions: true, ...deepSeekDefaultEffort }
+        : { includeToolNameAliases: true }),
     } : {}),
     ...(isNativeDeepSeek ? {
       acceptsToolChoice: false,

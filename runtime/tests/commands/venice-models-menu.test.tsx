@@ -12,7 +12,7 @@ import { readLocalByokCredential } from "../auth/native-credentials.js";
 import type { EnvSnapshot } from "../config/env.js";
 import { resolveHomeContext, type HomeContext } from "../config/home.js";
 import type { ConfigStore } from "../config/store.js";
-import { VENICE_MODELS } from "../llm/registry/venice-models.js";
+import { VENICE_MODELS, VENICE_TOOL_CALLS_NOT_DELIVERED } from "../llm/registry/venice-models.js";
 import type { Session } from "../session/session.js";
 import { chooseProviderModel } from "./providers-hub-actions.js";
 import { openProvidersHub } from "./providers-hub.js";
@@ -46,7 +46,8 @@ const fixture = JSON.parse(readFileSync(new URL("../llm/fixtures/venice-models.j
   }[];
 };
 const TOOL_MODELS = fixture.data
-  .filter(model => model.type === "text" && model.model_spec.capabilities.supportsFunctionCalling === true && model.model_spec.offline !== true)
+  .filter(model => model.type === "text" && model.model_spec.capabilities.supportsFunctionCalling === true && model.model_spec.offline !== true &&
+    !VENICE_TOOL_CALLS_NOT_DELIVERED.has(model.id))
   .map(model => model.id);
 const KEY_A = "fake-venice-key-a";
 const KEY_B = "fake-venice-key-b";

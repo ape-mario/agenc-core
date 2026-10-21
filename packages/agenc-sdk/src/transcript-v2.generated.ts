@@ -13,6 +13,9 @@ interface TranscriptV2JsonObject {
 }
 
 export interface PendingEffectReview extends TranscriptV2JsonObject {
+  readonly sessionId?: string;
+  /** False for a descendant's review: its parent can still take prompts. */
+  readonly blocksSession?: boolean;
   readonly callId: string;
   readonly toolName: string;
   readonly description: string;
@@ -20,10 +23,14 @@ export interface PendingEffectReview extends TranscriptV2JsonObject {
 }
 
 export interface SessionTranscriptV2Message extends TranscriptV2JsonObject {
+  /** Runtime user event ID shared with the file checkpoint and history. */
+  readonly canonicalUserMessageId?: string;
   readonly messageId: string;
   readonly commitEventId: string;
   readonly role: "user" | "assistant";
   readonly text: string;
+  /** Original user submission time, when retained by the durable journal. */
+  readonly acceptedAt?: string;
   /** Display-only delta prefix, never a committed response or model-history item. */
   readonly partial?: "streaming" | "interrupted";
   readonly partialTruncated?: boolean;

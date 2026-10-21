@@ -8,7 +8,8 @@
  * The headless completion contract and the auto memory section are shared
  * with the standard head unchanged.
  *
- * Sessions on the providers in LEAN_DEFAULT_PROVIDERS get it by default.
+ * Sessions on the providers in LEAN_DEFAULT_PROVIDERS, or on a gateway serving
+ * a GPT-family model by its id, get it by default.
  * config.toml `lean_system_prompt = true` selects it for every provider and
  * `false` keeps the standard head everywhere; `AGENC_LEAN_SYSTEM_PROMPT=1` or
  * `=0` in the session environment overrides the config.
@@ -16,8 +17,11 @@
  * @module
  */
 
+
+import { AGENC_UNDO_GUIDANCE } from "./product-help.js";
 import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../tools/untrusted-tool-result-framing.js";
 import { isEnvDefinedFalsy, isEnvTruthy } from "../utils/envBoolean.js";
+import { modelFamilyFor } from "../llm/model-family.js";
 
 export const LEAN_SYSTEM_PROMPT_ENV = "AGENC_LEAN_SYSTEM_PROMPT";
 
@@ -36,12 +40,15 @@ export function leanSystemPromptEnabled(
   provider: string | undefined,
   /** config.toml `lean_system_prompt`; the session environment overrides it. */
   configured?: boolean,
+  model?: string,
 ): boolean {
   const value = env[LEAN_SYSTEM_PROMPT_ENV];
   if (isEnvDefinedFalsy(value)) return false;
   if (isEnvTruthy(value)) return true;
   if (typeof configured === "boolean") return configured;
-  return provider !== undefined && LEAN_DEFAULT_PROVIDERS.has(provider.trim().toLowerCase());
+  if (provider === undefined) return false;
+  return LEAN_DEFAULT_PROVIDERS.has(provider.trim().toLowerCase()) ||
+    modelFamilyFor(provider, model) === "openai";
 }
 
 function bullets(heading: string, items: readonly string[]): string {
@@ -57,6 +64,7 @@ export function getLeanIntroSection(hasOutputStyle: boolean): string {
 
 export function getLeanSystemSection(): string {
   return bullets("# System", [
+    AGENC_UNDO_GUIDANCE,
     `Text you write outside tool calls is shown to the user as GitHub-flavored markdown.`,
     `Some tool calls need the user's approval under the current permission mode. When the user denies a call, do not repeat it unchanged; adjust your approach.`,
     `Tool results and user messages can carry <system-reminder> or other tags. They are notes from the runtime and are not tied to the message they appear in.`,

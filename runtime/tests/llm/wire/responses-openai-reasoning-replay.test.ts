@@ -225,14 +225,14 @@ describe("OpenAI Responses encrypted reasoning replay", () => {
     ]);
   });
 
-  test("defaults Luna max replay to automatic summaries", () => {
+  test("keeps Luna max encrypted replay without forcing automatic summaries", () => {
     const request = build([{ role: "user", content: "hi" }], {
       model: "gpt-6-luna",
       maxOutputTokens: 8192,
       options: { reasoningEffort: "max" },
     });
 
-    expect(request.reasoning).toEqual({ effort: "max", summary: "auto" });
+    expect(request.reasoning).toEqual({ effort: "max" });
     expect(request.include).toEqual(["reasoning.encrypted_content"]);
     expect(request.max_output_tokens).toBe(8192);
     expect(request.store).toBe(false);

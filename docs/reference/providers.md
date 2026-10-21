@@ -1,6 +1,6 @@
 # Providers reference
 
-Built-in model providers for AgenC **0.19.8**. Source of truth:
+Built-in model providers for AgenC **0.19.11**. Source of truth:
 `runtime/src/llm/registry/provider-info.ts`
 (`BUILT_IN_PROVIDER_DEFINITIONS`). Each row owns the display name, defaults,
 ordered credential and endpoint environment ingress names, and first-run
@@ -171,7 +171,7 @@ they run only through the Grok Build CLI ACP path. See
 | `gemini` | Gemini | `gemini-3.8-flash` | `https://generativelanguage.googleapis.com/v1beta` | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | `GEMINI_BASE_URL` | `api-key` |
 | `kimi` | Kimi (Moonshot) | `kimi-k3` | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` | _(fixed global endpoint)_ | `api-key` |
 | `mistral` | Mistral | `mistral-medium-latest` | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` | `MISTRAL_BASE_URL` | `api-key` |
-| `nvidia-nim` | NVIDIA NIM | `nvidia/llama-3.1-nemotron-70b-instruct` | `https://integrate.api.nvidia.com/v1` | `NVIDIA_API_KEY` | `NVIDIA_BASE_URL` | `api-key` |
+| `nvidia-nim` | NVIDIA NIM | `nvidia/nemotron-3-super-120b-a12b` | `https://integrate.api.nvidia.com/v1` | `NVIDIA_API_KEY` | `NVIDIA_BASE_URL` | `api-key` |
 | `minimax` | MiniMax | `MiniMax-M2.5` | `https://api.minimax.io/v1` | `MINIMAX_API_KEY` | `MINIMAX_BASE_URL` | `api-key` |
 | `github` | GitHub Copilot | `gpt-5.3-codex` | `https://api.githubcopilot.com` | `GITHUB_TOKEN`, `GH_TOKEN` | `GITHUB_BASE_URL` | `api-key` |
 | `amazon-bedrock` | Amazon Bedrock | `amazon.nova-pro-v1:0` | `https://bedrock-runtime.us-east-1.amazonaws.com` | access: `AWS_BEDROCK_ACCESS_KEY_ID`, `AWS_ACCESS_KEY_ID`; secret: `AWS_BEDROCK_SECRET_ACCESS_KEY`, `AWS_SECRET_ACCESS_KEY`; optional session: `AWS_BEDROCK_SESSION_TOKEN`, `AWS_SESSION_TOKEN` | `AWS_BEDROCK_BASE_URL` | `environment` |
@@ -712,8 +712,11 @@ requests, non-reasoning models, reasoning effort `none`, and other providers
 using this adapter keep their existing behavior. Switching provider or model
 does not replay mismatched reasoning state.
 
-An unset `reasoning_summary` requests `auto` while replay is enabled. Explicit
-summary choices are preserved: `none` disables summaries while encrypted
+An unset `reasoning_summary` requests `auto` while replay is enabled, except for
+`gpt-6-luna` on the platform API: summaries stay off by default while encrypted
+reasoning still replays. ChatGPT sign-in and other models keep their existing
+automatic-summary default. Explicit summary choices are preserved, including
+`auto` to request summaries on Luna; `none` disables summaries while encrypted
 reasoning still replays. Set `AGENC_OPENAI_REASONING_REPLAY=0` to disable
 retention and replay, or use `false`, `no` or `off`; see [env.md](env.md).
 The switch is captured with each session, including ChatGPT sign-in sessions.
@@ -725,6 +728,29 @@ stateless), the continuation optimizer keeps `prompt_cache_key` and
 skips the incremental delta. Chaining an unstored id used to reject
 every later request of a subscription conversation once tools or
 history made it an extension.
+
+### OpenAI prompt cache layout
+
+A Responses request on the platform API puts the static head of the system
+prompt in `instructions` and the session tail (workspace, memory directories,
+permission section) in the first input item, ahead of the conversation. Each
+request of a session therefore repeats the previous request byte for byte and
+adds only new history, so GPT-5.6 and later, which write the cache up to the
+last user message or tool output, read all of it back. When the tail changes
+(another permission mode, reloaded project instructions), that request is
+written to the cache again. The ChatGPT subscription backend rejects system
+input items and keeps the tail in `instructions`.
+
+GPT-5.6 and later use `prompt_cache_key` only to separate cache scopes: a
+request reads nothing that a request with another key wrote. On the platform
+API those models get one key per AgenC home: `agenc-` and 32 hex characters
+of a random id generated once and kept in `<AgenC home>/prompt-cache-scope`
+(mode 0600; regenerated only when missing or malformed). A new session then
+reads the instructions, tools and tail that the previous session of the same
+home wrote within the cache lifetime (at least 30 minutes), and separate homes
+keep separate scopes. The id is not sent anywhere else. Older OpenAI models,
+the ChatGPT subscription backend and every other provider keep the
+conversation id as the key.
 
 Under a hard aggregate token or USD cap, admission still requires a
 provider-enforced `max_output_tokens` and authoritative usage. Without
@@ -752,10 +778,15 @@ provider-neutral HTTP client:
 
 - request max retries: **4**
 - stream max retries: **5**
-- stream idle timeout: **unset** (0) at the transport level. The session
-  watchdog owns the idle deadline: `stream_watchdog_timeout_ms` defaults to
-  `600000` (warning at half, retryable `stream_idle` abort at the deadline);
-  set it or `AGENC_STREAM_IDLE_TIMEOUT_MS` to `0` to allow unbounded silence
+- standalone HTTP-client stream idle timeout: **unset** (0). During a session
+  sampling attempt, the watchdog observes raw HTTP bytes before SSE parsing,
+  including keepalive comments and partial frames. `stream_watchdog_timeout_ms`
+  defaults to `1200000` (twenty minutes without bytes, then retryable
+  `stream_idle` through the reconnect ladder). Set it or
+  `AGENC_STREAM_IDLE_TIMEOUT_MS` to `0` to allow unbounded byte silence.
+  Independently, `stream_quiet_warning_ms` / `AGENC_STREAM_QUIET_WARNING_MS`
+  defaults to `600000`: ten minutes without a model delta emits a soft warning
+  on the TUI status, without aborting. Zero disables that warning.
 
 Model-provider streaming uses HTTP/SSE. The daemon, realtime connector, MCP,
 and gateway have separate WebSocket transports; they are not provider
@@ -984,6 +1015,64 @@ Kimi, Qwen, Z.AI, Meta, NVIDIA NIM and GitHub Copilot publish no
 zero-data-retention control for their APIs; treat them as retaining data per
 their terms.
 
+## DeepSeek
+
+Select `deepseek` and provide `DEEPSEEK_API_KEY`. The default model is
+`deepseek-flash`; since 2026-10-17 DeepSeek serves DeepSeek-V4.1-Flash-1017
+under that id, so no setting changes. It has a 1M-token context, image input,
+Low/High/Max effort (High by default) and up to 384K output tokens; AgenC asks
+for 64K per call by default. The retired names `deepseek-v4-flash` and
+`deepseek-v4-flash-vision-exp` still reach the same model. `deepseek-v4-pro`
+serves DeepSeek-V4-Pro-0813.
+
+Cost estimates use DeepSeek's peak rates: Flash $0.30 per million input tokens,
+$1.20 per million output tokens and $0.006 per million cached input tokens.
+DeepSeek charges half outside 01:00 to 04:00 and 06:00 to 10:00 UTC on
+weekdays, so real bills can be lower than the estimate.
+
+On OpenRouter the new model has its own id, `deepseek/deepseek-v4.1-flash-1017`;
+`deepseek/deepseek-v4.1-flash` stays on the September build.
+
+### The same model through a gateway
+
+A DeepSeek or GPT model reached through OpenRouter, Ollama Cloud or Venice by its
+id (`deepseek/deepseek-v4.1-flash-1017`, `deepseek-v4.1-flash:1017`,
+`deepseek-v4-1-flash-1017`; `openai/gpt-6-luna`, `openai-gpt-6-luna`) gets the
+behavior AgenC tunes for that model on its own API, where the gateway has an
+equivalent field:
+
+- DeepSeek: Light's task limits and batch Edit, the shared-prefix prompt layout,
+  64k output tokens a call (the route's limit stays the ceiling), High effort
+  when none is set (unless the route offers None), reasoning replayed on later
+  requests, and no `parallel_tool_calls` field.
+- GPT: Light's apply_patch, the lean head in standard mode, parallel tool
+  calls, the personality line, and the encrypted reasoning
+  (`reasoning_details`) replayed unchanged.
+- OpenRouter: a DeepSeek model's requests carry a `prompt_cache_key` that
+  names the model and the leading system message. Once a host returns a cache
+  hit for that key, OpenRouter keeps later requests with it, from any session,
+  on that host, as DeepSeek's own API shares one cache across sessions. A GPT
+  model carries the session's own key, as on OpenAI's own API. No `session_id`
+  is sent: with one, OpenRouter keeps a session on whichever host served its
+  first request, whether that host caches well or not. Reasoning is read from
+  `reasoning`. Costs are the charge OpenRouter reports. Which host serves the
+  first request is still OpenRouter's choice: by default it load-balances by
+  price among the hosts the account allows, and account privacy settings can
+  exclude the model author's own endpoint.
+
+The managed AgenC route and custom OpenAI-compatible endpoints keep their own
+contracts.
+
+In a `deepseek` session on DeepSeek's own API host, the WebSearch tool searches
+through DeepSeek's Search API with the session's key, for both models, at
+$0.75 per 1,000 successful searches; see
+[Direct DeepSeek](../providers/deepseek-direct.md#web-search) for the setting
+and the fallback.
+
+Sources: https://api-docs.deepseek.com/quick_start/pricing/,
+https://api-docs.deepseek.com/news/news261017 and
+https://api-docs.deepseek.com/guides/search
+
 ## Ollama Cloud
 
 Select `ollama-cloud` and provide `OLLAMA_API_KEY` for direct hosted inference at
@@ -992,16 +1081,25 @@ connection; `OLLAMA_BASE_URL` never reroutes the Cloud key. No local Ollama
 installation is required.
 
 The checked-in Cloud metadata comes from Ollama's `/api/tags` and `/api/show`
-on 2026-09-11. Desktop refreshes model IDs from `/v1/models`; an empty successful
-listing stays empty. Unknown additions can use text/tools and native context
+on 2026-10-20, rechecked on 2026-10-21. Runtime discovery refreshes IDs from
+`/api/tags` and capabilities from `/api/show`. Unknown additions can use text/tools and native context
 metadata, but do not inherit unverified image or effort settings from another
 provider. Cloud model IDs retain their tags (for example `gpt-oss:120b`).
 
-DeepSeek V4.1 Flash defaults to Low and supports image input. Reasoning controls
-are model specific; binary thinking models expose None/High, GPT OSS uses
-Low/Medium/High, and non-thinking models have no effort control. The 16k default
-and 32k recovery budget are AgenC output budgets, not advertised Cloud limits.
-Cloud quota and model availability depend on the Ollama account.
+DeepSeek models default to High, as on DeepSeek's own API, and V4.1 Flash
+supports image input. Reasoning controls are model specific; binary thinking
+models expose None/High, GPT OSS uses Low/Medium/High, and non-thinking models
+have no effort control. DeepSeek models reserve 64k output tokens a call with
+DeepSeek's own 393,216 ceiling (Cloud refuses more); for other models the 16k
+default and 32k recovery budget are AgenC output budgets, not advertised Cloud
+limits. Cloud quota and model availability depend on the Ollama account.
+
+An Ollama Cloud session uses its own key for `web_fetch` through Ollama's
+`/api/web_fetch` API. Successful fetches cost $0.001 each (balance-verified
+2026-10-21). URL permission checks and private-address rejection still apply.
+A provider failure falls back to guarded direct fetching and is named in the
+result. Ollama returns page text, title and links; it does not report the
+origin HTTP status or the final redirected URL.
 
 Sources: https://docs.ollama.com/cloud and
 https://docs.ollama.com/api/openai-compatibility.
@@ -1034,7 +1132,12 @@ Venice uses streaming OpenAI-compatible Chat Completions at
 `enable_web_search = "off"`, `enable_web_scraping = false`,
 `enable_web_citations = false`, and `enable_x_search = false`.
 AgenC supplies the system prompt and tools. Reasoning arrives separately in
-`reasoning_content` and stays out of the visible answer.
+`reasoning_content` and stays out of the visible answer; a GPT model's
+encrypted reasoning arrives in `reasoning_details` and goes back unchanged on
+the next request. Every request carries a `prompt_cache_key`, which Venice uses
+to route to a server holding the cached prefix: for a DeepSeek model it names
+the model and the leading system message (sessions share the prefix, as on
+DeepSeek's own API), for other models it is the session's own key.
 
 Authenticated `GET /models` discovery offers online text models with
 `model_spec.capabilities.supportsFunctionCalling = true`. It uses
@@ -1042,12 +1145,21 @@ Authenticated `GET /models` discovery offers online text models with
 reasoning, supported effort levels, vision, and USD pricing per million
 tokens. Core stores rates per thousand tokens.
 
+Sessions in the same process reuse a successful list for ten minutes, scoped
+to the endpoint, credential and transport. Expired lists refresh in the
+background; failed or malformed refreshes keep the last known limits and
+retry later. They do not reset a known context window to the conservative
+fallback. The TUI loads live effort data when a gateway model is selected,
+so its status line does not depend on opening `/effort` first.
+
+
 Each model's price comes from that list: `input`, `output`, `cache_input`, and
 the `extended` rates above `context_token_threshold` input tokens. Budget
-admission reserves and charges at it, and the cost sidecar and the status line
-show it. AgenC asks Venice for no prompt caching, so the `cache_write` price
-is not used. A Venice model ID never takes another provider's price for the
-same name. When the list gives a model no price, admission reserves the
+admission reserves at it. A completed call costs what Venice reports with the
+reply (`cost`, USD plus DIEM credit, which Venice prices 1:1), and the cost
+sidecar and the status line show that charge. Chat Completions reports no cache
+writes, so the `cache_write` price is not used for estimates. A Venice model ID
+never takes another provider's price for the same name. When the list gives a model no price, admission reserves the
 conservative ceiling and the status line says `price unknown`.
 
 The `/providers` and `/model` screens read this list with the key the session

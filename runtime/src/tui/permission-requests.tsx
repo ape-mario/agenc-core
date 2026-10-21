@@ -21,6 +21,8 @@ import type { AgenCBridgeSession } from "./session-types.js";
 import { createSessionAppStateBridge } from "./session-app-state.js";
 import type { AppState } from "./state/AppState.js";
 import { approvalInputText } from "./approval-input-text.js";
+import { abbreviateHomePaths } from "../utils/home-path-display.js";
+import { fileEditTargetPath } from "../tools/system/file-edit-target.js";
 import { Box, useInput, type Key } from "./ink.js";
 import type { InputEvent } from "./ink/events/input-event.js";
 import { useRegisterKeybindingContext } from "./keybindings/KeybindingContext.js";
@@ -34,7 +36,7 @@ import { EXIT_PLAN_MODE_TOOL_NAME } from "../tools/ExitPlanModeTool/constants.js
 import { PlanApprovalOverlay } from "./components/PlanApprovalOverlay.js";
 import { AskUserQuestionOverlay } from "./components/AskUserQuestionOverlay.js";
 import { setPlanApprovalChoice } from "./plan-approval-choice.js";
-import { useApprovalTypingGuard } from "./hooks/useApprovalTypingGuard.js";
+import { useApprovalTypingGuard, type ApprovalComposerDraft } from "./hooks/useApprovalTypingGuard.js";
 import {
   classifyApprovalRisk,
   typedConfirmationWordForRisk,
@@ -252,10 +254,12 @@ export function usePermissionRequests(
   useEffect(() => {
     const previousResolver = session.services.approvalResolver;
     const previousBridge = session.appStateBridge;
+    const pending = new Set<PendingRequest>();
+    const interruptedTurns = new Set<string>();
     session.services.approvalResolver = {
       request(ctx) {
         return new Promise<ReviewDecision>((resolve) => {
-          if (ctx.signal?.aborted === true) {
+          if (ctx.signal?.aborted === true || interruptedTurns.has(ctx.turnId)) {
             resolve(ABORT);
             return;
           }
@@ -268,6 +272,7 @@ export function usePermissionRequests(
             resolve,
           };
           const settle = (decision: ReviewDecision): void => {
+            if (!pending.delete(queuedRequest)) return;
             setRequests((queue) =>
               queue.filter((item) => item.id !== request.id),
             );
@@ -275,16 +280,25 @@ export function usePermissionRequests(
           };
           const onAbort = (): void => settle(ABORT);
           ctx.signal?.addEventListener("abort", onAbort, { once: true });
-          setRequests((queue) => [
-            ...queue,
-            {
-              ...request,
-              resolve(decision) {
-                ctx.signal?.removeEventListener("abort", onAbort);
-                settle(decision);
-              },
+          const queuedRequest: PendingRequest = {
+            ...request,
+            resolve(decision) {
+              if (!pending.has(queuedRequest)) return;
+              ctx.signal?.removeEventListener("abort", onAbort);
+              if (decision.kind === "abort" && !interruptedTurns.has(ctx.turnId)) {
+                interruptedTurns.add(ctx.turnId);
+                // Stop every sibling immediately, including requests which
+                // arrive while the daemon is acknowledging cancellation.
+                for (const sibling of [...pending]) {
+                  if (sibling !== queuedRequest && sibling.ctx.turnId === ctx.turnId) sibling.resolve(ABORT);
+                }
+                void session.cancelActiveTurn?.("interrupted").catch(() => {});
+              }
+              settle(decision);
             },
-          ]);
+          };
+          pending.add(queuedRequest);
+          setRequests((queue) => [...queue, queuedRequest]);
         });
       },
     };
@@ -307,6 +321,7 @@ export function AgenCPermissionOverlay({
   request,
   tools,
   onDismiss,
+  composerDraft,
 }: {
   readonly request: PendingRequest | undefined;
   readonly tools: readonly any[];
@@ -314,6 +329,7 @@ export function AgenCPermissionOverlay({
   readonly isNonInteractiveSession?: boolean;
   readonly debug?: boolean;
   readonly onDismiss?: () => void;
+  readonly composerDraft?: ApprovalComposerDraft;
 }) {
   // Register the whole approval family as a modal overlay: without this the
   // GLOBAL turn-cancel (useCancelRequest) treats esc as "cancel the turn"
@@ -393,6 +409,7 @@ export function AgenCPermissionOverlay({
       request={request}
       toolUseConfirm={toolUseConfirm}
       onDismiss={onDismiss}
+      composerDraft={composerDraft}
     />
   );
 }
@@ -499,6 +516,26 @@ function toolLabel(toolUseConfirm: ProjectedToolUseConfirm): string {
   return toolUseConfirm.tool.name;
 }
 
+/** The question of the separate approval asked before a refused call runs without the sandbox. */
+export const RUN_WITHOUT_SANDBOX_TITLE = "run without the sandbox?";
+
+/**
+ * The card's note. A request to run without the sandbox always keeps its
+ * question (the refusal and what approving changes), with a Write card's
+ * preview warning after it; other cards show the warning instead of their
+ * reason, as before.
+ */
+function approvalNote(opts: {
+  readonly question: string;
+  readonly runsWithoutSandbox: boolean;
+  readonly writePreviewWarning: string | undefined;
+}): string {
+  if (!opts.runsWithoutSandbox) return opts.writePreviewWarning ?? opts.question;
+  return opts.writePreviewWarning === undefined
+    ? opts.question
+    : `${opts.question} ${opts.writePreviewWarning}`;
+}
+
 /** Live shell/command tool names whose approval input IS a runnable command. */
 const SHELL_COMMAND_TOOL_NAMES: ReadonlySet<string> = new Set([
   "system.bash",
@@ -532,10 +569,12 @@ function AgenCApprovalOverlay({
   request,
   toolUseConfirm,
   onDismiss,
+  composerDraft,
 }: {
   readonly request: PendingRequest;
   readonly toolUseConfirm: ProjectedToolUseConfirm;
   readonly onDismiss?: () => void;
+  readonly composerDraft?: ApprovalComposerDraft;
 }) {
   const command = approvalInputText(toolUseConfirm.input, { prettyJson: true });
   const fileWritePreview = request.ctx.fileWritePreview;
@@ -564,7 +603,7 @@ function AgenCApprovalOverlay({
         ? "CREATE"
         : "EDIT";
       return {
-        file: built.file,
+        file: abbreviateHomePaths(built.file),
         stats: built.stats,
         lines: built.lines,
         remaining: built.remaining,
@@ -621,7 +660,7 @@ function AgenCApprovalOverlay({
     toolInput: toolUseConfirm.input,
   });
   const destructive = risk === "destructive";
-  const { waiting: typingWaiting, blockTyping } = useApprovalTypingGuard(destructive);
+  const { waiting: typingWaiting, blockTyping, draftFocused } = useApprovalTypingGuard(destructive, composerDraft);
   const requiredWord = typedConfirmationWordForRisk({
     risk,
     command,
@@ -674,6 +713,13 @@ function AgenCApprovalOverlay({
 
   const handleSelectionInput = useCallback(
     (input: string, key: Key, event: InputEvent): boolean => {
+      if (key.escape) {
+        event.stopImmediatePropagation();
+        if (fullDiffVisibleRef.current) return handleDiffInput(input, key, event);
+        abort();
+        return true;
+      }
+      if (draftFocused && blockTyping(input, key, event)) return true;
       if (handleDiffInput(input, key, event)) return true;
       if (blockTyping(input, key, event)) return true;
       if (input === "1") {
@@ -716,9 +762,17 @@ function AgenCApprovalOverlay({
       }
       return false;
     },
-    [approve, approveForSession, confirmSelection, reject, handleDiffInput, blockTyping],
+    [approve, approveForSession, confirmSelection, reject, abort, handleDiffInput, blockTyping, draftFocused],
   );
-  useInputCapture((input, key, event) => handleDiffInput(input, key, event) || blockTyping(input, key, event), { context: "Modal", isActive: destructive });
+  useInputCapture((input, key, event) => {
+    if (key.escape && !fullDiffVisibleRef.current) {
+      event.stopImmediatePropagation();
+      abort();
+      return true;
+    }
+    if (draftFocused && blockTyping(input, key, event)) return true;
+    return handleDiffInput(input, key, event) || blockTyping(input, key, event);
+  }, { context: "Modal", isActive: destructive });
   useInputCapture(handleSelectionInput, { context: "Modal", isActive: !destructive });
   useInput(handleSelectionInput, { isActive: !destructive });
 
@@ -750,8 +804,7 @@ function AgenCApprovalOverlay({
         return;
       }
       if (key.escape) {
-        if (onDismiss !== undefined) abort();
-        else reject();
+        abort();
         return;
       }
       if (key.backspace || key.delete) {
@@ -773,40 +826,55 @@ function AgenCApprovalOverlay({
     </Popup>;
   }
   const name = toolLabel(toolUseConfirm);
+  // The separate question asked after the sandbox refused an approved call:
+  // its title and summary say so, because the reason text below is the first
+  // row a short terminal drops.
+  const runsWithoutSandbox = request.ctx.runsWithoutSandbox === true;
   const title =
-    risk === "destructive"
-      ? "destructive high-risk approval"
-      : risk === "medium"
-        ? "medium-risk approval"
-        : "needs approval";
+    runsWithoutSandbox
+      ? "approval to run without the sandbox"
+      : risk === "destructive"
+        ? "destructive high-risk approval"
+        : risk === "medium"
+          ? "medium-risk approval"
+          : "needs approval";
   return (
     <Box flexDirection="column" gap={1}>
       <ApprovalCard
-        risk={destructive ? "high" : "low"}
+        risk={destructive || runsWithoutSandbox ? "high" : "low"}
         title={`tool · ${name} · ${title}`}
-        command={command.length > 0 ? command : toolUseConfirm.description}
+        {...(runsWithoutSandbox ? { summary: `${RUN_WITHOUT_SANDBOX_TITLE} · ${name}` } : {})}
+        // Home paths read as ~/..., as in the transcript's tool rows; the
+        // risk checks above still read the input as given.
+        command={abbreviateHomePaths(command.length > 0 ? command : toolUseConfirm.description)}
         commandIsShell={approvalCommandIsShell(toolUseConfirm)}
-        confirmLabel={destructive ? `type ${requiredWord}` : "enter"}
+        confirmLabel={draftFocused ? "tab to review" : destructive ? `type ${requiredWord}` : "enter"}
         facts={[
           { label: "tool", value: name },
-          {
-            label: "scope",
-            value: risk === "low" ? "session" : risk,
-            color: destructive
-              ? "error"
-              : risk === "medium"
-                ? "warning"
-                : "text2",
-          },
+          runsWithoutSandbox
+            ? { label: "sandbox", value: "would be off", color: "error" }
+            : {
+                label: "scope",
+                value: risk === "low" ? "session" : risk,
+                color: destructive
+                  ? "error"
+                  : risk === "medium"
+                    ? "warning"
+                    : "text2",
+              },
           { label: "request", value: request.id },
           {
             label: "confirmation",
-            value: destructive ? `type ${requiredWord}` : "enter",
+            value: draftFocused ? "tab to review" : destructive ? `type ${requiredWord}` : "enter",
           },
         ]}
-        note={writePreviewUnavailable
-          ? `Existing content unavailable; this write may overwrite a file. ${fileWritePreview?.kind === "unavailable" ? fileWritePreview.reason : ""}`.trim()
-          : toolUseConfirm.description}
+        note={abbreviateHomePaths(approvalNote({
+          question: toolUseConfirm.description,
+          runsWithoutSandbox,
+          writePreviewWarning: writePreviewUnavailable
+            ? `Existing content unavailable; this write may overwrite a file. ${fileWritePreview?.kind === "unavailable" ? fileWritePreview.reason : ""}`.trim()
+            : undefined,
+        }))}
         {...(diffPreview !== undefined ? { diffPreview } : {})}
         requestId={request.id}
         requireTypedConfirmation={destructive}
@@ -814,6 +882,13 @@ function AgenCApprovalOverlay({
         typedConfirmationTarget={requiredWord}
         selectedIndex={selectedIndex}
         typingWaiting={typingWaiting}
+        cancelLabel="stop turn"
+        draftText={composerDraft?.text}
+        draftFocused={draftFocused}
+        sessionScope={(toolUseConfirm.tool.name === "Write" || toolUseConfirm.tool.name === "Edit") &&
+          fileEditTargetPath(request.input) !== undefined
+          ? `${name} this file only`
+          : "this exact action only"}
       />
     </Box>
   );

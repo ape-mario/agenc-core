@@ -376,6 +376,8 @@ nonzero exit status but does not wait indefinitely for storage repair. Memory
 cannot survive process exit; if storage failed before a recovery file became
 durable, shutdown or a forced kill can still lose that unpersisted state.
 
+Clear information requests (such as MCP data queries or explanations) can finish without a workspace checklist when the turn has successful tool results and no commands or recorded workspace writes. Requests mentioning implementation, execution or output artifacts retain verification, as do ambiguous tasks, explicit checklists and verification rounds already in progress. The gate records this applicability decision as `skipped` with reason `answer_only`; it does not certify answer correctness or change tool permissions.
+
 `max_turns` is unset by default; an unset turn cap does not impose a
 synthetic stop. `completion_gate` defaults to `mode = "auto"` with
 `max_rounds = 3`: in a non-interactive session (`agenc -p`, a routine, an
@@ -455,12 +457,24 @@ each time the remaining reservation halves and re-arms once a request fits
 again, so a long tool loop that is walking toward the context window is
 visible in the transcript and the rollout before the provider refuses a
 request. The fit itself is unchanged.
-`stream_watchdog_timeout_ms` defaults to `600000` (ten
-minutes of provider silence): the runtime warns at half that time and aborts
-the stream with a retryable `stream_idle` error at the deadline. Set it to
-`0` to permit provider silence indefinitely. The *default* applies to session
+`stream_quiet_warning_ms` defaults to `600000` (ten minutes without a model
+delta). It emits a `warning` event with cause `stream_idle_warning`; the TUI
+status shows "no output from the model for N minutes", the
+reasoning effort captured from the active request, and the interrupt hint.
+This warning never ends a turn.
+Keepalives do not reset it; text, reasoning, and tool-input deltas do.
+Set it to `0` to disable the warning.
+
+`stream_watchdog_timeout_ms` defaults to `1200000` (twenty minutes without
+any HTTP stream bytes). The runtime observes bytes before parsing SSE, so
+comments, keepalives, partial frames, and reasoning frames all refresh
+liveness even when there is no visible output. A completely silent connection
+is aborted with a retryable `stream_idle` error and uses the existing finite
+reconnect ladder. This is an idle interval, with no total turn deadline.
+Set it to `0` to permit byte silence indefinitely; the soft warning still works.
+The *default* applies to session
 turns only: a one-shot review delegate (`/review`, guardian approval review)
-carries its own deadline, so the ten-minute default is not layered on top of
+carries its own deadline, so the twenty-minute default is not layered on top of
 it. A value you configure yourself is still honoured inside a review delegate.
 
 `provider_outage_wait_ms` and `provider_outage_retry_ms` govern what happens
@@ -513,7 +527,7 @@ names; `[]` denotes an array entry. Open maps accept keys at the indicated
 | `approval_policy` | `untrusted`, `on-failure`, `on-request`, or `never`. |
 | `sandbox_mode` | `read-only`, `workspace-write`, or `danger-full-access`. `read-only` and `workspace-write` reserve `AGENC_HOME` when it sits under a writable ancestor. `danger-full-access` skips the reservation. See [tools-permissions-sandbox.md](tools-permissions-sandbox.md#agenc-home-under-writable-sandbox-roots). |
 | `reasoning_effort` | `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, or `none`. |
-| `reasoning_summary` | `auto`, `concise`, `detailed`, or `none`. |
+| `reasoning_summary` | `auto`, `concise`, `detailed`, or `none`. When unset, `gpt-6-luna` on the OpenAI platform API leaves summaries off while retaining encrypted reasoning replay. Other OpenAI replay routes, including ChatGPT sign-in, default to `auto`. An explicit setting takes precedence. |
 | `approvals_reviewer` | `user` or `auto_review`. |
 | `model_verbosity` | `low`, `medium`, or `high`. Sets response detail via the native verbosity parameter on supported direct OpenAI models; other routes (including DeepSeek, GLM, Anthropic and ChatGPT subscription models) use a Response Detail instruction. Applies at the top level or in a profile. A runtime response-detail override takes precedence; clearing it restores the configured value. Without an explicit setting, `DEFAULT_MODEL_VERBOSITY` in `runtime/src/config/runtime-defaults.ts` supplies the release default. When that switch is undefined, no response-detail instruction or native verbosity parameter is added. This controls user-facing prose, not the work, checks, or required error reporting. |
 | `service_tier` | `priority` or `flex`. `priority` is the one "Fast" dial: OpenAI priority processing (`service_tier`, GPT-5 family and GPT-4.1/4o/o-series, 2x standard price), Anthropic fast mode on Claude Opus 5.5, Opus 5 and Opus 4.8 (`speed: "fast"` plus the `fast-mode-2026-02-01` beta header, 2x price, research preview access from Anthropic), and xAI priority processing on Grok 4.7 and Grok 4.6 (`service_tier: "priority"`, 2x price, API-key billing only; a session signed in with X does not send it). Providers and models without a fast tier ignore it; the model info `serviceTiers` list says which ones have it. |
@@ -533,7 +547,8 @@ names; `[]` denotes an array entry. Open maps accept keys at the indicated
 | `defer_rare_tools` | Load rarely needed built-in tools (delegation, process, web, rare tools) through `system.searchTools` instead of sending them with every request. Unset: on for standard sessions, off for Light. `AGENC_DEFER_RARE_TOOLS` in the session environment overrides it. |
 | `lean_system_prompt` | Use the lean static head of the system prompt. Unset: on for OpenAI and Grok sessions. `AGENC_LEAN_SYSTEM_PROMPT` in the session environment overrides it. |
 | `stream_degenerate_guard` | Stop disordered short-vocabulary model output; default `true`. Set `false` for intentional random text. A stopped partial is marked unreliable; one automatic retry is allowed only before streamed tool work. |
-| `stream_watchdog_timeout_ms` | Non-negative inter-chunk idle timeout; default `600000`, `0` disables. |
+| `stream_watchdog_timeout_ms` | Non-negative byte-idle timeout; default `1200000`, `0` disables. Keepalives refresh it. |
+| `stream_quiet_warning_ms` | Non-negative no-delta soft warning interval; default `600000`, `0` disables. Never ends a turn. |
 | `provider_outage_wait_ms` | Non-negative total time a turn keeps waiting for a provider outage to end once the reconnect ladder is spent; default `1800000` (30 minutes), `0` ends the turn as soon as the ladder is exhausted. |
 | `provider_outage_retry_ms` | Positive first slow-retry delay during a provider outage, doubling up to ten times this value; default `30000`. |
 
@@ -679,7 +694,8 @@ discovered metadata.
 | `providers.<provider>.capability_overrides.supportsImageInput`, `providers.<provider>.capability_overrides.supportsAudioInput`, `providers.<provider>.capability_overrides.supportsAudioOutput` | Boolean media capabilities. |
 | `providers.<provider>.capability_overrides.supportsProviderNativeWebSearch`, `providers.<provider>.capability_overrides.supportsExtendedThinking` | Boolean native search/thinking capabilities. |
 | `providers.<provider>.capability_overrides.acceptsImageHistory`, `providers.<provider>.capability_overrides.acceptsAudioHistory`, `providers.<provider>.capability_overrides.acceptsThinkingHistory`, `providers.<provider>.capability_overrides.acceptsReasoningEffort` | Boolean accepted-history/effort capabilities. |
-| `providers.<provider>.web_search`, `providers.<provider>.x_search`, `providers.<provider>.code_execution` | Grok-only native web, X, and code capabilities; rejected on every other provider. |
+| `providers.<provider>.web_search` | Native web search. Grok: the server-side `web_search` tool. DeepSeek: WebSearch through DeepSeek's Search API; unset means on only for DeepSeek's own API host when no `tools_config.web_search_endpoint` is set, `true` also uses a custom base URL and goes first, `false` never (`AGENC_DEEPSEEK_WEB_SEARCH` wins). Rejected on every other provider. |
+| `providers.<provider>.x_search`, `providers.<provider>.code_execution` | Grok-only native X and code capabilities; rejected on every other provider. |
 | `providers.<provider>.enable_image_search`, `providers.<provider>.enable_image_understanding`, `providers.<provider>.enable_video_understanding` | Grok-only native media capabilities; rejected on every other provider. |
 | `providers.<provider>.incremental_continuation` | Grok-only boolean (`AGENC_XAI_INCREMENTAL`) for Responses `previous_response_id` continuation on streaming turns; on for Grok unless set to `false`. |
 | `providers.<provider>.auth` | OpenAI and Grok only: `auto` (default), `oauth`, or `api-key`. Which credential to use when both an account sign-in and an API key are present; `auto` prefers the sign-in. `OPENAI_AUTH_MODE` / `GROK_AUTH_MODE` in the environment win over it. Applies to new sessions; `/providers` writes it. Rejected under every other provider table. |
@@ -700,6 +716,7 @@ discovered metadata.
 | `profiles.<profile>.reasoning_effort`, `profiles.<profile>.reasoning_summary`, `profiles.<profile>.reasoning_cap_policy` | Reasoning overrides. |
 | `profiles.<profile>.approvals_reviewer`, `profiles.<profile>.model_verbosity`, `profiles.<profile>.service_tier`, `profiles.<profile>.personality` | Reviewer/presentation overrides. |
 | `profiles.<profile>.tools_config` | Profile-local tool block with the same fields as `tools_config`. |
+| `profiles.<profile>.tools_config.web_search_provider` | Live search adapter selection, with the same values and environment precedence as `tools_config.web_search_provider`. |
 | `profiles.<profile>.tools_config.web_search_endpoint`, `profiles.<profile>.tools_config.web_search_endpoint_kind` | Search URL and `duckduckgo`/`searxng`/`brave`/`json` decoder. |
 | `profiles.<profile>.tools_config.enabled_tools`, `profiles.<profile>.tools_config.disabled_tools` | Exact tool-name allow/disable arrays. |
 | `profiles.<profile>.tools_config.<tool>.default_permission_mode` | Exact-name per-tool approval default. |
@@ -709,7 +726,8 @@ discovered metadata.
 | Paths | Type / meaning |
 | --- | --- |
 | `tools_config` | Tool policy block. There is no `[tools]` alias in v2. |
-| `tools_config.web_search_endpoint` | Search backend URL. |
+| `tools_config.web_search_provider` | Live WebSearch backend after session-native search: `auto` (default), `firecrawl`, `tavily`, `exa`, `you`, `jina`, `bing`, `mojeek`, `linkup`, `custom`, `ddg`, or `native`. `WEB_SEARCH_PROVIDER` wins; keys come from session env. Auto tries configured keys before DuckDuckGo; explicit names fail without switching backend. |
+| `tools_config.web_search_endpoint` | Search backend URL. With an explicitly named provider, overrides its HTTP endpoint using that provider's auth and decoder. In `auto`, uses the generic decoder below and precedes keyed adapters. `AGENC_WEB_SEARCH_ENDPOINT` wins. |
 | `tools_config.web_search_endpoint_kind` | `duckduckgo`, `searxng`, `brave`, or `json`. |
 | `tools_config.enabled_tools`, `tools_config.disabled_tools` | Exact tool-name arrays. |
 | `tools_config.<tool>` | Exact dispatch-name block for any registered tool. Quote names containing dots in TOML, for example `[tools_config."system.bash"]`. |
@@ -1024,3 +1042,34 @@ above the cap. Independent monetary limits remain enforced.
 In-flight tools finish before a local partial-result summary is emitted. No extra
 model call is spent generating that summary. Unknown usage retains its reserved
 amount. Provider-reported overruns remain subject to execution admission policy.
+
+A permission-blocked routine names the mode that refused it; there is no
+`config.toml` override for those strings:
+[agents.md](agents.md#permission-blocked-explanation).
+
+## Remote control owner switch
+
+`remote_control` is a home/managed-only table. `remote_control.enabled` is a
+boolean, default `false`:
+
+```toml
+[remote_control]
+enabled = false
+```
+
+The owner can set `enabled = true` by editing `$AGENC_HOME/config.toml` outside
+the agent. Managed `config.toml` and sorted `config.d/*.toml` drop-ins override
+that choice; managed `false` cannot be overridden by user configuration.
+Project/local files, plugins, profiles, `--config`, CLI patches, and environment
+variables have no authority over this setting. `agenc config set/unset` refuses
+the table; use the owner editor and restart the daemon. Agent file tools and
+shell write checks protect the home file and managed sources, including custom
+home paths, symlink targets and managed drop-ins, in every permission mode.
+
+When false, phone starts refuse before connector imports, account checks or
+network access; `/remote` is hidden from help/completion, bridge initialization
+is denied by the daemon, and stored pairings do not reconnect. Local status and
+off still work. `AGENC_REMOTE_FULL_CONTROL` is ignored with a warning. When true,
+the existing full-control consent and sign-in checks still apply. Browser
+`remote.*` enrollment uses the same switch; Telegram Connections have separate
+owner authority. See [remote control](../remote-control.md).

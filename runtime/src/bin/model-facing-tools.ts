@@ -1,3 +1,5 @@
+import { runOllamaWebFetch, OLLAMA_WEB_FETCH_USD_PER_REQUEST } from "../llm/providers/ollama-cloud/web-fetch.js";
+import { configuredSearchChain, runConfiguredSearchProviders } from "../tools/WebSearchTool/providers/live.js";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
@@ -61,10 +63,33 @@ import {
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
 } from "../llm/registry/provider-info.js";
 import {
+  buildDeepSeekSearchQuery,
+  DEEPSEEK_SEARCH_USD_PER_REQUEST,
+  DEEPSEEK_WEB_SEARCH_ENV,
+  deepSeekSearchEndpoint,
+  isOfficialDeepSeekApiHost,
+  resolveDeepSeekWebSearchSetting,
+  runDeepSeekSearch,
+} from "../llm/providers/deepseek/web-search.js";
+import {
   resolveProviderBaseURLEnvironment,
 } from "../llm/registry/provider-ingress.js";
+import {
+  GATEWAY_SEARCH_MAX_OUTPUT_TOKENS,
+  GATEWAY_SEARCH_PROMPT_TOKENS_CEILING,
+  ollamaWebSearchCostUsd,
+  OPENROUTER_EXA_SEARCH_USD_PER_REQUEST,
+  runOllamaWebSearch,
+  runOpenRouterWebSearch,
+  runVeniceWebSearch,
+  VENICE_WEB_SEARCH_USD_PER_REQUEST,
+  type GatewaySearchOutcome,
+  type TokenRates,
+} from "../llm/providers/gateway-web-search.js";
+import { DEFAULT_MODEL_COSTS, resolveModelCostEntry } from "../session/cost.js";
 import type { Tool, ToolResult } from "../tools/types.js";
 import { validationErrorToolResult } from "../tools/results.js";
+import { isRuntimeInjectedArgKey } from "../tools/strict-args.js";
 import {
   DEADLINE_RESERVE_SPAWN_REFUSAL,
   inDeadlineReserve,
@@ -91,6 +116,7 @@ import {
 import { delegate } from "../agents/delegate.js";
 import {
   runAgentsOnCsv,
+  agentJobStateDatabasePath,
   recordAgentJobResultAsync,
   CsvJobRecoverySupervisor,
   type AgentJobProgressEmitter,
@@ -137,6 +163,14 @@ import {
   createImagineVideoTool,
   hasImagineVideoBackend,
 } from "../tools/system/imagine-video.js";
+import {
+  createImagineSpeechTool,
+  hasImagineSpeechBackend,
+} from "../tools/system/imagine-speech.js";
+import {
+  createImagineEditTool,
+  hasImagineEditBackend,
+} from "../tools/system/imagine-edit.js";
 import { getRuleByContentsForTool } from "../permissions/rules.js";
 import type {
   PermissionResult,
@@ -167,7 +201,9 @@ import {
 } from "../permissions/session-tool-policy.js";
 import { readToolRuntimeContext } from "../tools/runtimes/context.js";
 import { registerSessionCronMutation } from "../tools/runtimes/session-cron.js";
-import { openStateDatabases } from "../state/sqlite-driver.js";
+import { openStateDatabases, resolveStateDatabasePaths } from "../state/sqlite-driver.js";
+import { WORKFLOW_HANDOFF_STORE_DIRNAME } from "../state/database-paths.js";
+import { canonicalAuthorityPath } from "../sandbox/desktop-authority-protection.js";
 import { resolveSecureStorageHome } from "../utils/secureStorage/home.js";
 import { getCACertificates } from "../utils/caCerts.js";
 import { getMTLSConfig } from "../utils/mtls.js";
@@ -212,12 +248,20 @@ export interface ModelFacingToolOptions {
   readonly outputSchema?: Record<string, unknown>;
   /** `[tools]` block from config.toml (env vars win over these). */
   readonly toolsConfig?: {
+    readonly web_search_provider?: string;
     readonly web_search_endpoint?: string;
     readonly web_search_endpoint_kind?: string;
     readonly [k: string]: unknown;
   };
   /** `[providers.grok]` capability profile for the independent xAI tool backend. */
   readonly grokCapabilities?: GrokCapabilityConfig;
+  /**
+   * `[providers.deepseek] web_search`. Unset means auto: a deepseek session on
+   * DeepSeek's own API host searches through DeepSeek's Search API unless a
+   * search endpoint is configured. `AGENC_DEEPSEEK_WEB_SEARCH` in the session
+   * environment wins.
+   */
+  readonly deepseekWebSearch?: boolean;
   /**
    * Session provider slug retained for embedding compatibility. Tool
    * availability must not be gated by the provider that performs reasoning.
@@ -267,6 +311,16 @@ function json(content: unknown, isError?: boolean): ToolResult {
   };
 }
 
+/** Whether `store` is one of `declared`, compared as the sandbox compares paths. */
+function sameStoreTarget(store: string, declared: readonly string[]): boolean {
+  try {
+    const target = canonicalAuthorityPath(store);
+    return declared.some((entry) => canonicalAuthorityPath(entry) === target);
+  } catch {
+    return false;
+  }
+}
+
 /** A refusal made before the tool touched anything; see preEffectRefusal. */
 function refusal(content: unknown): ToolResult {
   return validationErrorToolResult(
@@ -299,6 +353,7 @@ function toolMetadata(
     readonly deferred?: boolean;
     readonly hiddenByDefault?: boolean;
     readonly keywords?: readonly string[];
+    readonly fixedWriteTargets?: () => readonly string[];
   } = {},
 ): Tool["metadata"] {
   return {
@@ -309,7 +364,34 @@ function toolMetadata(
     deferred: opts.deferred ?? false,
     keywords: opts.keywords ?? [family],
     preferredProfiles: ["coding", "operator", "general"],
+    ...(opts.fixedWriteTargets !== undefined
+      ? { fixedWriteTargets: opts.fixedWriteTargets }
+      : {}),
   };
+}
+
+/**
+ * The stores WorkflowTool writes itself: it opens the project state and logs
+ * databases (`openStateDatabases`, same options) and keeps step handoffs in
+ * the project's `workflow-handoffs` directory. Each step runs as a delegated
+ * agent whose own tool calls are checked by its own sandbox, as with
+ * spawn_agent. Without a resolvable AgenC home nothing is declared and the
+ * runtime sandbox keeps refusing the call.
+ */
+function workflowStoreWriteTargets(opts: ModelFacingToolOptions): readonly string[] {
+  try {
+    const paths = resolveStateDatabasePaths({
+      cwd: opts.workspaceRoot,
+      agencHome: stateRoot(opts),
+    });
+    return [
+      paths.stateDbPath,
+      paths.logsDbPath,
+      join(paths.projectDir, WORKFLOW_HANDOFF_STORE_DIRNAME),
+    ];
+  } catch {
+    return [];
+  }
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -859,10 +941,10 @@ function isUsableWebSearchUrl(rawUrl: string): boolean {
   }
 }
 
-function filterWebSearchResults(
-  results: readonly WebSearchResultEntry[],
+function filterWebSearchResults<T extends WebSearchResultEntry>(
+  results: readonly T[],
   filters: WebSearchFilters,
-): readonly WebSearchResultEntry[] {
+): readonly T[] {
   return results.filter((entry) => {
     if (
       filters.allowedDomains.length > 0 &&
@@ -1194,6 +1276,177 @@ async function runGrokNativeWebSearch(
     if (error instanceof AdmissionDeniedError || error instanceof TaskBudgetReachedError) throw error;
     return undefined;
   }
+}
+
+function configuredWebSearchEndpoint(
+  opts: ModelFacingToolOptions,
+): string | undefined {
+  return (
+    stringValue(opts.env?.AGENC_WEB_SEARCH_ENDPOINT) ??
+    stringValue(opts.toolsConfig?.web_search_endpoint)
+  );
+}
+
+interface DeepSeekWebSearchBackend {
+  readonly endpoint: string;
+  readonly apiKey: string;
+}
+
+/**
+ * DeepSeek's Search API for a deepseek session (llm/providers/deepseek/
+ * web-search.ts). It reuses the session's own key and host, so the key never
+ * reaches a host the session does not already call. Auto mode needs DeepSeek's
+ * own API host and leaves a configured search endpoint in charge.
+ */
+function resolveDeepSeekWebSearchBackend(
+  opts: ModelFacingToolOptions,
+): DeepSeekWebSearchBackend | undefined {
+  const setting = resolveDeepSeekWebSearchSetting(
+    opts.env?.[DEEPSEEK_WEB_SEARCH_ENV],
+    opts.deepseekWebSearch,
+  );
+  if (setting === "off") return undefined;
+  const provider = currentSessionProvider(opts);
+  if (provider === undefined || readProviderIdentity(provider) !== "deepseek") {
+    return undefined;
+  }
+  const factoryOptions = readProviderFactoryOptions(provider);
+  const apiKey = stringValue(factoryOptions.apiKey);
+  if (apiKey === undefined) return undefined;
+  const baseURL =
+    stringValue(factoryOptions.baseURL) ?? BUILT_IN_PROVIDER_BASE_URLS.deepseek;
+  if (
+    setting === "auto" &&
+    (!isOfficialDeepSeekApiHost(baseURL) ||
+      configuredWebSearchEndpoint(opts) !== undefined)
+  ) {
+    return undefined;
+  }
+  const endpoint = deepSeekSearchEndpoint(baseURL);
+  return endpoint === undefined ? undefined : { endpoint, apiKey };
+}
+
+/** An Ollama Cloud, OpenRouter or Venice session's own search route. */
+interface GatewayWebSearchBackend {
+  readonly provider: "ollama-cloud" | "openrouter" | "venice";
+  readonly apiKey: string;
+  readonly baseURL: string;
+  readonly model: string;
+  readonly rates: TokenRates | undefined;
+}
+
+const GATEWAY_SEARCH_BASE_URLS: Readonly<Record<GatewayWebSearchBackend["provider"], string>> = {
+  "ollama-cloud": "https://ollama.com/v1",
+  openrouter: "https://openrouter.ai/api/v1",
+  venice: "https://api.venice.ai/api/v1",
+};
+
+/**
+ * The session's own provider search, used before the configured chain like
+ * DeepSeek's: an Ollama Cloud, OpenRouter or Venice session searches with its
+ * own key (never the managed route's, never another provider's). An explicit
+ * search endpoint or a named search provider keeps priority.
+ */
+function resolveGatewayWebSearchBackend(opts: ModelFacingToolOptions): GatewayWebSearchBackend | undefined {
+  const provider = currentSessionProvider(opts);
+  if (provider === undefined) return undefined;
+  const identity = readProviderIdentity(provider);
+  if (identity !== "ollama-cloud" && identity !== "openrouter" && identity !== "venice") return undefined;
+  if (configuredWebSearchEndpoint(opts) !== undefined) return undefined;
+  const mode = configuredSearchChain(requireModelFacingRequestEnvironment(opts), opts.toolsConfig).mode;
+  if (mode !== "auto" && mode !== "native") return undefined;
+  const factoryOptions = readProviderFactoryOptions(provider);
+  if (factoryOptions.extra?.managedGateway === true || factoryOptions.extra?.managedCredential === true) return undefined;
+  const apiKey = stringValue(factoryOptions.apiKey);
+  if (apiKey === undefined) return undefined;
+  const live = (opts.getSession()?.services as { providerService?: { current?: () => { model?: unknown } } } | undefined)
+    ?.providerService?.current?.();
+  const model = stringValue(live?.model) ?? stringValue(factoryOptions.model);
+  if (model === undefined) return undefined;
+  const baseURL = (stringValue(factoryOptions.baseURL) ?? GATEWAY_SEARCH_BASE_URLS[identity]).replace(/\/+$/, "");
+  // Ollama's search lives on ollama.com only; a session pointed elsewhere has no route.
+  if (identity === "ollama-cloud" && baseURL !== GATEWAY_SEARCH_BASE_URLS["ollama-cloud"]) return undefined;
+  const price = resolveModelCostEntry({ provider: identity, model }, DEFAULT_MODEL_COSTS)?.entry;
+  const rates = price === undefined
+    ? undefined
+    : { inputUsdPerToken: price.inputUsdPer1K / 1000, outputUsdPerToken: price.outputUsdPer1K / 1000 };
+  return { provider: identity, apiKey, baseURL, model, rates };
+}
+
+/** Native fetch only uses the current session's direct Ollama Cloud key. */
+function ollamaWebFetchKey(opts: ModelFacingToolOptions): string | undefined {
+  const provider = currentSessionProvider(opts);
+  if (!provider || readProviderIdentity(provider) !== "ollama-cloud") return undefined;
+  const config = readProviderFactoryOptions(provider);
+  if (config.extra?.managedGateway === true || config.extra?.managedCredential === true) return undefined;
+  if ((stringValue(config.baseURL) ?? "https://ollama.com/v1").replace(/\/+$/, "") !== "https://ollama.com/v1") return undefined;
+  return stringValue(config.apiKey);
+}
+
+/** The most one gateway search can cost, or null when the session model has no price. */
+function gatewaySearchCeilingUsd(backend: GatewayWebSearchBackend, maxResults: number): number | null {
+  if (backend.provider === "ollama-cloud") return ollamaWebSearchCostUsd(maxResults);
+  if (backend.rates === undefined) return null;
+  const tokens = GATEWAY_SEARCH_PROMPT_TOKENS_CEILING * backend.rates.inputUsdPerToken +
+    GATEWAY_SEARCH_MAX_OUTPUT_TOKENS * backend.rates.outputUsdPerToken;
+  return (backend.provider === "openrouter" ? OPENROUTER_EXA_SEARCH_USD_PER_REQUEST : VENICE_WEB_SEARCH_USD_PER_REQUEST) + tokens;
+}
+
+async function runGatewayWebSearch(
+  backend: GatewayWebSearchBackend,
+  input: {
+    readonly query: string;
+    readonly maxResults: number;
+    readonly filters: WebSearchFilters;
+    readonly signal?: AbortSignal;
+  },
+): Promise<GatewaySearchOutcome> {
+  const common = {
+    apiKey: backend.apiKey,
+    query: input.query,
+    maxResults: input.maxResults,
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
+  };
+  if (backend.provider === "ollama-cloud") return await runOllamaWebSearch(common);
+  if (backend.provider === "openrouter") {
+    return await runOpenRouterWebSearch({
+      ...common,
+      baseURL: backend.baseURL,
+      model: backend.model,
+      allowedDomains: [...input.filters.allowedDomains],
+      blockedDomains: [...input.filters.blockedDomains],
+    });
+  }
+  return await runVeniceWebSearch({
+    ...common,
+    baseURL: backend.baseURL,
+    model: backend.model,
+    ...(backend.rates === undefined ? {} : { rates: backend.rates }),
+  });
+}
+
+function webSearchResultLimit(args: Record<string, unknown>): number {
+  return Math.max(1, Math.min(numberValue(args.max_results) ?? MAX_SEARCH_RESULTS, MAX_SEARCH_RESULTS));
+}
+
+/**
+ * WebSearch's charge bound. A configured endpoint is unpriced; DeepSeek's
+ * search is $0.00075 per successful request; an Ollama Cloud, OpenRouter or
+ * Venice session's own search costs what its provider lists; the keyless
+ * chain is free. The Grok native path reserves its own model call.
+ */
+function webSearchMaxCostUsd(opts: ModelFacingToolOptions, args: Record<string, unknown>): number | null {
+  if (configuredWebSearchEndpoint(opts) !== undefined ||
+      configuredSearchChain(requireModelFacingRequestEnvironment(opts), opts.toolsConfig).providers.length > 0) return null;
+  const gateway = resolveGatewayWebSearchBackend(opts);
+  if (gateway !== undefined) {
+    const filters = webSearchFilters(args);
+    const filtered = filters.allowedDomains.length > 0 || filters.blockedDomains.length > 0;
+    return gatewaySearchCeilingUsd(gateway, filtered ? 10 : webSearchResultLimit(args));
+  }
+  return resolveDeepSeekWebSearchBackend(opts) !== undefined
+    ? DEEPSEEK_SEARCH_USD_PER_REQUEST
+    : 0;
 }
 
 function xSearchOptionsFromArgs(
@@ -1617,6 +1870,14 @@ function webFetchMappedIPv4(address: string): string | null {
   return null;
 }
 
+/**
+ * Refuse a key the tool does not take. Keys the runtime injects (`__callId`
+ * and the `__agenc*` channel) are tolerated, as in tools/strict-args.ts: a
+ * subagent's dispatch adds them as plain properties (the signed session id,
+ * the home), and a CSV worker's report_agent_job_result was refused for
+ * `__agencSessionIdSig`, a key the model never wrote. Model-supplied
+ * `__agenc*` keys are stripped before a child's call reaches here.
+ */
 function strictArgs(
   args: Record<string, unknown>,
   opts: {
@@ -1630,7 +1891,7 @@ function strictArgs(
     SESSION_ID_ARG,
   ]);
   for (const key of Object.keys(args)) {
-    if (!allowed.has(key)) {
+    if (!allowed.has(key) && !isRuntimeInjectedArgKey(key)) {
       return refusal({ error: `unknown field \`${key}\`` });
     }
   }
@@ -1710,6 +1971,23 @@ function createMultiAgentV2RuntimeTools(
     opts.csvAgentJobsRepositories ?? UNCONFIGURED_CSV_AGENT_JOBS_REPOSITORIES;
   const roleWorkspace =
     opts.roleCatalog?.workspace ?? createAgentRoleWorkspace(opts.workspaceRoot);
+  /**
+   * Where report_agent_job_result and resolve_csv_job_review write: rows of
+   * this workspace's project state database, the one the repository authority
+   * opens for it (`<agenc-home>/projects/<key>/agenc-state_1.sqlite`). No
+   * argument names a path. Declaring it lets the runtime sandbox verify the
+   * real store; undeclared, every worker report was refused as unverifiable
+   * and each CSV item ended as an unknown outcome. An authority that cannot
+   * name its store declares nothing, and the calls stay refused.
+   */
+  const csvJobStoreWriteTargets = (): readonly string[] => {
+    try {
+      const store = csvAgentJobsRepositories.stateDatabasePath?.(opts.workspaceRoot);
+      return store === undefined ? [] : [store];
+    } catch {
+      return [];
+    }
+  };
 
   const emit = (
     session: Session,
@@ -2077,6 +2355,15 @@ function createMultiAgentV2RuntimeTools(
     if (stop !== undefined && typeof stop !== "boolean") {
       return json({ error: "stop must be a boolean" }, true);
     }
+    // The result is written to the job's own state database. Only this
+    // workspace's store was verified by the sandbox for this call, so a job
+    // that records elsewhere is refused before anything is written.
+    const jobStore = agentJobStateDatabasePath(jobId);
+    if (jobStore !== undefined && !sameStoreTarget(jobStore, csvJobStoreWriteTargets())) {
+      return refusal({
+        error: `job ${jobId} records its results outside this workspace's job store`,
+      });
+    }
     const outcome = await recordAgentJobResultAsync({
       jobId,
       itemId,
@@ -2439,6 +2726,7 @@ function createMultiAgentV2RuntimeTools(
       metadata: toolMetadata("agent", {
         mutating: true,
         keywords: ["agent", "job", "report", "result"],
+        fixedWriteTargets: csvJobStoreWriteTargets,
       }),
       recoveryCategory: "side-effecting",
       inputSchema: {
@@ -2580,6 +2868,7 @@ function createMultiAgentV2RuntimeTools(
         mutating: true,
         deferred: true,
         keywords: ["agent", "job", "csv", "review", "resolve"],
+        fixedWriteTargets: csvJobStoreWriteTargets,
       }),
       requiresApproval: true,
       recoveryCategory: "side-effecting",
@@ -3477,12 +3766,13 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
     isReadOnly: true,
     concurrencyClass: { kind: "shared_read" },
     recoveryCategory: "idempotent",
-    // The fetch itself is an unpriced HTTPS request, and the optional prompt
-    // extraction is charged at the model boundary (runAdmittedModelFacingCall).
+    // Direct HTTPS fetch is free; native Ollama fetch reserves its listed fee.
+    // Optional extraction is charged at the model boundary (runAdmittedModelFacingCall).
     // Without an explicit zero bound the default unpriced estimate held every
     // successful fetch as missing_tool_usage and marked the whole session's
     // cost unknown.
-    admissionEstimate: () => ({ maxInputTokens: 0, maxOutputTokens: 0, maxCostUsd: 0 }),
+    admissionEstimate: () => ({ maxInputTokens: 0, maxOutputTokens: 0,
+      maxCostUsd: ollamaWebFetchKey(opts) ? OLLAMA_WEB_FETCH_USD_PER_REQUEST : 0 }),
     inputSchema: {
       type: "object",
       properties: {
@@ -3518,7 +3808,30 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
         MIN_FETCH_BYTES,
         Math.min(MAX_FETCH_BYTES, maxChars * 4),
       );
+      let providerFetchFallback: string | undefined;
+      let providerFetchCost = 0;
+      const resultWithCharge = (result: ToolResult): ToolResult => ({ ...result,
+        admissionUsage: { inputTokens: 0, outputTokens: 0, costUsd: providerFetchCost } });
       try {
+        const apiKey = ollamaWebFetchKey(opts);
+        if (apiKey !== undefined) {
+          await assertLiveWebFetchHostAllowed(new URL(normalized).hostname, effectSignal);
+          const page = await runOllamaWebFetch({ apiKey, url: normalized, signal: effectSignal,
+            timeoutMs: numberValue(args.timeout_ms) });
+          providerFetchCost = page.costUsd;
+          if (page.kind === "content") {
+            const content = page.content.slice(0, maxChars);
+            const prompt = stringValue(args.prompt);
+            const extracted = prompt && content.length >= WEB_FETCH_EXTRACTION_MIN_CHARS
+              ? await runWebFetchExtraction(opts, { url: normalized, content, prompt, signal: effectSignal }) : undefined;
+            // Ollama does not report the final URL or origin HTTP status. Do not
+            // invent either from its successful API response, or trust links as fetches.
+            return resultWithCharge(json({ source: "ollama-cloud_web_fetch", provider: "ollama-cloud",
+              url: normalized, title: page.title, content, links: page.links,
+              truncated: page.content.length > maxChars, ...(extracted ? { extracted, prompt } : {}) }));
+          }
+          providerFetchFallback = page.reason;
+        }
         const initialParsed = new URL(normalized);
         const initialPreapproved = isPreapprovedHost(
           initialParsed.hostname,
@@ -3610,7 +3923,8 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
             } catch {
               /* extraction still useful without the persisted copy */
             }
-            return json({
+            return resultWithCharge(json({
+              ...(providerFetchFallback ? { provider_fetch_fallback: providerFetchFallback } : {}),
               status: response.status,
               ok: response.ok,
               url: normalized,
@@ -3628,11 +3942,12 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
                 0,
                 WEB_FETCH_EXTRACTION_PREVIEW_CHARS,
               ),
-            });
+            }));
           }
         }
-        return json(
+        return resultWithCharge(json(
           {
+            ...(providerFetchFallback ? { provider_fetch_fallback: providerFetchFallback } : {}),
             status: response.status,
             ok: response.ok,
             url: normalized,
@@ -3645,10 +3960,10 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
             content: textBody,
           },
           response.ok ? undefined : true,
-        );
+        ));
       } catch (error) {
         effectSignal?.throwIfAborted();
-        return json({ error: `fetch failed: ${errorMessage(error)}` }, true);
+        return resultWithCharge(json({ error: `fetch failed: ${errorMessage(error)}` }, true));
       }
     },
   };
@@ -3883,6 +4198,8 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
   // Bootstrap keeps this registry across provider switches. Resolve optional
   // xAI credentials only when its deferred tool is actually requested.
   const deferXSearch = opts.getSession() === null;
+  // One warning per registry: later failures still note it in the result.
+  let deepseekSearchWarned = false;
   const tools: Tool[] = [
     createWebFetchTool(opts),
     {
@@ -3895,14 +4212,10 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
       isReadOnly: true,
       concurrencyClass: { kind: "shared_read" },
       recoveryCategory: "idempotent",
-      admissionEstimate: () => ({
+      admissionEstimate: (args) => ({
         maxInputTokens: 0,
         maxOutputTokens: 0,
-        maxCostUsd:
-          stringValue(opts.env?.AGENC_WEB_SEARCH_ENDPOINT) !== undefined ||
-          stringValue(opts.toolsConfig?.web_search_endpoint) !== undefined
-            ? null
-            : 0,
+        maxCostUsd: webSearchMaxCostUsd(opts, args),
       }),
       inputSchema: {
         type: "object",
@@ -3921,16 +4234,9 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
         const query = stringValue(args.query);
         if (!query) return json({ error: "query is required" }, true);
         const filters = webSearchFilters(args);
-        const endpoint =
-          stringValue(opts.env?.AGENC_WEB_SEARCH_ENDPOINT) ??
-          stringValue(opts.toolsConfig?.web_search_endpoint);
-        const maxResults = Math.max(
-          1,
-          Math.min(
-            numberValue(args.max_results) ?? MAX_SEARCH_RESULTS,
-            MAX_SEARCH_RESULTS,
-          ),
-        );
+        const endpoint = configuredWebSearchEndpoint(opts);
+        const chain = configuredSearchChain(requestEnvironment, opts.toolsConfig);
+        const maxResults = webSearchResultLimit(args);
         const nativeResult = await runGrokNativeWebSearch(
           opts,
           args,
@@ -3941,8 +4247,105 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
         if (nativeResult !== undefined) {
           return nativeResult;
         }
+        // DeepSeek's Search API for a deepseek session. A failure or an empty
+        // answer falls through to the chain below, which says why.
+        const deepseek = resolveDeepSeekWebSearchBackend(opts);
+        // A paid fallback is unpriced. An early DeepSeek success still has an exact receipt.
+        const gateway = resolveGatewayWebSearchBackend(opts);
+        const reportsDeepSeekCharge = (deepseek !== undefined || gateway !== undefined) &&
+          endpoint === undefined && chain.providers.length === 0;
+        let deepseekBilled = false;
+        let deepseekFallback: string | undefined;
+        // What the session's own provider search charged, when it ran.
+        let gatewayCharge = 0;
+        const withDeepSeekCharge = (result: ToolResult, deepseekOnly = false): ToolResult =>
+          reportsDeepSeekCharge || deepseekOnly
+            ? {
+                ...result,
+                admissionUsage: {
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  costUsd: (deepseekBilled ? DEEPSEEK_SEARCH_USD_PER_REQUEST : 0) + gatewayCharge,
+                },
+              }
+            : result;
+        if (deepseek !== undefined) {
+          const shaped = buildDeepSeekSearchQuery(query, filters);
+          const filtered =
+            filters.allowedDomains.length > 0 || filters.blockedDomains.length > 0;
+          const outcome = await runDeepSeekSearch({
+            endpoint: deepseek.endpoint,
+            apiKey: deepseek.apiKey,
+            query: shaped.query,
+            count: filtered ? 10 : maxResults,
+            ...(effectSignal !== undefined ? { signal: effectSignal } : {}),
+            fetchOptions: getProxyFetchOptions({ environment: requestEnvironment }),
+          });
+          deepseekBilled = outcome.billed;
+          const results = outcome.kind === "results"
+            ? filterWebSearchResults(outcome.hits, filters).slice(0, maxResults)
+            : [];
+          if (results.length > 0) {
+            return withDeepSeekCharge(json({
+              query,
+              ...(shaped.shortened ? { query_sent: shaped.query } : {}),
+              source: "deepseek_search",
+              provider: "deepseek",
+              results,
+            }), true);
+          }
+          deepseekFallback = outcome.kind === "failed"
+            ? outcome.reason
+            : outcome.kind === "empty"
+              ? "no results"
+              : "no results matched the domain filters";
+          if (outcome.kind === "failed" && !deepseekSearchWarned) {
+            deepseekSearchWarned = true;
+            opts.emitWarning?.({
+              cause: "deepseek_web_search_failed",
+              message: `DeepSeek web search failed (${outcome.reason}); WebSearch used its fallback search instead.`,
+            });
+          }
+        }
+        // An Ollama Cloud, OpenRouter or Venice session searches with its own
+        // key first; a failure or an empty answer falls through to the chain.
+        let gatewayFallback: string | undefined;
+        if (gateway !== undefined) {
+          const filtered =
+            filters.allowedDomains.length > 0 || filters.blockedDomains.length > 0;
+          const outcome = await runGatewayWebSearch(gateway, {
+            query,
+            maxResults: filtered ? 10 : maxResults,
+            filters,
+            ...(effectSignal !== undefined ? { signal: effectSignal } : {}),
+          });
+          gatewayCharge = outcome.costUsd ?? 0;
+          const results = outcome.kind === "results"
+            ? filterWebSearchResults(outcome.hits, filters).slice(0, maxResults)
+            : [];
+          if (results.length > 0) {
+            return withDeepSeekCharge(json({
+              query,
+              source: `${gateway.provider}_web_search`,
+              provider: gateway.provider,
+              results,
+              ...(outcome.costUsd === undefined ? {} : { cost_usd: outcome.costUsd }),
+            }), true);
+          }
+          gatewayFallback = outcome.kind === "failed"
+            ? outcome.reason
+            : outcome.kind === "empty"
+              ? "no results"
+              : "no results matched the domain filters";
+        }
+        const finish = (payload: Record<string, unknown>): ToolResult =>
+          withDeepSeekCharge(json({
+            ...payload,
+            ...(deepseekFallback === undefined ? {} : { deepseek_search_fallback: deepseekFallback }),
+            ...(gatewayFallback === undefined ? {} : { provider_search_fallback: gatewayFallback }),
+          }));
         // 1. Explicitly configured endpoint (env or config-bridged).
-        if (endpoint !== undefined) {
+        if (endpoint !== undefined && chain.mode === "auto") {
           const kind = webSearchEndpointKind(opts);
           const configured = await runConfiguredEndpointSearch(
             endpoint,
@@ -3955,7 +4358,7 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
             configured.results,
             filters,
           ).slice(0, maxResults);
-          return json({
+          return finish({
             query,
             source: endpoint,
             kind,
@@ -3968,6 +4371,34 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
               : {}),
           });
         }
+        // Shared keyed adapters use this session's environment, never the TUI's.
+        const configuredProvider = await runConfiguredSearchProviders({
+          chain,
+          environment: requestEnvironment,
+          ...(endpoint !== undefined ? { endpoint } : {}),
+          input: {
+            query,
+            max_results: maxResults,
+            allowed_domains: [...filters.allowedDomains],
+            blocked_domains: [...filters.blockedDomains],
+          },
+          ...(effectSignal !== undefined ? { signal: effectSignal } : {}),
+        });
+        if (configuredProvider !== undefined) {
+          return finish({
+            query,
+            source: configuredProvider.providerName,
+            provider: configuredProvider.providerName,
+            results: filterWebSearchResults(configuredProvider.hits.map(hit => ({
+              title: hit.title,
+              url: hit.url,
+              snippet: (hit.description ?? "").slice(0, 600),
+            })), filters).slice(0, maxResults),
+          });
+        }
+        if (chain.mode === "native") {
+          return json({ error: "No native web search backend is available for this session" }, true);
+        }
         // 2. Keyless real-SERP default: DuckDuckGo HTML.
         const htmlResults = filterWebSearchResults(
           await runDuckDuckGoHtmlSearch(
@@ -3978,7 +4409,7 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
           filters,
         ).slice(0, maxResults);
         if (htmlResults.length > 0) {
-          return json({
+          return finish({
             query,
             source: "duckduckgo_html",
             results: htmlResults,
@@ -4000,7 +4431,7 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
           parseDuckDuckGoInstantAnswer(raw),
           filters,
         ).slice(0, maxResults);
-        return json({
+        return finish({
           query,
           source: "duckduckgo_instant_answer",
           results,
@@ -5077,6 +5508,7 @@ function createCronAndWorkflowTools(
         mutating: true,
         deferred: true,
         keywords: ["workflow", "run", "pipeline", "fan-out"],
+        fixedWriteTargets: () => workflowStoreWriteTargets(opts),
       }),
       requiresApproval: true,
       recoveryCategory: "side-effecting",
@@ -5129,7 +5561,7 @@ function createCronAndWorkflowTools(
           });
           const artifactStore = new WorkflowHandoffArtifactStore({
             driver,
-            trustedRoot: join(driver.projectDir, "workflow-handoffs"),
+            trustedRoot: join(driver.projectDir, WORKFLOW_HANDOFF_STORE_DIRNAME),
           });
           await artifactStore.recoverIntents();
           const { runAgentWorkflowV2 } =
@@ -5275,6 +5707,13 @@ export function createModelFacingTools(
     scopedOpts.getSession() === null || hasImagineImageBackend(imagineOptions);
   const includeImagineVideo =
     scopedOpts.getSession() === null || hasImagineVideoBackend(imagineOptions);
+  // Always deferred (found through system.searchTools): an OpenRouter or
+  // Venice session speaks, and a Venice session edits or upscales images,
+  // with its own key; no other session can call them.
+  const includeImagineSpeech =
+    scopedOpts.getSession() === null || hasImagineSpeechBackend(imagineOptions);
+  const includeImagineEdit =
+    scopedOpts.getSession() === null || hasImagineEditBackend(imagineOptions);
 
   return [
     ...createMultiAgentV2RuntimeTools(scopedOpts),
@@ -5291,6 +5730,8 @@ export function createModelFacingTools(
           createImagineVideoTool(imagineOptions),
         ]
       : []),
+    ...(includeImagineSpeech ? [createImagineSpeechTool(imagineOptions)] : []),
+    ...(includeImagineEdit ? [createImagineEditTool(imagineOptions)] : []),
     createNotebookReadTool(scopedOpts),
     createNotebookEditTool(scopedOpts),
     createLspTool(scopedOpts),

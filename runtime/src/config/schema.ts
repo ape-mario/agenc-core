@@ -160,13 +160,15 @@ export interface ShellEnvironmentPolicy {
 }
 
 export interface ToolsConfig {
+  /** Live WebSearch adapter selection; WEB_SEARCH_PROVIDER wins. Keys stay in env. */
+  readonly web_search_provider?: string;
   /**
-   * Search backend for the WebSearch tool on providers without native
-   * web search. `AGENC_WEB_SEARCH_ENDPOINT` env wins over this value.
+   * Search backend URL after session-native search. With an explicitly named
+   * provider, overrides its endpoint. `AGENC_WEB_SEARCH_ENDPOINT` env wins.
    */
   readonly web_search_endpoint?: string;
   /**
-   * Response format of `web_search_endpoint`:
+   * Response format of `web_search_endpoint` in auto mode:
    * duckduckgo (instant-answer JSON, default) | searxng | brave | json.
    * `AGENC_WEB_SEARCH_KIND` env wins. Brave API keys come from
    * `AGENC_WEB_SEARCH_API_KEY` (secrets never live in config.toml).
@@ -675,8 +677,13 @@ export interface ProviderConfig {
   readonly timeout_ms?: number;
   readonly capability_overrides?: ProviderCapabilityOverrides;
   readonly fallback?: ProviderFallbackConfig;
-  /** Grok-only native capabilities. Rejected on every other provider table. */
+  /**
+   * Native web search. Grok: the server-side web_search tool. DeepSeek: the
+   * Search API behind WebSearch (unset is auto, see
+   * llm/providers/deepseek/web-search.ts). Rejected on every other table.
+   */
   readonly web_search?: boolean;
+  /** Grok-only native capabilities. Rejected on every other provider table. */
   readonly x_search?: boolean;
   readonly code_execution?: boolean;
   readonly enable_image_search?: boolean;
@@ -908,6 +915,8 @@ export interface AgenCConfig {
   readonly mcp_servers?: Readonly<Record<string, McpServerConfig>>;
   readonly xaa_idp?: XaaIdpConfig;
   readonly daemon?: DaemonConfig;
+  /** Owner-only phone/browser relay capability. No environment or project authority. */
+  readonly remote_control?: { readonly enabled?: boolean };
   readonly gateway?: GatewayConfig;
   readonly protocol?: ProtocolConfig;
   readonly lsp_servers?: Readonly<Record<string, LspServerConfigInput>>;
@@ -999,6 +1008,8 @@ export interface AgenCConfig {
    */
   readonly lean_system_prompt?: boolean;
   readonly stream_watchdog_timeout_ms?: number;
+  /** Warn after this long without a model delta; zero disables the warning. */
+  readonly stream_quiet_warning_ms?: number;
   readonly provider_outage_wait_ms?: number;
   readonly provider_outage_retry_ms?: number;
   readonly max_output_tokens?: number;
@@ -1084,6 +1095,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "mcp_servers",
   "xaa_idp",
   "daemon",
+  "remote_control",
   "gateway",
   "protocol",
   "lsp_servers",
@@ -1151,6 +1163,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "defer_rare_tools",
   "lean_system_prompt",
   "stream_watchdog_timeout_ms",
+  "stream_quiet_warning_ms",
   "provider_outage_wait_ms",
   "provider_outage_retry_ms",
   "max_output_tokens",
@@ -1175,14 +1188,12 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
 ]);
 
 /**
- * Default session stream-idle deadline. xAI streams reasoning deltas
- * continuously (11,478 thinking deltas in one reviewed session), so ten
- * minutes of complete provider silence is a dead socket or a stalled stream,
- * not thinking. The watchdog warns at half this value and the resulting
- * `stream_idle` abort is retryable through the reconnect ladder. Operators
- * set `stream_watchdog_timeout_ms = 0` to disable it.
+ * Default byte-idle deadline. Allow twenty minutes without any network bytes;
+ * keepalives and reasoning frames reset it regardless of visible output.
+ * The resulting `stream_idle` abort uses the reconnect ladder. Zero disables
+ * it. The independent soft warning defaults to ten minutes without a delta.
  */
-export const DEFAULT_STREAM_WATCHDOG_TIMEOUT_MS = 600_000;
+export const DEFAULT_STREAM_WATCHDOG_TIMEOUT_MS = 1_200_000;
 /** Total time a turn keeps waiting for a provider outage to end (30 min). */
 export const DEFAULT_PROVIDER_OUTAGE_WAIT_MS = 1_800_000;
 /** First slow-retry delay after the reconnect ladder is spent (30 s). */
@@ -1216,6 +1227,7 @@ export function defaultConfig(): AgenCConfig {
         transport: "stdio",
       }) as McpServerModeConfig,
     }) as McpConfig,
+    remote_control: Object.freeze({ enabled: false }),
     daemon: Object.freeze({
       autostart: true,
     }) as DaemonConfig,
@@ -1239,11 +1251,12 @@ export function defaultConfig(): AgenCConfig {
     ]) as readonly string[],
     project_doc_max_bytes: 32_768,
     stream_degenerate_guard: true,
-    // Ten-minute stream-idle deadline by default (see
+    // Twenty-minute byte-idle deadline by default (see
     // DEFAULT_STREAM_WATCHDOG_TIMEOUT_MS). A half-open socket or a stalled
     // provider stream otherwise hangs the turn until the user cancels;
     // `0` disables the deadline for operators who need unbounded silence.
     stream_watchdog_timeout_ms: DEFAULT_STREAM_WATCHDOG_TIMEOUT_MS,
+    stream_quiet_warning_ms: 600_000,
     // A provider that is down for minutes is not the turn's fault (#2212).
     // Once the fast reconnect ladder is spent, the turn waits with a slow
     // backoff (30 s doubling to 5 min) and tries again for up to this long;
@@ -1706,6 +1719,9 @@ const REQUEST_LEVEL_ZERO_DATA_RETENTION_PROVIDERS: ReadonlySet<string> = new Set
   "openrouter",
 ]);
 
+/** The one provider besides Grok whose table takes `web_search`. */
+const DEEPSEEK_WEB_SEARCH_PROVIDER = "deepseek";
+
 const GROK_CAPABILITY_BOOLEAN_KEYS = Object.freeze([
   "web_search",
   "x_search",
@@ -1725,6 +1741,24 @@ function validateGrokCapabilities(
     "remote_mcp",
     "incremental_continuation",
   ] as const;
+  const makeError: InvalidConfigFactory = (field, detail) =>
+    new InvalidProviderConfigError(field, detail);
+  // DeepSeek's Search API backs WebSearch for deepseek sessions, so
+  // providers.deepseek takes web_search; the other fields stay Grok-only.
+  if (providerId === DEEPSEEK_WEB_SEARCH_PROVIDER) {
+    if (capabilityKeys.some(key => key !== "web_search" && record[key] !== undefined)) {
+      throw new InvalidProviderConfigError(
+        providerId,
+        "Grok capability fields are allowed only under providers.grok; providers.deepseek accepts only web_search",
+      );
+    }
+    const webSearch = optionalBoolean(
+      record.web_search,
+      fieldPath(providerId, "web_search"),
+      makeError,
+    );
+    return webSearch === undefined ? {} : { web_search: webSearch };
+  }
   if (
     providerId !== "grok" &&
     capabilityKeys.some(key => record[key] !== undefined)
@@ -1736,8 +1770,6 @@ function validateGrokCapabilities(
   }
   if (providerId !== "grok") return {};
 
-  const makeError: InvalidConfigFactory = (field, detail) =>
-    new InvalidProviderConfigError(field, detail);
   const out: Record<string, unknown> = {};
   for (const key of GROK_CAPABILITY_BOOLEAN_KEYS) {
     const value = optionalBoolean(

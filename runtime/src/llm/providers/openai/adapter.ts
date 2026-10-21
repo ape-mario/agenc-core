@@ -1,3 +1,4 @@
+import { ToolArgumentProgress } from "./tool-argument-progress.js";
 import { oneShotFastModeActive } from "../../../one-shot-fast-mode.js";
 import { deepSeekReasoningOnlyReplayProvenance } from "../../deepseek-reasoning-only-replay.js";
 import { openAiModelRequiresResponses, openAiModelRequiresBufferedResponse } from "../../registry/openai-current-models.js";
@@ -73,6 +74,7 @@ import {
   serializeProviderToolArguments,
 } from "../../wire/shared.js";
 import { ThinkTagStreamFilter } from "../../wire/think-tags.js";
+import { ReasoningDetailsAccumulator } from "../../wire/reasoning-details.js";
 import {
   advertisedResponsesToolNames,
   buildOpenAIResponsesRequest,
@@ -1554,13 +1556,11 @@ export class OpenAIProvider implements LLMProvider {
       request.prompt_cache_key = normalizePromptCacheKey(request.prompt_cache_key);
     }
     if (oneShotFastModeActive()) return request;
-    let metadata = collectChatCompletionsRequestMetadata(request);
     const accountedInputTokens = normalizePositiveInteger(
       args.options?.accountedInputTokens,
     );
-    if (accountedInputTokens !== undefined) {
-      metadata = { ...metadata, estimatedPromptTokens: accountedInputTokens };
-    }
+    // The admitted input count replaces the wire estimate, so it is not built.
+    let metadata = collectChatCompletionsRequestMetadata(request, accountedInputTokens);
     metadata = this.fitRequestWithinContextWindow(
       request,
       metadata,
@@ -2156,10 +2156,21 @@ export class OpenAIProvider implements LLMProvider {
       const rawFinishReasons = new Set<string>();
       let usage: Record<string, unknown> = {};
       let servedServiceTier: unknown;
+      // Gateway reasoning items (OpenRouter, Venice) and Venice's per-call charge.
+      const reasoningDetails = streamCapabilityHints.replaysReasoningDetails === true
+        ? new ReasoningDetailsAccumulator()
+        : undefined;
+      let topLevelCost: unknown;
       const toolCallAccumulator = new Map<
         number,
         { id: string; name: string; arguments: string }
       >();
+      const toolArgumentProgress = new Map<number, ToolArgumentProgress>();
+      // Provider index -> accumulator slot. MiniMax models on Ollama Cloud
+      // stream parallel calls that all carry index 0 and distinct ids; a new
+      // id at an index already holding a call starts a new call.
+      const toolCallSlotByIndex = new Map<number, number>();
+      let nextToolCallSlot = 0;
 
       for await (const event of this.readSseEvents(
         response,
@@ -2215,6 +2226,10 @@ export class OpenAIProvider implements LLMProvider {
         }
         if (typeof chunk.service_tier === "string") {
           servedServiceTier = chunk.service_tier;
+        }
+        if (streamCapabilityHints.reportsTopLevelCost === true &&
+            chunk.cost !== null && typeof chunk.cost === "object") {
+          topLevelCost = chunk.cost;
         }
 
         const choices = Array.isArray(chunk.choices)
@@ -2294,14 +2309,35 @@ export class OpenAIProvider implements LLMProvider {
             });
           }
 
+          reasoningDetails?.push(delta.reasoning_details);
+
           const deltaToolCalls = Array.isArray(delta.tool_calls)
             ? (delta.tool_calls as Array<Record<string, unknown>>)
             : [];
           for (const toolCall of deltaToolCalls) {
-            const index =
+            const incomingId =
+              typeof toolCall.id === "string" && toolCall.id.length > 0
+                ? toolCall.id
+                : undefined;
+            let index =
               typeof toolCall.index === "number"
-                ? toolCall.index
-                : toolCallAccumulator.size;
+                ? toolCallSlotByIndex.get(toolCall.index)
+                : undefined;
+            if (
+              index !== undefined &&
+              incomingId !== undefined &&
+              (toolCallAccumulator.get(index)?.id ?? "") !== "" &&
+              toolCallAccumulator.get(index)?.id !== incomingId
+            ) {
+              index = undefined;
+            }
+            if (index === undefined) {
+              index = nextToolCallSlot;
+              nextToolCallSlot += 1;
+              if (typeof toolCall.index === "number") {
+                toolCallSlotByIndex.set(toolCall.index, index);
+              }
+            }
             const fn =
               toolCall.function && typeof toolCall.function === "object"
                 ? (toolCall.function as Record<string, unknown>)
@@ -2325,6 +2361,9 @@ export class OpenAIProvider implements LLMProvider {
                 fn.arguments,
               );
               if (argumentDelta.length > 0) {
+                const progress = toolArgumentProgress.get(index) ?? new ToolArgumentProgress();
+                progress.push(argumentDelta, this.name);
+                toolArgumentProgress.set(index, progress);
                 existing.arguments += argumentDelta;
                 bufferedToolProgress ||= argumentDelta.trim().length > 0;
               }
@@ -2513,6 +2552,9 @@ export class OpenAIProvider implements LLMProvider {
                         "reasoning_content"]: reasoningContent,
                       }
                     : {}),
+                  ...(reasoningDetails !== undefined && reasoningDetails.size > 0
+                    ? { reasoning_details: reasoningDetails.items() }
+                    : {}),
                   ...(toolCalls.length > 0
                     ? {
                       tool_calls: toolCalls.map((toolCall) => ({
@@ -2545,6 +2587,7 @@ export class OpenAIProvider implements LLMProvider {
               },
             ],
             usage,
+            ...(topLevelCost !== undefined ? { cost: topLevelCost } : {}),
             ...(servedServiceTier !== undefined
               ? { service_tier: servedServiceTier }
               : {}),

@@ -34,13 +34,15 @@
  * @module
  */
 
+
+import { AGENC_UNDO_GUIDANCE } from "./product-help.js";
 import {
   lightBudgetWorkflow,
   lightBudgetSystem,
   lightBudgetActions,
   LIGHT_BUDGET_DEADLINE,
 } from "./light-budget-prompt.js";
-import { lightEditsWithApplyPatch } from "../tools/light-profile.js";
+import { lightEditsWithApplyPatch, lightStatesTaskLimits } from "../tools/light-profile.js";
 import { spawnSync } from "node:child_process";
 import { platform as osPlatform, type as osType, release as osRelease } from "node:os";
 
@@ -71,6 +73,7 @@ import { sanitizeSystemReminderContent } from "./attachments/system-reminder-san
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from "./system-prompt-boundary.js";
 import { BRIEF_TOOL_NAME } from "../tools/BriefTool/prompt.js";
 import { loadMemoryPrompt } from "../memory/memdir.js";
+import { liveSessionMemoryOwner } from "../services/extractMemories/memory-paths.js";
 import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../tools/untrusted-tool-result-framing.js";
 import { logForDebugging } from "../utils/debug.js";
 import { runWithCanonicalSettingsAuthority } from "../utils/settings/canonicalAuthority.js";
@@ -140,6 +143,7 @@ IMPORTANT: You must NEVER generate or guess URLs for the user unless you are con
  */
 export function getSimpleSystemSection(): string {
   const items = [
+    AGENC_UNDO_GUIDANCE,
     `Text you write outside tool calls is shown to the user as GitHub-flavored markdown in a monospace font.`,
     `Tools run under a permission mode the user chose; a call it does not allow asks the user first. If the user denies a call, do not repeat it: work out why and adjust.`,
     `<system-reminder> and other tags in tool results or user messages carry system information unrelated to the message they appear in.`,
@@ -374,7 +378,7 @@ export function getAgentToolSection(
     `Use spawn_agent.message_ref to copy the current user message or a delimited excerpt verbatim into the child task without regenerating it. Prefer this for long prompts; the child still receives the usual limits and permissions.`,
     `Set exact_output: true on spawn_agent or assign_task when you need verbatim JSON or another machine-readable child answer. This applies only to that child task; ordinary chat keeps completion verification, even when its text mentions JSON. Child final answers are always delivered verbatim to you, using result_ref pages for large answers.`,
     `When asked to return a child result verbatim, preserve its exact final answer, including JSON and whitespace. Do not add a checklist, fences, a summary, or repeat the child’s file work.`,
-    `After delegating, call wait_agent only when the next critical-path step is blocked on the result; otherwise do meaningful non-overlapping work and never wait by reflex. Do not redo delegated work. When a coding task returns, review the changes, then integrate or refine them.`,
+    `After delegating, use wait_agent to collect results when the next critical-path step is blocked; it returns queued completions immediately and wakes on new messages. Never wait for helpers with shell sleep or file/status polling; otherwise do meaningful non-overlapping work and never wait by reflex. Do not redo delegated work. When a coding task returns, review the changes, then integrate or refine them.`,
     `Run independent information-seeking subtasks in parallel, split implementation into disjoint slices for parallel agents when write scopes do not overlap, and delegate verification only when it can run beside implementation and is likely to catch a concrete risk before integration.`,
   ];
   return joinSection("# Subagents", items);
@@ -499,14 +503,11 @@ export async function resolveMemoryPromptInputs(session: SystemPromptSessionSnap
   readonly memoryPrompt: string;
 }> {
   try {
-    const configStore = session.services?.configStore;
-    if (configStore === undefined) return { memoryInstructions: "", memoryPrompt: "" };
-    const prompt = await loadMemoryPrompt({
-      cwd,
-      configStore,
-      env: session.services?.userShell?.childEnvironment ?? session.services?.providerEnvironment ?? {},
-      runtimeOptions: { remoteMode: false, ...session.services?.runtimeOptions },
-    }, session.services?.providerEnvironment);
+    // The owner the runtime sandbox resolves the same directories from
+    // (sessionDurableMemoryWriteRoots), so a memory write lands where both agree.
+    const owner = liveSessionMemoryOwner(session.services, cwd);
+    if (owner === undefined) return { memoryInstructions: "", memoryPrompt: "" };
+    const prompt = await loadMemoryPrompt(owner, session.services?.providerEnvironment);
     return {
       memoryInstructions: prompt?.instructions ?? "",
       memoryPrompt: prompt?.directories ?? "",
@@ -517,6 +518,30 @@ export async function resolveMemoryPromptInputs(session: SystemPromptSessionSnap
       { level: "debug" },
     );
     return { memoryInstructions: "", memoryPrompt: "" };
+  }
+}
+
+/**
+ * Interactive Light's memory rules and directories for the memory-on-request
+ * reminder (prompts/attachments/memory-on-request.ts), whatever the memory
+ * holds now: the session's fixed prefix left them out when its memory was empty
+ * at assembly. Undefined when memory is disabled or unavailable. Resolved from
+ * the same owner as resolveMemoryPromptInputs and the runtime sandbox.
+ */
+export async function resolveLightMemoryOnRequest(session: SystemPromptSessionSnapshot, cwd: string): Promise<string | undefined> {
+  try {
+    const owner = liveSessionMemoryOwner(session.services, cwd);
+    if (owner === undefined) return undefined;
+    const prompt = await loadMemoryPrompt(owner, session.services?.providerEnvironment);
+    if (prompt === null) return undefined;
+    if (prompt.onRequest !== undefined) return prompt.onRequest;
+    return prompt.instructions.length > 0 ? [prompt.instructions, prompt.directories].join("\n\n") : undefined;
+  } catch (error) {
+    logForDebugging(
+      `memory rules unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      { level: "debug" },
+    );
+    return undefined;
   }
 }
 
@@ -1215,10 +1240,15 @@ export async function assembleSystemPrompt(
     promptEnvironment,
     envInfoInputs.provider,
     readConfiguredLeanSystemPrompt(session),
+    envInfoInputs.model,
   );
   const staticSections: Array<string | null> = light
     ? [
-        lightBudgetWorkflow(opts.outputStyle != null, lightEditsWithApplyPatch(envInfoInputs.provider)),
+        lightBudgetWorkflow(
+          opts.outputStyle != null,
+          lightEditsWithApplyPatch(envInfoInputs.provider, envInfoInputs.model),
+          lightStatesTaskLimits(envInfoInputs.provider, promptEnvironment, envInfoInputs.model),
+        ),
         lightBudgetSystem(),
         lightBudgetActions(),
         session.services?.runtimeOptions?.nonInteractive === true

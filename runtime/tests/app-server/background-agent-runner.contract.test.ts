@@ -1,5 +1,7 @@
 import * as oneShotDurability from "../../src/durability/one-shot-durability.js";
 import { ModelRegistry, modelRegistryEntryToModelInfo } from "../../src/llm/model-registry.js";
+import { ModelMetadataResolver } from "../../src/llm/model-metadata.js";
+import { clearPublishedModelCatalogs } from "../../src/llm/registry/published-model-catalog.js";
 import { resolveSessionReasoningEffort } from "../../src/session/session-reasoning-effort.js";
 import { buildAnthropicMessagesRequest } from "../../src/llm/wire/messages-anthropic.js";
 import desktopEffortCatalog from "../llm/desktop-effort-catalog.json";
@@ -101,6 +103,8 @@ import { createOperatorEffectReviewResolution } from "../../src/state/effect-rev
 import { listUnresolvedUnknownOutcomeEffects } from "../../src/state/unknown-outcome-gate.js";
 import { recordInFlightToolCallUnknownOutcome } from "../../src/state/tool-output-rotation.js";
 import { seedPendingEffectReview } from "../state/helpers/effect-review-fixture.js";
+import { bindLiveAgentSession } from "../../src/agents/live-session.js";
+import { assertNoLiveUnknownEffect, poisonLiveEffect } from "../../src/budget/effect-settlement-supervisor.js";
 import { registerChildApprovalSession, revokeChildApprovalSession } from "../../src/agents/child-approval-context.js";
 import type { ApprovalResolver } from "../../src/permissions/guardian/arbiter.js";
 import type { TurnContext } from "../session/turn-context.js";
@@ -2766,6 +2770,128 @@ describe("AgenC delegate background-agent runner", () => {
       driver.close();
       otherDriver.close();
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("lets the parent review a live descendant without lifting another session's mutation gate (#2607)", async () => {
+    const root = mkdtempSync(join(canonicalTmpdir(), "agenc-child-review-"));
+    const cwd = join(root, "workspace");
+    const home = join(root, "home");
+    mkdirSync(cwd);
+    const parentId = "conv-parent-review";
+    const childId = "conv-child-review";
+    const now = "2026-10-19T00:00:00.000Z";
+    const parent = makeTopLevelRunner({ conversationId: parentId, workspaceRoot: cwd });
+    const child = makeTopLevelRunner({ conversationId: childId, workspaceRoot: cwd,
+      rolloutItems: [{ type: "event_msg", timestamp: now, payload: {
+        eventId: "unknown-1", id: "unknown-1", seq: 2, msg: { type: "effect_unknown_outcome", payload: {
+          runId: childId, stepId: "tool:step-1", callId: "call-1", toolName: "exec_command",
+          recoveryCategory: "side-effecting", reason: "acknowledgement_lost", requiresReview: true, recordedAt: now,
+        } },
+      } }],
+    });
+    Object.assign(parent.configStore, { homeContext: { path: home } });
+    Object.assign(child.configStore, { homeContext: { path: home } });
+    const childSession = child.session as unknown as Session;
+    const parentSession = parent.session as unknown as Session;
+    const live = { agentId: childId, agentPath: "/root/child", abortController: new AbortController() };
+    const unbind = bindLiveAgentSession(live as never, childSession);
+    Object.assign(parent.control, { getLive: (id: string) => id === childId ? live : undefined });
+    Object.assign(parent.rolloutStore, { listThreadSpawnDescendants: () => [{ childThreadId: childId }] });
+    const driver = openStateDatabases({ cwd, agencHome: home });
+    const effects = new StateRunDurabilityRepository(driver);
+    Object.assign(child.rolloutStore, { recordEffectEvent: (event: Event) => {
+      if (event.msg.type !== "effect_review_resolved") throw new Error("unexpected review event");
+      effects.resolveEffectReview({ ...event.msg.payload, eventId: event.eventId! });
+    } });
+    const identity = { runId: childId, stepId: "tool:step-1", callId: "call-1", toolName: "exec_command", recoveryCategory: "side-effecting" as const };
+    try {
+      seedPendingEffectReview(driver, childId, now);
+      poisonLiveEffect(childSession, identity);
+      // A child error must not poison the root or bypass its own mutation fence.
+      expect(() => assertNoLiveUnknownEffect(parentSession, "side-effecting")).not.toThrow();
+      expect(() => assertNoLiveUnknownEffect(childSession, "idempotent")).not.toThrow();
+      expect(() => assertNoLiveUnknownEffect(childSession, "side-effecting")).toThrow();
+      await parent.runner.startAgent({ objective: "idle parent", deferInitialTurn: true });
+      const review = createOperatorEffectReviewResolution({ disposition: "confirmed_no_effect", actorId: "operator",
+        evidenceRef: "test:child-probe", evidenceSha256: "a".repeat(64), reviewedAt: now });
+      const { domainAction: _domainAction, ...pending } = review;
+      await expect(parent.runner.resolveLiveEffectReview(parentId, { sessionId: childId, toolCallId: "call-1",
+        resolution: { ...pending, disposition: "remains_unknown", workflowStatus: "pending" },
+      })).resolves.toMatchObject({ kind: "resolved", durable: true });
+      expect(() => assertNoLiveUnknownEffect(childSession, "interactive")).toThrow();
+      expect(child.rolloutItems).toHaveLength(2);
+      // A parent gate can already be referring to this child's exact effect
+      // (the reported bricked-session case). Settling its canonical owner
+      // must clear that mirror too, without touching other parent effects.
+      poisonLiveEffect(parentSession, identity);
+      expect(() => assertNoLiveUnknownEffect(parentSession, "side-effecting")).toThrow();
+      await expect(parent.runner.resolveLiveEffectReview(parentId, { sessionId: childId, toolCallId: "call-1", resolution: review }))
+        .resolves.toMatchObject({ kind: "resolved", durable: true });
+      expect(() => assertNoLiveUnknownEffect(childSession, "side-effecting")).not.toThrow();
+      expect(() => assertNoLiveUnknownEffect(parentSession, "side-effecting")).not.toThrow();
+      poisonLiveEffect(parentSession, { ...identity, runId: parentId, stepId: "other-parent-step" });
+      await parent.runner.resolveLiveEffectReview(parentId, { sessionId: childId, toolCallId: "call-1", resolution: review });
+      expect(() => assertNoLiveUnknownEffect(parentSession, "side-effecting")).toThrow();
+      expect(effects.getEffect(childId, "tool:step-1")?.reviewStatus).toBe("resolved");
+      expect(parent.rolloutItems.some((item) => (item as { payload?: { msg?: { type?: string } } }).payload?.msg?.type === "effect_review_resolved")).toBe(false);
+      await expect(parent.runner.resolveLiveEffectReview(parentId, { sessionId: "unrelated-session", toolCallId: "call-1", resolution: review }))
+        .rejects.toThrow("does not own session");
+    } finally {
+      unbind();
+      await parent.runner.stopAgent(parentId);
+      driver.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("shows and settles a closed child's canonical effect from its parent while respecting the journal lease (#2607)", async () => {
+    const root = mkdtempSync(join(canonicalTmpdir(), "agenc-closed-child-review-"));
+    const cwd = join(root, "workspace");
+    const home = join(root, "home");
+    mkdirSync(cwd);
+    const parentId = "conv-closed-child-parent";
+    const childId = "conv-closed-child";
+    const now = "2026-10-19T00:00:00.000Z";
+    const parent = makeTopLevelRunner({ conversationId: parentId, workspaceRoot: cwd });
+    Object.assign(parent.configStore, { homeContext: { path: home } });
+    Object.assign(parent.control, { getLive: () => undefined });
+    Object.assign(parent.rolloutStore, { listThreadSpawnDescendants: () => [{ childThreadId: childId }] });
+    const childStore = new RolloutStore({ cwd, sessionId: childId, agencHome: home, agencVersion: "0.19.11",
+      sessionTempRoot: join(root, "temp"), autoStartScheduler: false });
+    childStore.open({ sessionId: childId, cwd, timestamp: now, originator: "agenc-subagent", agencVersion: "0.19.11" });
+    const driver = openStateDatabases({ cwd, agencHome: home });
+    try {
+      const events: Event[] = [
+        { eventId: "child-intent", id: "child-intent", seq: 1, msg: { type: "effect_intent", payload: {
+          formatVersion: 2, runId: childId, stepId: "tool:child", callId: "child-call", toolName: "Browser", recoveryCategory: "interactive",
+          intentDigest: "d".repeat(64), attempt: 1, recordedAt: now,
+        } } },
+        { eventId: "child-unknown", id: "child-unknown", seq: 2, msg: { type: "effect_unknown_outcome", payload: {
+          formatVersion: 2, runId: childId, stepId: "tool:child", callId: "child-call", toolName: "Browser", recoveryCategory: "interactive",
+          outcome: "unknown_outcome", intentEventSeq: 1, reason: "acknowledgement_lost", requiresReview: true, recordedAt: now,
+        } } },
+      ];
+      for (const event of events) { childStore.append(event, { durable: true }); childStore.recordEffectEvent(event); }
+      await parent.runner.startAgent({ objective: "review closed child", deferInitialTurn: true });
+      await expect(parent.runner.getAgentSessionTranscriptV2(parentId, { sessionId: "session_visible_parent" }))
+        .resolves.toMatchObject({ pendingEffectReviews: [{ sessionId: childId, callId: "child-call", toolName: "Browser", blocksSession: false }] });
+      const resolution = createOperatorEffectReviewResolution({ disposition: "confirmed_no_effect", actorId: "operator",
+        evidenceRef: "test:closed-child", evidenceSha256: "b".repeat(64), reviewedAt: now });
+      const params = { sessionId: childId, toolCallId: "child-call", resolution };
+      // A missing live handle never grants a second writer to an open child.
+      await expect(parent.runner.resolveLiveEffectReview(parentId, params)).rejects.toThrow();
+      expect(new StateRunDurabilityRepository(driver).getEffect(childId, "tool:child")?.reviewStatus).toBe("pending");
+      childStore.close();
+      await expect(parent.runner.resolveLiveEffectReview(parentId, { ...params,
+        expectedAttempt: { runId: childId, stepId: "tool:child", unknownEventId: "stale-event", unknownSequence: 2 },
+      })).rejects.toThrow("no longer matches");
+      await expect(parent.runner.resolveLiveEffectReview(parentId, params)).resolves.toMatchObject({ kind: "resolved", durable: true });
+      expect(new StateRunDurabilityRepository(driver).getEffect(childId, "tool:child")?.reviewStatus).toBe("resolved");
+      await expect(parent.runner.getAgentSessionTranscriptV2(parentId, { sessionId: "session_visible_parent" }))
+        .resolves.toMatchObject({ pendingEffectReviews: [] });
+    } finally {
+      childStore.close(); await parent.runner.stopAgent(parentId); driver.close(); rmSync(root, { recursive: true, force: true });
     }
   });
 
@@ -6820,6 +6946,47 @@ describe("AgenC delegate background-agent runner", () => {
     expect(recordedRuntimeSettingsEvents(h.rolloutItems)).toEqual(before);
   });
 
+  it("reads Venice's live list before refusing an effort level the session has not seen yet", async () => {
+    // Seen live (jobs/pv, 2026-10-20): the daemon's start-up read of Venice's
+    // list timed out, so /effort low was refused for a model whose live row
+    // offers it until the first request read the list.
+    const agentId = "venice-live-effort";
+    const model = "regression-venice-live-effort";
+    const list = { data: [{
+      id: model, type: "text", model_spec: {
+        name: "Regression Live Effort", offline: false, availableContextTokens: 256000, maxCompletionTokens: 8192,
+        pricing: { input: { usd: 0.12 }, output: { usd: 0.36 } },
+        capabilities: { supportsFunctionCalling: true, supportsReasoning: true, supportsReasoningEffort: true,
+          reasoningEffortOptions: ["none", "low", "medium", "high"], defaultReasoningEffort: "low" },
+      },
+    }] };
+    const h = makeTopLevelRunner({ conversationId: agentId, canonicalRuntimeSettings: true });
+    h.sessionState.sessionConfiguration.provider.slug = "venice";
+    h.sessionState.sessionConfiguration.collaborationMode.model = model;
+    // The Venice provider reads its list before each request (and now on demand).
+    const getExecutionProfile = vi.fn(async () => {
+      await new ModelMetadataResolver({
+        fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(list))),
+        env: { VENICE_API_KEY: "fixture" },
+      }).discoverVeniceModels({});
+      return undefined;
+    });
+    Object.assign(h.session.services, { provider: { getExecutionProfile } });
+    try {
+      await h.runner.startAgent({ objective: "work", cwd: process.cwd() });
+      await expect(h.runner.applyAgentConfig(agentId, { sessionId: "session_1", reasoningEffort: "low" }))
+        .resolves.toMatchObject({ applied: true });
+      expect(getExecutionProfile).toHaveBeenCalledTimes(1);
+      expect(h.sessionState.sessionConfiguration.collaborationMode.reasoningEffort).toBe("low");
+      // A level the live row does not offer is still refused, without another read.
+      await expect(h.runner.applyAgentConfig(agentId, { sessionId: "session_1", reasoningEffort: "max" }))
+        .rejects.toThrow("does not support this reasoning effort");
+      expect(h.sessionState.sessionConfiguration.collaborationMode.reasoningEffort).toBe("low");
+    } finally {
+      clearPublishedModelCatalogs();
+    }
+  });
+
   describe("reasoning effort across a model switch", () => {
     async function startOn(agentId: string, provider: string, model: string) {
       const h = makeTopLevelRunner({ conversationId: agentId, canonicalRuntimeSettings: true });
@@ -7549,6 +7716,24 @@ describe("AgenC delegate background-agent runner", () => {
     // updated to the new mode.
     expect(permissionModeRegistry.transact).toHaveBeenCalledTimes(1);
     expect(permissionUpdates[0]).toMatchObject({ mode: "plan" });
+  });
+
+  it("keeps running commands alive when a permission-mode change leaves execution authority unchanged", async () => {
+    const { runner, sandboxExecutionBroker, permissionModeRegistry } = makeTopLevelRunner({
+      conversationId: "permission-mode-keeps-command", canonicalRuntimeSettings: true,
+    });
+    await runner.startAgent({ objective: "work", cwd: process.cwd() });
+    const quiesce = vi.fn(async () => {});
+    const resume = vi.fn(async () => {});
+    const unregister = registerSandboxExecutionLifecycleParticipant(sandboxExecutionBroker, {
+      name: "running-command", quiesce, resume,
+    });
+    try {
+      await runner.setAgentPermissionMode("permission-mode-keeps-command", { sessionId: "session_1", mode: "acceptEdits" });
+      expect(permissionModeRegistry.current().mode).toBe("acceptEdits");
+      expect(quiesce).not.toHaveBeenCalled();
+      expect(resume).not.toHaveBeenCalled();
+    } finally { unregister(); }
   });
 
   it("rejects the 4097th session rule before the production registry publishes", async () => {
@@ -10042,6 +10227,56 @@ describe("AgenC delegate background-agent runner", () => {
     expect(runTurnFn).toHaveBeenCalledOnce();
     expect(session.stoppedByUserSinceLastPrompt).toBe(newerStop);
     expect(session.clearUserStop).toHaveBeenCalledTimes(newerStop ? 0 : 1);
+  });
+
+  it("[managed-thread] preserves semantic input in atomic initial turn options", async () => {
+    const { runner, stub } = makeTopLevelRunner({ conversationId: "session-initial-paste-semantics" });
+    const text = "Build these independent items:\n1. health\n2. version";
+    await runner.startAgent({ objective: text, initialContent: text,
+      initialDisplayUserMessage: "[Pasted text #1 +2 lines]", initialUserPromptText: text,
+      unattendedAllow: [], unattendedDeny: [],
+    });
+    expect(stub.thread.submit).toHaveBeenCalledWith(expect.objectContaining({ type: "user_input", input: [{ type: "text", text }],
+      submitOptions: expect.objectContaining({ displayUserMessage: "[Pasted text #1 +2 lines]", userPromptText: text }),
+    }));
+  });
+
+  it("[managed-thread] uses semantic input for root-turn decisions with a compact paste display", async () => {
+    const { runner, control, session, configStore } = makeTopLevelRunner({ conversationId: "session-paste-semantics" });
+    await runner.startAgent({ objective: "passive", initialContent: [], unattendedAllow: [], unattendedDeny: [] });
+    let submitDriver: (message: string, options?: unknown) => Promise<void> = async () => { throw new Error("driver missing"); };
+    const driverSession = {
+      ...session,
+      newDefaultTurn: () => ({}),
+      installTurnDriverHooks: (hooks: { submit: typeof submitDriver }) => { submitDriver = hooks.submit; },
+    };
+    const runTurnFn = vi.fn(async function* () {});
+    __installDaemonTurnDriverHooksForTest(driverSession as never, configStore as never, runTurnFn as never);
+    control.sendInput.mockImplementationOnce(async (...invocation: unknown[]) => {
+      await submitDriver(invocation[1] as string, invocation[2]);
+    });
+    const content = "Build these independent items:\n1. a /health route\n2. a /version route";
+    const sessions = new AgenCDaemonSessionManager();
+    const manager = new AgenCDaemonAgentManager({ runner, sessionManager: sessions });
+    const dispatcher = new AgenCDaemonJsonRpcDispatcher({ agentManager: manager, sessionManager: sessions });
+    const connection = dispatcher.createConnection();
+    await sessions.restoreSession({ sessionId: "paste-client", agentId: "session-paste-semantics", status: "waiting", createdAt: "2026-09-10T00:00:00.000Z" });
+    await manager.restoreAgent({ agentId: "session-paste-semantics", objective: "passive", startedAt: "2026-09-10T00:00:00.000Z", lastActiveAt: "2026-09-10T00:00:00.000Z", sessionIds: ["paste-client"], runtimeAvailable: true });
+    try {
+      expect(await connection.dispatch({ jsonrpc: "2.0", id: "initialize", method: "initialize", params: { protocol: { version: "1.2.0" } } })).toHaveProperty("result");
+      const result = await connection.dispatch({ jsonrpc: "2.0", id: "paste-message", method: "message.stream", params: {
+        sessionId: "paste-client", content,
+        metadata: { displayUserMessage: "[Pasted text #1 +2 lines]", userPromptText: content },
+        clientMessageId: "paste-semantics", streamId: "stream_1",
+      } });
+      expect(result).not.toHaveProperty("error");
+    } finally {
+      await connection.close();
+      await dispatcher.close();
+      await runner.stopAgent("session-paste-semantics", "test_cleanup");
+    }
+    expect(runTurnFn).toHaveBeenCalledWith(expect.anything(), expect.anything(), content,
+      expect.objectContaining({ rootHumanTurnText: content, displayUserMessage: null }));
   });
 
   it("[managed-thread] replays a legacy hook-block error as session-only after attach", async () => {

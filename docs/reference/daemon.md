@@ -1,6 +1,6 @@
 # Daemon reference
 
-The local **app-server** control plane for AgenC **0.19.8**. One daemon per
+The local **app-server** control plane for AgenC **0.19.11**. One daemon per
 `AGENC_HOME`. Clients (TUI, print CLI, gateway, remote, SDK, background
 agents) attach over a local socket and speak JSON-RPC.
 
@@ -11,6 +11,8 @@ autostart and the TUI 10 s lost-turn probe:
 [`#recovery-after-a-disappeared-daemon`](#recovery-after-a-disappeared-daemon).
 Max-output-tokens escalate, continuation, and exhaustion:
 [`#max-output-tokens-recovery`](#max-output-tokens-recovery).
+Routine permission-blocked explanations:
+[agents.md](agents.md#permission-blocked-explanation).
 
 ## Connection and session ownership
 
@@ -391,7 +393,7 @@ Never retry after admission may have arrived.
 | `session.statusLine.execute`                                                                                | Render the configured custom status line for the owning live session (protocol 1.11)                               |
 | `session.processes.list` / `session.processes.stop`                                                         | Inspect and acknowledge-stop the session's own background processes (protocol 1.13)                                |
 | `session.goal`                                                                                              | Set, inspect, pause, resume, or clear the session goal. See [goal.md](goal.md) (protocol 1.14)                      |
-| `routine.capabilities` / `routine.list` / `routine.get` / `routine.create` / `routine.update` / `routine.delete` / `routine.run` / `routine.runs` / `routine.cancel`                                                                                                 | Daemon-owned local routines. See [autonomy.md](autonomy.md)                                                        |
+| `routine.capabilities` / `routine.list` / `routine.get` / `routine.create` / `routine.update` / `routine.delete` / `routine.run` / `routine.runs` / `routine.cancel`                                                                                                 | Daemon-owned local routines. See [agents.md](agents.md#routine-runs). Permission-blocked runs store a fixed `run.error`: [agents.md](agents.md#permission-blocked-explanation). |
 | `routine.session.prepare.respond`                                                                           | Answer Core's request to prepare a routine's session before its first turn, so the client can attach its tools (protocol 1.17) |
 | `remote.*` / `telegram.*`                                                                                   | See the [remote and Telegram method contracts](#remote-and-telegram-methods) below                     |
 | `daemon.reload`                                                                                             | Reload configuration. Open sessions take the new `[agents]` cross-provider settings. A session that could not read them again is listed in the result's `crossProviderSettings.failed`, with `timedOut: true` when it ran out of time. Other session settings apply to new sessions |

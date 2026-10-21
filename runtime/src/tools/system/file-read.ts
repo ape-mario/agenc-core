@@ -1,3 +1,4 @@
+import { sideEffectFreeTool } from "../side-effect-free.js";
 /**
  * `FileRead` — first-class file reading tool for AgenC.
  *
@@ -60,6 +61,7 @@ import {
 } from "./filesystem.js";
 import { FILE_TOOL_PATH_SCHEMA } from "./agent-path-hints.js";
 import { checkToolPathPermission } from "../../permissions/path-validation.js";
+import { sessionDurableMemoryDirectoriesOf } from "../../services/extractMemories/memory-paths.js";
 import { sessionPlanFileAuthority } from "../../planning/session-plan-authority.js";
 import { roughTokenCountEstimationForFileType } from "../../llm/token-estimation.js";
 import {
@@ -1504,7 +1506,7 @@ export function createFileReadTool(config: FileReadToolConfig): Tool {
     config.maxNotebookBytes ?? DEFAULT_MAX_NOTEBOOK_BYTES;
   const sparseLineNumbers = config.lightMode === true || config.sparseLineNumbers === true;
 
-  return {
+  return sideEffectFreeTool({
     name: FILE_READ_TOOL_NAME,
     description: fileReadDescription(sparseLineNumbers),
     metadata: {
@@ -1578,6 +1580,9 @@ export function createFileReadTool(config: FileReadToolConfig): Tool {
         // perform anyway, and a print-mode run (which auto-denies requests)
         // could not read the plan file it was told to keep (#2131).
         planFileAuthority: sessionPlanFileAuthority(context.session),
+        // Memory files are the session's own memory directories, the ones
+        // its memory prompt names.
+        durableMemory: sessionDurableMemoryDirectoriesOf(context.session, cwd),
       });
       if (decision.behavior !== "allow") return decision;
 
@@ -1744,7 +1749,7 @@ export function createFileReadTool(config: FileReadToolConfig): Tool {
         await boundRead?.dispose();
       }
     },
-  };
+  });
 }
 
 /**

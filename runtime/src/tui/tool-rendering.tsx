@@ -8,16 +8,18 @@ import { stringWidth } from "./ink/stringWidth.js";
 import { stripUnderlineAnsi } from "./components/shell/OutputLine.js";
 import { selectAgenCTuiGlyphs } from "./glyphs.js";
 import { ResultLine } from "./components/v2/primitives.js";
-import { parseClampMarker, readableToolError, summarizeToolError } from "./tool-error-text.js";
+import { parseClampMarker, readableToolError, shellFailureReason, summarizeToolError } from "./tool-error-text.js";
 import { modelToolAliasTarget } from "../tools/model-tool-aliases.js";
 import { summarizeToolInput } from "./message-renderers/toolRowPreview.js";
 import { AskUserQuestionTool } from "../tools/ask-user-question/tui-tool.js";
 import { formatToolPathForDisplay } from "../tools/system/agent-path-hints.js";
+import { abbreviateHomePaths } from "../utils/home-path-display.js";
 import { isRecord } from "../utils/record.js";
 import { unescapeXml } from "../utils/xml.js";
 import {
   pickToolResultDispatch,
   resultTextForTuiTool,
+  summarizeWebSearchResult,
 } from "./tool-result-routing.js";
 
 // These views render with raw ANSI color literals ("green"/"red") that aren't
@@ -271,6 +273,42 @@ export function GrepMatchesView({
 }
 
 /**
+ * WebSearch result: one line naming the search and the number of results
+ * ("3 results via DeepSeek search"), plus the reason when DeepSeek's search
+ * fell back. Verbose (ctrl+o) lists each source's title and URL.
+ */
+export function WebSearchResultsView({
+  content,
+  verbose = false,
+}: {
+  readonly content: string;
+  readonly verbose?: boolean;
+}): React.ReactElement {
+  const summary = summarizeWebSearchResult(content);
+  if (summary === undefined) {
+    return <ResultLine>{summarizeResultText(content)}</ResultLine>;
+  }
+  const count = summary.results.length;
+  const line =
+    `${count === 0 ? "no results" : `${count} ${count === 1 ? "result" : "results"}`} via ${summary.source}` +
+    (summary.deepseekFallback !== undefined
+      ? ` (DeepSeek search: ${summary.deepseekFallback})`
+      : "");
+  if (!verbose) return <ResultLine>{line}</ResultLine>;
+  return (
+    <Box flexDirection="column">
+      <Text>{line}</Text>
+      {summary.results.map((result, index) => (
+        <Box key={`${index}:${result.url}`} flexDirection="column">
+          <Text>{result.title}</Text>
+          <Text dimColor>{`  ${result.url}`}</Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+/**
  * Compact one-line summary of a raw (envelope-less) Grep result. Prefers an
  * explicit `Found ...` line from the daemon; otherwise counts the match/file
  * lines itself.
@@ -381,7 +419,7 @@ export function ToolErrorView({
   // One red line under the failed step, like every other result: the reason
   // without wrappers or machine prefixes. The stored result stays intact.
   const message = extractToolTag(content, "tool-error") ?? content;
-  return <ResultLine failed>{summarizeToolError(message)}</ResultLine>;
+  return <ResultLine failed>{summarizeToolError(abbreviateHomePaths(message))}</ResultLine>;
 }
 
 /**
@@ -511,15 +549,9 @@ export function BashOutputView({
   // The transcript shows one line per step; ctrl+o (verbose) shows the output.
   if (!verbose) {
     if (isFailure) {
-      // The reason is the last line of stderr when there is one (stdout may
-      // end with unrelated progress), else the last line of the output.
-      const lastLine = (text: string) =>
-        text
-          .split("\n")
-          .map((line) => stripAnsi(line).trim())
-          .filter((line) => line.length > 0 && parseClampMarker(line) === null)
-          .at(-1);
-      const tail = lastLine(stderrTrimmed) ?? lastLine(stdoutTrimmed);
+      // Prefer a diagnostic over runtime/version footers after a stack trace.
+      // Keep stderr authoritative; plain daemon exec results combine both streams.
+      const tail = shellFailureReason(stderrTrimmed) ?? shellFailureReason(stdoutTrimmed);
       return (
         <ResultLine failed>
           {`exit ${exitCode}${tail !== undefined ? `, ${tail}` : ""}`}
@@ -623,7 +655,7 @@ function displayFilePathFromInput(input: unknown): string {
 }
 
 function truncateInline(value: string, limit = 140): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
+  const normalized = abbreviateHomePaths(value).replace(/\s+/g, " ").trim();
   if (normalized.length <= limit) return normalized;
   return `${normalized.slice(0, limit - 1)}…`;
 }
@@ -967,7 +999,7 @@ export function createTuiTool(name: string): any {
       // `tool-result-routing.ts` so unit tests
       // can exercise the routing logic without dragging the upstream
       // component chain into vitest.
-      const joined = resultTextForTuiTool(content);
+      const joined = abbreviateHomePaths(resultTextForTuiTool(content));
       const target = pickToolResultDispatch(presentationName, joined);
       switch (target) {
         case "suppress":
@@ -996,6 +1028,10 @@ export function createTuiTool(name: string): any {
         case "glob-paths-view":
           return (
             <GlobPathsView content={joined} verbose={options?.verbose ?? false} />
+          );
+        case "web-search-view":
+          return (
+            <WebSearchResultsView content={joined} verbose={options?.verbose ?? false} />
           );
         case "generic":
         default:

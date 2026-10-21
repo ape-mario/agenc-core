@@ -29,7 +29,7 @@ import { prepareModelToolArgs, validateToolPreflight } from "./tools/execution.j
 
 import type { LLMTool, LLMToolCall } from "./llm/types.js";
 import { lightPresentation, standardPresentation } from "./tools/light-presentation.js";
-import { LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES, LIGHT_INITIAL_TOOL_NAMES, lightEditsWithApplyPatch } from "./tools/light-profile.js";
+import { LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES, LIGHT_INITIAL_TOOL_NAMES, lightEditsWithApplyPatch, lightUsesBatchEdit } from "./tools/light-profile.js";
 import type { FunctionCallOutputContentItem } from "./tools/context.js";
 import type {
   Tool,
@@ -74,6 +74,7 @@ import {
 } from "./tools/system/file-read.js";
 import {
   createFileEditTool,
+  createFileBatchEditTool,
   createFileMultiEditTool,
   FILE_EDIT_TOOL_NAME,
   FILE_MULTI_EDIT_TOOL_NAME,
@@ -741,7 +742,7 @@ export function buildToolRegistry(
   const deferRareTools = options.deferRareTools === true;
   const standardDeferral = deferRareTools && options.lightMode !== true;
   const markDiscovered = (toolNames: readonly string[]): void => {
-    for (const name of standardDeferral ? withDeferredCompanions(toolNames) : toolNames) {
+    for (const name of withDeferredCompanions(toolNames)) {
       if (typeof name === "string" && name.trim().length > 0) {
         discoveredToolNames.add(name);
       }
@@ -776,10 +777,15 @@ export function buildToolRegistry(
           isDeferredSpec(spec) ? { ...spec, deferred: true } : spec,
         )),
     onDiscoverTools: markDiscovered,
+    ...(options.lightMode === true ? { compactResults: true } : {}),
     ...(options.mcpToolsProvider?.primeCatalogs !== undefined
       ? { onBeforeSearch: () => options.mcpToolsProvider!.primeCatalogs!() }
       : {}),
   });
+  // A sandbox notice that tells the model to retry with sandbox_permissions
+  // loads exec_command's full schema for the next request: the lean schema
+  // Light and deferred standard sessions present hides that field.
+  const onEscalationAdvised = (): void => markDiscovered(["exec_command"]);
   const shellTools = [
     createExecCommandTool({
       lightMode: options.lightMode,
@@ -791,6 +797,7 @@ export function buildToolRegistry(
         : standardDeferral
           ? { onSessionYielded: () => markDiscovered(PROCESS_SESSION_TOOLS) }
           : {}),
+      onEscalationAdvised,
       ...(options.bashExecObserver !== undefined
         ? { execObserver: options.bashExecObserver }
         : {}),
@@ -800,6 +807,7 @@ export function buildToolRegistry(
       cwd: options.workspaceRoot,
       allowedPaths: [options.workspaceRoot],
       unifiedExecManager,
+      onEscalationAdvised,
     }),
     createKillProcessTool({
       cwd: options.workspaceRoot,
@@ -1104,6 +1112,33 @@ export function buildToolRegistry(
       ),
     ),
   );
+  const legacyBuiltinEdit = defaultBuiltinTools.find(tool => tool.name === FILE_EDIT_TOOL_NAME);
+  const batchBuiltinEdit = configuredTools([tagTool(createFileBatchEditTool({
+    lightMode: options.lightMode,
+    allowedPaths: [options.workspaceRoot],
+  }))])[0];
+  /**
+   * The provider instance's name and, when the session's binding is for that
+   * provider, the bound model: a gateway's model id names the family Light
+   * tunes for (light-profile.ts).
+   */
+  function sessionModelIdentity(): { readonly provider: string | undefined; readonly model: string | undefined } {
+    const services = options.getSession?.()?.services;
+    const provider = services?.provider?.name;
+    let model: string | undefined;
+    try {
+      const binding = services?.providerService?.current();
+      model = binding !== undefined && binding.provider === provider ? binding.model : undefined;
+    } catch {
+      model = undefined;
+    }
+    return { provider, model };
+  }
+  function usesBatchEdit(): boolean {
+    if (options.lightMode !== true) return false;
+    const identity = sessionModelIdentity();
+    return lightUsesBatchEdit(identity.provider, identity.model);
+  }
   // Direct shell RPCs select one daemon-owned builtin by name. Reserve both
   // names even when the canonical tool is disabled or unavailable so an
   // extension cannot become the physical execution target by collision.
@@ -1218,6 +1253,7 @@ export function buildToolRegistry(
       // The supplied TOML policy is live, including nested per-tool defaults.
       // Snapshot its value rather than its object identity or array references.
       [JSON.stringify(options.toolsConfig)],
+      [usesBatchEdit()],
     ];
   }
 
@@ -1266,7 +1302,9 @@ export function buildToolRegistry(
     );
     const withoutManagedMcpCollisions = (tools: readonly Tool[]): Tool[] =>
       preserveTrustedRuntimeOwnedTools(tools).filter(tool => !managedMcpNames.has(tool.name));
-    const baseSpecs = withoutManagedMcpCollisions(staticTools).map(specForTool);
+    const baseSpecs = withoutManagedMcpCollisions(staticTools.map(tool =>
+      usesBatchEdit() && tool === legacyBuiltinEdit && batchBuiltinEdit !== undefined ? batchBuiltinEdit : tool,
+    )).map(specForTool);
     const directMcpTools = mcpTools.filter(
       (tool) => tool.metadata?.deferred !== true,
     );
@@ -1331,10 +1369,11 @@ export function buildToolRegistry(
     if (options.lightMode === true && !specs.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME)) {
       return specs;
     }
+    const lightIdentity = options.lightMode === true ? sessionModelIdentity() : { provider: undefined, model: undefined };
     return specs.filter(
       (spec) =>
         (options.lightMode === true
-          ? (lightEditsWithApplyPatch(options.getSession?.()?.services?.provider?.name)
+          ? (lightEditsWithApplyPatch(lightIdentity.provider, lightIdentity.model)
             ? LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES : LIGHT_INITIAL_TOOL_NAMES).has(spec.tool.name) ||
             (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined) ||
             // A policy that opts out of MCP deferral wants its allowlisted MCP
@@ -1443,10 +1482,14 @@ export function buildToolRegistry(
       const searchVisible = visible.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME);
       const leanExec = searchVisible && !discoveredToolNames.has("exec_command");
       const leanGrep = searchVisible && !discoveredToolNames.has("Grep");
+      const leanSearch = !discoveredToolNames.has(SYSTEM_SEARCH_TOOLS_NAME);
+      const leanRead = searchVisible && !discoveredToolNames.has("FileRead");
       const tools = visible.map((spec) => {
         const tool = toolToLLMTool(spec.tool);
         if (spec.tool.metadata?.source !== "builtin") return tool;
-        if (options.lightMode === true) return lightPresentation(tool, { leanExec });
+        if (options.lightMode === true) {
+          return lightPresentation(tool, { leanExec, leanSearch, leanRead, lightSession: true });
+        }
         // Standard sessions with the default deferral send compact wording for
         // the core tools (same fields, same schema) and the lean exec_command
         // and Grep until system.searchTools selects them.
@@ -1474,7 +1517,8 @@ export function buildToolRegistry(
     toLLMTools(): LLMTool[] {
       const router = buildRouter();
       if (!oneShotFastModeActive()) return buildPresentedTools(router);
-      const provider = options.getSession?.()?.services?.provider?.name;
+      const identity = sessionModelIdentity();
+      const provider = `${identity.provider ?? ""}\u0000${identity.model ?? ""}`;
       const discovered = [...discoveredToolNames];
       const memo = presentationMemo;
       if (memo?.router === router && memo.provider === provider &&

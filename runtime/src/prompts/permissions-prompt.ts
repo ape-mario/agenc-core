@@ -76,12 +76,17 @@ export const BYPASS_AUTONOMY_NOTE =
  * requests are rejected, is false there. A model told it gave up on opening a
  * page in the user's browser and started the browser's binary inside the
  * sandbox, which crashed it. The text names only the cases bypass users
- * expect to leave the sandbox, GUI apps and blocked network: an escalated
- * command also skips the shell write guards, and `--bypass-approvals` keeps
- * file changes inside the workspace.
+ * expect to leave the sandbox: GUI apps, blocked network, and one retry of an
+ * operation the user asked for that the sandbox refused on a protected path
+ * (exec_command's notice for protected .git metadata says the same,
+ * tools/system/exec-sandbox-denial.ts). Without that last case a model told
+ * by the notice to retry a requested commit escalated answered that it could
+ * not work around the sandbox. An escalated command also skips the shell write
+ * guards, and `--bypass-approvals` keeps file changes inside the workspace, so
+ * protected files are never written another way.
  */
 export const APPROVAL_POLICY_BYPASS_ESCALATION =
-  "Approval policy is currently never, and this session runs in bypass mode, so a request to leave the sandbox is granted without asking. Use it only for a GUI app (open, xdg-open, osascript) that opens a browser or a file, or for network access the sandbox blocks: provide `sandbox_permissions` with the value `\"require_escalated\"` and a one-line `justification`. Keep file changes inside the workspace, and do not work around the sandbox another way, such as starting an app's binary directly.\n";
+  "Approval policy is currently never, and this session runs in bypass mode, so a request to leave the sandbox is granted without asking. Use it only for a GUI app (open, xdg-open, osascript) that opens a browser or a file, for network access the sandbox blocks, or for one retry of an operation the user explicitly asked for that the sandbox refused on a protected path, such as a git command on protected .git metadata: provide `sandbox_permissions` with the value `\"require_escalated\"` and a one-line `justification`. Keep file changes inside the workspace, do not write protected files another way, and do not work around the sandbox another way, such as starting an app's binary directly.\n";
 
 /**
  * Approval policy: unless trusted. Begins with one literal space character.
@@ -394,7 +399,7 @@ const LIGHT_SANDBOX_TEXT: Readonly<Record<SandboxPolicy, string>> = {
   danger_full_access:
     "Sandbox danger-full-access: no filesystem sandboxing; all commands are permitted.",
   workspace_write:
-    "Sandbox workspace-write: commands may read files and edit files in cwd and writable_roots; editing files elsewhere requires approval.",
+    "Sandbox workspace-write: commands read anywhere and edit only in cwd and writable_roots unless approved.",
   read_only: "Sandbox read-only: commands may only read files.",
   external_sandbox:
     "Sandbox external-sandbox: an external authority controls it, and AgenC does not widen or replace it.",
@@ -419,7 +424,7 @@ export const LIGHT_APPROVAL_NEVER =
 
 /** Light rendering of APPROVAL_POLICY_BYPASS_ESCALATION. */
 export const LIGHT_APPROVAL_BYPASS_ESCALATION =
-  "Approval policy never: bypass mode grants a request to leave the sandbox without asking. Use it only for GUI apps (open, xdg-open, osascript) or blocked network: call exec_command with sandbox_permissions \"require_escalated\" and a one-line justification. Keep file changes inside the workspace; do not work around the sandbox another way.";
+  "Approval policy never: bypass mode grants leaving the sandbox without asking, only for GUI apps (open, xdg-open, osascript), blocked network or one retry of a requested operation the sandbox refused on a protected path such as .git: call exec_command with sandbox_permissions \"require_escalated\" and a one-line justification. Keep file changes in the workspace; never write protected files or work around the sandbox another way.";
 
 /**
  * Where the bypass escalation text applies. The same sessions get escalation
@@ -443,14 +448,21 @@ function bypassGrantsEscalation(
 /**
  * Light's head has no section titled 'Executing actions with care', so this
  * note refers to its action rules directly. Same terms as
- * BYPASS_AUTONOMY_NOTE.
+ * BYPASS_AUTONOMY_NOTE; the action rules it points at already list the
+ * destructive, irreversible, shared-system and externally visible actions that
+ * still need the user's request. A Light session whose permissions carry this
+ * note gets no auto-mode reminder (prompts/attachments/auto-mode.ts), so the
+ * note keeps that reminder's "make reasonable assumptions".
  */
 export const LIGHT_BYPASS_AUTONOMY_NOTE =
-  "Tool calls are pre-approved: do not ask for tool permission or plan approval, and do not pause to confirm local, reversible work. The action rules above still apply: destructive, irreversible, shared-system or externally visible actions need the user's explicit request. If the task is genuinely ambiguous, ask one question with AskUserQuestion; when the requested work is done and verified, stop and report.";
+  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the action rules above still apply. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous, else make reasonable assumptions; when the work is done and verified, stop and report.";
 
-/** LIGHT_BYPASS_AUTONOMY_NOTE for a standard head, which names its action rules' section. */
+/**
+ * LIGHT_BYPASS_AUTONOMY_NOTE for a standard head, which names its action rules' section. Standard
+ * sessions keep the auto-mode reminder, so this note leaves its assumptions sentence to it.
+ */
 export const COMPACT_BYPASS_AUTONOMY_NOTE =
-  "Tool calls are pre-approved: do not ask for tool permission or plan approval, and do not pause to confirm local, reversible work. The rules in 'Executing actions with care' still apply: destructive, irreversible, shared-system or externally visible actions need the user's explicit request. If the task is genuinely ambiguous, ask one question with AskUserQuestion; when the requested work is done and verified, stop and report.";
+  "Tool calls are pre-approved: never ask for tool permission or plan approval or pause to confirm local, reversible work; the rules in 'Executing actions with care' still apply. Ask one question (AskUserQuestion) only if the task is genuinely ambiguous; when the work is done and verified, stop and report.";
 
 const LIGHT_APPROVAL_TEXT: Partial<Record<PermissionMode, string>> = {
   plan: LIGHT_APPROVAL_UNLESS_TRUSTED,

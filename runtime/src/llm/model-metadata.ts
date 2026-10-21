@@ -1,6 +1,15 @@
-import { parseVeniceModels, veniceModelCosts, type VeniceModel } from "./registry/venice-models.js";
+import { parseVeniceModels, veniceCatalogEntry, veniceModelCosts, type VeniceModel } from "./registry/venice-models.js";
 import { recordPublishedModelCosts } from "./registry/published-model-costs.js";
-import { EndpointMetadataCache, type EndpointMetadataScope } from "./endpoint-metadata-cache.js";
+import { recordPublishedModelCatalog } from "./registry/published-model-catalog.js";
+import { openRouterCatalogEntry, openRouterRowFromListing } from "./registry/openrouter-models.js";
+import {
+  OLLAMA_CLOUD_ORIGIN,
+  ollamaCloudCatalogEntry,
+  parseOllamaCloudShow,
+  parseOllamaCloudTags,
+  type OllamaCloudModelRow,
+} from "./registry/ollama-cloud-models.js";
+import { EndpointMetadataCache, endpointMetadataForTransport, type EndpointMetadataScope } from "./endpoint-metadata-cache.js";
 import {
   readProviderConfig,
 } from "../config/resolve-provider.js";
@@ -8,6 +17,8 @@ import type { AgenCConfig } from "../config/schema.js";
 import { resolveModelCatalogMetadata } from "./registry/model-catalog.js";
 import { rememberSuccessfulLookup } from "./remember-successful-lookup.js";
 import { normalizeProviderMetadataIdentity } from "../provider-identity.js";
+import { gatewayModelFamily } from "./model-family.js";
+import { DEEPSEEK_MODELS } from "./registry/deepseek-models.js";
 import {
   allowsOpenAICompatibleKeyFallback,
   resolveProviderApiKeyEnvironment,
@@ -32,6 +43,13 @@ export const CONSERVATIVE_CONTEXT_WINDOW_TOKENS =
   OPENAI_COMPATIBLE_FALLBACK_CONTEXT_WINDOW;
 
 const DEFAULT_METADATA_TIMEOUT_MS = 1_000;
+/**
+ * A provider's whole model list (Ollama Cloud's tags and model card,
+ * OpenRouter's public list) can take longer than one model lookup, and
+ * capability flags and effort levels depend on it, so it gets more time.
+ * A resolver reads it once. Venice has its own, longer limit below.
+ */
+const LIVE_MODEL_LIST_TIMEOUT_MS = 5_000;
 const MODELS_DEV_API_URL = "https://models.dev/api.json";
 const LITELLM_MODEL_MAP_URL =
   "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
@@ -105,7 +123,18 @@ interface FetchJsonOptions {
   readonly headers?: Readonly<Record<string, string>>;
   /** Ollama's native metadata endpoint is a POST with a JSON body. */
   readonly jsonBody?: Readonly<Record<string, unknown>>;
+  /** Overrides the resolver's timeout for one large listing. */
+  readonly timeoutMs?: number;
 }
+
+/**
+ * Venice's model list is the only source of its models' limits, and it is
+ * large (about 170 KB) and often takes 1 to 5 seconds. With the general 1 s
+ * metadata timeout most sessions gave up on it and ran on the conservative
+ * fallback (a 128k window and 32k output cap instead of the model's own).
+ * The first chat call waits for the list anyway.
+ */
+const VENICE_MODEL_LIST_TIMEOUT_MS = 10_000;
 
 type MetadataJson = object | string | number | boolean | null;
 
@@ -169,6 +198,10 @@ export const SHARED_PUBLIC_MODEL_CATALOGS = new PublicModelCatalogCache();
 export class ModelMetadataResolver {
   private veniceResponse?: MetadataJson;
   private veniceModels?: readonly VeniceModel[];
+  private openRouterListing?: MetadataJson;
+  private ollamaCloudTags?: MetadataJson;
+  private ollamaCloudListed?: readonly OllamaCloudModelRow[];
+  private readonly ollamaCloudShown = new Map<string, OllamaCloudModelRow>();
   private readonly readSavedApiKey?: (provider: string) => string | undefined;
   private readonly fetchImpl?: typeof fetch;
   private readonly env: Readonly<Record<string, string | undefined>>;
@@ -176,6 +209,7 @@ export class ModelMetadataResolver {
   private readonly onWarn?: (msg: string) => void;
   private readonly publicCatalogs?: PublicModelCatalogCache;
   private readonly endpointCatalogs?: EndpointMetadataCache;
+  private readonly veniceCatalogs?: EndpointMetadataCache;
   private endpointRevision = -1;
   private inFlightJson = new Map<
     string,
@@ -183,15 +217,19 @@ export class ModelMetadataResolver {
   >();
   private jsonCache = new Map<string, MetadataJson | undefined>();
   private readonly warnedInvalidEnv = new Set<string>();
+  /** An explicitly configured timeout applies here too. */
+  private readonly veniceListTimeoutMs: number;
 
   constructor(options: ModelMetadataResolverOptions = {}) {
     this.fetchImpl = options.fetchImpl;
     this.readSavedApiKey = options.readSavedApiKey;
     this.env = options.env ?? process.env;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_METADATA_TIMEOUT_MS;
+    this.veniceListTimeoutMs = options.timeoutMs ?? VENICE_MODEL_LIST_TIMEOUT_MS;
     this.onWarn = options.onWarn;
     this.publicCatalogs = options.publicCatalogs;
     this.endpointCatalogs = options.endpointCatalogs;
+    this.veniceCatalogs = options.endpointCatalogs ?? (options.fetchImpl ? endpointMetadataForTransport(options.fetchImpl) : undefined);
   }
 
   /** Observe authority changes even when an upper-level model cache has a hit. */
@@ -203,6 +241,10 @@ export class ModelMetadataResolver {
       // maps and must not republish data into this generation.
       this.veniceResponse = undefined;
       this.veniceModels = undefined;
+      this.openRouterListing = undefined;
+      this.ollamaCloudTags = undefined;
+      this.ollamaCloudListed = undefined;
+      this.ollamaCloudShown.clear();
       this.inFlightJson = new Map();
       this.jsonCache = new Map();
       this.endpointRevision = revision;
@@ -212,6 +254,7 @@ export class ModelMetadataResolver {
 
   private endpointScope(params: LookupParams): EndpointMetadataScope | undefined {
     const provider = normalizeMetadataProviderIdentity(params.provider);
+    if (provider === "venice") return undefined;
     return this.endpointCatalogs?.observe(provider, this.endpointConfiguration(params));
   }
 
@@ -276,6 +319,14 @@ export class ModelMetadataResolver {
   }
 
   private async resolveMetadata(params: LookupParams): Promise<ResolvedModelMetadata> {
+    if (normalizeMetadataProviderIdentity(params.provider) === "ollama-cloud") {
+      // Record the live row first: the catalog lookups below then read it.
+      try {
+        await this.discoverOllamaCloudModels(params.config, params.model);
+      } catch {
+        // Best effort, as every other live lookup here.
+      }
+    }
     const explicit = readExplicitConfigMetadata(params);
     if (normalizeMetadataProviderIdentity(params.provider) === "venice") {
       const model = (await this.discoverVeniceModels(params.config))?.find(entry => entry.model === params.model);
@@ -400,25 +451,47 @@ export class ModelMetadataResolver {
     this.onWarn?.(msg);
   }
 
+  private liveModelListTimeoutMs(): number {
+    return Math.max(this.timeoutMs, LIVE_MODEL_LIST_TIMEOUT_MS);
+  }
+
   async discoverVeniceModels(config: AgenCConfig): Promise<readonly VeniceModel[] | undefined> {
     const params = { provider: "venice", model: "", config };
     this.cacheRevision(params);
-    const scope = this.endpointScope(params);
     const baseUrl = providerBaseUrl(config, "venice", this.env);
     const headers = authHeaders("venice", config, this.credentialEnvironment("venice"));
-    // Do not turn listing the offline catalog into an unauthenticated request.
-    if (!baseUrl || !headers?.Authorization) return undefined;
-    const response = await this.fetchEndpointJson(params, baseUrl, modelsUrlFromBaseUrl(baseUrl), { headers });
-    if (scope !== undefined && !this.endpointCatalogs!.matchesConfiguration(scope, this.endpointConfiguration(params))) {
+    // No key or transport: use the bundled catalog without a network request.
+    if (!baseUrl || !headers?.Authorization || !this.veniceCatalogs) return undefined;
+    const cache = this.veniceCatalogs;
+    const configuration = { baseUrl, headers };
+    const scope = cache.observe("venice", configuration);
+    const url = modelsUrlFromBaseUrl(baseUrl);
+    const response = await cache.get(scope, {
+      baseUrl, url, method: "GET", headers, timeoutMs: this.veniceListTimeoutMs,
+    }, async () => {
+      const result = await this.fetchJsonUncached(url, { headers, timeoutMs: this.veniceListTimeoutMs });
+      // A broken/empty list must not discard the last successful limits.
+      return parseVeniceModels(result).length > 0 ? result : undefined;
+    }, { staleWhileRevalidate: true });
+    if (!cache.matchesConfiguration(scope, {
+      baseUrl: providerBaseUrl(config, "venice", this.env),
+      headers: authHeaders("venice", config, this.credentialEnvironment("venice")),
+    })) {
       throw new Error("Provider metadata configuration changed during discovery; retry with the current configuration");
     }
-    if (response === undefined || !Array.isArray(asRecord(response)?.data)) return undefined;
+    if (response === undefined) return undefined;
     if (response !== this.veniceResponse) {
       this.veniceResponse = response;
       this.veniceModels = parseVeniceModels(response);
       // Venice's prices are the price of record for its models (see
       // published-model-costs): admission and the cost sidecar read them.
       recordPublishedModelCosts("venice", veniceModelCosts(this.veniceModels));
+      // So are its capability flags and effort levels (published-model-catalog).
+      recordPublishedModelCatalog(
+        "venice",
+        this.veniceModels.map((model, priority) => veniceCatalogEntry(model, priority)),
+        { replace: true },
+      );
     }
     return this.veniceModels;
   }
@@ -492,7 +565,7 @@ export class ModelMetadataResolver {
         ...(options.jsonBody !== undefined ? { "content-type": "application/json" } : {}),
       },
       ...(options.jsonBody !== undefined ? { body: JSON.stringify(options.jsonBody) } : {}),
-      timeoutMs: this.timeoutMs,
+      timeoutMs: options.timeoutMs ?? this.timeoutMs,
     }, () => this.fetchJsonUncached(url, options)));
   }
 
@@ -501,7 +574,89 @@ export class ModelMetadataResolver {
   ): Promise<ModelMetadataValues | undefined> {
     if (normalizeMetadataProviderIdentity(params.provider) !== "openrouter") return undefined;
     const response = await this.fetchJson(OPENROUTER_MODELS_URL);
+    this.recordOpenRouterListing(response);
     return metadataFromOpenAiModelsResponse(response, params.model);
+  }
+
+  /** Read OpenRouter's public list and record its rows (see below). */
+  async discoverOpenRouterModels(): Promise<boolean> {
+    const response = await this.fetchJson(OPENROUTER_MODELS_URL, { timeoutMs: this.liveModelListTimeoutMs() });
+    this.recordOpenRouterListing(response);
+    return response !== undefined;
+  }
+
+  /**
+   * OpenRouter's public list carries each model's input modalities,
+   * parameters (tools, reasoning) and effort levels. Record them so a model
+   * the bundled snapshot does not know, or knows from an older list, gets
+   * its current capabilities.
+   */
+  private recordOpenRouterListing(response: MetadataJson | undefined): void {
+    if (response === undefined || response === this.openRouterListing) return;
+    const data = asRecord(response)?.data;
+    if (!Array.isArray(data)) return;
+    this.openRouterListing = response;
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = data.flatMap((value) => {
+      const row = openRouterRowFromListing(value, today);
+      return row === undefined ? [] : [row];
+    });
+    if (rows.length === 0) return;
+    recordPublishedModelCatalog(
+      "openrouter",
+      rows.map((row, index) => openRouterCatalogEntry(row, index)),
+      { replace: true },
+    );
+  }
+
+  /**
+   * Ollama Cloud's own list (`GET /api/tags`) and one model's details
+   * (`POST /api/show`), both answered without a key. Recorded as the
+   * provider's published rows: capability tags from the list, context and
+   * thinking levels from the details. Best effort; the bundled rows answer
+   * while the network does not.
+   */
+  async discoverOllamaCloudModels(
+    config: AgenCConfig,
+    model?: string,
+  ): Promise<readonly OllamaCloudModelRow[] | undefined> {
+    const params = { provider: "ollama-cloud", model: model ?? "", config };
+    this.cacheRevision(params);
+    const headers = authHeaders("ollama-cloud", config, this.credentialEnvironment("ollama-cloud"));
+    const timeoutMs = this.liveModelListTimeoutMs();
+    const [tags, show] = await Promise.all([
+      this.fetchEndpointJson(params, OLLAMA_CLOUD_BASE_URL, `${OLLAMA_CLOUD_ORIGIN}/api/tags`, {
+        ...(headers !== undefined ? { headers } : {}),
+        timeoutMs,
+      }),
+      model === undefined || model.trim().length === 0
+        ? Promise.resolve(undefined)
+        : this.fetchEndpointJson(params, OLLAMA_CLOUD_BASE_URL, `${OLLAMA_CLOUD_ORIGIN}/api/show`, {
+          ...(headers !== undefined ? { headers } : {}),
+          jsonBody: { model: model.trim() },
+          timeoutMs,
+        }),
+    ]);
+    if (tags !== undefined && tags !== this.ollamaCloudTags) {
+      this.ollamaCloudTags = tags;
+      this.ollamaCloudListed = parseOllamaCloudTags(tags);
+    }
+    if (model !== undefined && show !== undefined) {
+      const shown = parseOllamaCloudShow(model.trim(), show);
+      if (shown !== undefined) this.ollamaCloudShown.set(shown.model, shown);
+    }
+    if (this.ollamaCloudListed === undefined && this.ollamaCloudShown.size === 0) return undefined;
+    const listed = this.ollamaCloudListed ?? [];
+    const rows = [
+      ...listed.map((row) => this.ollamaCloudShown.get(row.model) ?? row),
+      ...[...this.ollamaCloudShown.values()].filter((row) => !listed.some((entry) => entry.model === row.model)),
+    ];
+    recordPublishedModelCatalog(
+      "ollama-cloud",
+      rows.map((row, priority) => ollamaCloudCatalogEntry(row, priority, "list")),
+      { replace: this.ollamaCloudListed !== undefined },
+    );
+    return Object.freeze(rows);
   }
 
   private async resolveModelsDevMetadata(
@@ -557,7 +712,7 @@ export class ModelMetadataResolver {
     options: FetchJsonOptions,
   ): Promise<MetadataJson | undefined> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? this.timeoutMs);
     try {
       const response = await fetchProviderRequest(url, {
         ...(options.jsonBody !== undefined
@@ -582,7 +737,47 @@ export class ModelMetadataResolver {
   }
 }
 
+/** DeepSeek's own per-call output default and ceiling (registry/deepseek-models.ts). */
+const DEEPSEEK_OUTPUT_DEFAULT = DEEPSEEK_MODELS[0]!.maxOutputTokens;
+const DEEPSEEK_OUTPUT_CEILING = DEEPSEEK_MODELS[0]!.maxOutputTokensUpperLimit;
+
+/**
+ * A DeepSeek model through a gateway gets the per-call output default it has on
+ * DeepSeek's own API (64k; reasoning and the answer share it), bounded by the
+ * route's limit, which stays available to explicit settings and max-output
+ * recovery. Without it a session reserved 393,216 tokens a call on OpenRouter,
+ * 131,072 on Venice and 16,384 on Ollama Cloud. Ollama Cloud serves these models
+ * with DeepSeek's own ceiling (it refuses max_tokens above 393,216), not the
+ * 32,768 policy cap of its other models.
+ */
+function applyModelFamilyOutputContract(
+  params: Pick<LookupParams, "provider" | "model">,
+  metadata: ModelMetadataValues,
+): ModelMetadataValues {
+  const provider = normalizeMetadataProviderIdentity(params.provider);
+  if (gatewayModelFamily(provider, params.model) !== "deepseek" ||
+      metadata.maxOutputTokensExplicit === true) {
+    return metadata;
+  }
+  const routeUpper = provider === "ollama-cloud"
+    ? DEEPSEEK_OUTPUT_CEILING
+    : metadata.maxOutputTokensUpperLimit ?? metadata.maxOutputTokens ?? DEEPSEEK_OUTPUT_CEILING;
+  return {
+    ...metadata,
+    maxOutputTokens: Math.min(DEEPSEEK_OUTPUT_DEFAULT, routeUpper),
+    maxOutputTokensUpperLimit: routeUpper,
+    maxOutputTokensCappedDefault: true,
+  };
+}
+
 function applyRegisteredModelOutputContract(
+  params: Pick<LookupParams, "provider" | "model">,
+  metadata: ModelMetadataValues,
+): ModelMetadataValues {
+  return applyModelFamilyOutputContract(params, applyCatalogOutputContract(params, metadata));
+}
+
+function applyCatalogOutputContract(
   params: Pick<LookupParams, "provider" | "model">,
   metadata: ModelMetadataValues,
 ): ModelMetadataValues {
@@ -666,9 +861,11 @@ export function hasDynamicProviderModelCatalog(
   provider: string,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-  // Venice's IDs come from its /models list; the bundled snapshot is only the
-  // offline fallback, so an ID missing from it is not a typo.
-  if (normalizeMetadataProviderIdentity(provider) === "venice") return true;
+  // Venice's IDs come from its /models list and Ollama Cloud's from its
+  // /api/tags list; the bundled snapshots are only the offline fallback, so
+  // an ID missing from them is not a typo.
+  const identity = normalizeMetadataProviderIdentity(provider);
+  if (identity === "venice" || identity === "ollama-cloud") return true;
   return shouldPreferDynamicMetadata({ config, provider, model: "" }, env);
 }
 

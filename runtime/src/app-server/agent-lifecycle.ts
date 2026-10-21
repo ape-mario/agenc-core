@@ -814,6 +814,7 @@ export class AgenCDaemonAgentManager {
           params.initialContent !== undefined ||
           params.deferInitialTurn !== undefined ||
           params.initialDisplayUserMessage !== undefined ||
+          params.initialUserPromptText !== undefined ||
           params.metadata !== undefined ||
           params.unattendedAllow !== undefined ||
           params.unattendedDeny !== undefined)
@@ -1151,6 +1152,9 @@ export class AgenCDaemonAgentManager {
                 : {}),
               ...(params.deferInitialTurn !== undefined
                 ? { deferInitialTurn: params.deferInitialTurn }
+                : {}),
+              ...(params.initialUserPromptText !== undefined
+                ? { initialUserPromptText: params.initialUserPromptText }
                 : {}),
               ...(params.initialDisplayUserMessage !== undefined
                 ? {
@@ -3155,28 +3159,41 @@ export class AgenCDaemonAgentManager {
         `AgenC daemon session has no working directory: ${params.sessionId}`,
       );
     }
-    // Clients address the daemon session (`session_...`), but the durable
-    // effect rows and the live runtime session belong to the agent's
-    // conversation (`conv-...`). The live runner resolves only its own
-    // conversation, so review against that id. Injected runners without a
-    // live journal keep the legacy daemon-session keying.
-    const reviewSessionId =
-      this.#runner?.resolveLiveEffectReview !== undefined
-        ? session.agentId
-        : params.sessionId;
+    // The attached daemon session authorizes its canonical conversation and
+    // durable spawn descendants. Never infer authority from a supplied id.
+    const reviewSessionIds = this.#runner?.effectReviewSessionIds?.(session.agentId) ?? [
+      this.#runner?.resolveLiveEffectReview !== undefined ? session.agentId : params.sessionId,
+    ];
+    if (params.effectSessionId !== undefined && !reviewSessionIds.includes(params.effectSessionId)) {
+      throw new AgenCDaemonAgentLifecycleError("INVALID_ARGUMENT",
+        `Session ${params.effectSessionId} is not owned by parent ${params.sessionId}; attach to its owning session to review it`);
+    }
+    const selectedIds = params.effectSessionId === undefined ? reviewSessionIds : [params.effectSessionId];
     const driver = openStateDatabases({ cwd: session.cwd, agencHome: this.#agencHome });
     try {
-      const candidates =
-        params.toolCallId !== undefined
-          ? [
-              {
-                sessionId: reviewSessionId,
-                toolCallId: params.toolCallId,
-                toolName: "",
-                startedAt: "",
-              },
-            ]
-          : [...listUnresolvedUnknownOutcomeEffects(driver, reviewSessionId)];
+      const durableEffects = new StateRunDurabilityRepository(driver);
+      const pending = selectedIds.flatMap(id => [...listUnresolvedUnknownOutcomeEffects(driver, id)]);
+      const candidates = params.toolCallId === undefined ? pending : selectedIds.flatMap(id => {
+        const effect = durableEffects.getEffectBySessionCall(id, params.toolCallId!);
+        if (params.attempt !== undefined && effect?.runId !== params.attempt.runId) return [];
+        const legacy = pending.find(candidate => candidate.sessionId === id && candidate.toolCallId === params.toolCallId);
+        return effect === undefined && legacy === undefined ? [] : [{ sessionId: id,
+          toolCallId: params.toolCallId!, toolName: effect?.toolName ?? legacy?.toolName ?? "", startedAt: effect?.intentAt ?? legacy?.startedAt ?? "" }];
+      });
+      if (params.toolCallId !== undefined && candidates.length > 1) {
+        throw new AgenCDaemonAgentLifecycleError("INVALID_ARGUMENT",
+          `Tool call ${params.toolCallId} has multiple owning sessions. Review one at a time from this parent: ` +
+          candidates.map(effect => `/resolve ${effect.toolCallId} <confirmed_committed|confirmed_no_effect|remains_unknown> --session ${effect.sessionId}`).join("; "));
+      }
+      // Keep exact-attempt stale checks on the canonical owner even if the
+      // requested record disappeared. They must not silently turn into no-ops.
+      if (params.toolCallId !== undefined && candidates.length === 0) {
+        candidates.push({ sessionId: params.effectSessionId ?? reviewSessionIds[0]!,
+          toolCallId: params.toolCallId, toolName: "", startedAt: "" });
+      }
+      const reviewSessionId = candidates[0]?.sessionId ?? reviewSessionIds[0]!;
+      const remainingCount = () => reviewSessionIds.reduce((count, id) =>
+        count + listUnresolvedUnknownOutcomeEffects(driver, id).length, 0);
       const resolved: SessionResolveToolCallResult["resolved"][number][] = [];
 
       if (!isEvidenceToolCallResolution(params)) {
@@ -3187,7 +3204,7 @@ export class AgenCDaemonAgentManager {
           // v1/v2 effect stays pending until an evidence-bearing request arrives.
           if (
             durableEffects.getEffectBySessionCall(
-              reviewSessionId,
+              effect.sessionId,
               effect.toolCallId,
             ) !== undefined
           ) {
@@ -3195,7 +3212,7 @@ export class AgenCDaemonAgentManager {
           }
           if (
             resolveUnknownOutcomeEffect(driver, {
-              sessionId: reviewSessionId,
+              sessionId: effect.sessionId,
               toolCallId: effect.toolCallId,
             })
           ) {
@@ -3208,10 +3225,7 @@ export class AgenCDaemonAgentManager {
         return {
           sessionId: params.sessionId,
           resolved,
-          remaining: listUnresolvedUnknownOutcomeEffects(
-            driver,
-            reviewSessionId,
-          ).length,
+          remaining: remainingCount(),
         };
       }
 
@@ -3292,10 +3306,7 @@ export class AgenCDaemonAgentManager {
           });
         }
       }
-      const remaining = listUnresolvedUnknownOutcomeEffects(
-        driver,
-        reviewSessionId,
-      ).length;
+      const remaining = remainingCount();
       return { sessionId: params.sessionId, resolved, remaining };
     } finally {
       driver.close();
@@ -4112,6 +4123,7 @@ export class AgenCDaemonAgentManager {
     return await this.#runner.previewFileRewind(agentId, {
       sessionId: params.sessionId,
       messageOrdinal: params.messageOrdinal,
+      ...(params.userMessageId !== undefined ? { userMessageId: params.userMessageId } : {}),
     });
   }
 
@@ -4137,6 +4149,7 @@ export class AgenCDaemonAgentManager {
     return await this.#runner.rewindFilesToMessage(agentId, {
       sessionId: params.sessionId,
       messageOrdinal: params.messageOrdinal,
+      ...(params.userMessageId !== undefined ? { userMessageId: params.userMessageId } : {}),
     });
   }
 
@@ -4397,6 +4410,7 @@ export class AgenCDaemonAgentManager {
     readonly acceptedAt: string;
     readonly ifBusy?: "reject";
     readonly displayUserMessage?: string | null;
+    readonly userPromptText?: string;
     readonly methodName?: "message.send" | "message.stream";
     /** Set only by authenticated daemon ingress, never by RPC payload metadata. */
     readonly localMcpAccess?: boolean;
@@ -4464,6 +4478,7 @@ export class AgenCDaemonAgentManager {
         originalContent: params.content,
         ...(params.exactOutput !== undefined ? { exactOutput: params.exactOutput } : {}),
         ...(params.localMcpAccess !== undefined ? { localMcpAccess: params.localMcpAccess } : {}),
+        ...(params.userPromptText !== undefined ? { userPromptText: params.userPromptText } : {}),
         ...(params.displayUserMessage !== undefined
           ? { displayUserMessage: params.displayUserMessage }
           : {}),
@@ -5179,6 +5194,9 @@ function toolPolicyToMetadata(policy: SessionToolPolicy): JsonObject {
       : {}),
     ...(policy.deferMcpTools !== undefined
       ? { deferMcpTools: policy.deferMcpTools }
+      : {}),
+    ...(policy.noFsWriteTools !== undefined
+      ? { noFsWriteTools: [...policy.noFsWriteTools] }
       : {}),
   };
 }

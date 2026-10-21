@@ -56,6 +56,25 @@ function stubSession(opts: {
 }
 
 describe("statusCommand", () => {
+  it("uses durable session usage after reconnect instead of reset daemon counters", () => {
+    const usage = { runId: "run", sequence: 10, costUsd: 0.0208, heldCostUsd: 0,
+      inputTokens: 12000, outputTokens: 345, totalTokens: 12345, modelCalls: 2,
+      hasUnknownCost: false, models: [], agents: [] };
+    const lines = collectStatus(stubSession({ costSummary: "$0.00 stale" }), "/ws", 2000,
+      { tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: 0 } }, usage);
+    expect(lines.filter(line => line.key.startsWith("Cost"))).toEqual([{ key: "Cost (USD)", value: "$0.0208" }]);
+    expect(lines).toContainEqual({ key: "Tokens emitted", value: "12345 (in: 12000, out: 345)" });
+    expect(createStatusDashboardSnapshot({ lines, git: { state: "clean", branch: "main", changedFiles: 0 } }).sessionCost).toBe("$0.0208");
+  });
+
+  it("retains unknown and estimated pricing markers from durable usage", () => {
+    const usage = { runId: "run", sequence: 1, costUsd: 0.0208, heldCostUsd: 0,
+      inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1,
+      hasUnknownCost: true, costEstimated: true, models: [], agents: [] };
+    expect(collectStatus(stubSession(), "/ws", 2000, undefined, usage)).toContainEqual({
+      key: "Cost (USD)", value: "≥$0.0208 est.",
+    });
+  });
   it("shows an unavailable task budget for a view without session config", () => {
     expect(collectStatus(stubSession(), "/ws", 5000)).toContainEqual({ key: "Task budget", value: "unavailable" });
   });
@@ -233,6 +252,24 @@ describe("status git summary", () => {
         porcelain: { stdout: " M file.ts\n?? new.ts\n", stderr: "", code: 0 },
       }),
     ).toEqual({ state: "dirty", branch: "main", changedFiles: 2 });
+  });
+
+  it("reports a missing git as informational, not as a git failure", () => {
+    // Windows without Git for Windows: the spawn fails before git can say anything.
+    const summary = summarizeGitStatus({
+      insideWorkTree: { stdout: "", stderr: "Error: spawn git ENOENT", code: -1 },
+      branch: { stdout: "", stderr: "", code: 0 },
+      porcelain: { stdout: "", stderr: "", code: 0 },
+    });
+    expect(summary).toEqual({ state: "no-git", message: "Install git to see branch state here." });
+    const row = createStatusDashboardSnapshot({ lines: [], git: summary }).rows.find((entry) => entry.section === "git");
+    expect(row).toMatchObject({ value: "git not installed", state: "info" });
+    // Any other spawn failure is still an error.
+    expect(summarizeGitStatus({
+      insideWorkTree: { stdout: "", stderr: "Error: spawn git EMFILE", code: -1 },
+      branch: { stdout: "", stderr: "", code: 0 },
+      porcelain: { stdout: "", stderr: "", code: 0 },
+    }).state).toBe("error");
   });
 
   it("detects non-git directories", () => {

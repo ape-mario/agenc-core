@@ -8,7 +8,7 @@ import type { ExecCommandToolOutput } from "../../unified-exec/types.js";
  * the containment that stops a command's residue never said so.
  */
 export const RESIDUAL_PROCESSES_NOTE =
-  "[note: this command left processes running after it exited. Cleanup is complete; those processes are no longer running. To start a service that must keep running after the command returns and after this session ends, call exec_command again with detach: true.]";
+  "[note: this command left processes running after it exited. Cleanup is complete; those processes are no longer running. To start a service that must keep running after the command returns and after this session ends, use detach: true only outside the sandbox (an approved require_escalated launch, if permitted). Otherwise keep the process in the foreground with yield_time_ms; managed sessions stop at session end.]";
 
 /** Model-facing alias only; canonical results and structured facts stay intact. */
 export function compactExecExitFooter(content: string): string {
@@ -97,12 +97,14 @@ export function formatUnifiedExecToolContent(
 
 export function unifiedExecCodeModeResult(
   output: ExecCommandToolOutput,
+  sandboxNotice?: string | null,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {
     wall_time_seconds: output.wall_time_seconds,
     original_token_count: output.original_token_count,
     output: output.output,
   };
+  if (sandboxNotice != null) result.sandbox_notice = sandboxNotice;
 
   if (output.command_outcome !== undefined) {
     result.command_outcome = output.command_outcome;

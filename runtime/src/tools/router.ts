@@ -1,3 +1,7 @@
+import { prepareShellObservation } from "./side-effect-free-shell.js";
+import { sandboxModeRequiresPlatformIsolation } from "./runtimes/sandboxing.js";
+import { autoFixPostToolHookIsInactive } from "../services/autoFix/autoFixHook.js";
+import { toolStage, withToolTiming } from "./stage-timing.js";
 import { interruptedExecReport } from "./interrupted-exec-report.js";
 import { readPendingPhysicalSettlement } from "./physical-settlement.js";
 import { stripModelSuppliedAgenCInternalArgs } from "./internal-args.js";
@@ -81,6 +85,7 @@ import {
   approvalDenialEndsTurn,
 } from "./orchestrator.js";
 import { LiveEffectMutationBlockedError } from "../budget/effect-settlement-supervisor.js";
+import { McpFilesystemApprovalRequiredError } from "./runtimes/mcp-filesystem-approval.js";
 import {
   executeToolDispatch,
   type ApprovalRequestFn,
@@ -98,7 +103,7 @@ import type {
   PostToolUseHook,
   PreToolUseHook,
 } from "./hooks.js";
-import { runPreToolUseHooks } from "./hooks.js";
+import { runPreToolUseHooks as untimedPreHooks } from "./hooks.js";
 import { isWorkflowApprovalSession } from "../permissions/approval-failure.js";
 import { clearApprovalResponseKey } from "../permissions/approval-response-key.js";
 import {
@@ -142,6 +147,8 @@ import {
   createWorkspaceOperationLifetime,
   runWithWorkspaceOperationLifetime,
 } from "../workspace/tool-operation-lifetime.js";
+
+const runPreToolUseHooks: typeof untimedPreHooks = (...args) => toolStage("hooks", () => untimedPreHooks(...args));
 
 export interface ToolCall {
   readonly toolName: ToolName;
@@ -228,6 +235,13 @@ export interface LiveToolDispatchOptions {
     idx: number,
   ) => void;
   readonly onHookAdditionalContext?: (contexts: readonly string[]) => void;
+  /**
+   * Set by the tool executor for a shell call it scheduled next to other calls
+   * of the same response because it classifies as read-only. If dispatch
+   * cannot run it on the read-only route (no-write, no-network sandbox), the
+   * ordinary run waits here until no other call of the batch executes.
+   */
+  readonly runAloneOffReadOnlyRoute?: <T>(run: () => Promise<T>) => Promise<T>;
 }
 
 export interface DirectToolDispatchOptions {
@@ -666,6 +680,7 @@ export class ToolRouter {
         },
         ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
         approvalPolicy: effectiveApprovalPolicy,
+        requestedApprovalPolicy: opts.approvalPolicy ?? directDispatchApprovalPolicy(invocation),
         sandboxMode: requestedSandboxMode,
         payload: executionPayload,
         ...(activeExecPolicy !== undefined
@@ -727,9 +742,11 @@ export class ToolRouter {
             runtimeCallContext,
             {
               approvalPolicy: effectiveApprovalPolicy,
+              requestedApprovalPolicy: opts.approvalPolicy ?? directDispatchApprovalPolicy(invocation),
               requestedSandboxMode,
               sandboxMode: sandbox,
               approvalResolved: dispatchContext.approvalResolved,
+              ...(dispatchContext.mcpNoFsWritesApproved === true ? { mcpNoFsWritesApproved: true } : {}),
               ...(dispatchContext.additionalPermissions !== undefined
                 ? {
                     additionalPermissions:
@@ -835,6 +852,14 @@ export class ToolRouter {
   }
 
   async dispatchModelToolCall(
+    toolCall: LLMToolCall,
+    opts: LiveToolDispatchOptions,
+  ): Promise<ToolDispatchResult> {
+    return withToolTiming(opts.session, toolCall.id, toolCall.name, () =>
+      this.dispatchModelToolCallTimed(toolCall, opts));
+  }
+
+  private async dispatchModelToolCallTimed(
     toolCall: LLMToolCall,
     opts: LiveToolDispatchOptions,
   ): Promise<ToolDispatchResult> {
@@ -1233,6 +1258,7 @@ export class ToolRouter {
           : {}),
         ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
         approvalPolicy: effectiveApprovalPolicy,
+        requestedApprovalPolicy: opts.approvalPolicy,
         sandboxMode: opts.sandboxMode,
         payload: executionPayload,
         ...(activeExecPolicy !== undefined
@@ -1303,9 +1329,11 @@ export class ToolRouter {
             runtimeCallContext,
             {
               approvalPolicy: effectiveApprovalPolicy,
+              requestedApprovalPolicy: opts.approvalPolicy,
               requestedSandboxMode: opts.sandboxMode,
               sandboxMode: sandbox,
               approvalResolved: dispatchContext.approvalResolved,
+              ...(dispatchContext.mcpNoFsWritesApproved === true ? { mcpNoFsWritesApproved: true } : {}),
               ...(dispatchContext.additionalPermissions !== undefined
                 ? {
                     additionalPermissions:
@@ -1316,11 +1344,16 @@ export class ToolRouter {
               invocation: dispatchInvocation,
             },
           );
-          return runAdmittedToolCall({
+          const observationTool = await toolStage("sandbox_broker", () => prepareShellObservation(
+            spec.tool, dispatchArgs, opts.turn.cwd, opts.session.services.sandboxExecutionBroker,
+            { owner: opts.session, ordinaryPathSandboxed: sandboxModeRequiresPlatformIsolation(sandbox) }));
+          const executionTool = observationTool ?? spec.tool;
+          const admitted = () => runAdmittedToolCall({
             session: opts.session,
             turnId: opts.turn.subId,
             callId: toolCall.id,
-            tool: spec.tool,
+            tool: executionTool,
+            requireDurable: Boolean(opts.postHooks?.some(hook => !autoFixPostToolHookIsInactive(hook)) || opts.failureHooks?.length),
             args: dispatchArgs,
             signal: toolAbortController.signal,
             ...(orchestrateDispatchAttempt > 1
@@ -1330,7 +1363,7 @@ export class ToolRouter {
               executeToolDispatch(
                 rawDispatchOptions(dispatchRawArgs, {
                   ...withoutPermissionEvaluator(opts),
-                  tool: spec.tool,
+                  tool: executionTool,
                   parsedArgs: dispatchArgs,
                   invocation: dispatchInvocation,
                   preHooks: [],
@@ -1349,6 +1382,11 @@ export class ToolRouter {
                 }),
               ),
           });
+          // A call scheduled next to others as read-only that cannot take the
+          // read-only route may write: it runs only once nothing else runs.
+          return observationTool === undefined && opts.runAloneOffReadOnlyRoute !== undefined
+            ? opts.runAloneOffReadOnlyRoute(admitted)
+            : admitted();
         },
       });
       markLoadedToolNamesDiscovered(
@@ -1804,6 +1842,7 @@ export function attachPreflightRuntimeContext(
       classification: call.classification,
     }, {
       approvalPolicy: params.approvalPolicy,
+      requestedApprovalPolicy: params.approvalPolicy,
       requestedSandboxMode: params.sandboxMode,
       sandboxMode: params.sandboxMode,
       approvalResolved: false,
@@ -1849,6 +1888,14 @@ function workflowPolicyDenial(session: Session, source: string): Partial<ToolDis
 }
 
 async function toolDispatchErrorResult(err: unknown, session?: Session, toolName?: string): Promise<ToolDispatchResult> {
+  if (err instanceof McpFilesystemApprovalRequiredError) {
+    return {
+      content: JSON.stringify({ error: err.message, retryable: false, executed: false }),
+      isError: true,
+      preventContinuation: true,
+      metadata: { retryable: false, executed: false, mcpFilesystemApprovalRequired: err.message },
+    };
+  }
   const pending = toolName === "exec_command" ? readPendingPhysicalSettlement<ToolDispatchResult>(err) : undefined;
   if (pending?.callerStop === "abort") {
     // The admission boundary has already installed its unknown-effect poison
@@ -1893,7 +1940,13 @@ async function toolDispatchErrorResult(err: unknown, session?: Session, toolName
         : {}),
       metadata: {
         ...(approvalDenialEndsTurn(err)
-          ? { approvalDenied: true, approvalDeniedStage: err.stage }
+          ? {
+              approvalDenied: true,
+              approvalDeniedStage: err.stage,
+              ...(err.sandboxRefusal !== undefined
+                ? { approvalDeniedSandboxRefusal: err.sandboxRefusal }
+                : {}),
+            }
           : {}),
         approvalFailure: {
           decision: err.decision.kind,

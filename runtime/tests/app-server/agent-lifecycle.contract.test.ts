@@ -6013,6 +6013,7 @@ describe("AgenC background agent lifecycle", () => {
           },
         ],
         initialDisplayUserMessage: "Explain the selected code",
+        initialUserPromptText: "Expanded initial human request",
       }),
     ).resolves.toMatchObject({
       agentId: "agent_image",
@@ -6030,6 +6031,7 @@ describe("AgenC background agent lifecycle", () => {
           },
         ],
         initialDisplayUserMessage: "Explain the selected code",
+        initialUserPromptText: "Expanded initial human request",
       }),
     ]);
     await expect(sessions.getSession("session_image")).resolves.toMatchObject({
@@ -6817,6 +6819,44 @@ describe("AgenC background agent lifecycle", () => {
       restoreEnv();
       rmSync(home, { recursive: true, force: true });
       rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("routes parent reviews to descendants, refuses unrelated owners, and requires a session for duplicate call ids (#2607)", async () => {
+    const { cwd, home, restoreEnv } = createThreadStoreTestDirs();
+    const daemonSessionId = "session_parent_child_review";
+    const agentId = "conv-parent-child-review";
+    const sessions = new AgenCDaemonSessionManager({ createSessionId: () => daemonSessionId });
+    const driver = openStateDatabases({ cwd, agencHome: home });
+    const now = "2026-10-19T00:00:00.000Z";
+    try {
+      const effects = await seedUnknownEffectSession(driver, sessions, { cwd, agentId, callId: "call_root", toolName: "Browser" });
+      for (const id of ["child-a", "grandchild-b", "unrelated"]) {
+        effects.ensureInitialEpoch({ runId: id, openedAt: now });
+        effects.beginEffect({ runId: id, epoch: 1, sessionId: id, stepId: "tool:child", callId: "same-call", toolName: "Browser",
+          recoveryCategory: "interactive", intentDigest: "d".repeat(64), eventId: "intent", eventSequence: 1, intentAt: now });
+        effects.markEffectUnknown({ runId: id, stepId: "tool:child", eventId: "unknown", eventSequence: 2, reason: "acknowledgement_lost", observedAt: now });
+      }
+      const review = vi.fn(async (_owner: string, params: ResolveDurableEffectReviewOptions) => projectLiveReview(driver, params));
+      const runner = { effectReviewSessionIds: () => [agentId, "child-a", "grandchild-b"], resolveLiveEffectReview: review } as unknown as AgenCBackgroundAgentRunner;
+      const agents = new AgenCDaemonAgentManager({ sessionManager: sessions, runner, agencHome: home });
+      const request = { sessionId: daemonSessionId, toolCallId: "same-call", disposition: "confirmed_no_effect", attestation: "operator" } as const;
+      await expect(agents.resolveSessionToolCall(request)).rejects.toThrow("multiple owning sessions");
+      await expect(agents.resolveSessionToolCall({ ...request, effectSessionId: "unrelated" })).rejects.toThrow("not owned by parent");
+      expect(review).not.toHaveBeenCalled();
+      await expect(agents.resolveSessionToolCall({ ...request, effectSessionId: "grandchild-b", disposition: "remains_unknown" }))
+        .resolves.toMatchObject({ remaining: 3 });
+      expect(effects.getEffect("grandchild-b", "tool:child")?.reviewStatus).toBe("pending");
+      await expect(agents.resolveSessionToolCall({ ...request, effectSessionId: "grandchild-b" }))
+        .resolves.toMatchObject({ resolved: [{ toolCallId: "same-call", toolName: "Browser" }], remaining: 2 });
+      expect(review.mock.calls.at(-1)).toMatchObject([agentId, { sessionId: "grandchild-b", resolution: { evidenceRef: "operator-attestation:grandchild-b:same-call" } }]);
+      expect(effects.getEffect("child-a", "tool:child")?.reviewStatus).toBe("pending");
+      expect(effects.getEffect("unrelated", "tool:child")?.reviewStatus).toBe("pending");
+      // A unique child call can be addressed with the original /resolve form.
+      await expect(agents.resolveSessionToolCall({ ...request, toolCallId: "call_root" }))
+        .resolves.toMatchObject({ remaining: 1 });
+    } finally {
+      driver.close(); restoreEnv(); rmSync(home, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true });
     }
   });
 

@@ -14,14 +14,16 @@ import {
 import { buildRecoverableToolFailureMetadata } from "../result-metadata.js";
 import {
   confirmedNoEffectDisposition,
+  execEscalationGrant,
   runtimeSandboxForExec,
   SANDBOX_PERMISSION_INPUT_PROPERTIES,
 } from "./exec-command.js";
 import { SandboxExecutionError } from "../../sandbox/execution-broker.js";
 import { createToolEffectDispositionEvidence } from "../effect-boundary.js";
 import { readToolRuntimeContext } from "../runtimes/context.js";
-import { execSandboxDenialNotice, sandboxEscalationAvailable } from "./exec-sandbox-denial.js";
+import { execSandboxDenialNotice } from "./exec-sandbox-denial.js";
 import { execNetworkFailureNotice } from "./exec-network-failure.js";
+import { notifyExecEscalationDiscovery } from "../exec-session-discovery.js";
 
 export interface WriteStdinToolConfig {
   readonly lightMode?: boolean;
@@ -30,6 +32,12 @@ export interface WriteStdinToolConfig {
   readonly env?: Record<string, string>;
   readonly maxTimeoutMs?: number;
   readonly unifiedExecManager?: UnifiedExecProcessManagerLike;
+  /**
+   * A sandbox notice on this result tells the model to retry the session's
+   * exec_command with sandbox_permissions: present exec_command's full
+   * schema on the next request.
+   */
+  readonly onEscalationAdvised?: () => void;
 }
 
 function asString(value: unknown): string | undefined {
@@ -99,7 +107,7 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
   return {
     name: "write_stdin",
     description:
-      "Poll or write to a session exec_command left running, by session_id. chars='' polls any running session for new output; sending input needs a session started with tty=true.",
+      "Poll or write to a session exec_command left running, by session_id. chars='' polls any running session for new output; sending input needs a session started with tty=true and matching sandbox_permissions. Empty polls only read already-approved output and need no new sandbox escalation.",
     metadata: {
       family: "terminal",
       source: "builtin",
@@ -161,7 +169,7 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
         sandbox_permissions: {
           ...SANDBOX_PERMISSION_INPUT_PROPERTIES.sandbox_permissions,
           description:
-            "The sandbox_permissions value the session was started with, to reach it.",
+            "For non-empty input, match the sandbox_permissions value the session was started with. Empty polls need no escalation.",
         },
       },
       required: ["session_id"],
@@ -246,27 +254,29 @@ export function createWriteStdinTool(config?: WriteStdinToolConfig): Tool {
         const denial = execSandboxDenialNotice({
           output: execContent,
           exitCode: output.exitCode,
-          sandboxApplied: runtimeSandbox !== undefined,
-          escalationAvailable: runtimeContext === undefined ||
-            sandboxEscalationAvailable(runtimeContext.approvalPolicy, {
-              sandboxMode: runtimeContext.requestedSandboxMode,
-              session: runtimeContext.invocation.session,
-            }),
+          sandboxApplied: output.sandboxApplied ?? runtimeSandbox !== undefined,
+          session: runtimeContext?.invocation.session,
+          escalation: execEscalationGrant(args, "with_approval"),
         });
-        const notice = denial?.notice ?? execNetworkFailureNotice({
-          output: execContent,
-          exitCode: output.exitCode,
-          runtimeSandbox,
-          escalationAvailable: runtimeContext !== undefined &&
-            sandboxEscalationAvailable(runtimeContext.approvalPolicy, {
-              sandboxMode: runtimeContext.requestedSandboxMode,
-              session: runtimeContext.invocation.session,
-            }),
-        });
+        const networkEscalation = execEscalationGrant(args, "unavailable");
+        const networkNotice = denial === null
+          ? execNetworkFailureNotice({
+              output: execContent,
+              exitCode: output.exitCode,
+              runtimeSandbox: output.sandboxApplied === false ? undefined : runtimeSandbox,
+              escalation: networkEscalation,
+            })
+          : null;
+        // The retry the notice asks for is the session's exec_command launch:
+        // present that tool's sandbox_permissions on the next request.
+        if (denial?.advisesEscalation === true || (networkNotice !== null && networkEscalation !== "unavailable")) {
+          notifyExecEscalationDiscovery(args, config?.onEscalationAdvised);
+        }
+        const notice = denial?.notice ?? networkNotice;
         return {
           content: notice === null ? execContent : `${execContent}\n\n${notice}`,
           isError: isError || undefined,
-          codeModeResult: unifiedExecCodeModeResult(output),
+          codeModeResult: unifiedExecCodeModeResult(output, notice),
           // Ordinary terminal receipts settle this call without claiming
           // command success. Missing authenticated outcomes remain unknown
           // even when descendant cleanup has independently completed.

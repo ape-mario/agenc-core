@@ -1,3 +1,4 @@
+import { sideEffectFreeTool } from "../side-effect-free.js";
 /**
  * `Grep` — AgenC-owned ripgrep wrapper.
  *
@@ -533,55 +534,24 @@ async function isRipgrepAvailable(
   const ripgrepPath = selectPinnedRipgrepPath();
   if (ripgrepPath === undefined) return false;
   if (readCapability !== undefined) {
-    const probeArgs = ["--no-config", "--no-follow", "--version"];
+    // Authenticate the bound sandbox before consulting the process-wide
+    // availability cache, exactly as the former probe did: a missing or
+    // failed boundary rejects here. The prepared spawn is settled without a
+    // launch. The bound search is its own probe: it runs the same pinned
+    // executable through the same helper and sandbox, and a launch that
+    // cannot execute it reports PINNED_RIPGREP_UNAVAILABLE (see
+    // boundRipgrepUnavailable). A cached success never skips that sandboxed
+    // launch; a cached failure still fails closed.
     const command = await prepareBoundRipgrepCommand({
       readCapability,
       toolArgs,
       fallbackCwd: cwd,
       program: ripgrepPath,
-      args: probeArgs,
+      args: ["--no-config", "--no-follow", "--version"],
       env: scrubEnvForChildProcess(process.env),
     });
-    if (ripgrepAvailability === false) return false;
-    try {
-      const remaining =
-        deadline === undefined
-          ? RIPGREP_PROBE_TIMEOUT_MS
-          : Math.min(
-              RIPGREP_PROBE_TIMEOUT_MS,
-              remainingGrepOperationMs(deadline),
-            );
-      if (remaining < 1) return false;
-      const result = await withBoundRipgrepCommand(
-        command,
-        (resolved, lifecycleSignal) =>
-          readCapability.runRipgrep({
-            program: resolved.program,
-            args: resolved.args,
-            env: resolved.env,
-            ...(resolved.argv0 !== undefined
-              ? { argv0: resolved.argv0 }
-              : {}),
-            timeoutMs: remaining,
-            maxOutputBytes: RIPGREP_PROBE_MAX_OUTPUT_BYTES,
-            ...(signal !== undefined || lifecycleSignal !== undefined
-              ? {
-                  signal:
-                    signal !== undefined && lifecycleSignal !== undefined
-                      ? AbortSignal.any([signal, lifecycleSignal])
-                      : (signal ?? lifecycleSignal),
-                }
-              : {}),
-          }),
-      );
-      return (
-        result.exitCode === 0 &&
-        result.stopReason === undefined &&
-        result.spawnError === undefined
-      );
-    } catch {
-      return false;
-    }
+    if (isSandboxPreparedSpawn(command)) command.runSync(() => undefined);
+    return ripgrepAvailability !== false;
   }
   if (ripgrepAvailability === false) return false;
   // Authenticate and prepare the probe before consulting the process-wide
@@ -1841,6 +1811,7 @@ async function runRipgrepCollectRecords(params: {
               : {}),
           }),
       );
+      if (boundRipgrepUnavailable(result)) return pinnedRipgrepUnavailableResult();
       const parser = createCollectionWireParser(
         params.outputMode,
         helperMaximumLines,
@@ -2538,6 +2509,23 @@ function pinnedRipgrepUnavailableResult(): LimitedRipgrepResult {
   };
 }
 
+/**
+ * Ripgrep itself exits 0, 1 or 2. 126/127 with no output means the sandboxed
+ * launch could not execute the pinned binary: the outcome the removed
+ * --version probe reported as PINNED_RIPGREP_UNAVAILABLE.
+ */
+function boundRipgrepUnavailable(result: {
+  readonly stdout: Buffer;
+  readonly exitCode: number | null;
+  readonly aborted: boolean;
+  readonly stopReason?: string;
+  readonly spawnError?: Error;
+}): boolean {
+  return (result.exitCode === 126 || result.exitCode === 127) &&
+    result.stdout.byteLength === 0 && !result.aborted &&
+    result.stopReason === undefined && result.spawnError === undefined;
+}
+
 function descriptorRelativePath(
   candidatePath: string,
   capabilityRoot: string,
@@ -2969,7 +2957,7 @@ export function createGrepTool(config?: GrepToolConfig): Tool {
   const operationBudgetLimits = config?.__testOperationBudgetLimits;
   const afterRootIgnoreSnapshot = config?.__testAfterRootIgnoreSnapshot;
 
-  return {
+  return sideEffectFreeTool({
     name: GREP_TOOL_NAME,
     description: GREP_DESCRIPTION,
     metadata: {
@@ -3275,7 +3263,7 @@ export function createGrepTool(config?: GrepToolConfig): Tool {
         }
       }
     },
-  };
+  });
 }
 
 // Re-export internal symbols used solely by the test file. Kept at the

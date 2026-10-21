@@ -6,12 +6,15 @@ const source = process.argv[2]
   ? JSON.parse(await readFile(process.argv[2], 'utf8'))
   : await (await fetch('https://openrouter.ai/api/v1/models')).json();
 const efforts = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+// Models whose announced expiration date has passed are left out; the date is
+// the generation day (UTC), or AGENC_CATALOG_DATE for a reproducible rerun.
+const today = process.env.AGENC_CATALOG_DATE ?? new Date().toISOString().slice(0, 10);
 const rows = source.data.filter(row =>
   row.supported_parameters?.includes('tools') &&
   row.architecture?.output_modalities?.length === 1 &&
   row.architecture.output_modalities[0] === 'text' &&
   !row.id.endsWith(':batch') && !row.id.startsWith('~') &&
-  (!row.expiration_date || row.expiration_date >= '2026-09-29')
+  (!row.expiration_date || row.expiration_date.slice(0, 10) >= today)
 ).map(row => ({
   model: row.id, label: row.name,
   context: row.context_length,
@@ -22,6 +25,7 @@ const rows = source.data.filter(row =>
   ...(efforts.has(row.reasoning?.default_effort) ? { defaultEffort: row.reasoning.default_effort } : {}),
   pricing: Object.fromEntries(Object.entries(row.pricing).filter(([, value]) => typeof value === 'string')),
   ...(row.pricing.overrides ? {priceOverrides: row.pricing.overrides} : {}),
+  ...(row.expiration_date ? { expires: row.expiration_date.slice(0, 10) } : {}),
 }));
 if (new Set(rows.map(row => row.model)).size !== rows.length) throw new Error('Duplicate provider model IDs');
 // The complete provider snapshot is data, loaded only when capability rows are
@@ -37,4 +41,4 @@ await writeFile(resolve(directory, 'openrouter-model-ids.ts'),
   '/** Generated with openrouter-models.data.json; preserve provider order. */\n' +
   'export const OPENROUTER_MODEL_IDS: readonly string[] = Object.freeze(' +
   JSON.stringify(rows.map(row => row.model), null, 2) + ');\n');
-console.log(`Generated ${rows.length} OpenRouter models`);
+console.log(`Generated ${rows.length} OpenRouter models (expiry filter ${today})`);

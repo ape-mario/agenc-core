@@ -12,7 +12,7 @@ import { StaticModelsManager } from "../../../../src/llm/models-manager.js";
 import { collectProviderAvailability } from "../../../../src/llm/discovery/provider-discovery.js";
 import { veniceFetch } from "../../../../src/llm/providers/venice/transport.js";
 import { ModelRegistry } from "../../../../src/llm/model-registry.js";
-import { parseVeniceModels, veniceDefaultModel, VENICE_MODELS } from "../../../../src/llm/registry/venice-models.js";
+import { parseVeniceModels, veniceDefaultModel, VENICE_MODELS, VENICE_TOOL_CALLS_NOT_DELIVERED } from "../../../../src/llm/registry/venice-models.js";
 import { AGENC_DAEMON_CLIENT_ENV_KEYS } from "../../../../src/app-server/protocol/index.js";
 import { snapshotProviderEnvironment } from "../../../../src/llm/provider-environment.js";
 import { redactDurableSecrets } from "../../../../src/session/provider-replay-redaction.js";
@@ -195,7 +195,8 @@ describe("Venice built-in provider", () => {
     const { baseURL, requests } = await fakeServer();
     const manager = new StaticModelsManager({ config: { model_provider: "venice", providers: { venice: { base_url: baseURL } } }, fallbackProvider: "venice", metadata: { fetchImpl: fetch, env: { VENICE_API_KEY: key } } });
     const models = (await manager.listModels()).filter(model => model.provider === "venice");
-    const eligible = fixture.data.filter((model: any) => model.type === "text" && model.model_spec.capabilities.supportsFunctionCalling && !model.model_spec.offline);
+    const eligible = fixture.data.filter((model: any) => model.type === "text" && model.model_spec.capabilities.supportsFunctionCalling && !model.model_spec.offline &&
+      !VENICE_TOOL_CALLS_NOT_DELIVERED.has(model.id));
     expect(models.map(model => model.slug).sort()).toEqual(eligible.map((model: any) => model.id).sort());
     const info = await manager.getModelInfoForProvider("venice", "zai-org-glm-5-2");
     expect(info).toMatchObject({ contextWindow: 1_000_000, maxOutputTokensUpperLimit: 131_072, supportsToolUse: true, supportedReasoningLevels: ["none", "high", "max"], defaultReasoningLevel: "max" });

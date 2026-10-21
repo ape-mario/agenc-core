@@ -64,10 +64,12 @@ export const JSON_RPC_VERSION = "2.0" as const;
  * 1.32 adds the optional `toolPolicy` on `agent.create`: a fixed tool
  * allowlist for the session, with an optional frozen permission mode.
  * 1.33 adds memory-only provider API key replacement for an idle session.
+ * 1.34 adds parent review of descendant effects, an optional effectSessionId
+ * owner selector, and owning-session metadata on pending effect reviews.
  * Clients that need any of the additive surfaces above must not negotiate an
  * older daemon.
  */
-export const AGENC_DAEMON_PROTOCOL_VERSION = "1.33.0" as const;
+export const AGENC_DAEMON_PROTOCOL_VERSION = "1.34.0" as const;
 export const AGENC_DAEMON_PROTOCOL_SCHEMA_ID =
   "urn:agenc:app-server:protocol" as const;
 export const AGENC_DAEMON_PROTOCOL_PACKAGE_NAME =
@@ -304,6 +306,7 @@ export const AGENC_DAEMON_CLIENT_ENV_KEYS = [
   "AGENC_COORDINATOR_MODE",
   "AGENC_LEAN_SYSTEM_PROMPT",
   "AGENC_STREAM_IDLE_TIMEOUT_MS",
+  "AGENC_STREAM_QUIET_WARNING_MS",
   "AGENC_AUTH_BACKEND",
   "AGENC_AUTH_MANAGED_KEYS_ENABLED",
   "AGENC_ONBOARDING",
@@ -355,6 +358,7 @@ export const AGENC_DAEMON_CLIENT_ENV_KEYS = [
   "AGENC_OPENAI_CONTEXT_WINDOWS",
   "AGENC_OPENAI_REASONING_REPLAY",
   "AGENC_DEEPSEEK_REASONING_ONLY_REPLAY",
+  "AGENC_DEEPSEEK_WEB_SEARCH",
   "AGENC_SESSION_ACCESS_TOKEN",
   "AGENC_AFTER_LAST_COMPACT",
   "AGENC_CACHE_SESSION_TAIL",
@@ -411,6 +415,9 @@ export const AGENC_DAEMON_CLIENT_ENV_KEYS = [
   "WEB_CUSTOM_ALLOW_ARBITRARY_HEADERS",
   "WEB_CUSTOM_MAX_BODY_KB",
   "WEB_CUSTOM_TIMEOUT_SEC",
+  "AGENC_WEB_SEARCH_ENDPOINT",
+  "AGENC_WEB_SEARCH_KIND",
+  "AGENC_WEB_SEARCH_API_KEY",
   "XAI_API_KEY",
   "GROK_API_KEY",
   "GROK_AUTH_MODE",
@@ -1551,6 +1558,8 @@ export interface AgentCreateParams extends JsonObject {
    * the daemon must validate it before the first model turn is admitted.
    */
   readonly initialDisplayUserMessage?: string | null;
+  /** Expanded human input for first-turn decisions, before skill/hook transforms. */
+  readonly initialUserPromptText?: string;
   readonly unattendedAllow?: readonly string[];
   readonly unattendedDeny?: readonly string[];
   /**
@@ -1627,6 +1636,8 @@ export interface InitializeParams extends JsonObject {
    */
   readonly protocol?: DaemonProtocolInfo;
   readonly clientName?: string;
+  /** Local connector registration, admitted only by owner remote_control policy. */
+  readonly remoteControlBridge?: boolean;
   readonly authCookie?: string;
   readonly capabilities?: JsonObject;
 }
@@ -1861,6 +1872,7 @@ export interface SessionClearParams extends JsonObject {
  */
 export interface SessionResolveToolCallLegacyParams extends JsonObject {
   readonly sessionId: string;
+  readonly effectSessionId?: string;
   /** When omitted, review every eligible legacy effect in the session. */
   readonly toolCallId?: string;
   readonly reviewer?: string;
@@ -1890,6 +1902,8 @@ export interface SessionResolveToolCallAttempt extends JsonObject {
 /** Evidence-bearing resolution required for every durable effect record. */
 export interface SessionResolveToolCallEvidenceParams extends JsonObject {
   readonly sessionId: string;
+  /** Canonical owner, restricted to this attached session's descendant tree. */
+  readonly effectSessionId?: string;
   readonly toolCallId: string;
   readonly disposition:
     "confirmed_committed" | "confirmed_no_effect" | "remains_unknown";
@@ -1908,6 +1922,7 @@ export interface SessionResolveToolCallEvidenceParams extends JsonObject {
  */
 export interface SessionResolveToolCallAttestationParams extends JsonObject {
   readonly sessionId: string;
+  readonly effectSessionId?: string;
   readonly toolCallId: string;
   readonly disposition:
     "confirmed_committed" | "confirmed_no_effect" | "remains_unknown";
@@ -2060,6 +2075,7 @@ export interface SessionRewindConversationToMessageParams extends JsonObject {
 export interface SessionFileRewindParams extends JsonObject {
   readonly sessionId: string;
   readonly messageOrdinal: number;
+  readonly userMessageId?: string;
 }
 
 export interface SessionShellExecuteParams extends JsonObject {
@@ -3822,10 +3838,14 @@ export interface SessionTranscriptResult extends JsonObject {
 }
 
 export interface SessionTranscriptV2Message extends JsonObject {
+  /** Runtime user event ID shared with the file checkpoint and history. */
+  readonly canonicalUserMessageId?: string;
   readonly messageId: string;
   readonly commitEventId: string;
   readonly role: "user" | "assistant";
   readonly text: string;
+  /** Original user submission time, when retained by the durable journal. */
+  readonly acceptedAt?: string;
   /** Display-only delta prefix, never a committed response or model-history item. */
   readonly partial?: "streaming" | "interrupted";
   readonly partialTruncated?: boolean;
@@ -3949,6 +3969,9 @@ export interface DisplayAttachment extends JsonObject {
 }
 
 export interface PendingEffectReview extends JsonObject {
+  readonly sessionId?: string;
+  /** False for a descendant's review: its parent can still take prompts. */
+  readonly blocksSession?: boolean;
   readonly callId: string;
   readonly toolName: string;
   readonly description: string;
@@ -4091,6 +4114,7 @@ export interface SessionPreviewFileRewindResult extends JsonObject {
   readonly code?: string;
   readonly message?: string;
   readonly canRestoreFiles?: boolean;
+  readonly checkpointAvailable?: boolean;
   readonly filesChanged?: readonly string[];
   readonly insertions?: number;
   readonly deletions?: number;

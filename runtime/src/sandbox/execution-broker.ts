@@ -1,3 +1,4 @@
+import { toolStage } from "../tools/stage-timing.js";
 import type { BoundReadOnlyCwdCapability } from "./bound-readonly-cwd.js";
 /**
  * Final process-execution boundary for commands that do not naturally pass
@@ -65,8 +66,9 @@ import {
   type SandboxPreparedSpawn,
 } from "./execution-prepared-spawn.js";
 import { resolveSessionTempRoot } from "../session/runtime-options.js";
+import { protectRemoteControlAuthority, remoteControlAuthorityPaths } from "./remote-control-protection.js";
 import { cronLockAuthorityRoots, protectCronAuthority } from "./cron-authority-protection.js";
-import { desktopAuthorityRoot, protectDesktopAuthority } from "./desktop-authority-protection.js";
+import { canonicalAuthorityPath, desktopAuthorityRoot, protectDesktopAuthority } from "./desktop-authority-protection.js";
 import { protectAgencHomeUnderWritableRoot, sandboxAgencHome } from "./agenc-home-protection.js";
 import { protectDaemonSocket } from "./daemon-socket-protection.js";
 import {
@@ -280,6 +282,8 @@ export interface SandboxExecutionBrokerOptions {
   readonly allowLocalBinding?: boolean;
   readonly persistentSession?: boolean;
   readonly permissionProfile?: PermissionProfile;
+  /** Trusted session resolver, evaluated at the broker cwd (including worktree forks). */
+  readonly sessionMemoryRoots?: (cwd: string) => readonly string[];
   readonly platform?: NodeJS.Platform;
   readonly sandboxManager?: SandboxExecutionManager;
   /** Internal lineage marker propagated by forkForCwd. */
@@ -570,6 +574,7 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
   readonly #windowsSandboxPrivateDesktop: boolean;
   readonly #desktopAuthorityRoot: string;
   readonly #agencHome: string;
+  readonly #sessionMemoryRoots: SandboxExecutionBrokerOptions["sessionMemoryRoots"];
   readonly #cronAuthorityRoots: readonly string[];
   #allowGpu: boolean;
   #allowLocalBinding: boolean;
@@ -599,6 +604,7 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
     this.#env = { ...(options.env ?? process.env) };
     this.#desktopAuthorityRoot = desktopAuthorityRoot(undefined, this.#env);
     this.#agencHome = sandboxAgencHome(undefined, this.#env);
+    this.#sessionMemoryRoots = options.sessionMemoryRoots;
     this.#cronAuthorityRoots = cronLockAuthorityRoots();
     this.#platform = options.platform ?? process.platform;
     this.#sandboxManager = options.sandboxManager ?? defaultSandboxManager;
@@ -1004,6 +1010,7 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
       mode: this.mode,
       cwd: resolvedCwd,
       env: this.#env,
+      ...(this.#sessionMemoryRoots === undefined ? {} : { sessionMemoryRoots: this.#sessionMemoryRoots }),
       sessionTempRoot: this.#sessionTempRoot,
       ...(this.#explicitLinuxHelper !== undefined
         ? { agencLinuxSandboxExe: this.#explicitLinuxHelper }
@@ -1066,10 +1073,28 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
       const target = pattern.endsWith("/**") ? pattern.slice(0, -3) : pattern;
       return { path: /[*?]/u.test(target) ? { kind: "glob" as const, pattern: target } : { kind: "path" as const, path: target }, access: "none" as const };
     });
+    // A platform probe depends on cwd, environment, platform and helper, not
+    // on the narrowed policy or mode beyond its label. A fork for this
+    // broker's own cwd reuses this broker's successful probe, which every
+    // authority change resets, instead of running bubblewrap synchronously
+    // again for each read-only inspection. Any other fork probes as before.
+    const parentStatus = this.#status;
+    const parentCwd = this.#cwd;
+    const parentEnv = this.#env;
+    const probe: NonNullable<SandboxExecutionBrokerOptions["probe"]> =
+      parentStatus?.kind === "ready" && path.resolve(cwd) === parentCwd
+        ? (options) => options.mode === "read_only" && options.cwd === parentCwd &&
+            options.platform === this.#platform &&
+            options.agencLinuxSandboxExe === this.#explicitLinuxHelper &&
+            sameEnvironment(options.env, parentEnv)
+          ? { ...parentStatus, mode: options.mode }
+          : this.#probe(options)
+        : this.#probe;
     return new SandboxExecutionBroker({
       mode: "read_only",
       cwd,
       env: this.#env,
+      ...(this.#sessionMemoryRoots === undefined ? {} : { sessionMemoryRoots: this.#sessionMemoryRoots }),
       sessionTempRoot: this.#sessionTempRoot,
       ...(this.#explicitLinuxHelper !== undefined ? { agencLinuxSandboxExe: this.#explicitLinuxHelper } : {}),
       windowsSandboxLevel: this.#windowsSandboxLevel,
@@ -1079,7 +1104,7 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
       permissionProfile: { ...permissionProfile, fileSystem: { ...permissionProfile.fileSystem, entries: [...permissionProfile.fileSystem.entries, ...deniedEntries] } },
       platform: this.#platform,
       sandboxManager: this.#sandboxManager,
-      probe: this.#probe,
+      probe,
       planLandlockPolicy: this.#planLandlockPolicy,
       forkDepth: this.forkDepth + 1,
       lifecycleLeaseDrainTimeoutMs: this.#lifecycleLeaseDrainTimeoutMs,
@@ -1161,10 +1186,15 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
   }
 
   #protectProfile(profile: PermissionProfile): PermissionProfile {
+    // File tools write in-process. Shells must not inherit a workspace or temp
+    // grant over memory, including trusted custom/remote roots outside home.
+    for (const root of this.#sessionMemoryRoots?.(this.#cwd) ?? []) {
+      profile = protectDesktopAuthority(profile, canonicalAuthorityPath(root));
+    }
     return protectAgencHomeUnderWritableRoot(
-      protectDaemonSocket(protectCronAuthority(protectDesktopAuthority(
+      protectRemoteControlAuthority(protectDaemonSocket(protectCronAuthority(protectDesktopAuthority(
         profile, this.#desktopAuthorityRoot,
-      ), this.#cronAuthorityRoots)),
+      ), this.#cronAuthorityRoots)), remoteControlAuthorityPaths(this.#agencHome, undefined, this.#env)),
       this.#agencHome, this.#cwd, this.#sessionTempRoot,
     );
   }
@@ -1215,6 +1245,14 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
     surface: SandboxExecutionSurface,
     requestedCommand: SandboxSpawnCommand,
     options: SandboxPrepareSpawnOptions = {},
+  ): SandboxPreparedSpawn {
+    return toolStage("sandbox_broker", () => this.prepareSpawnTimed(surface, requestedCommand, options));
+  }
+
+  private prepareSpawnTimed(
+    surface: SandboxExecutionSurface,
+    requestedCommand: SandboxSpawnCommand,
+    options: SandboxPrepareSpawnOptions,
   ): SandboxPreparedSpawn {
     // A routine run's commands get their scratch folder inside the workspace
     // as TMPDIR: the session temp root is not writable for them.
@@ -1731,6 +1769,12 @@ function isSpawnExecutable(candidate: string, platform: NodeJS.Platform): boolea
   } catch {
     return false;
   }
+}
+
+function sameEnvironment(left: NodeJS.ProcessEnv, right: NodeJS.ProcessEnv): boolean {
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length &&
+    keys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && left[key] === right[key]);
 }
 
 export function probeSandboxExecutionStatus(options: {

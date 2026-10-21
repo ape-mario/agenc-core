@@ -510,7 +510,7 @@ vi.mock("../../../utils/debug.js", () => ({
 }));
 
 vi.mock("../../../utils/directMemberMessage.js", () => ({
-  parseDirectMemberMessage: () => harness.directMessage,
+  parseDirectMemberMessage: vi.fn(() => harness.directMessage),
   sendDirectMemberMessage: vi.fn(() => harness.directMessageResult),
 }));
 
@@ -770,7 +770,7 @@ vi.mock("./useSwarmBanner.js", () => ({
 }));
 
 import { createRoot } from "../../ink/root.js";
-import { sendDirectMemberMessage } from "../../../utils/directMemberMessage.js";
+import { parseDirectMemberMessage, sendDirectMemberMessage } from "../../../utils/directMemberMessage.js";
 import { getImageFromClipboard } from "../../../utils/imagePaste.js";
 import { cacheImagePath, storeImage } from "../../../utils/imageStore.js";
 import { logError } from "../../../utils/log.js";
@@ -2115,6 +2115,16 @@ describe("PromptInput render surface", () => {
     } finally { await rendered.dispose(); }
   });
 
+  test.each(["!", "!python3 --version"])("returns the normalized shell edit to the text input: %s", async (value) => {
+    const onModeChange = vi.fn();
+    const rendered = await renderPromptInput({ onModeChange });
+    try {
+      const change = harness.baseProps!.onChange as (value: string) => unknown;
+      expect(change(value)).toEqual({ value: value.slice(1), offset: value.length - 1 });
+      expect(onModeChange).toHaveBeenCalledWith("bash");
+    } finally { await rendered.dispose(); }
+  });
+
   test("executes bash-mode input locally and emits transcript events", async () => {
     const emitted: unknown[] = [];
     const setToolJSX = vi.fn();
@@ -2718,6 +2728,41 @@ describe("PromptInput render surface", () => {
     } finally {
       await rendered.dispose();
     }
+  });
+
+  test("expands pasted prompt text before submitting to the viewed agent", async () => {
+    const task = { id: "worker" };
+    harness.activeAgent = { type: "local_agent", task };
+    const onAgentSubmit = vi.fn(async () => {});
+    const pastedContents = createPastedContentsState({ 1: { id: 1, type: "text", content: "first line\nsecond line" } });
+    const rendered = await renderPromptInput({ input: "Please [Pasted text #1 +1 lines]", onAgentSubmit, pastedContents: pastedContents.current, setPastedContents: pastedContents.setPastedContents });
+    try {
+      const props = await waitForPromptInputProps();
+      await (props.onSubmit as (value: string) => Promise<void>)("Please [Pasted text #1 +1 lines]");
+      expect(onAgentSubmit).toHaveBeenCalledWith("Please first line\nsecond line", task, expect.anything());
+    } finally { await rendered.dispose(); }
+  });
+
+  test("recognizes a fully pasted direct message without expanding quoted refs twice", async () => {
+    harness.isAgentSwarmsEnabled = true;
+    harness.directMessageResult = { recipientName: "teammate", success: true };
+    harness.appState.teamContext = { teamName: "alpha", teammates: { teammate: { name: "teammate" } } };
+    vi.mocked(parseDirectMemberMessage)
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce({ recipientName: "teammate", message: "review literal [Pasted text #5]\nand tests" });
+    const pastedContents = createPastedContentsState({
+      4: { id: 4, type: "text", content: "@teammate review literal [Pasted text #5]\nand tests" },
+      5: { id: 5, type: "text", content: "must not replace quoted ref" },
+    });
+    const onSubmit = vi.fn(async () => {});
+    const rendered = await renderPromptInput({ input: "[Pasted text #4 +1 lines]", onSubmit, pastedContents: pastedContents.current, setPastedContents: pastedContents.setPastedContents });
+    try {
+      const props = await waitForPromptInputProps();
+      await (props.onSubmit as (value: string) => Promise<void>)("[Pasted text #4 +1 lines]");
+      expect(parseDirectMemberMessage).toHaveBeenCalledWith("@teammate review literal [Pasted text #5]\nand tests");
+      expect(sendDirectMemberMessage).toHaveBeenCalledWith("teammate", "review literal [Pasted text #5]\nand tests", expect.anything(), expect.any(Function));
+      expect(onSubmit).not.toHaveBeenCalled();
+    } finally { await rendered.dispose(); }
   });
 
   test("warns for macOS option-key characters with native CSIu terminal guidance", async () => {

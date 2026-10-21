@@ -202,6 +202,13 @@ export function validateToolsConfig(
   const record = requirePlainObject(value, field);
   for (const [key, item] of Object.entries(record)) {
     const path = `${field}.${key}`;
+    if (key === "web_search_provider") {
+      optionalEnum(item, path, [
+        "auto", "firecrawl", "tavily", "exa", "you", "jina", "bing",
+        "mojeek", "linkup", "custom", "ddg", "native",
+      ]);
+      continue;
+    }
     if (key === "web_search_endpoint") {
       optionalString(item, path);
       continue;
@@ -613,6 +620,12 @@ const ROOT_FIELD_VALIDATORS = {
   mcp: delegatedObjectValidator("mcp"),
   mcp_servers: delegatedObjectValidator("mcp_servers"),
   daemon: validateDaemon,
+  remote_control: (value) => {
+    if (value === undefined) return;
+    const record = requirePlainObject(value, "remote_control");
+    rejectUnknownFields(record, new Set(["enabled"]), "remote_control");
+    optionalBoolean(record.enabled, "remote_control.enabled");
+  },
   gateway: validateGateway,
   protocol: delegatedObjectValidator("protocol"),
   lsp_servers: validateLspServers,
@@ -685,6 +698,7 @@ const ROOT_FIELD_VALIDATORS = {
   defer_rare_tools: fieldValidator("defer_rare_tools", optionalBoolean),
   lean_system_prompt: fieldValidator("lean_system_prompt", optionalBoolean),
   stream_watchdog_timeout_ms: fieldValidator("stream_watchdog_timeout_ms", optionalNonNegativeInteger),
+  stream_quiet_warning_ms: fieldValidator("stream_quiet_warning_ms", optionalNonNegativeInteger),
   provider_outage_wait_ms: fieldValidator("provider_outage_wait_ms", optionalNonNegativeInteger),
   provider_outage_retry_ms: fieldValidator("provider_outage_retry_ms", optionalPositiveInteger),
   max_output_tokens: fieldValidator("max_output_tokens", optionalPositiveInteger),

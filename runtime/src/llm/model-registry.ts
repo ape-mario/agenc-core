@@ -19,7 +19,8 @@ import {
   type ModelMetadataResolverOptions,
   type ResolvedModelMetadata,
 } from "./model-metadata.js";
-import { resolveRegisteredModelCatalogEntry } from "./registry/model-catalog.js";
+import { OPENAI_PERSONALITY_MESSAGES, resolveRegisteredModelCatalogEntry } from "./registry/model-catalog.js";
+import { gatewayFamilyDefaultEffort, gatewayModelFamily } from "./model-family.js";
 import { resolveBedrockModelIdentity } from "../utils/model/claudeModelId.js";
 import { modelSupportsPersonality } from "../context/personality-spec-instructions.js";
 import {
@@ -90,6 +91,10 @@ function inferDefaultReasoningLevel(
   entry: ModelRegistryEntry,
   supportedReasoningLevels: readonly ReasoningEffort[],
 ): ReasoningEffort | undefined {
+  // A DeepSeek model reasons at high by default on DeepSeek's own API; the
+  // request sends that default to the gateway too (capability-gating.ts).
+  const familyDefault = gatewayFamilyDefaultEffort(entry.provider, entry.model, supportedReasoningLevels);
+  if (familyDefault !== undefined) return familyDefault;
   if (entry.veniceModel) return entry.veniceModel.defaultReasoningLevel;
   if (entry.provider === "gemini") return undefined;
   const catalog = catalogEntryFor(entry);
@@ -191,6 +196,11 @@ export function modelRegistryEntryToModelInfo(
   const serviceTiers = inferServiceTiers(entry);
   const catalog = catalogEntryFor(entry);
   const visibility = catalog?.visibility ?? "list";
+  // A gateway serving a GPT-family model by its id gets the session shape
+  // OpenAI's own API gets: parallel tool calls (OpenRouter's parameter list
+  // omits the field although it forwards it) and the personality instructions.
+  const gptThroughGateway = gatewayModelFamily(entry.provider, entry.model) === "openai";
+  const modelMessages = catalog?.modelMessages ?? (gptThroughGateway ? OPENAI_PERSONALITY_MESSAGES : undefined);
   return {
     slug: entry.model,
     provider: entry.provider,
@@ -222,11 +232,9 @@ export function modelRegistryEntryToModelInfo(
     defaultReasoningSummary: catalog?.defaultReasoningSummary ?? "auto",
     truncationPolicy: "off",
     supportsToolUse: entry.capabilities.supportsToolUse,
-    supportsParallelToolCalls: catalog?.supportsParallelToolCalls ?? false,
-    ...(catalog?.modelMessages !== undefined
-      ? { modelMessages: catalog.modelMessages }
-      : {}),
-    supportsPersonality: modelSupportsPersonality(catalog?.modelMessages),
+    supportsParallelToolCalls: catalog?.supportsParallelToolCalls === true || gptThroughGateway,
+    ...(modelMessages !== undefined ? { modelMessages } : {}),
+    supportsPersonality: modelSupportsPersonality(modelMessages),
     visibility,
     showInPicker: visibility === "list",
     ...(entry.veniceModel ? {

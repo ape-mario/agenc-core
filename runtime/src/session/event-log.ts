@@ -360,6 +360,7 @@ export interface CompletionGateEvent {
     | "unavailable_checks"
     | "rounds_exhausted"
     | "no_tool_use"
+    | "answer_only"
     | "deadline_reserve";
   /** Tool calls that completed between the last injection and this decision. */
   readonly toolCallsSinceInjection: number;
@@ -417,6 +418,8 @@ export interface TokenCountEvent {
    * "priority" or "fast"), which bills at fast-mode rates.
    */
   readonly speed?: "fast";
+  /** What the provider charged for this call in USD (OpenRouter `usage.cost`). */
+  readonly providerCostUsd?: number;
 }
 
 export interface McpToolCallBeginEvent {
@@ -1201,6 +1204,12 @@ export type EventMsg =
         readonly callId: string;
         readonly toolName: string;
         readonly args: string;
+        /**
+         * How a crash during this call is recovered. The daemon's in-flight
+         * tool index records it; idempotent rows are observer state and
+         * commit without their own fsync.
+         */
+        readonly recoveryCategory?: ToolRecoveryCategory;
       };
     }
   | {
@@ -2035,6 +2044,9 @@ export function usageToTokenCountEvent(usage: LLMUsage): EventMsg {
         : {}),
       ...(usage.webSearchRequests !== undefined
         ? { webSearchRequests: usage.webSearchRequests }
+        : {}),
+      ...(usage.providerCostUsd !== undefined
+        ? { providerCostUsd: usage.providerCostUsd }
         : {}),
     },
   };

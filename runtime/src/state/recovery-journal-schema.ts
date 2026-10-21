@@ -839,6 +839,7 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
       model: isString,
       provider: isString,
       speed: literal("fast"),
+      providerCostUsd: isNumber,
     },
   ),
   mcp_tool_call_begin: objectShape({
@@ -875,11 +876,14 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
     { callId: isString, command: isString },
     { reason: isString },
   ),
-  tool_call_started: objectShape({
-    callId: isString,
-    toolName: isString,
-    args: isString,
-  }),
+  tool_call_started: objectShape(
+    {
+      callId: isString,
+      toolName: isString,
+      args: isString,
+    },
+    { recoveryCategory: isToolRecoveryCategory },
+  ),
   tool_input_block_start: objectShape({
     callId: isString,
     index: isNonNegativeInteger,
@@ -1112,6 +1116,7 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
         "unavailable_checks",
         "rounds_exhausted",
         "no_tool_use",
+        "answer_only",
         "deadline_reserve",
       ),
       toolCallsSinceInjection: isNonNegativeInteger,

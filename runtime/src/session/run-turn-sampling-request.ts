@@ -14,23 +14,19 @@ import {
   filterToolsForLocalProfile,
   usesLocalToolProfile,
 } from "../llm/wire/capability-gating.js";
-import {
-  StreamModelError,
-  type StreamModelRequestContract,
-} from "../phases/stream-model.js";
-import * as planModeHelpers from "./plan-mode.js";
+import type { StreamModelRequestContract } from "../phases/stream-model.js";
 import type { Session } from "./session.js";
 import { modelContextWindow, type TurnContext } from "./turn-context.js";
 import type { TurnState } from "./turn-state.js";
 import { messageText } from "./run-turn-messages.js";
 import type { ToolPermissionContext } from "../permissions/types.js";
+import { getEffectiveContextWindowSizeForEnvironment } from "../services/compact/thresholds.js";
+import { getSelectedProviderEnvironment } from "../utils/model/providers.js";
 import { getSessionPermissionInstructions } from "./permission-instructions.js";
 import {
   appendVolatileInstructions,
   sessionTailCacheEnabled,
 } from "./session-tail-cache.js";
-
-const MAX_PLAN_TOOL_REQUIRED_RETRIES = 2;
 
 // ─────────────────────────────────────────────────────────────────────
 // Prompt + tool building
@@ -234,11 +230,12 @@ function buildSamplingRequestContract(
   );
   return {
     ...request,
+    contextWindowTokens: getEffectiveContextWindowSizeForEnvironment({ options: {
+      mainLoopModel: samplingContext.modelInfo.slug,
+      contextWindowTokens: request.contextWindowTokens,
+    } }, getSelectedProviderEnvironment()),
     ...(state.reasoningOnlyRecoveryPending === true
       ? { reasoningOnlyRecovery: true as const }
-      : {}),
-    ...(planModeHelpers.isPlanMode(samplingContext) && request.tools.length > 0
-      ? { toolChoice: "required" as const }
       : {}),
     ...(state.maxOutputTokensOverride !== undefined
       ? { maxOutputTokens: state.maxOutputTokensOverride }
@@ -279,56 +276,9 @@ function snapshotSamplingRequestContract(
   };
 }
 
-function removeLastAssistantMessage(state: TurnState): void {
-  const last = state.messages.at(-1);
-  if (last?.role === "assistant") {
-    state.messages.pop();
-  }
-}
-
-function enforcePlanModeToolBoundary(
-  state: TurnState,
-  ctx: TurnContext,
-  request: StreamModelRequestContract,
-  currentPermissionMode = ctx.permissionMode,
-): void {
-  if (!planModeHelpers.isPlanMode(ctx)) return;
-  if (currentPermissionMode !== "plan") return;
-  if (request.tools.length === 0) return;
-  if (state.toolUseBlocks.length > 0) {
-    state.planToolRequiredRetryCount = 0;
-    return;
-  }
-
-  const assistant = state.assistantMessages.at(-1);
-  const assistantText = assistant?.text?.trim() ?? "";
-  if (assistantText.length === 0) return;
-
-  state.planToolRequiredRetryCount += 1;
-  if (state.planToolRequiredRetryCount > MAX_PLAN_TOOL_REQUIRED_RETRIES) {
-    throw new StreamModelError(
-      new Error(
-        "plan_mode_tool_required: provider returned assistant text without a tool call",
-      ),
-    );
-  }
-
-  removeLastAssistantMessage(state);
-  state.assistantMessages = [];
-  state.toolUseBlocks = [];
-  state.needsFollowUp = false;
-  state.messages.push({
-    role: "user",
-    content:
-      "Plan mode requires this step to end with a tool call. Do not ask questions or request approval in assistant text. If you need user input, call AskUserQuestion with concrete options. If the plan is ready for approval, call ExitPlanMode. If you have concluded that nothing needs to change, that conclusion is the plan: call ExitPlanMode with it. Repeating the same text does not end the step. If you need more context, call a read-only tool.",
-  });
-  state.transition = { reason: "plan_tool_required" };
-}
-
 // Shared with run-turn.ts and its sibling modules.
 export {
   discoverDirectMcpToolMentions,
   buildSamplingRequestContract,
   snapshotSamplingRequestContract,
-  enforcePlanModeToolBoundary,
 };

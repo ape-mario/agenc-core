@@ -708,9 +708,9 @@ export function ChatBody({
   )
 }
 
-// The transcript surface (ActiveWorkSurface) adds paddingX={1} around the
-// welcome panel, so reserve 2 columns from the reported content width to avoid
-// overflowing the pane.
+// Isolated welcome panels reserve a column on either side. In the app,
+// ContentWidthProvider already accounts for the transcript padding; do not
+// subtract a second inset from that width.
 const WELCOME_INSET = 2
 
 function useWelcomeAvailableWidth(): number {
@@ -719,10 +719,8 @@ function useWelcomeAvailableWidth(): number {
   const { columns: terminalColumns } = useTerminalSize()
   // `TerminalFrameColumnsContext` intentionally defaults to 120 for isolated
   // primitives, but a real 44/80-col Ink viewport can be narrower than that.
-  // Clamp the fallback to the physical terminal so the brand row switches to
-  // its stacked compact form before Yoga starts wrapping the logo itself.
-  const available = contentWidth ?? Math.min(frameColumns, terminalColumns)
-  return Math.max(1, available - WELCOME_INSET)
+  // Clamp the fallback to the physical terminal before fitting the mark.
+  return Math.max(1, contentWidth ?? (Math.min(frameColumns, terminalColumns) - WELCOME_INSET))
 }
 
 // Portable fallback for terminals without a graphics protocol. These Braille
@@ -936,12 +934,23 @@ function WelcomeHintLine(): React.ReactNode {
   )
 }
 
+// Reserve ten rows outside the mark: name + gap (2), transcript top
+// padding (1), and prompt/footer chrome including a wrapped placeholder (7).
+// Hints cost another gap and row; drop them before shrinking the brand mark.
+export function welcomeColdPanelLayout(availableWidth: number, terminalRows: number): {
+  readonly compactLogo: boolean
+  readonly showHint: boolean
+} {
+  const fullWidth = Math.max(...AGENC_LOGO_MARK_LINES.map(line => stringWidth(line)))
+  const compactLogo = availableWidth < fullWidth || terminalRows < AGENC_LOGO_MARK_LINES.length + 10
+  const logoRows = compactLogo ? AGENC_LOGO_MARK_COMPACT_LINES.length : AGENC_LOGO_MARK_LINES.length
+  return { compactLogo, showHint: terminalRows >= logoRows + 12 }
+}
+
 export function WelcomeColdPanel(): React.ReactNode {
   const availableWidth = useWelcomeAvailableWidth()
   const { rows: terminalRows } = useTerminalSize()
-  // The full mark is 20x10 cells; short panes get the 12x6 mark.
-  const compactLogo = availableWidth < 96 || terminalRows < 24
-  const showHint = terminalRows >= 16
+  const { compactLogo, showHint } = welcomeColdPanelLayout(availableWidth, terminalRows)
 
   return (
     <Box
@@ -1539,6 +1548,7 @@ export function approvalDiffPreviewBudget(
 export function ApprovalCard({
   risk,
   title,
+  summary,
   command,
   commandIsShell = true,
   facts,
@@ -1550,9 +1560,15 @@ export function ApprovalCard({
   typedConfirmationTarget = 'yes',
   selectedIndex,
   typingWaiting = false,
+  draftText,
+  draftFocused = false,
+  sessionScope = 'allow in this session',
+  cancelLabel = 'cancel',
 }: {
   readonly risk: 'low' | 'high'
   readonly title: string
+  /** Replaces the risk summary row, for a card whose question the risk tier does not say. */
+  readonly summary?: string
   readonly command: string
   /**
    * Whether `command` is an actual SHELL command (Run/Bash) that should carry
@@ -1577,12 +1593,16 @@ export function ApprovalCard({
   /** Selected row of the action picker (0 approve-once, 1 session, 2 deny). */
   readonly selectedIndex?: number
   readonly typingWaiting?: boolean
+  readonly draftText?: string
+  readonly draftFocused?: boolean
+  readonly sessionScope?: string
+  readonly cancelLabel?: string
 }): React.ReactNode {
   const variant: BadgeVariant = risk === 'high' ? 'error' : 'accent'
   const primaryFact = facts[0]?.value ?? title
   // The action picker below owns the "1/2/3 + confirm" affordance — keep the
   // summary line to identity only (no repeated confirm text, no `{}` inputs).
-  const approvalSummary = `${risk === 'high' ? 'high-risk approval' : 'needs approval'} · ${primaryFact}`
+  const approvalSummary = summary ?? `${risk === 'high' ? 'high-risk approval' : 'needs approval'} · ${primaryFact}`
   // The approval popup is rendered into a fixed-height slot (the layout
   // overlay row, or the modal context). Without a height cap the body grows
   // past the popup's own bottom border and bleeds onto the footer below it.
@@ -1614,7 +1634,7 @@ export function ApprovalCard({
   // lines it may show) so the same decision is unit-testable without the
   // renderer; see `approvalDiffPreviewBudget`.
   const budget = approvalDiffPreviewBudget(
-    popupBodyRows,
+    popupBodyRows - (draftText !== undefined && (draftText.length > 0 || draftFocused) ? 2 : 0),
     diffPreview?.lines.length ?? 0,
   )
   const showPreview = diffPreview !== undefined && budget.showPreview
@@ -1641,9 +1661,11 @@ export function ApprovalCard({
     <Popup
       title={title}
       headerRight={
-        requireTypedConfirmation
-          ? `${typedConfirmationValue.length > 0 ? typedConfirmationValue : ' '} / ${typedConfirmationTarget}`
-          : 'esc to close'
+        draftFocused
+          ? 'tab review approval'
+          : requireTypedConfirmation
+            ? `${typedConfirmationValue.length > 0 ? typedConfirmationValue : ' '} / ${typedConfirmationTarget}`
+            : `esc ${cancelLabel}`
       }
       status={requestId === undefined ? undefined : `req ${requestId}`}
       accentColor={variantColor[variant]}
@@ -1654,13 +1676,23 @@ export function ApprovalCard({
       footer={
         // Only real affordances go here — there is no `e` handler, so the old
         // `e edit command` hint sent users to a dead key.
-        requireTypedConfirmation
-          ? [{ keyName: 'type', label: 'confirmation required' }]
-          : []
+        draftFocused
+          ? [{ keyName: 'tab', label: 'review approval' }]
+          : requireTypedConfirmation
+            ? [{ keyName: 'type', label: 'confirmation required' }]
+            : []
       }
     >
       <Box flexDirection="column" paddingX={1} flexShrink={0}>
-        {typingWaiting && !compactActions ? (
+        {draftText !== undefined && (draftText.length > 0 || draftFocused) ? (
+          <>
+            <ThemedText color="text2" wrap="truncate-end">{`Draft saved: ${draftText || '(empty)'}`}</ThemedText>
+            <ThemedText color="inactive" wrap="truncate-end">
+              {draftFocused ? 'Typing stays in your draft. Enter keeps it. Tab reviews approval. Esc stops the turn.' : 'Your draft will return to the input after approval.'}
+            </ThemedText>
+          </>
+        ) : null}
+        {typingWaiting && !draftFocused && !compactActions ? (
           <ThemedText color="text2" wrap="truncate-end">
             {requireTypedConfirmation
               ? `Card is waiting. Type ${typedConfirmationTarget}, then press Enter after a pause.`
@@ -1675,7 +1707,9 @@ export function ApprovalCard({
         {requireTypedConfirmation ? (
           <Box flexDirection="column" flexShrink={0}>
             <ThemedText color="inactive" wrap="truncate-end">
-              type '{typedConfirmationTarget}' to approve · esc cancel
+              {draftFocused
+                ? `Press Tab to review this approval · esc ${cancelLabel}`
+                : `type '${typedConfirmationTarget}' to approve · pause, then Enter · esc ${cancelLabel}`}
             </ThemedText>
             <Box flexDirection="row" gap={1}>
               <ThemedText color={typedConfirmationValue === typedConfirmationTarget ? 'agenc' : 'text2'}>
@@ -1706,8 +1740,8 @@ export function ApprovalCard({
               const marker = selected ? '❯ ' : '  '
               const rowText = `${marker}${index + 1}  ${action.label}`
               const detailText = compactActions
-                ? (index === 2 ? ' · esc cancel' : '')
-                : `  ${action.suffix}`
+                ? (index === 2 ? ` · esc ${cancelLabel}` : '')
+                : `  ${index === 1 ? sessionScope : action.suffix}`
               return (
                 <Box key={action.label}>
                   {selected ? (
@@ -1728,7 +1762,7 @@ export function ApprovalCard({
         {!requireTypedConfirmation && !compactActions ? (
           <Box marginTop={1} marginBottom={1} flexShrink={0}>
             <ThemedText color="inactive" wrap="truncate-end">
-              1·2·3 choose   ↑↓ move   ⏎ confirm   esc cancel{diffPreview !== undefined ? '   ctrl+w d full diff' : ''}
+              1·2·3 choose   ↑↓ move   ⏎ confirm   esc {cancelLabel}{diffPreview !== undefined ? '   ctrl+w d full diff' : ''}
             </ThemedText>
           </Box>
         ) : null}
@@ -1744,7 +1778,8 @@ export function ApprovalCard({
           // the file, so this line is redundant and omitted (the `showPreview`
           // branch above); only surface the bare path when no diff is rendered.
           // Empty/`{}` inputs (EnterPlanMode and friends) render no line at all.
-          <ThemedText color="text2" wrap="truncate-end">
+          // A long path loses its middle, never its file name.
+          <ThemedText color="text2" wrap="truncate-middle">
             {command}
           </ThemedText>
         )}
@@ -1787,7 +1822,7 @@ export function ApprovalCard({
           </Box>
         ) : null}
         {showNote ? (
-          <ThemedText color="inactive" wrap="truncate-end">
+          <ThemedText color="inactive" wrap="wrap">
             note · {note}
           </ThemedText>
         ) : null}

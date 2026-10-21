@@ -1,3 +1,4 @@
+import { toolStage } from "../tools/stage-timing.js";
 import { oneShotFastModeActive } from "../one-shot-fast-mode.js";
 import { SessionWriteBehindQueue, withSessionWriteBehind } from "./write-behind.js";
 /**
@@ -1696,6 +1697,7 @@ export interface SessionRewindConversationToMessageParams {
 
 export interface SessionFileRewindParams {
   readonly messageOrdinal: number;
+  readonly userMessageId?: string;
 }
 
 export type SessionFileRewindErrorCode =
@@ -1707,6 +1709,7 @@ export type SessionPreviewFileRewindResult =
       readonly sessionId: string;
       /** True when restoring files for this message would change disk state. */
       readonly canRestoreFiles: boolean;
+      readonly checkpointAvailable?: boolean;
       readonly filesChanged: readonly string[];
       readonly insertions: number;
       readonly deletions: number;
@@ -4559,14 +4562,36 @@ export class Session {
   }
 
   /**
-   * Resolve a message ordinal (over selectable user messages in the
-   * active history — same contract as conversation rewind) to the
-   * `userMessageId` stamped by `runTurn`, which keys the file-history
-   * sidecar's barrier snapshot for that message.
+   * Resolve a durable prompt ID across automatic compaction, or a legacy
+   * active-history ordinal, to the file-history barrier snapshot. Explicit
+   * transcript resets retire older selections; compaction does not.
    */
   private resolveFileRewindTarget(
     messageOrdinal: number,
+    durableUserMessageId?: string,
   ): { found: false } | { found: true; userMessageId: string | null } {
+    if (durableUserMessageId !== undefined) {
+      // Stable IDs never fall back to ordinals: compaction can reassign those.
+      const current = this.snapshotHistoryMessages().some(message =>
+        isSelectableHistoryUserMessage(message) &&
+        (message.runtimeOnly?.userMessageId ?? message.runtimeOnly?.responseItemId) === durableUserMessageId);
+      if (current) return { found: true, userMessageId: durableUserMessageId };
+      const items = this.rolloutStore?.readAll() ?? [];
+      // Automatic compaction is not a transcript reset. Explicit clear/rewind
+      // boundaries do retire prompts and must not resurrect stale selections.
+      let boundary = -1;
+      for (let index = items.length - 1; index >= 0; index--) {
+        const item = items[index]!;
+        if (item.type === "event_msg" &&
+            (item.payload.msg.type === "history_cleared" || item.payload.msg.type === "transcript_epoch")) {
+          boundary = index;
+          break;
+        }
+      }
+      const exists = items.slice(boundary + 1).some(item => item.type === "event_msg" &&
+        item.payload.msg.type === "user_message" && item.payload.id === durableUserMessageId);
+      return exists ? { found: true, userMessageId: durableUserMessageId } : { found: false };
+    }
     const sourceHistory = this.snapshotHistoryMessages();
     const { activeHistory } = splitActiveHistory(sourceHistory);
     const selectedIndex = activeHistoryIndexForOrdinal(
@@ -4590,7 +4615,7 @@ export class Session {
   async previewFileRewind(
     params: SessionFileRewindParams,
   ): Promise<SessionPreviewFileRewindResult> {
-    const target = this.resolveFileRewindTarget(params.messageOrdinal);
+    const target = this.resolveFileRewindTarget(params.messageOrdinal, params.userMessageId);
     if (!target.found) {
       return {
         ok: false,
@@ -4610,6 +4635,7 @@ export class Session {
         ok: true,
         sessionId: this.conversationId,
         canRestoreFiles: false,
+        checkpointAvailable: false,
         filesChanged: [],
         insertions: 0,
         deletions: 0,
@@ -4619,6 +4645,7 @@ export class Session {
       ok: true,
       sessionId: this.conversationId,
       canRestoreFiles: preview.filesChanged.length > 0,
+      checkpointAvailable: true,
       filesChanged: [...preview.filesChanged],
       insertions: preview.insertions,
       deletions: preview.deletions,
@@ -4657,7 +4684,7 @@ export class Session {
       throw error;
     }
     try {
-      const target = this.resolveFileRewindTarget(params.messageOrdinal);
+      const target = this.resolveFileRewindTarget(params.messageOrdinal, params.userMessageId);
       if (!target.found) {
         return {
           ok: false,
@@ -4968,6 +4995,15 @@ export class Session {
     event: Event,
     appendOpts: AppendOptions = {},
   ): { readonly event: Event; publish(): Event } {
+    // Through the class, not the receiver: prepareEmit may be borrowed by a
+    // facade (`Session.prototype.prepareEmit`) that has no private helpers.
+    return toolStage("persistence", () => Session.prototype.prepareEmitTimed.call(this, event, appendOpts));
+  }
+
+  private prepareEmitTimed(
+    event: Event,
+    appendOpts: AppendOptions,
+  ): { readonly event: Event; publish(): Event } {
     if (this.writeBehind.draining) this.writeBehind.drain();
     if (this.canonicalJournalSealed) {
       throw new Error(
@@ -5076,6 +5112,10 @@ export class Session {
 
   /** Publish an event already stamped and appended by {@link prepareEmit}. */
   publishPreparedEvent(event: Event): Event {
+    return toolStage("ui_fanout", () => Session.prototype.publishPreparedEventTimed.call(this, event));
+  }
+
+  private publishPreparedEventTimed(event: Event): Event {
     if (this.writeBehind.deferring) {
       const captured = structuredClone(event);
       this.writeBehind.defer("event-publication", () => this.publishPreparedEvent(captured));

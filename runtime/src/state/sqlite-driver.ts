@@ -78,8 +78,9 @@ export type SqliteDatabase = BetterSqlite3.Database;
  *   returns, and so is every commit before it in the WAL.
  * - `"rebuildable"`: the transaction writes only the SQLite projection of a
  *   canonical rollout journal (`thread_rollout_items`, its `backfill_files`
- *   and `rollout_receipts` bookkeeping and the merged thread metadata), which
- *   backfill rebuilds from the journal. In WAL mode it commits at
+ *   and `rollout_receipts` bookkeeping and the merged thread metadata), or
+ *   the exact tool-pair validation index that its canonical owner resets and
+ *   rebuilds from response items on every open. In WAL mode it commits at
  *   `synchronous = NORMAL`: the commit is in the WAL and visible to every
  *   connection when it returns, and survives the process dying, but it is
  *   fsynced only by the next FULL commit on this database (any connection) or
@@ -89,8 +90,20 @@ export type SqliteDatabase = BetterSqlite3.Database;
  *   commit and stays self-consistent. The projection's receipt rolls back
  *   with its rows, so the next index of that journal re-reads the dropped
  *   tail. Outside WAL mode it stays FULL.
+ * - `"observational"`: the transaction writes only observer state about a
+ *   call that cannot change external state (an idempotent tool call's
+ *   in-flight row). No recovery, unknown-outcome gate, budget or effect
+ *   decision reads it: those use canonical events, effect projections and
+ *   side-effecting rows, which stay FULL. Output-only progress updates may
+ *   also use this mode: they preserve the already-committed call identity,
+ *   arguments, status and recovery category. An orphan backfill or a category
+ *   change still uses FULL. It commits like `"rebuildable"`:
+ *   a process death keeps it; a power loss before the next FULL commit can
+ *   drop it. An idempotent call can disappear from the observer index;
+ *   output-only progress rolls back to earlier output while preserving the
+ *   durable call identity, arguments, status and recovery category.
  */
-export type StateCommitDurability = "full" | "rebuildable";
+export type StateCommitDurability = "full" | "rebuildable" | "observational";
 
 type TransactionOperation = () => unknown;
 type TransactionRunner = BetterSqlite3.Transaction<
@@ -323,7 +336,7 @@ export class StateSqliteDriver {
     return this.withTransactionDurability(
       this.state,
       () => this.state.transaction(fn).immediate(),
-      durability === "rebuildable" && this.#stateWal,
+      durability !== "full" && this.#stateWal,
     );
   }
 

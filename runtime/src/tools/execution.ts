@@ -1,3 +1,4 @@
+import { toolStage } from "./stage-timing.js";
 /**
  * Tool execution — the central gate between the model's tool_use
  * blocks and the actual `Tool.execute()` call.
@@ -59,6 +60,7 @@
  * @module
  */
 
+import { MIN_TOOL_RESULT_BYTES, resolveOffloadThresholdBytes } from "./result-visibility.js";
 import { attachExecOwnerBinding } from "../unified-exec/process-ownership.js";
 import { invocationForArgs, stringifyToolArgsWithBigInt } from "./execution-invocation.js";
 import { beginExecutingToolCall } from "../session/executing-tool-calls.js";
@@ -104,9 +106,9 @@ import {
   signSessionId,
 } from "./system/filesystem.js";
 import {
-  runPostToolUseFailureHooks,
-  runPostToolUseHooks,
-  runPreToolUseHooks,
+  runPostToolUseFailureHooks as untimed_runPostToolUseFailureHooks,
+  runPostToolUseHooks as untimed_runPostToolUseHooks,
+  runPreToolUseHooks as untimed_runPreToolUseHooks,
   type HookAttachmentKind,
   type HookPermissionResult,
   type HookTimingRecord,
@@ -129,6 +131,10 @@ import { approvalResponseKey } from "../permissions/approval-response-key.js";
 // it bricks the whole tools/ test surface. The canonical strings are
 // authored once here and mirrored by the UI surface (T7 wires the
 // real messages.ts import when the runtime graph lands).
+const runPostToolUseFailureHooks: typeof untimed_runPostToolUseFailureHooks = (...args) => toolStage("hooks", () => untimed_runPostToolUseFailureHooks(...args));
+const runPostToolUseHooks: typeof untimed_runPostToolUseHooks = (...args) => toolStage("hooks", () => untimed_runPostToolUseHooks(...args));
+const runPreToolUseHooks: typeof untimed_runPreToolUseHooks = (...args) => toolStage("hooks", () => untimed_runPreToolUseHooks(...args));
+
 const INTERRUPT_MESSAGE_FOR_TOOL_USE =
   "[Request interrupted by user for tool use]";
 const CANCEL_MESSAGE =
@@ -173,7 +179,7 @@ import {
   DEFAULT_BYTES_PER_TOKEN,
   detectContentType,
 } from "../llm/token-estimation.js";
-import { enforceRuntimeSandboxAttempt } from "./runtimes/sandboxing.js";
+import { enforceRuntimeSandboxAttempt, remoteControlWriteRefusal } from "./runtimes/sandboxing.js";
 import {
   createTransactionGuardContext,
   evaluateToolInvocationTransactionGuard,
@@ -210,7 +216,7 @@ export const DEFAULT_MAX_TOOL_RESULT_BYTES = 400_000;
  * window we never starve tools below ~16 KB (~4-8K tokens), so small
  * configs can still read meaningful output.
  */
-export const MIN_TOOL_RESULT_BYTES = 16_000;
+export { MIN_TOOL_RESULT_BYTES, resolveOffloadThresholdBytes } from "./result-visibility.js";
 
 /**
  * Fraction of the model's context window a single tool result may
@@ -247,22 +253,6 @@ export const LARGE_CONTEXT_WINDOW_TOKENS = 200_000;
  * while still carrying the path plus actionable head and tail slices.
  */
 const OFFLOAD_REFERENCE_MAX_BYTES = 4_000;
-
-/**
- * Optional inline-size threshold for the offload, in bytes
- * (`AGENC_TOOL_RESULT_OFFLOAD_BYTES`). When set and lower than the
- * model-aware cap, results above it are offloaded even though they would
- * have fit inline: the full output is persisted either way, so the only
- * effect is how much of the context window one tool result may occupy.
- * Unset or invalid keeps today's behavior (offload only above the cap).
- */
-export function resolveOffloadThresholdBytes(): number | undefined {
-  const raw = process.env.AGENC_TOOL_RESULT_OFFLOAD_BYTES;
-  if (raw === undefined || raw.trim() === "") return undefined;
-  const parsed = Number(raw);
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) return undefined;
-  return parsed;
-}
 
 function resolveSingleResultWindowFraction(): number {
   const raw = process.env.AGENC_MAX_TOOL_RESULT_WINDOW_FRACTION;
@@ -1033,6 +1023,13 @@ export function validateToolPreflight(
         });
       }
       options.onValidatedArgs?.();
+      const ownerRefusal = remoteControlWriteRefusal(tool, args, readToolRuntimeContext(args));
+      if (ownerRefusal !== undefined) {
+        return {
+          ...validationErrorToolResult(`tool:${tool.name}:remote_control_owner_only`, `<tool_use_error>${ownerRefusal}</tool_use_error>`),
+          metadata: { preflightCode: "remote_control_owner_only" },
+        };
+      }
       const failure = tool.preflight?.(args);
       if (failure !== undefined && failure !== null) {
         message = failure.message;
@@ -2279,7 +2276,7 @@ export async function runToolUse(
     const finishExecuting = beginExecutingToolCall(invocation.session, invocation.callId, effectiveSignal);
     let result: Awaited<ReturnType<typeof tool.execute>>;
     try {
-      result = await tool.execute(argsForTool);
+      result = await toolStage("execution", () => tool.execute(argsForTool));
     } finally {
       finishExecuting();
     }
@@ -2310,7 +2307,7 @@ export async function runToolUse(
         : {}),
     });
     rawExecutionSettled = true;
-    dispatch = await finishPhysicalSuccess(rawDispatch, effectiveSignal);
+    dispatch = await toolStage("result_sealing", () => finishPhysicalSuccess(rawDispatch, effectiveSignal));
     cleanupModeSub();
   } catch (err) {
     const pending = readPendingPhysicalSettlement<ToolDispatchResult>(err);

@@ -659,6 +659,7 @@ export interface AgenCDaemonDispatcherOptions {
   readonly routines?: RoutineService;
   readonly routinePreparation?: RoutineSessionPreparation;
   readonly remote?: Pick<RemoteService, "handle" | "stop">;
+  readonly remoteControlEnabled?: () => boolean;
   readonly ownerTelegram?: Pick<OwnerTelegramService, "handle">;
   /** Workspace-scoped CSV unknown-outcome review service. */
   readonly csvJobReview?: AgenCCsvJobReviewService;
@@ -806,6 +807,7 @@ export class AgenCDaemonJsonRpcDispatcher {
   readonly #routines: RoutineService | undefined;
   readonly #routinePreparation: RoutineSessionPreparation | undefined;
   readonly #remote: Pick<RemoteService, "handle" | "stop"> | undefined;
+  readonly #remoteControlEnabled: () => boolean;
   readonly #ownerTelegram: Pick<OwnerTelegramService, "handle"> | undefined;
   readonly #routineSubscriptions = new Map<AgenCDaemonJsonRpcConnection, () => void>();
   readonly #csvJobReview: AgenCCsvJobReviewService | undefined;
@@ -854,6 +856,7 @@ export class AgenCDaemonJsonRpcDispatcher {
     this.#routines = options.routines;
     this.#routinePreparation = options.routinePreparation;
     this.#remote = options.remote;
+    this.#remoteControlEnabled = options.remoteControlEnabled ?? (() => false);
     this.#ownerTelegram = options.ownerTelegram;
     this.#csvJobReview = options.csvJobReview;
     this.#projectTrust = options.projectTrust;
@@ -986,7 +989,13 @@ export class AgenCDaemonJsonRpcDispatcher {
     const method = message.method;
     try {
       const params = objectParams(message.params);
+      if (connection.remoteControlBridge && !this.#remoteControlEnabled()) {
+        return errorResponse(id, -32000, "Phone remote control is disabled by owner configuration", { code: "REMOTE_CONTROL_DISABLED" });
+      }
       if (method === "initialize") {
+        if (params.remoteControlBridge === true && !this.#remoteControlEnabled()) {
+          return errorResponse(id, -32000, "Phone remote control is disabled by owner configuration", { code: "REMOTE_CONTROL_DISABLED" });
+        }
         if (!connection.beginInitialization()) {
           return errorResponse(id, -32000, "Already initialized", {
             code: "CONNECTION_ALREADY_INITIALIZED",
@@ -1047,6 +1056,7 @@ export class AgenCDaemonJsonRpcDispatcher {
             connection,
             negotiated.state.clientCapabilities,
           );
+          connection.remoteControlBridge = params.remoteControlBridge === true;
           connection.markInitialized(negotiated.state);
           return successResponse(id, {
             type: "initialized",
@@ -1071,6 +1081,9 @@ export class AgenCDaemonJsonRpcDispatcher {
 
       if ((REMOTE_METHODS as readonly string[]).includes(method)) {
         if (!this.#remote || !this.#initializeAuthenticator || connection.remoteAccess) return methodNotImplementedResponse(id, method);
+        if (!this.#remoteControlEnabled() && !["remote.status", "remote.stop", "remote.capabilities", "remote.revoke", "remote.pair.cancel"].includes(method)) {
+          return errorResponse(id, -32000, "Remote control is disabled by owner configuration", { code: "REMOTE_CONTROL_DISABLED" });
+        }
         await this.#waitForStartupRestores(method, params, INERT_ABORT_SIGNAL);
         return successResponse(id, await this.#remote.handle(method as RemoteMethod, params));
       }
@@ -2736,6 +2749,8 @@ export class AgenCDaemonJsonRpcConnection {
     return this.#cancellationScope;
   }
 
+  remoteControlBridge = false;
+
   markInitialized(state: AgenCDaemonConnectionInitializeState): void {
     this.assertOpen();
     this.#initializeState = state;
@@ -2962,6 +2977,7 @@ function validateInitializeParams(params: JsonObject): InitializeParams {
   const validated = validateObjectShape(params, {
     methodName: "initialize",
     stringFields: ["protocolVersion", "clientName", "authCookie"],
+    booleanFields: ["remoteControlBridge"],
     objectFields: ["protocol", "capabilities"],
   });
   if (validated.protocol !== undefined) {
@@ -3113,6 +3129,7 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
       "objective",
       "resumeSessionId",
       "resumeRolloutPath",
+      "initialUserPromptText",
       "cwd",
       "model",
       "provider",
@@ -3269,7 +3286,8 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
     validated.resumeSessionId !== undefined &&
     (validated.initialContent !== undefined ||
       validated.deferInitialTurn !== undefined ||
-      validated.initialDisplayUserMessage !== undefined)
+      validated.initialDisplayUserMessage !== undefined ||
+      validated.initialUserPromptText !== undefined)
   ) {
     throw invalidParams(
       "agent.create param 'resumeSessionId' cannot be combined with initial turn content or metadata",
@@ -3286,7 +3304,8 @@ function validateAgentCreateParams(params: JsonObject): AgentCreateParams {
   if (
     validated.deferInitialTurn === true &&
     (validated.initialContent !== undefined ||
-      validated.initialDisplayUserMessage !== undefined)
+      validated.initialDisplayUserMessage !== undefined ||
+      validated.initialUserPromptText !== undefined)
   ) {
     throw invalidParams(
       "agent.create param 'deferInitialTurn' cannot be combined with initial turn content or metadata",
@@ -3946,6 +3965,7 @@ function validateSessionResolveToolCallParams(
     methodName: "session.resolveToolCall",
     stringFields: [
       "sessionId",
+      "effectSessionId",
       "toolCallId",
       "disposition",
       "evidenceRef",
@@ -3956,6 +3976,9 @@ function validateSessionResolveToolCallParams(
     objectFields: ["attempt"],
   });
   validateRequiredString(validated, "session.resolveToolCall", "sessionId");
+  if (validated.effectSessionId !== undefined) {
+    validateRequiredString(validated, "session.resolveToolCall", "effectSessionId");
+  }
   const hasEvidenceFields = [
     "disposition",
     "evidenceRef",
@@ -4234,7 +4257,7 @@ function validateSessionFileRewindParams(
 ): SessionFileRewindParams {
   const validated = validateObjectShape(params, {
     methodName,
-    stringFields: ["sessionId"],
+    stringFields: ["sessionId", "userMessageId"],
     numberFields: ["messageOrdinal"],
   });
   validateRequiredString(validated, methodName, "sessionId");
@@ -4246,6 +4269,10 @@ function validateSessionFileRewindParams(
     throw invalidParams(
       `${methodName} messageOrdinal must be a non-negative integer`,
     );
+  }
+  if (validated.userMessageId !== undefined) {
+    validateRequiredString(validated, methodName, "userMessageId");
+    validateMaximumUtf8Bytes(validated.userMessageId, methodName, "userMessageId", 1024);
   }
   return validated as SessionFileRewindParams;
 }
@@ -4957,10 +4984,12 @@ function displayUserMessageFromMetadata(
   metadata: JsonObject | undefined,
 ): {
   readonly displayUserMessage?: string | null;
+  readonly userPromptText?: string;
 } {
   if (metadata === undefined) return {};
   const result: {
     displayUserMessage?: string | null;
+    userPromptText?: string;
   } = {};
   if ("displayUserMessage" in metadata) {
     const value = metadata.displayUserMessage;
@@ -4970,6 +4999,12 @@ function displayUserMessageFromMetadata(
       );
     }
     result.displayUserMessage = value;
+  }
+  if ("userPromptText" in metadata) {
+    if (typeof metadata.userPromptText !== "string") {
+      throw invalidParams(`${methodName} metadata 'userPromptText' must be a string`);
+    }
+    result.userPromptText = metadata.userPromptText;
   }
   return result;
 }

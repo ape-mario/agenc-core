@@ -97,7 +97,7 @@ function requestBody(
 }
 
 describe("OpenAIProvider encrypted reasoning replay (AGENC_OPENAI_REASONING_REPLAY)", () => {
-  test.each([false, true])("requests automatic Luna max summaries by default (stream=%s)", async (stream) => {
+  test.each([false, true])("keeps Luna max encrypted replay without forcing automatic summaries (stream=%s)", async (stream) => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(stream
       ? toolTurnStream([REASONING, SERVER_CALL])
       : new Response(JSON.stringify({ status: "completed", output: [REASONING, SERVER_CALL] }),
@@ -109,7 +109,7 @@ describe("OpenAIProvider encrypted reasoning replay (AGENC_OPENAI_REASONING_REPL
       ? provider.chatStream(messages, () => {}, options)
       : provider.chat(messages, options));
 
-    expect(requestBody(fetchImpl, 0).reasoning).toEqual({ effort: "max", summary: "auto" });
+    expect(requestBody(fetchImpl, 0).reasoning).toEqual({ effort: "max" });
     expect(requestBody(fetchImpl, 0).include).toEqual(["reasoning.encrypted_content"]);
     expect(requestBody(fetchImpl, 0).max_output_tokens).toBe(8192);
     expect(response.providerReasoningProvenance).toEqual({ provider: "openai", model: "gpt-6-luna" });
@@ -256,7 +256,10 @@ describe("OpenAIProvider encrypted reasoning replay (AGENC_OPENAI_REASONING_REPL
     expect(body.include).toEqual(enabled ? ["reasoning.encrypted_content"] : undefined);
     if (enabled) {
       expect(body.input).toContainEqual(REASONING);
-      expect(body.reasoning).toEqual({ ...(reasoningEffort ? { effort: reasoningEffort } : {}), summary: "auto" });
+      // Luna on the platform API keeps its own summary default; other models request auto.
+      const expected = { ...(reasoningEffort ? { effort: reasoningEffort } : {}),
+        ...(model === "gpt-6-luna" ? {} : { summary: "auto" }) };
+      expect(body.reasoning).toEqual(Object.keys(expected).length > 0 ? expected : undefined);
       expect(response.providerReasoningProvenance).toEqual({ provider: "openai", model });
     } else {
       expect(body.input).not.toContainEqual(REASONING);

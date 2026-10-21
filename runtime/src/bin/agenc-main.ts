@@ -39,7 +39,7 @@ import type { AgenCConfig } from "../config/schema.js";
 import { providerQualifiedModel } from "../config/provider-model-authority.js";
 import type { PreparedTurnRuntimeInputs, RunSingleTurnOpts } from "./local-turn-runtime.js";
 import { clearSystemPromptSections } from "../prompts/sections.js";
-import { resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, type ResolvedResumeSession } from "./resume-session.js";
+import { resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, reproveResumeSessionAllowingAppend, type ResolvedResumeSession } from "./resume-session.js";
 import { formatAgenCDaemonCliHelpText, parseAgenCDaemonCliArgs, runAgenCDaemonCli } from "../app-server/daemon-control.js";
 import { captureRemoteCliRuntimeContext, formatAgenCRemoteCliHelpText, parseAgenCRemoteCliArgs, runAgenCRemoteCli } from "./remote-cli.js";
 import { parseAgenCDaemonProxyCliArgs, runAgenCDaemonProxyCli } from "./daemon-proxy-cli.js";
@@ -1838,6 +1838,9 @@ async function createDeferredDaemonPromptTuiSession(params: {
                     ? content[0].text
                     : content,
               }),
+          ...(!deferInitialTurn && firstSubmitOptions?.userPromptText !== undefined
+            ? { initialUserPromptText: firstSubmitOptions.userPromptText }
+            : {}),
           ...(firstSubmitOptions?.displayUserMessage !== undefined
             ? {
                 initialDisplayUserMessage:
@@ -4092,7 +4095,9 @@ async function resumeResolvedTUIEntry(
     let authoritative: ResolvedResumeSession;
     try {
       assertResumeCwdProof(descriptor.cwd, cwdProof);
-      authoritative = reproveResumeDescriptor(descriptor, options.agencHome);
+      // A daemon may still be appending to this session (a terminal closed mid-reply): appends
+      // only. The exact descriptor is reproved again before any cold resume.
+      authoritative = reproveResumeSessionAllowingAppend(descriptor, options.agencHome);
     } catch (error) {
       process.stderr.write(
         `agenc: unable to resume session '${displayId}': ${

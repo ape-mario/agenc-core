@@ -32,7 +32,7 @@ import type {
   MemorySelectorRequest,
 } from "../../memory/recall-contract.js";
 import { closeFullCorpusMemoryIndexes } from "../../memory/find-relevant.js";
-import { getProjectMemoryPath } from "../../memory/paths.js";
+import { buildProjectMemoryDirectory, getProjectMemoryPath } from "../../memory/paths.js";
 import {
   enterCanonicalSettingsAuthority,
   resetCanonicalSettingsAuthorityForTesting,
@@ -167,6 +167,45 @@ function writeFillerMemories(dir: string, term: string, count = 5): void {
 }
 
 describe("relevantMemoriesProducer", () => {
+  test.each([null, "zebra deployment"])('recalls only the live owner memory across daemon projects (query=%s)', async (userInput) => {
+    const daemon = join(root, "daemon");
+    mkdirSync(daemon);
+    setProjectRoot(daemon);
+    installMemoryAuthority();
+    const otherDir = buildProjectMemoryDirectory(agencHome, daemon);
+    mkdirSync(otherDir, { recursive: true });
+    const other = writeMemory(otherDir, "other.md", "zebra deployment", "OTHER_PROJECT_PRIVATE_FACT");
+    const owned = writeMemory(projectMemoryDir, "own.md", "zebra deployment", "OWN_PROJECT_FACT");
+    const sessionKey = {
+      services: { configStore: new ConfigStore({ home: agencHome, env: { AGENC_HOME: agencHome }, cwd }) },
+      sessionConfiguration: { cwd },
+    };
+    const out = await relevantMemoriesProducer(makeOpts({ sessionKey, userInput }), getAttachmentTrackingState(sessionKey));
+    const paths = out.flatMap(a => a.kind === "relevant_memories" ? a.memories.map(m => m.path) : []);
+    expect(paths).toContain(owned);
+    expect(paths).not.toContain(other);
+  });
+
+  test("live owner's enabled memory is independent of the daemon's disabled setting", async () => {
+    const owned = writeMemory(projectMemoryDir, "enabled.md", "zebra deployment", "SESSION_ENABLED_FACT");
+    memoryAuthority.enabled = false;
+    const sessionKey = {
+      services: { configStore: new ConfigStore({ home: agencHome, env: {}, cwd }) },
+      sessionConfiguration: { cwd },
+    };
+    const out = await relevantMemoriesProducer(makeOpts({ sessionKey, userInput: null }), getAttachmentTrackingState(sessionKey));
+    expect(out.flatMap(a => a.kind === "relevant_memories" ? a.memories.map(m => m.path) : [])).toContain(owned);
+  });
+
+  test("live owner's disabled memory never falls back to daemon memory", async () => {
+    writeMemory(projectMemoryDir, "hidden.md", "zebra deployment", "DISABLED_PRIVATE_FACT");
+    const sessionKey = {
+      services: { configStore: new ConfigStore({ home: agencHome, env: {}, cwd }), runtimeOptions: { simpleMode: true } },
+      sessionConfiguration: { cwd },
+    };
+    expect(await relevantMemoriesProducer(makeOpts({ sessionKey, userInput: null }), getAttachmentTrackingState(sessionKey))).toEqual([]);
+  });
+
   test("skips without an AgenC home", async () => {
     installMemoryAuthority();
     const trackingState = getAttachmentTrackingState({});

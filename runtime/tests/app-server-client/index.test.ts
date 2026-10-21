@@ -395,6 +395,7 @@ describe("app-server-client daemon helpers", () => {
           },
         ],
         initialDisplayUserMessage: "Explain the selected code",
+        initialUserPromptText: "Expanded initial human request",
       });
 
       expect(createAgent).toHaveBeenCalledWith(
@@ -420,6 +421,7 @@ describe("app-server-client daemon helpers", () => {
             },
           ],
           initialDisplayUserMessage: "Explain the selected code",
+        initialUserPromptText: "Expanded initial human request",
         }),
       );
       await startAgenCDaemonPromptAgent({
@@ -1251,7 +1253,7 @@ describe("app-server-client daemon helpers", () => {
       await expect(run("/settings")).resolves.toMatchObject({
         result: {
           kind: "error",
-          message: "Unknown command: /settings. Run /help to see available commands.",
+          message: "Unknown command: /settings. Run /config to change settings.",
         },
       });
       await expect(run("/provider grok")).resolves.toMatchObject({

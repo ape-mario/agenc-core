@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { type OneShotContinueSession } from "./route.js";
 import { type AgentRuntimeOptions } from "../session/runtime-options.js";
 import { hasSupportedFileIdentity } from "../session/session-store.js";
-import { resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, type ResolvedResumeSession, type ResumeSessionResolution } from "./resume-session.js";
+import { resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, reproveResumeSessionAllowingAppend, type ResolvedResumeSession, type ResumeSessionResolution } from "./resume-session.js";
 import { AgenCDaemonResponseError } from "../app-server/agent-cli.js";
 import type { AgentCreateParams, AgentSummary, MessageContentBlock } from "../app-server/protocol/index.js";
 import { isRecord } from "../utils/record.js";
@@ -210,7 +210,8 @@ export async function runDaemonOneShotContinue(params: OneShotContinueResumeOpti
   let cancelled = false;
   try {
     assertResumeCwdProof(target.descriptor.cwd, cwdProof);
-    let descriptor = reproveResumeDescriptor(target.descriptor, params.agencHome);
+    // A daemon may still be appending to this session: appends only before readiness.
+    let descriptor = reproveResumeSessionAllowingAppend(target.descriptor, params.agencHome);
     await params.deps.ensureDaemonReady(params.env)();
     assertResumeCwdProof(descriptor.cwd, cwdProof);
     descriptor = reproveResumeSessionAfterDaemonReady(descriptor, params.agencHome);

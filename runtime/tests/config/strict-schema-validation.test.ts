@@ -47,6 +47,8 @@ describe("strict schema-v2 validation coverage", () => {
     ["document bytes", { project_doc_max_bytes: 0 }, /project_doc_max_bytes/u],
     ["auto updates", { autoUpdates: "yes" }, /autoUpdates/u],
     ["watchdog", { stream_watchdog_timeout_ms: -1 }, /stream_watchdog_timeout_ms/u],
+    ["quiet warning", { stream_quiet_warning_ms: -1 }, /stream_quiet_warning_ms/u],
+    ["quiet warning fraction", { stream_quiet_warning_ms: 0.5 }, /stream_quiet_warning_ms/u],
     ["max output", { max_output_tokens: 0 }, /max_output_tokens/u],
     ["max turns", { max_turns: 0 }, /max_turns/u],
     ["budget cap", { max_budget_usd: Number.NaN }, /max_budget_usd/u],
@@ -299,6 +301,25 @@ describe("strict schema-v2 validation coverage", () => {
         llm: { xai: { web_search: true } },
       }),
     ).toThrow(/unknown schema-v2 key: llm/u);
+  });
+
+  test.each(["auto", "firecrawl", "tavily", "exa", "you", "jina", "bing", "mojeek", "linkup", "custom", "ddg", "native"])(
+    "accepts configured search backend %s in strict user and profile config",
+    (provider) => {
+      const config = validateStrictConfigDocument({
+        config_version: 2,
+        tools_config: { web_search_provider: provider, web_search_endpoint: "https://search.example/api" },
+        profiles: { search: { tools_config: { web_search_provider: provider } } },
+      });
+      expect(config.tools_config?.web_search_provider).toBe(provider);
+      expect(config.profiles?.search?.tools_config?.web_search_provider).toBe(provider);
+    },
+  );
+
+  test.each(["invalid", 1, {}])("rejects malformed configured search backend %j", (provider) => {
+    expect(() => validateStrictConfigDocument({
+      config_version: 2, tools_config: { web_search_provider: provider },
+    })).toThrow(/web_search_provider/u);
   });
 
   test("accepts every newly closed block and documented extension maps", () => {

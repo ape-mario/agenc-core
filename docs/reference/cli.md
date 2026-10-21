@@ -9,7 +9,7 @@ Live help: `agenc help` and `agenc help <topic>`. Sources:
 Top-level help is a command index; `agenc help <topic>` contains each
 command's full syntax and options.
 
-Version: **0.19.8**. Default session provider **grok**, fresh-config session model
+Version: **0.19.11**. Default session provider **grok**, fresh-config session model
 **grok-4.6** (see [providers.md](providers.md)).
 
 ---
@@ -65,7 +65,7 @@ From `formatCliHelpText()`:
 | `--model <id\|provider:id>` | Override model for this session |
 | `--permission-mode <mode>` | Override startup mode: `default`, `acceptEdits`, `plan`, `dontAsk`, or `auto`. `bypassPermissions` is an explicit session-only opt-in bound to the current workspace. Internal `unattended` / `bubble` modes are not CLI addressable. |
 | `--autonomous` | Enable autonomous tick mode |
-| `--bypass-approvals` | Skip approval prompts, sandbox escalation requests included: commands start in the OS sandbox, and one that asks to run outside it (`sandbox_permissions: "require_escalated"`) is allowed without a prompt. In a workspace-write sandbox the model is told it may ask only for GUI apps and blocked network, and to keep file changes inside the workspace; elsewhere it is told such requests are rejected. Same session-only `bypassPermissions` opt-in as `--permission-mode bypassPermissions`. On a host that cannot sandbox at all the run continues without kernel confinement and prints one stderr notice naming the reason. Conflicts with a different `--permission-mode`. |
+| `--bypass-approvals` | Skip approval prompts, sandbox escalation requests included: commands start in the OS sandbox, and one that asks to run outside it (`sandbox_permissions: "require_escalated"`) is allowed without a prompt. In a workspace-write sandbox the model is told it may ask only for GUI apps, blocked network, and one retry of an operation the user asked for that the sandbox refused on a protected path such as `.git` metadata, and to keep file changes inside the workspace; elsewhere it is told such requests are rejected. Same session-only `bypassPermissions` opt-in as `--permission-mode bypassPermissions`. On a host that cannot sandbox at all the run continues without kernel confinement and prints one stderr notice naming the reason. Conflicts with a different `--permission-mode`. |
 | `--dangerously-bypass-approvals-and-sandbox` | Bypass approvals and sandbox checks everywhere (the explicit no-sandbox opt-out) |
 | `--image <file\|url\|data-url>` | Attach a startup image |
 
@@ -123,6 +123,7 @@ From `formatCliHelpText()`:
   structured output includes the event. `completion_gate.mode = "never"`
   in the config turns that off; see
   [config.md](config.md#built-in-defaults).
+  Clear information requests (such as MCP data queries or explanations) can finish without a workspace checklist when the turn has successful tool results and no commands or recorded workspace writes. Requests mentioning implementation, execution or output artifacts retain verification, as do ambiguous tasks, explicit checklists and verification rounds already in progress. The gate records this applicability decision as `skipped` with reason `answer_only`; it does not certify answer correctness or change tool permissions.
 - `--output-format stream-json` with `--input-format stream-json` is the
   protocol used by the SDK subprocess transport
   (`promptViaSubprocess` in `@tetsuo-ai/agenc-sdk`).
@@ -508,8 +509,17 @@ owners still fail with `RUN_ID_AMBIGUOUS`; changing cwd does not select an owner
 
 ## `remote`
 
+The owner must edit `[remote_control] enabled = true` in
+`$AGENC_HOME/config.toml` outside the agent, then restart the daemon. The default
+is false; managed policy wins. Flags, project config and environment variables
+cannot enable this capability. Disabled starts refuse before connector imports,
+account checks or network access. Local `status` and `off` remain available;
+`/remote` is hidden from TUI help and completion. After owner enablement,
+`--full-control` (or `AGENC_REMOTE_FULL_CONTROL=1`) supplies the existing per-run
+consent, followed by the account check.
+
 ```text
-agenc remote on
+agenc remote on --full-control
 agenc remote status
 agenc remote off
 ```

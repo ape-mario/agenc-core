@@ -1,4 +1,5 @@
 import { sessionProcessBoundaries } from "./session-process-boundary.js";
+import { attachProtectedCreateMonitor, startProtectedCreateMonitor } from "../sandbox/linux-launcher/protected-create-monitor.js";
 import {
   execFileSync,
   spawn,
@@ -854,9 +855,21 @@ export function spawnContainedProcess(
               options.directBwrap.validateAdmission();
               options.directBwrap.signal.throwIfAborted();
               dispatched = true;
-              return spawnLinuxSubreaperContainedProcess(program, args, options, {
-                ...handoff, brokerPath, brokerContext,
-              });
+              // Missing protected paths this launch leaves unmounted: watch
+              // them from before the command starts until its owner stops the
+              // monitor after the whole process tree is gone.
+              const monitor = handoff.protectedCreateTargets === undefined
+                ? undefined : startProtectedCreateMonitor(handoff.protectedCreateTargets);
+              try {
+                const child = spawnLinuxSubreaperContainedProcess(program, args, options, {
+                  ...handoff, brokerPath, brokerContext,
+                });
+                if (monitor !== undefined) attachProtectedCreateMonitor(child, monitor);
+                return child;
+              } catch (error) {
+                monitor?.stop();
+                throw error;
+              }
             }
           } finally {
             if (!dispatched) handoff.dispose();

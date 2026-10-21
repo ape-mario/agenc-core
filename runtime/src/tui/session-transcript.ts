@@ -90,6 +90,8 @@ export interface AdaptedTranscript {
    * `turn_start`.
    */
   readonly turnStreamedChars: number;
+  /** Authoritative per-attempt warning; cleared by output or a request boundary. */
+  readonly streamQuietWarning?: string | null;
   /**
    * Most recent provider-reported usage from a `token_count` event, in the
    * assistant-message usage-block shape the context-percentage derivation
@@ -310,6 +312,7 @@ const USER_VISIBLE_WARNING_CAUSES: ReadonlySet<string> = new Set([
   "pre_sampling_compact_failed",
   "auto_compact_failed",
   "output_reservation_squeezed",
+  "context_fit_shortened",
   "effect_review_required",
   "empty_response_retry",
   "deadline_reserve",
@@ -330,10 +333,14 @@ const USER_VISIBLE_WARNING_CAUSES: ReadonlySet<string> = new Set([
   "goal_impossible",
   "goal_judge_unavailable",
   "goal_worktree_baseline_unavailable",
-  // Provider / mode change the user just observed
-  "provider_switched",
+  // Successful model switches already have command feedback. Raw provider
+  // transition diagnostics stay in the event log, including no-op switches.
+  // Rejections and resumed-model changes still need user-visible guidance.
   "provider_switch_rejected",
   "mode_changed",
+  "permission_mode_queued",
+  "permission_mode_unconfirmed",
+  "permission_mode_sync_failed",
   "resumed_with_different_model",
   // Input mutation
   "file_mention_attachment_dropped",
@@ -342,7 +349,6 @@ const USER_VISIBLE_WARNING_CAUSES: ReadonlySet<string> = new Set([
   "schema_validation_failed",
   "malformed_tool_call",
   "daemon_connection_state",
-  "stream_idle_warning",
 ]);
 
 /**
@@ -507,7 +513,7 @@ function plainGlobProjection(result: string): {
  * virtual list's height cache (M-TUI-1). The optional `uuid` param keeps
  * external callers unchanged.
  */
-export function makeUserMessage(content: unknown, uuid: string = randomUUID()): any {
+export function makeUserMessage(content: unknown, uuid: string = randomUUID(), messageTimestamp: string = timestamp()): any {
   return {
     type: "user",
     message: {
@@ -515,7 +521,7 @@ export function makeUserMessage(content: unknown, uuid: string = randomUUID()): 
       content: textFromContent(content) || "(empty)",
     },
     uuid,
-    timestamp: timestamp(),
+    timestamp: messageTimestamp,
   };
 }
 
@@ -1076,6 +1082,11 @@ function usageFromTokenCountPayload(payload: Record<string, unknown>): ModelUsag
     singleCall: true,
     // A turn served in fast mode bills at the model's fast-mode rates.
     ...(payload.speed === "fast" ? { speed: "fast" as const } : {}),
+    // The provider's own charge for the call, when it reported one.
+    ...(typeof payload.providerCostUsd === "number" && Number.isFinite(payload.providerCostUsd) &&
+      payload.providerCostUsd >= 0
+      ? { providerCostUsd: payload.providerCostUsd }
+      : {}),
   };
 }
 
@@ -1874,6 +1885,12 @@ function collapseRepeatedSystemLines(messages: any[]): any[] {
   return collapsed;
 }
 
+const STREAM_WARNING_RESET_EVENTS = new Set([
+  "turn_start", "turn_started", "turn_complete", "turn_completed",
+  "turn_failed", "turn_aborted", "history_cleared", "history_replaced",
+  "stream_error", "tool_call_started", "tool_input_block_start",
+]);
+
 export function adaptTranscriptEvents(
   events: readonly SessionTranscriptEvent[],
   startupMessages: readonly LLMMessage[] = [],
@@ -1901,6 +1918,7 @@ export function adaptTranscriptEvents(
   const provisionalTextUuids = new Set<string>();
   let realtimeStreamingText = "";
   let turnStreamedChars = 0;
+  let streamQuietWarning: string | null = null;
   let latestUsage: AdaptedTranscript["latestUsage"] = null;
   let sessionCostUsd = 0;
   let sessionUsage: AdmissionUsageSummary | null = null;
@@ -1966,6 +1984,7 @@ export function adaptTranscriptEvents(
     }
   };
 
+  let pendingUserTimestampIndex: number | undefined;
   for (const raw of orderedEvents) {
     const event = unwrap(raw);
     if (seen.has(event.key)) continue;
@@ -1982,11 +2001,22 @@ export function adaptTranscriptEvents(
     let blockIndex = 0;
     const nextUuid = (): string => `${event.key}:${blockIndex++}`;
 
+    if (STREAM_WARNING_RESET_EVENTS.has(event.type) ||
+      (event.type === "execution_admission" && payload.event === "dispatched") ||
+      ((event.type === "agent_message_delta" || event.type === "assistant_thinking_delta") &&
+        typeof payload.delta === "string" && payload.delta.length > 0) ||
+      (event.type === "tool_input_delta" &&
+        ((typeof payload.partialJson === "string" && payload.partialJson.length > 0) ||
+         (typeof payload.partial_json === "string" && payload.partial_json.length > 0))) ||
+      (event.type === "assistant_text" && typeof payload.content === "string" && payload.content.length > 0)) {
+      streamQuietWarning = null;
+    }
     switch (event.type) {
       case "session_usage":
         sessionUsage = latestSessionUsage(sessionUsage, event);
         break;
       case "history_cleared":
+        pendingUserTimestampIndex = undefined;
         provisionalTextUuids.clear();
         nextActiveUserOrdinal = undefined;
         pendingTaskBudgetNotice = null;
@@ -2016,6 +2046,7 @@ export function adaptTranscriptEvents(
         isStreaming = false;
         break;
       case "history_replaced": {
+        pendingUserTimestampIndex = undefined;
         provisionalTextUuids.clear();
         nextActiveUserOrdinal = undefined;
         pendingTaskBudgetNotice = null;
@@ -2087,6 +2118,10 @@ export function adaptTranscriptEvents(
         currentTurnId =
           typeof payload.turnId === "string" ? payload.turnId : currentTurnId;
         currentTurnTimestamp = timestampFromUnixMillis(payload.startedAt);
+        if (pendingUserTimestampIndex !== undefined) {
+          out[pendingUserTimestampIndex].timestamp = currentTurnTimestamp ?? "";
+          pendingUserTimestampIndex = undefined;
+        }
         currentTurnAssistantMessageIndexes = [];
         currentTurnModelCalls = 0;
         // Clear streaming tool state when a new turn boundary arrives. Any
@@ -2286,12 +2321,15 @@ export function adaptTranscriptEvents(
               typeof text === "string" && text.startsWith("<bash-stdout>")) break;
         }
         const userMessage = {
-          ...makeUserMessage(payload.displayText ?? payload.message, nextUuid()),
+          ...makeUserMessage(payload.displayText ?? payload.message, nextUuid(),
+            typeof payload.acceptedAt === "string" && Number.isFinite(Date.parse(payload.acceptedAt))
+              ? payload.acceptedAt : ""),
           canonicalUserMessageId: payload.canonicalUserMessageId ?? payload.messageId ?? payload.queuedCommandUuid ?? (raw as { id?: string }).id,
         };
         if (nextActiveUserOrdinal !== undefined && selectableUserMessagesFilter(userMessage)) {
           userMessage.activeConversationOrdinal = nextActiveUserOrdinal++;
         }
+        pendingUserTimestampIndex = userMessage.timestamp === "" ? out.length : undefined;
         out.push(userMessage);
         break;
       }
@@ -2824,6 +2862,19 @@ export function adaptTranscriptEvents(
         break;
       }
       case "warning": {
+        if (payload.cause === "stream_idle_resumed") {
+          streamQuietWarning = null;
+          break;
+        }
+        if (payload.cause === "stream_idle_warning") {
+          const effort = payloadRecord(payload.details).reasoningEffort;
+          const effortLabel = typeof effort === "string" &&
+            ["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(effort)
+              ? ` (${effort === "none" ? "effort off" : `${effort} effort`})`
+              : "";
+          streamQuietWarning = `${stringResult(payload.message)}${effortLabel}`;
+          break;
+        }
         // Allow-list of warning causes that surface to the user's
         // transcript. Every other cause stays in the daemon log and
         // observability sinks only — most of the 89 causes the
@@ -3203,6 +3254,7 @@ export function adaptTranscriptEvents(
     streamingToolUses,
     streamingThinking,
     turnStreamedChars,
+    streamQuietWarning,
     latestUsage,
     sessionCostUsd: sessionUsage?.costUsd ?? sessionCostUsd,
     sessionUsage,

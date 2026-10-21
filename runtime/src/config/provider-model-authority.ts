@@ -243,9 +243,12 @@ function resolveExplicitPair(
     return Object.freeze({ provider, model: projectedModel });
   }
 
-  // Venice's discovered catalog can serve bare IDs also owned by native
-  // providers. The explicit provider/model pair remains the routing authority.
-  if (provider === "venice") return Object.freeze({ provider, model: projectedModel });
+  // Venice's and Ollama Cloud's discovered catalogs can serve bare IDs also
+  // owned by native providers (kimi-k3, glm-5.3, muse-spark-open). The
+  // explicit provider/model pair remains the routing authority.
+  if (provider === "venice" || provider === "ollama-cloud") {
+    return Object.freeze({ provider, model: projectedModel });
+  }
 
   try {
     const resolved = resolveModelDisambiguated(projectedModel, catalog);

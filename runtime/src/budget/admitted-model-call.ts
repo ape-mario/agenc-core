@@ -41,7 +41,11 @@ import { xaiSendsPriorityProcessing } from "../llm/providers/grok/priority-proce
 import { taskBudgetOf, prepareInteractiveTaskBudgetCall } from "../session/task-budget.js";
 import { AdmissionDeniedError } from "./admission-client.js";
 import { hitM4DurabilityFailpoint } from "../durability/failpoints.js";
-import { isLLMPreGenerationRejection, LLMManagedAdmissionError } from "../llm/errors.js";
+import {
+  isLLMPreGenerationRejection,
+  LLMContextWindowExceededError,
+  LLMManagedAdmissionError,
+} from "../llm/errors.js";
 import { oneShotFastModeActive } from "../one-shot-fast-mode.js";
 
 // A local-only count has no cache consumer. Match a SHA-256 revision's encoded
@@ -349,6 +353,11 @@ function maximumTokenCostUsd(
   return tokenCost + outputTokens * entry.webSearchUsdPerRequest;
 }
 
+function withoutProviderCharge(usage: LLMResponse["usage"]): LLMResponse["usage"] {
+  const { providerCostUsd: _charge, ...rest } = usage;
+  return rest;
+}
+
 function usageCostUsd(
   model: string,
   provider: string,
@@ -398,6 +407,8 @@ function usageCostUsd(
     // Charge by the speed the provider reports it served, not the one
     // requested: a fast request served at standard speed bills standard.
     ...(usage.speed === "fast" ? { speed: "fast" as const } : {}),
+    // What the provider says it charged is the price of record.
+    ...(usage.providerCostUsd !== undefined ? { providerCostUsd: usage.providerCostUsd } : {}),
   };
   const resolved = computeUsdCostWithResolution(
     modelUsage,
@@ -472,6 +483,18 @@ function isSameModelIdentity(reported: string, requested: string): boolean {
  * a fragment. Compaction is the path back from here, not a smaller ceiling.
  */
 export const MIN_ADMISSIBLE_OUTPUT_TOKENS = 1_024;
+
+/** The provider's context-length refusal, when it is the error or one of its causes. */
+function contextWindowRefusalIn(
+  error: unknown,
+): LLMContextWindowExceededError | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    if (current instanceof LLMContextWindowExceededError) return current;
+    current = (current as { readonly cause?: unknown }).cause;
+  }
+  return undefined;
+}
 
 /**
  * Shared context-fit authority for admission and advisory-compaction preflight.
@@ -983,7 +1006,9 @@ export async function runAdmittedModelCall(
     const actualPrice = usageCostUsd(
       managedRoutePriced ? effectiveModel : actualModel,
       pricingProvider,
-      usage,
+      // A managed call is billed in AgenC credits, never at what the upstream
+      // provider charged the gateway.
+      requestedProvider === "agenc" ? withoutProviderCharge(usage) : usage,
       params.options,
     );
     if (actualPrice === null) {
@@ -1048,6 +1073,14 @@ export async function runAdmittedModelCall(
     if (lateCancellation !== undefined) throw lateCancellation;
     return response;
   } catch (error) {
+    // A context-length refusal of a request admitted on a calibrated estimate
+    // corrects that calibration before compaction retries the request.
+    if (dispatched && accountingResult !== undefined) {
+      const refusal = contextWindowRefusalIn(error);
+      if (refusal !== undefined) {
+        tokenAccountingService.recordContextOverflow(accountingResult, refusal.message);
+      }
+    }
     if (settled) {
       // Reconciliation/unknown-hold already reached an exactly-once terminal
       // state. Never overwrite it from a broad catch path.

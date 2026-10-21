@@ -1,3 +1,4 @@
+import { useSessionEffortCatalog } from "../hooks/useSessionEffortCatalog.js";
 import { isEffectReviewRequired } from "../../session/effect-review-gate.js";
 import { usePendingEffectReviews } from "../hooks/usePendingEffectReviews.js";
 import { EffectReviewCard } from "./EffectReviewCard.js";
@@ -83,6 +84,7 @@ import { CancelRequestHandler } from "../hooks/useCancelRequest.js";
 import { useApiKeyVerification } from "../hooks/useApiKeyVerification.js";
 import type { ProviderAuthReadContext } from "../../utils/auth.js";
 import { addToHistory, flushPromptHistoryForExit } from "../history/history.js";
+import { expandPastedTextRefs, parseReferences } from "../../utils/pasteReferences.js";
 import { GlobalKeybindingHandlers } from "../hooks/useGlobalKeybindings.js";
 import {
   type AppState,
@@ -112,6 +114,7 @@ import {
   useApp,
   useTerminalFocus,
   useTerminalTitle,
+  type Key,
 } from "../ink.js";
 import {
   clearPendingResumeSessionId,
@@ -2372,6 +2375,36 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     liveComposerDraftRef.current = { ...liveComposerDraftRef.current, input: nextInput };
     setInput(nextInput);
   }, []);
+  const preserveApprovalDraftInput = useCallback((value: string, key: Key) => {
+    const current = liveComposerDraftRef.current.input;
+    const cursor = composerCursorRef.current;
+    let offset = cursor?.input === current ? cursor.offset : current.length;
+    let next = current;
+    if (key.return || key.escape) return;
+    if (key.home || (key.ctrl && value === "a")) offset = 0;
+    else if (key.end || (key.ctrl && value === "e")) offset = current.length;
+    else if (key.leftArrow) offset = Math.max(0, offset - 1);
+    else if (key.rightArrow) offset = Math.min(current.length, offset + 1);
+    else if (key.ctrl && value === "u") { next = current.slice(offset); offset = 0; }
+    else if (key.ctrl && value === "k") next = current.slice(0, offset);
+    else if (key.ctrl && value === "w") {
+      const start = current.slice(0, offset).replace(/\S+\s*$/u, "").length;
+      next = current.slice(0, start) + current.slice(offset);
+      offset = start;
+    } else if (key.backspace) {
+      const previous = Array.from(current.slice(0, offset)).at(-1)?.length ?? 0;
+      next = current.slice(0, offset - previous) + current.slice(offset);
+      offset -= previous;
+    } else if (key.delete) {
+      const following = Array.from(current.slice(offset))[0]?.length ?? 0;
+      next = current.slice(0, offset) + current.slice(offset + following);
+    } else if (value.length > 0 && !key.ctrl && !key.meta && !key.super) {
+      next = current.slice(0, offset) + value + current.slice(offset);
+      offset += value.length;
+    }
+    composerCursorRef.current = { input: next, offset };
+    changeComposerInput(next);
+  }, [changeComposerInput]);
   const changeComposerPastedContents = useCallback<
     React.Dispatch<React.SetStateAction<Record<number, any>>>
   >((nextContents) => {
@@ -2647,6 +2680,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   );
   const { reviews: pendingEffectReviews, noteRefusal: noteReviewRefusal } = usePendingEffectReviews(props.session);
   const reviewNeeded = pendingEffectReviews.length > 0;
+  const reviewBlocksPrompt = pendingEffectReviews.some(review => review.blocksSession !== false);
   const ledgerVerification = useSyncExternalStore(
     subscribeLedgerVerification,
     getLedgerVerificationSnapshot,
@@ -2733,19 +2767,6 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   // "high effort" in the status line: the level the session runs at, or the
   // model's default when none is chosen. Follows /effort and model switches.
   const statusEffortValue = useAppState((state) => state.effortValue);
-  const statusEffortLabel = useMemo(() => {
-    const selection = readSessionSelection(props.session, { includePending: true });
-    if (selection.provider === "unknown" || selection.model === "unknown") return null;
-    const context = Object.freeze({ ...remoteAuthSessionContext, provider: selection.provider });
-    if (!modelSupportsEffortForContext(selection.model, context)) return null;
-    // The chosen level, else the default the daemon runs ("effort off" for a
-    // native none); nothing when no truthful default is known.
-    return getSessionEffortLabelForContext(
-      selection.model,
-      statusEffortValue as never,
-      context,
-    );
-  }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel]);
   const notifiedUnsupportedEfforts = useRef(new Set<string>());
   useEffect(() => {
     const selection = readSessionSelection(props.session, { includePending: true });
@@ -2893,6 +2914,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     () =>
       buildDefaultRegistry({
         surface: "daemon-tui",
+        remoteControlEnabled: () => configStore.current().remote_control?.enabled === true,
       }),
     [],
   );
@@ -3035,7 +3057,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     hasActiveSessionTurn ||
     hasActiveModelSubmission;
   const effectiveInputBusy =
-    reviewNeeded ||
+    reviewBlocksPrompt ||
     isLoading ||
     isCompacting ||
     shellAbortController !== null ||
@@ -3232,6 +3254,22 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       setToolJSX,
     ],
   );
+  const effortSelection = readSessionSelection(props.session, { includePending: true });
+  const effortCatalogRevision = useSessionEffortCatalog(props.session, effortSelection.provider,
+    effortSelection.model, () => createSlashCommandContext(""));
+  const statusEffortLabel = useMemo(() => {
+    const selection = readSessionSelection(props.session, { includePending: true });
+    if (selection.provider === "unknown" || selection.model === "unknown") return null;
+    const context = Object.freeze({ ...remoteAuthSessionContext, provider: selection.provider });
+    if (!modelSupportsEffortForContext(selection.model, context)) return null;
+    // The chosen level, else the default the daemon runs ("effort off" for a
+    // native none); nothing when no truthful default is known.
+    return getSessionEffortLabelForContext(
+      selection.model,
+      statusEffortValue as never,
+      context,
+    );
+  }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel, effortCatalogRevision]);
   const runLocalControlCommand = useCallback(async (parsed: ParsedSlashCommand): Promise<void> => {
     cancelTransientResult(true);
     try {
@@ -3446,8 +3484,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   );
   const submit = useCallback(
     async (value: string, options?: LiveSubmitOptions) => {
-      const text_0 = value.trim();
-      const historyDisplay = (options?.displayUserMessage ?? text_0).trim();
+      const historyDisplay = (options?.displayUserMessage ?? value).trim();
       const draftRestoreValue = options?.draftRestoreValue ?? value;
       const candidateRetry = retrySubmissionRef.current;
       const retry =
@@ -3460,6 +3497,11 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       const activePastedContents =
         retry?.pastedContents ?? options?.pastedContentsOverride ??
         (options?.fromQueue ? {} : pastedContents);
+      // The composer and history keep compact refs. All prompt consumers,
+      // including command dispatch and the daemon's routing/skill/title paths,
+      // receive the same in-place expansion, in the user's original order.
+      const expandedValue = expandPastedTextRefs(value, activePastedContents);
+      const text_0 = expandedValue.trim();
       const hasAttachments = Object.keys(activePastedContents).length > 0;
       if (text_0.length === 0 && !hasAttachments) return;
       const rejectNonModelSubmission = (): void => {
@@ -3525,8 +3567,8 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           return;
         }
         enqueue({
-          value: text_0,
-          preExpansionValue: text_0,
+          value,
+          preExpansionValue: historyDisplay,
           mode: "prompt",
           queueOwner: commandQueueOwner,
           ...(hasAttachments
@@ -3602,19 +3644,26 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           // best-effort: history persistence must not block submit
         }
       }
-      const attachmentsMessage = hasAttachments
-        ? pastedContentsToLLMMessage(activePastedContents)
-        : null;
+      // Referenced text is now part of the prompt, not a second user message.
+      // Keep images and any unreferenced attachments on the multipart path.
+      const remainingPastedContents = { ...activePastedContents };
+      for (const ref of parseReferences(value)) {
+        if (activePastedContents[ref.id]?.type === "text") {
+          delete remainingPastedContents[ref.id];
+        }
+      }
+      const attachmentsMessage = pastedContentsToLLMMessage(remainingPastedContents);
       const submission: ComposerSubmission = retry ?? {
         conversationId: props.session.conversationId,
         clientMessageId,
         draftRestoreValue,
         pastedContents: activePastedContents,
-        value,
+        value: expandedValue,
         options: {
           ...(options?.automatic === true ? {} : { source: "user" as const }),
           clientMessageId,
           displayUserMessage: options?.displayUserMessage ?? value,
+          ...(expandedValue !== value ? { userPromptText: expandedValue } : {}),
         },
         inputs: attachmentsMessage === null ? [] : [attachmentsMessage],
         ready: false,
@@ -3685,6 +3734,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
               ...(options?.automatic === true ? {} : { source: "user" as const }),
               clientMessageId,
               displayUserMessage: displayText,
+              ...(expandedValue !== value ? { userPromptText: expandedValue } : {}),
             };
             const admissionToken = admitPendingInputs(submission.inputs);
             admissionLease = {
@@ -3776,7 +3826,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
               args: parsedSlashCommand.argsRaw,
             },
             slashPromptCommand,
-            text_0,
+            historyDisplay,
           );
           return;
         }
@@ -3937,7 +3987,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           invocationCommands as unknown as Command[],
         );
         if (isDollarSkillCommand(command)) {
-          await submitPromptCommand(parsedDollarSkill, command, text_0);
+          await submitPromptCommand(parsedDollarSkill, command, historyDisplay);
           return;
         }
         if (command?.type === "local") {
@@ -3972,8 +4022,8 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           attachmentAdmitted = true;
         }
         if (!options?.fromQueue) setComposerPastedContents({});
-        // Pass `value` as displayUserMessage so the daemon emits the
-        // user-message transcript event with the user's raw typed text,
+        // Keep the compact value as displayUserMessage so the daemon emits
+        // the user-message transcript event with the user's composer text,
         // not the model-facing expanded payload. Without this the
         // transcript can show the post-expansion envelope instead of
         // the original input. Pairs with the daemon-hook change in
@@ -4482,11 +4532,13 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       // only works for sessions whose tools ran inside the TUI process.
       if (props.session.rewindFilesToMessage !== undefined) {
         const messageOrdinal = resolveSelectableMessageOrdinal(message_2);
-        if (messageOrdinal === -1) {
+        const userMessageId = message_2.canonicalUserMessageId;
+        if (messageOrdinal === -1 && typeof userMessageId !== "string") {
           throw new Error("The selected message is no longer available.");
         }
         const result = await props.session.rewindFilesToMessage({
-          messageOrdinal,
+          messageOrdinal: Math.max(0, messageOrdinal),
+          ...(typeof userMessageId === "string" ? { userMessageId } : {}),
         });
         if (!result.ok) {
           throw new Error(result.message ?? "Failed to restore files.");
@@ -4506,12 +4558,15 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     async (message_p: any) => {
       if (props.session.previewFileRewind === undefined) return undefined;
       const messageOrdinal = resolveSelectableMessageOrdinal(message_p);
-      if (messageOrdinal === -1) return undefined;
+      const userMessageId = message_p.canonicalUserMessageId;
+      if (messageOrdinal === -1 && typeof userMessageId !== "string") return undefined;
       try {
         const result = await props.session.previewFileRewind({
-          messageOrdinal,
+          messageOrdinal: Math.max(0, messageOrdinal),
+          ...(typeof userMessageId === "string" ? { userMessageId } : {}),
         });
-        if (!result.ok || result.canRestoreFiles !== true) return undefined;
+        if (!result.ok) throw new Error(result.message ?? "Code checkpoint is unavailable.");
+        if (result.checkpointAvailable === false) return undefined;
         return {
           filesChanged: [...(result.filesChanged ?? [])],
           insertions: result.insertions ?? 0,
@@ -4727,6 +4782,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       totalPausedMsRef={totalPausedMsRef}
       pauseStartTimeRef={pauseStartTimeRef}
       responseLengthRef={responseLengthRef}
+      streamQuietWarning={transcript.streamQuietWarning}
       verbose={false}
       providerAuthContext={remoteAuthSessionContext}
       hasActiveTools={hasActiveToolActivity}
@@ -4902,7 +4958,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           ) : null}
         </Box>
       ) : null}
-      {renderHealthWarning !== null ? (
+      {screen === "transcript" && renderHealthWarning !== null ? (
         <Text color="warning" wrap="truncate">
           {renderHealthWarning}
         </Text>
@@ -4936,6 +4992,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
           request={permissionRequests[0]}
           tools={permissionToolDescriptors}
           mcpClients={mcpClients as any}
+          composerDraft={{ text: input, onInput: preserveApprovalDraftInput }}
         />
       </>
     ) : elicitation.prompt !== null ? (
@@ -5009,16 +5066,20 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         if (isLocalJSXCommandActive) {
           return;
         }
+        const expandedInput = expandPastedTextRefs(
+          value_1, submitOptions?.pastedContentsOverride ?? pastedContents,
+        );
         if (
-          await executeRealtimeComposerCommand(props.session.realtime, value_1)
+          await executeRealtimeComposerCommand(props.session.realtime, expandedInput)
         ) {
+          setComposerPastedContents({});
           helpers_0.clearBuffer();
           helpers_0.resetHistory();
           helpers_0.setCursorOffset(0);
           return;
         }
         await submitViaElicitationPrompt(
-          elicitation,
+          { submit: () => elicitation.submit(expandedInput) },
           submit,
           value_1,
           helpers_0,
@@ -5062,20 +5123,20 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
         </Text>
       ) : null}
       {reviewNeeded && pendingEffectReviews[0]!.callId.length > 0 && props.session.resolveDaemonToolCall !== undefined ? (
-        <EffectReviewCard key={pendingEffectReviews[0]!.callId}
+        <EffectReviewCard key={`${pendingEffectReviews[0]!.sessionId ?? ""}:${pendingEffectReviews[0]!.callId}`}
           review={pendingEffectReviews[0]!}
           resolve={props.session.resolveDaemonToolCall}
           active={input.length === 0 && permissionRequests.length === 0 && elicitation.prompt === null && !isMessageSelectorVisible && !toolOwnsPrompt}
         />
       ) : null}
-      {reviewNeeded && fullscreen && queuedCommands.length > 0 ? (
+      {reviewBlocksPrompt && fullscreen && queuedCommands.length > 0 ? (
         <Text dimColor wrap="truncate">
           {queuedCommands.length} queued · {queuedCommandInputText(queuedCommands[queuedCommands.length - 1]!)}
         </Text>
       ) : null}
       {showPromptInput ? <GitStatusChrome session={props.session} events={liveSessionEvents} /> : null}
       {promptInputElement}
-      {reviewNeeded ? <Text color="warning">review needed · prompts wait for tool outcome review</Text> : null}
+      {reviewBlocksPrompt ? <Text color="warning">review needed · prompts wait for tool outcome review</Text> : null}
     </Box>
   );
 

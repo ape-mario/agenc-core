@@ -83,6 +83,8 @@ import {
 } from "../permissions/permission-updates.js";
 import { validateCanonicalSessionPermissionRuleBuckets } from "../permissions/session-rule-buckets.js";
 import type { PermissionModeRegistry } from "../permissions/permission-mode.js";
+import { permissionModePlainLabel } from "../permissions/mode-display.js";
+import { isPermissionMode } from "../permissions/types.js";
 import { parseRuleString, serializeRuleValue } from "../permissions/rules.js";
 import type {
   PermissionBehavior,
@@ -307,9 +309,11 @@ export interface AgenCTuiBridgeSession extends AgenCCompactProgressControls {
   }): Promise<SessionRewindConversationToMessageResult>;
   previewFileRewind?(params: {
     readonly messageOrdinal: number;
+    readonly userMessageId?: string;
   }): Promise<SessionPreviewFileRewindResult>;
   rewindFilesToMessage?(params: {
     readonly messageOrdinal: number;
+    readonly userMessageId?: string;
   }): Promise<SessionRewindFilesToMessageResult>;
   useSessionProviderKey?(provider: string, apiKey: string): Promise<void>;
   applyProviderModelSelection?(selection: {
@@ -438,9 +442,11 @@ export type AgenCDaemonBackedTuiSession<
   }): Promise<SessionRewindConversationToMessageResult>;
   previewFileRewind(params: {
     readonly messageOrdinal: number;
+    readonly userMessageId?: string;
   }): Promise<SessionPreviewFileRewindResult>;
   rewindFilesToMessage(params: {
     readonly messageOrdinal: number;
+    readonly userMessageId?: string;
   }): Promise<SessionRewindFilesToMessageResult>;
 };
 
@@ -1141,10 +1147,72 @@ export function createDaemonTuiSession<
       mcpProjection.noteConnectionState(currentConnectionState);
     }
   };
+  let unconfirmedPermissionMode: SessionSetPermissionModeParams["mode"] | undefined;
+  let permissionModeRecovery: Promise<unknown> | undefined;
+  const permissionModeResponseTimedOut = (error: unknown): boolean =>
+    error instanceof Error &&
+    error.message === "Timed out waiting for daemon response to session.setPermissionMode";
+  const reconcilePermissionMode = async (mode: SessionSetPermissionModeParams["mode"]) => {
+    try {
+      if (activeTurnSnapshot !== null || pendingSubmissions.size > 0 ||
+          baseSession.activeTurn?.unsafePeek?.() != null) {
+        const label = isPermissionMode(mode) ? permissionModePlainLabel(mode) : mode;
+        // Send the RPC now to reserve its FIFO position, but keep displaying
+        // canonical permissions until the preceding turn and writes settle.
+        broadcastDaemonEvent({
+          type: "warning",
+          payload: { cause: "permission_mode_queued", message: `Permission change to ${label} queued after the current turn. Esc can still stop the turn.` },
+        });
+      }
+      const requestMode = () => client.request("session.setPermissionMode", {
+        sessionId, mode,
+      } satisfies SessionSetPermissionModeParams);
+      let result: Awaited<ReturnType<typeof requestMode>>;
+      try {
+        result = await requestMode();
+      } catch (error) {
+        if (!permissionModeResponseTimedOut(error)) throw error;
+        // Retrying the same choice is idempotent, including when the first
+        // request committed but its response was lost.
+        result = await requestMode();
+      }
+      await runtimeSettingsReconciler.barrier();
+      assertRuntimeSettingsAuthority();
+      const registry = eventBridgeSession.services.permissionModeRegistry as {
+        current?(): { readonly mode?: unknown };
+      } | undefined;
+      if (typeof registry?.current !== "function" || registry.current().mode !== result.mode) {
+        throw new Error("daemon permission-mode response was not followed by matching canonical runtime settings");
+      }
+      unconfirmedPermissionMode = undefined;
+      return result;
+    } catch (error) {
+      if (permissionModeResponseTimedOut(error)) {
+        // A transport timeout does not prove an authority gap or end the turn.
+        // Preserve the choice and reconcile it before admitting later input.
+        unconfirmedPermissionMode = mode;
+        broadcastDaemonEvent({
+          type: "warning",
+          payload: { cause: "permission_mode_unconfirmed", message: "Permission change is unconfirmed. AgenC will check the daemon before sending your next input. Esc can still stop the turn." },
+        });
+        throw error;
+      }
+      if (isProvenPrecommitAuthorityRejection(error)) {
+        unconfirmedPermissionMode = undefined;
+        throw error;
+      }
+      return failRuntimeSettingsAuthority(error, "permission_rule_authority_reconciliation_failed");
+    }
+  };
   const awaitRuntimeSettingsAuthority = async (): Promise<void> => {
     ensureDaemonEventsSubscribed();
     await runtimeSettingsReconciler?.barrier();
     assertRuntimeSettingsAuthority();
+    if (unconfirmedPermissionMode !== undefined) {
+      permissionModeRecovery ??= reconcilePermissionMode(unconfirmedPermissionMode)
+        .finally(() => { permissionModeRecovery = undefined; });
+      await permissionModeRecovery;
+    }
   };
   const maybeStopDaemonEvents = (): void => {
     if (
@@ -1320,6 +1388,7 @@ export function createDaemonTuiSession<
       } | undefined;
       try {
         const metadata: JsonObject = {
+          ...(opts?.userPromptText !== undefined ? { userPromptText: opts.userPromptText } : {}),
           ...(opts?.displayUserMessage !== undefined
             ? { displayUserMessage: opts.displayUserMessage }
             : {}),
@@ -1499,6 +1568,7 @@ export function createDaemonTuiSession<
     resolveDaemonToolCall: async (params: ResolveDaemonToolCallParams) => {
       const result = await client.request("session.resolveToolCall", {
         sessionId,
+        ...(params.effectSessionId !== undefined ? { effectSessionId: params.effectSessionId } : {}),
         toolCallId: params.toolCallId,
         disposition: params.disposition,
         ...("attestation" in params
@@ -1510,7 +1580,7 @@ export function createDaemonTuiSession<
         ...(params.reviewer !== undefined ? { reviewer: params.reviewer } : {}),
       });
       eventReplay.publish({ type: "effect_review_acknowledged", payload: {
-        callId: params.toolCallId, disposition: params.disposition, remaining: result.remaining,
+        callId: params.toolCallId, sessionId: params.effectSessionId, disposition: params.disposition, remaining: result.remaining,
       } });
       return result;
     },
@@ -1667,11 +1737,13 @@ export function createDaemonTuiSession<
       client.request("session.previewFileRewind", {
         sessionId,
         messageOrdinal: params.messageOrdinal,
+        ...(params.userMessageId !== undefined ? { userMessageId: params.userMessageId } : {}),
       } satisfies SessionFileRewindParams),
     rewindFilesToMessage: async (params) =>
       client.request("session.rewindFilesToMessage", {
         sessionId,
         messageOrdinal: params.messageOrdinal,
+        ...(params.userMessageId !== undefined ? { userMessageId: params.userMessageId } : {}),
       } satisfies SessionFileRewindParams),
     useSessionProviderKey: async (provider, apiKey) => {
       await client.request("session.setProviderKey", { sessionId, provider, apiKey });
@@ -1736,36 +1808,7 @@ export function createDaemonTuiSession<
     setDaemonPermissionMode: (mode) =>
       runRuntimeSettingsAuthorityMutation(async () => {
         await awaitRuntimeSettingsAuthority();
-        try {
-          const result = await client.request("session.setPermissionMode", {
-            sessionId,
-            mode,
-          } satisfies SessionSetPermissionModeParams);
-          await awaitRuntimeSettingsAuthority();
-          const registry = (
-            eventBridgeSession.services as typeof eventBridgeSession.services & {
-              readonly permissionModeRegistry?: {
-                current(): { readonly mode?: unknown };
-              };
-            }
-          ).permissionModeRegistry;
-          if (
-            registry === undefined ||
-            typeof registry.current !== "function" ||
-            registry.current().mode !== result.mode
-          ) {
-            throw new Error(
-              "daemon permission-mode response was not followed by matching canonical runtime settings",
-            );
-          }
-          return result;
-        } catch (error) {
-          if (isProvenPrecommitAuthorityRejection(error)) throw error;
-          return failRuntimeSettingsAuthority(
-            error,
-            "permission_rule_authority_reconciliation_failed",
-          );
-        }
+        return reconcilePermissionMode(mode);
       }),
     mutateDaemonPermissionRule: (params) =>
       runRuntimeSettingsAuthorityMutation(async () => {
@@ -3281,8 +3324,18 @@ function transcriptEventFromMcpElicitationRequest(params: JsonObject): JsonObjec
 
 function transcriptEventFromSessionEvent(params: JsonObject): JsonObject | null {
   if (!isJsonObject(params.event)) return null;
+  // The scoped display id below belongs to transcript deduplication. File
+  // checkpoints are keyed by the original daemon user-message id.
+  const eventPayload = isJsonObject(params.event.payload) ? params.event.payload : undefined;
+  const promptId = params.event.type === "user_message" && typeof params.event.id === "string" && params.event.id.length > 0
+    ? params.event.id : undefined;
   return {
     ...params.event,
+    ...(promptId !== undefined && eventPayload !== undefined ? { payload: {
+      ...eventPayload,
+      canonicalUserMessageId: typeof eventPayload.canonicalUserMessageId === "string" && eventPayload.canonicalUserMessageId.length > 0
+        ? eventPayload.canonicalUserMessageId : promptId,
+    } } : {}),
     ...(typeof params.turnId === "string" ? { turnId: params.turnId } : {}),
     ...(typeof params.clientMessageId === "string"
       ? { clientMessageId: params.clientMessageId }

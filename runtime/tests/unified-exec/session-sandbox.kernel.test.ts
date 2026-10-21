@@ -9,6 +9,9 @@ import { withOneShotFastMode } from "../../src/one-shot-fast-mode.js";
 import * as supervised from "../../src/utils/supervisedProcess.js";
 import { permissionProfileFromRuntimePermissions, restrictedFileSystemPolicy } from "../../src/sandbox/engine/index.js";
 import type { UnifiedExecRuntimeSandbox } from "../../src/unified-exec/types.js";
+import net from "node:net";
+import { inspectReadOnlyCommand, inspectReadOnlyShellCommand, prepareReadOnlyInspectionInvocation,
+  prepareReadOnlyShellInvocation } from "../../src/permissions/readonly-inspection.js";
 let root: string, manager: UnifiedExecProcessManager, policy: UnifiedExecRuntimeSandbox;
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "manager-session-sandbox-"));
@@ -33,7 +36,7 @@ describe("persistent unified exec lifecycle", () => {
     const sandboxClose = vi.spyOn(SessionSandbox.prototype, "close");
     const launch = vi.spyOn(supervised, "spawnContainedProcess");
     for (let i = 0; i < 2; i++) {
-      const result = await withOneShotFastMode(() => run("printf bypass", { runtimeSandbox: undefined }));
+      const result = await withOneShotFastMode(() => run("printf bypass", { runtimeSandbox: undefined, ownerId: "parent" }), "parent");
       expect(result.stdout).toBe("bypass");
       expect(result.exitCode).toBe(0);
     }
@@ -44,9 +47,9 @@ describe("persistent unified exec lifecycle", () => {
   });
   it("drains a previous sandbox once when switching to bypass", async () => {
     const sandboxClose = vi.spyOn(SessionSandbox.prototype, "close");
-    await run("true");
+    await run("true", { ownerId: "parent" });
     for (let i = 0; i < 2; i++) {
-      const result = await withOneShotFastMode(() => run("printf bypass", { runtimeSandbox: undefined }));
+      const result = await withOneShotFastMode(() => run("printf bypass", { runtimeSandbox: undefined, ownerId: "parent" }), "parent");
       expect(result.stdout).toBe("bypass");
       expect(result.exitCode).toBe(0);
     }
@@ -148,6 +151,134 @@ describe("persistent unified exec lifecycle", () => {
     await first.prepareForDurableClose();
     await expect(run("true", one)).rejects.toThrow(/owner/);
     expect((await run(namespace, two)).stdout).toBe(b.stdout);
+  });
+  it("keeps verified read-only inspections in their own warm no-write namespace", async () => {
+    const readOnly: UnifiedExecRuntimeSandbox = { ...policy, preference: "require", permissionProfile: permissionProfileFromRuntimePermissions(
+      restrictedFileSystemPolicy([{ path: { kind: "special", value: { kind: "root" } }, access: "read" }]), "disabled") };
+    const direct = (command: string, args: string[]) => {
+      const directInvocation = prepareReadOnlyInspectionInvocation({ command, args, cwd: root, readPaths: [root] }, readOnly);
+      return manager.execCommand({ cmd: [command, ...args].join(" "), runtimeSandbox: readOnly, directInvocation,
+        workdir: root, yield_time_ms: 1000 });
+    };
+    const close = vi.spyOn(SessionSandbox.prototype, "close");
+    const launch = vi.spyOn(supervised, "spawnContainedProcess");
+    const shell = await run(namespace);
+    const first = await direct("readlink", ["/proc/self/ns/pid"]);
+    const write = await run(`printf x > shell-wrote; ${namespace}`);
+    const second = await direct("readlink", ["/proc/self/ns/pid"]);
+    const refused = await direct("touch", ["inspection-wrote"]);
+    expect([shell, first, write, second].map(result => result.exitCode)).toEqual([0, 0, 0, 0]);
+    // Alternating shell and inspection commands reuse both namespaces.
+    expect(second.stdout).toBe(first.stdout);
+    expect(write.stdout).toBe(shell.stdout);
+    expect(first.stdout).not.toBe(shell.stdout);
+    expect(close).not.toHaveBeenCalled();
+    expect(launch).toHaveBeenCalledTimes(2);
+    // The warm inspection namespace still has no write authority.
+    expect(refused.exitCode).not.toBe(0);
+    expect(fs.existsSync(path.join(root, "inspection-wrote"))).toBe(false);
+    expect(fs.readFileSync(path.join(root, "shell-wrote"), "utf8")).toBe("x");
+  });
+  const readOnlyPolicy = (): UnifiedExecRuntimeSandbox => ({ ...policy, preference: "require",
+    permissionProfile: permissionProfileFromRuntimePermissions(restrictedFileSystemPolicy([
+      { path: { kind: "special", value: { kind: "root" } }, access: "read" }]), "disabled") });
+  function readOnlyLine(cmd: string, target = manager, classify = true) {
+    const readOnly = readOnlyPolicy();
+    const inspected = inspectReadOnlyShellCommand({ cmd }, root);
+    if (classify && !inspected.allowed) throw new Error(inspected.reason);
+    // Unclassified, the invocation stands for a misclassification.
+    return target.execCommand({ cmd, runtimeSandbox: readOnly, workdir: root, yield_time_ms: 1000,
+      readOnlyShell: prepareReadOnlyShellInvocation({ command: cmd, cwd: root }, readOnly) });
+  }
+  it("runs classified command lines through the session shell in their own warm no-write namespace", async () => {
+    fs.mkdirSync(path.join(root, "src"));
+    for (const name of ["b.txt", "a.txt", "C.txt"]) fs.writeFileSync(path.join(root, "src", name), name);
+    const close = vi.spyOn(SessionSandbox.prototype, "close");
+    const launch = vi.spyOn(supervised, "spawnContainedProcess");
+    const listing = "cd src && ls | sort -r | head -2 && cat a.txt b.txt 2>/dev/null | wc -c && echo \"$PATH\"";
+    const ordinary = await run(listing);
+    const first = await readOnlyLine(`${listing}; ${namespace}`);
+    const shell = await run(namespace);
+    const second = await readOnlyLine(`${listing}; ${namespace}`);
+    const refused = await readOnlyLine("cd src && ls > ../line-wrote", manager, false);
+    expect([ordinary, first, shell, second].map(result => result.exitCode)).toEqual([0, 0, 0, 0]);
+    // The same shell, environment and cwd as the ordinary path: the same answer.
+    expect(ordinary.stdout).toBe("b.txt\na.txt\n10\n/usr/local/bin:/usr/bin:/bin\n");
+    expect(first.stdout.startsWith(ordinary.stdout)).toBe(true);
+    // Alternating with the shell reuses both namespaces; they stay distinct.
+    expect(second.stdout).toBe(first.stdout);
+    expect(first.stdout.endsWith(shell.stdout)).toBe(false);
+    expect(close).not.toHaveBeenCalled();
+    expect(launch).toHaveBeenCalledTimes(2);
+    // An output redirect is never classified read-only; run as if it had been,
+    // the namespace refuses the write.
+    expect(refused.exitCode).not.toBe(0);
+    expect(refused.stderr).toMatch(/Read-only file system/u);
+    expect(fs.existsSync(path.join(root, "line-wrote"))).toBe(false);
+  });
+  it("fails closed when a classified command line writes or connects after all", async () => {
+    fs.writeFileSync(path.join(root, "notes.txt"), "one\ntwo\n");
+    const bin = path.join(root, "bin");
+    fs.mkdirSync(bin);
+    // A `cat` earlier in PATH is what a misclassification looks like: the
+    // command line reads, the program it runs writes and connects.
+    fs.writeFileSync(path.join(bin, "cat"), [
+      "#!/bin/sh",
+      "printf x > \"$PWD/shadow-wrote\"",
+      `node -e 'const s=require("net").connect(process.argv[1]);s.on("connect",()=>{console.error("CONNECTED");process.exit(0)});s.on("error",e=>{console.error("CONNECT-"+e.code);process.exit(0)})' "$PWD/service.sock"`,
+      "exec /bin/cat \"$@\"",
+    ].join("\n") + "\n", { mode: 0o755 });
+    let connections = 0;
+    const service = net.createServer(socket => { connections += 1; socket.destroy(); });
+    await new Promise<void>(resolve => service.listen(path.join(root, "service.sock"), resolve));
+    const shadowed = new UnifiedExecProcessManager({ cwd: root, sessionTempRoot: path.join(root, "temp"),
+      baseEnv: { PATH: `${bin}:/usr/local/bin:/usr/bin:/bin` } });
+    try {
+      const readOnly = await readOnlyLine("cat notes.txt | head -1", shadowed);
+      expect(readOnly.stdout).toBe("one\n");
+      expect(readOnly.stderr).toMatch(/Read-only file system/u);
+      expect(readOnly.stderr).toMatch(/CONNECT-EPERM/u);
+      expect(fs.existsSync(path.join(root, "shadow-wrote"))).toBe(false);
+      expect(connections).toBe(0);
+      // The same command line on the ordinary path does write.
+      const ordinary = await shadowed.execCommand({ cmd: "cat notes.txt | head -1", login: false,
+        runtimeSandbox: policy, yield_time_ms: 1000 });
+      expect(ordinary.stdout).toBe("one\n");
+      expect(fs.readFileSync(path.join(root, "shadow-wrote"), "utf8")).toBe("x");
+    } finally {
+      await shadowed.closeAll();
+      await new Promise<void>(resolve => service.close(() => resolve()));
+    }
+  });
+  it("gives verified inspections the session's locale and time zone", async () => {
+    fs.writeFileSync(path.join(root, "accent.txt"), "\u00e9\n");
+    const stamped = path.join(root, "stamped.txt");
+    fs.writeFileSync(stamped, "x");
+    // 20:00 UTC on 2020-01-01 is already 2 January at UTC+9.
+    fs.utimesSync(stamped, new Date("2020-01-01T20:00:00Z"), new Date("2020-01-01T20:00:00Z"));
+    const local = new UnifiedExecProcessManager({ cwd: root, sessionTempRoot: path.join(root, "temp"),
+      baseEnv: { PATH: "/usr/local/bin:/usr/bin:/bin", LANG: "C.UTF-8", TZ: "JST-9" } });
+    try {
+      const readOnly: UnifiedExecRuntimeSandbox = { ...policy, preference: "require",
+        permissionProfile: permissionProfileFromRuntimePermissions(restrictedFileSystemPolicy([
+          { path: { kind: "special", value: { kind: "root" } }, access: "read" }]), "disabled") };
+      const inspect = async (cmd: string) => {
+        const inspected = inspectReadOnlyCommand("exec_command", { cmd }, root);
+        if (!inspected.allowed) throw new Error(inspected.reason);
+        return local.execCommand({ cmd, runtimeSandbox: readOnly, workdir: root, yield_time_ms: 1000,
+          directInvocation: prepareReadOnlyInspectionInvocation(inspected.invocation, readOnly) });
+      };
+      const ordinary = (cmd: string) => local.execCommand({ cmd, login: false, runtimeSandbox: policy, yield_time_ms: 1000 });
+      for (const cmd of ["wc -m accent.txt", "ls -l stamped.txt"]) {
+        const [direct, shell] = [await inspect(cmd), await ordinary(cmd)];
+        expect(direct.exitCode).toBe(0);
+        expect(direct.stdout).toBe(shell.stdout);
+      }
+      expect((await inspect("wc -m accent.txt")).stdout).toBe("2 accent.txt\n");
+      expect((await inspect("ls -l stamped.txt")).stdout).toMatch(/ Jan {2}2 {2}2020 stamped\.txt\n$/u);
+    } finally {
+      await local.closeAll();
+    }
   });
   it("closes cached namespaces across authority quiesce and durable shutdown", async () => {
     const launch = vi.spyOn(supervised, "spawnContainedProcess");

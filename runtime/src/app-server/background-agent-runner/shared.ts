@@ -101,6 +101,8 @@ export interface AgenCBackgroundAgentStartParams {
   readonly initialContent?: MessageContent;
   readonly deferInitialTurn?: boolean;
   readonly initialDisplayUserMessage?: string | null;
+  /** Expanded human input for first-turn decisions, before skill/hook transforms. */
+  readonly initialUserPromptText?: string;
   readonly metadata?: JsonObject;
   readonly unattendedAllow: readonly string[];
   readonly unattendedDeny: readonly string[];
@@ -303,6 +305,7 @@ export interface AgenCBackgroundAgentMessageParams {
   readonly content: MessageContent;
   readonly originalContent: MessageContent;
   readonly displayUserMessage?: string | null;
+  readonly userPromptText?: string;
   readonly messageId: string;
   readonly streamId: string;
   readonly acceptedAt: string;
@@ -392,6 +395,7 @@ export interface AgenCBackgroundAgentExtendCompactionRetentionParams {
 
 export interface AgenCBackgroundAgentConversationRewindParams {
   readonly sessionId: string;
+  readonly userMessageId?: string;
   readonly messageOrdinal: number;
   /** When aborted (request.cancel), refuse mid-flight rewind work (todo-108). */
   readonly signal?: AbortSignal;
@@ -574,6 +578,8 @@ export interface AgenCBackgroundAgentRunner {
     agentId: string,
     params: ResolveDurableEffectReviewOptions,
   ): Promise<ResolveDurableEffectReviewResult>;
+  /** Canonical root and durably recorded descendants this agent may review. */
+  effectReviewSessionIds?(agentId: string): readonly string[];
   addMcpServer?(
     agentId: string,
     params: AgenCBackgroundAgentMcpAddServerParams,

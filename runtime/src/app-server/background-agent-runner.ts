@@ -27,14 +27,16 @@ import { readPreparedContextPressure, clearPreparedContextPressure } from "../se
 import { readCompactionProgress, subscribeToCompactionProgress } from "../services/compact/progress.js";
 import { estimateMessagesTokens } from "../services/compact/_deps/runtime.js";
 import { toAgenCRuntimeMessages } from "../session/runtime-message-conversion.js";
-import { getAutoCompactThresholdForEnvironment } from "../services/compact/thresholds.js";
-import { getEffectiveContextWindowSizeForEnvironment } from "../services/compact/thresholds.js";
+import { getAutoCompactPolicyForEnvironment } from "../services/compact/thresholds.js";
 import {
   bootstrapLocalRuntimeSession,
   type LocalRuntimeBootstrap,
 } from "../bin/bootstrap.js";
 import { ensureAgentControl } from "../bin/delegate-tool.js";
 import { AgentControl } from "../agents/control.js";
+import { liveAgentSession } from "../agents/live-session.js";
+import { subscribeChildEffectReviews } from "../session/child-effect-reviews.js";
+import { PendingEffectReviews } from "../session/pending-effect-reviews.js";
 import { clearSession } from "../commands/clear.js";
 import { runTurn } from "../session/run-turn.js";
 import { llmMessageToResponseItem } from "../session/message-history-conversion.js";
@@ -125,10 +127,13 @@ import {
 } from "../budget/effect-settlement-supervisor.js";
 import {
   resolveLiveDurableEffectReview,
+  resolveDurableEffectReview,
   type ResolveDurableEffectReviewOptions,
   type ResolveDurableEffectReviewResult,
 } from "../state/effect-review.js";
 import { openStateDatabases } from "../state/sqlite-driver.js";
+import { listUnresolvedUnknownOutcomeEffects } from "../state/unknown-outcome-gate.js";
+import { StateRunDurabilityRepository } from "../state/run-durability.js";
 import { mergeDaemonClientEnvironment } from "./client-env-snapshot.js";
 import {
   permissionGrantsFromToolPermissionContext,
@@ -426,6 +431,8 @@ export {
 } from "./background-agent-runner/tool-recovery.js";
 
 const DAEMON_USER_STOP_GENERATION: unique symbol = Symbol("agenc.daemon-user-stop-generation");
+/** Providers whose effort levels come with their live model lists (published-model-catalog). */
+const LIVE_EFFORT_LEVEL_PROVIDERS: ReadonlySet<string> = new Set(["venice", "ollama-cloud"]);
 type DaemonHumanSessionSubmitOptions = DaemonSessionSubmitOptions & {
   readonly [DAEMON_USER_STOP_GENERATION]?: number;
 };
@@ -863,6 +870,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         }
         const firstSubmitOptions: DaemonSessionSubmitOptions = {
           [DAEMON_USER_PROMPT_PREPARED]: true as const,
+          ...(params.initialUserPromptText !== undefined ? { userPromptText: params.initialUserPromptText } : {}),
           clientMessageId: `user-initial-${managedThread.threadId}`,
           displayUserMessage:
             params.initialDisplayUserMessage === undefined
@@ -2946,6 +2954,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       [DAEMON_USER_STOP_GENERATION]: userStopGenerationToRelease,
       [DAEMON_LOCAL_MCP_ACCESS]: params.localMcpAccess === true,
       [DAEMON_USER_PROMPT_PREPARED]: true as const,
+      ...(params.userPromptText !== undefined ? { userPromptText: params.userPromptText } : {}),
       displayUserMessage:
         params.displayUserMessage === undefined
           ? messageContentDisplayText(params.originalContent)
@@ -3345,12 +3354,13 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         contextWindow: rawWindow,
         effectiveContextWindowPercent: liveModelInfo?.effectiveContextWindowPercent ?? 100,
       } });
-      const effectiveWindowTokens = rawWindow > 0
-        ? getEffectiveContextWindowSizeForEnvironment({ options: {
+      const compactionPolicy = rawWindow > 0
+        ? getAutoCompactPolicyForEnvironment({ options: {
           mainLoopModel: model,
           contextWindowTokens: effectiveModelWindow,
         } }, bootstrap.session.services.providerEnvironment ?? {})
         : undefined;
+      const effectiveWindowTokens = compactionPolicy?.effectiveWindowTokens;
       const preparedPressure = readPreparedContextPressure(bootstrap.session);
       const pressure = preparedPressure !== undefined && preparedPressure.model === model && preparedPressure.provider === provider && preparedPressure.effectiveWindowTokens === effectiveWindowTokens
         ? preparedPressure : undefined;
@@ -3373,10 +3383,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         ...(compactionWindow !== undefined ? {
           compactionInputTokens: pressure?.inputTokens ?? fallbackInput,
           compactionWindowTokens: compactionWindow,
-          compactionThresholdTokens: pressure?.autoCompactThresholdTokens ?? getAutoCompactThresholdForEnvironment(
-            { options: { mainLoopModel: model, contextWindowTokens: compactionWindow } },
-            bootstrap.session.services.providerEnvironment ?? {},
-          ),
+          compactionThresholdTokens: pressure?.autoCompactThresholdTokens ?? compactionPolicy?.compactionThresholdTokens,
           compactionReservedOutputTokens: pressure?.reservedOutputTokens ?? 0,
         } : {}),
         messageTokens: finiteNumber(messageTokens),
@@ -3489,15 +3496,91 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       active.bootstrap.rolloutStore.store?.sessionDir,
       { includeCompleteMessages: params.includeCompleteMessages },
     );
+    const descendantReviews = this.#descendantEffectReviews(active);
+    const reviews = [...(snapshot.pendingEffectReviews ?? []), ...descendantReviews];
+    const withReviews = { ...snapshot, pendingEffectReviews: reviews };
     const state = active.bootstrap.session.state?.unsafePeek?.() as { history?: unknown[] } | undefined;
-    if (!Array.isArray(state?.history)) return snapshot;
+    if (!Array.isArray(state?.history)) return withReviews;
     const activeUserMessageIds = splitActiveHistory(normalizeHistoryMessages(state.history)).activeHistory
       .filter(isSelectableHistoryUserMessage)
       .flatMap((message) => typeof message.runtimeOnly?.responseItemId === "string"
         ? [message.runtimeOnly.responseItemId] : []);
     const pendingId = snapshot.activeTurn?.clientMessageId;
     if (pendingId !== undefined && !activeUserMessageIds.includes(pendingId)) activeUserMessageIds.push(pendingId);
-    return { ...snapshot, activeUserMessageIds };
+    return { ...withReviews, activeUserMessageIds };
+  }
+
+  effectReviewSessionIds(agentId: string): readonly string[] {
+    const active = this.#active.get(agentId);
+    if (active === undefined || !isRunnableActiveAgent(active)) {
+      throw new Error(`AgenC daemon agent not running: ${agentId}`);
+    }
+    const rootId = active.bootstrap.session.conversationId;
+    return [rootId, ...(active.bootstrap.rolloutStore.listThreadSpawnDescendants?.(rootId) ?? [])
+      .map(edge => edge.childThreadId)];
+  }
+
+  #descendantEffectReviews(active: ActiveBackgroundAgent): NonNullable<SessionTranscriptV2Result["pendingEffectReviews"]> {
+    const rootId = active.bootstrap.session.conversationId;
+    const descendants = this.effectReviewSessionIds(active.thread.threadId).filter(id => id !== rootId);
+    if (descendants.length === 0) return [];
+    const agencHome = active.bootstrap.session.services.configStore?.homeContext.path;
+    if (agencHome === undefined) throw new Error("Effect review requires the owning session's configuration home");
+    const driver = openStateDatabases({ cwd: active.bootstrap.workspaceRoot, agencHome });
+    try {
+      const effects = new StateRunDurabilityRepository(driver);
+      return descendants.flatMap(sessionId => {
+        const pending = listUnresolvedUnknownOutcomeEffects(driver, sessionId);
+        if (pending.length === 0) return [];
+        const live = active.control.getLive?.(sessionId);
+        const child = live === undefined ? undefined : liveAgentSession(live);
+        const display = new PendingEffectReviews();
+        for (const item of child?.rolloutStore?.readAll() ?? []) {
+          if (item.type === "event_msg") display.apply(item.payload);
+        }
+        return pending.flatMap(effect => {
+          const durable = effects.getEffectBySessionCall(sessionId, effect.toolCallId);
+          // An executing intent is not yet an unknown outcome requiring review.
+          if (durable !== undefined && durable.reviewStatus !== "pending") return [];
+          const context = display.reviews.find(review => review.callId === effect.toolCallId);
+          return [{ sessionId, callId: effect.toolCallId, toolName: effect.toolName,
+            description: context?.description ?? `Child session ${sessionId}`, blocksSession: false,
+            error: `${context?.error ?? durable?.unknownReason ?? "Unknown outcome"}. From this parent run /resolve ${effect.toolCallId} <confirmed_committed|confirmed_no_effect|remains_unknown> --session ${sessionId}` }];
+        });
+      });
+    } finally { driver.close(); }
+  }
+
+  #publishEffectReviews(active: ActiveBackgroundAgent): void {
+    const snapshot = sessionTranscriptV2FromRollout(active.bootstrap.rolloutStore.readAll(),
+      active.sessionBinding?.sessionId ?? active.thread.threadId, active.thread.threadId);
+    void this.#emitOrBufferEvent(active, {
+      id: active.bootstrap.session.nextInternalSubId(), type: "effect_reviews_snapshot",
+      payload: { reviews: [...(snapshot.pendingEffectReviews ?? []), ...this.#descendantEffectReviews(active)] },
+      statusProjection: "session_only",
+    });
+  }
+
+  #clearReviewedEffectPoison(
+    active: ActiveBackgroundAgent,
+    params: ResolveDurableEffectReviewOptions,
+    outcome: ResolveDurableEffectReviewResult,
+  ): void {
+    if (outcome.kind === "not_found" || !outcome.durable || params.resolution.workflowStatus === "pending") return;
+    const root = active.bootstrap.session;
+    const sessions = new Set([root]);
+    for (const id of this.effectReviewSessionIds(active.thread.threadId)) {
+      if (id === root.conversationId) continue;
+      const live = active.control.getLive?.(id);
+      const child = live === undefined ? undefined : liveAgentSession(live);
+      if (child !== undefined) sessions.add(child);
+    }
+    // A parent fence may already reference the child's effect. The reviewed
+    // canonical run/step authorizes clearing that exact mirror only; a reused
+    // call id in another run or attempt must remain blocked.
+    for (const session of sessions) resolveLiveEffectPoison(session, {
+      callId: params.toolCallId, runId: outcome.runId, stepId: outcome.stepId,
+    });
   }
 
   async resolveLiveEffectReview(
@@ -3508,21 +3591,37 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     if (active === undefined || !isRunnableActiveAgent(active)) {
       throw new Error(`AgenC daemon agent not running: ${agentId}`);
     }
-    if (active.bootstrap.session.conversationId !== params.sessionId) {
+    if (!this.effectReviewSessionIds(agentId).includes(params.sessionId)) {
       throw new Error(
-        `AgenC daemon agent ${agentId} does not own session ${params.sessionId}`,
+        `AgenC daemon agent ${agentId} does not own session ${params.sessionId}; attach to the owning session and run /resolve ${params.toolCallId} <confirmed_committed|confirmed_no_effect|remains_unknown>`,
       );
     }
-    const session = active.bootstrap.session;
-    const agencHome = session.services.configStore?.homeContext.path;
+    const root = active.bootstrap.session;
+    const live = params.sessionId === root.conversationId ? undefined : active.control.getLive(params.sessionId);
+    const session = params.sessionId === root.conversationId ? root : live === undefined ? undefined : liveAgentSession(live);
+    const agencHome = root.services.configStore?.homeContext.path;
     if (agencHome === undefined) {
       throw new Error("Live effect review requires the owning session's configuration home");
     }
+    // Closed descendants still have reviewable canonical evidence. The offline
+    // path acquires their journal lease and refuses if a writer still owns it.
+    if (session === undefined) {
+      const driver = openStateDatabases({ cwd: active.bootstrap.workspaceRoot, agencHome });
+      try {
+        const result = resolveDurableEffectReview(driver, params);
+        this.#clearReviewedEffectPoison(active, params, result);
+        this.#publishEffectReviews(active);
+        return result;
+      }
+      finally { driver.close(); }
+    }
+    const rolloutStore = session.rolloutStore;
+    if (rolloutStore === null) throw new Error(`Owning session ${params.sessionId} has no live effect journal`);
     return runWithCurrentRuntimeSession(session, () => {
       const driver = openStateDatabases({ cwd: active.bootstrap.workspaceRoot, agencHome });
       try {
         const outcome = resolveLiveDurableEffectReview(driver, params, {
-          readAll: () => active.bootstrap.rolloutStore.readAll(),
+          readAll: () => rolloutStore.readAll(),
           append: (eventId, payload) =>
             session.emit(
               {
@@ -3533,20 +3632,10 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
               { durable: true },
             ),
           project: (event) =>
-            active.bootstrap.rolloutStore.recordEffectEvent(event),
+            rolloutStore.recordEffectEvent(event),
         });
-        if (
-          outcome.kind !== "not_found" &&
-          outcome.durable &&
-          params.resolution.workflowStatus !== "pending"
-        ) {
-          resolveLiveEffectPoison(session, {
-            callId: params.toolCallId,
-            ...(outcome.runId !== undefined ? { runId: outcome.runId } : {}),
-            ...(outcome.stepId !== undefined ? { stepId: outcome.stepId } : {}),
-          });
-        }
-        if (active.deferredDurableResumePendingReview &&
+        this.#clearReviewedEffectPoison(active, params, outcome);
+        if (session === root && active.deferredDurableResumePendingReview &&
           outcome.kind !== "not_found" &&
           !active.bootstrap.rolloutStore.hasPendingEffectReviews?.()) {
           const reapply = active.reapplyRecoveredHistoryAfterReview;
@@ -3562,6 +3651,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
             active.releaseDeferredDurableResumeReviewBarrier = undefined;
           }).catch(() => undefined);
         }
+        this.#publishEffectReviews(active);
         return outcome;
       } finally {
         driver.close();
@@ -3826,12 +3916,14 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     }
     const result = await preview.call(active.bootstrap.session, {
       messageOrdinal: params.messageOrdinal,
+      ...(params.userMessageId !== undefined ? { userMessageId: params.userMessageId } : {}),
     });
     if (result.ok) {
       return {
         sessionId: params.sessionId,
         ok: true,
         canRestoreFiles: result.canRestoreFiles,
+        checkpointAvailable: result.checkpointAvailable,
         filesChanged: [...result.filesChanged],
         insertions: result.insertions,
         deletions: result.deletions,
@@ -3859,6 +3951,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
     }
     const result = await rewindFiles.call(active.bootstrap.session, {
       messageOrdinal: params.messageOrdinal,
+      ...(params.userMessageId !== undefined ? { userMessageId: params.userMessageId } : {}),
     });
     if (result.ok) {
       return {
@@ -4522,7 +4615,16 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
           ? previousSettings.reasoningEffort
           : normalizeRuntimeSetting(params.reasoningEffort, RUN_RUNTIME_REASONING_EFFORTS, "reasoning effort");
         if (params.reasoningEffort !== undefined && level !== null) {
-          const effort = resolveReasoningEffort({ provider: previousSettings.provider, model: previousSettings.model });
+          const effortModel = { provider: previousSettings.provider, model: previousSettings.model };
+          let effort = resolveReasoningEffort(effortModel);
+          if (!effort.levels.includes(level) && LIVE_EFFORT_LEVEL_PROVIDERS.has(effortModel.provider)) {
+            // Venice and Ollama Cloud publish a model's levels with their live
+            // lists. When the session could not read the list yet (a slow
+            // network at start), its provider reads it now, before refusing.
+            await session.services.provider?.getExecutionProfile?.({ model: effortModel.model })
+              .catch(() => undefined);
+            effort = resolveReasoningEffort(effortModel);
+          }
           if (!effort.levels.includes(level)) {
             throw new Error("The selected model does not support this reasoning effort");
           }
@@ -5392,6 +5494,9 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
   }
 
   #installSessionEventLogBridge(active: ActiveBackgroundAgent): () => void {
+    const unsubscribeChildReviews = subscribeChildEffectReviews(active.bootstrap.session, () => {
+      this.#publishEffectReviews(active);
+    });
     const unsubscribeCompact = subscribeToCompactionProgress(active.bootstrap.session, (progress) => {
       // Live telemetry travels over the existing opaque notification surface.
       // It is never appended to the canonical run journal or used as authority.
@@ -5418,7 +5523,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
         };
       }
     ).eventLog;
-    if (typeof eventLog?.subscribe !== "function") return unsubscribeCompact;
+    if (typeof eventLog?.subscribe !== "function") return () => { unsubscribeCompact(); unsubscribeChildReviews(); };
     active.canonicalEventBridgeInstalled = true;
     const unsubscribeLog = eventLog.subscribe((event) => {
       if (event.msg?.type === "context_compacted" || event.msg?.type === "history_cleared" || event.msg?.type === "history_replaced") {
@@ -5445,7 +5550,7 @@ export class AgenCDelegateBackgroundAgentRunner implements AgenCBackgroundAgentR
       this.#applyCanonicalEventBookkeeping(active, daemonEvent);
       void this.#emitOrBufferEvent(active, daemonEvent);
     });
-    return () => { unsubscribeLog(); unsubscribeCompact(); };
+    return () => { unsubscribeLog(); unsubscribeCompact(); unsubscribeChildReviews(); };
   }
 
   #applyCanonicalEventBookkeeping(
@@ -6253,7 +6358,7 @@ function installDaemonTurnDriverHooks(
       const ctx = baseCtx;
       const rootHumanTurnText =
         opts?.source !== "autonomous_tick" && opts?.displayUserMessage !== null
-          ? (opts?.displayUserMessage ?? promptDisplayText)
+          ? (opts?.userPromptText ?? opts?.displayUserMessage ?? promptDisplayText)
           : undefined;
       // displayUserMessage: null suppresses the run-turn user_message
       // emit. On the daemon path, submitAgentMessage above already

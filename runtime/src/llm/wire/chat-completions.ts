@@ -59,6 +59,11 @@ import {
   buildCerebrasStructuredOutputTextFormat,
 } from "./cerebras-contract.js";
 import { splitLeadingThinkBlock } from "./think-tags.js";
+import {
+  decodeReasoningDetailsReplay,
+  encodeReasoningDetailsReplay,
+} from "./reasoning-details.js";
+import { normalizePromptCacheKey } from "../prompt-cache-key.js";
 import { applyZaiImageInputContract } from "./zai-contract.js";
 import { applyQwenKimiImageInputContract } from "./qwen-contract.js";
 import {
@@ -309,6 +314,7 @@ function toChatCompletionsMessages(
   acceptsDirectImageInput?: boolean,
   sessionTailAfterSetup = false,
   usesThinkingContentBlocks = false,
+  replaysReasoningDetails = false,
 ): Array<Record<string, unknown>> {
   // The caller passes the exact normalized sequence used to derive the
   // reasoning replay plan. Keeping a single projection prevents boundary or
@@ -400,6 +406,16 @@ function toChatCompletionsMessages(
       ? message.providerReasoningContent
       : undefined;
   };
+  // Structured reasoning items go back as `reasoning_details`, unchanged;
+  // anything else as the provider's reasoning text field.
+  const replayedReasoningFields = (
+    reasoning: string | undefined,
+  ): Record<string, unknown> => {
+    if (reasoning === undefined) return {};
+    const details = replaysReasoningDetails ? decodeReasoningDetailsReplay(reasoning) : undefined;
+    if (details !== undefined) return { reasoning_details: details };
+    return usesThinkingContentBlocks ? {} : { [reasoningContentField]: reasoning };
+  };
   const assistantContent = (content: unknown, reasoning: string | undefined): unknown =>
     usesThinkingContentBlocks && reasoning !== undefined
       ? [
@@ -424,9 +440,7 @@ function toChatCompletionsMessages(
       wireMessages.push({
         role: "assistant",
         content: assistantContent(messageTextContent(message.content), providerReasoningContent),
-        ...(!usesThinkingContentBlocks && providerReasoningContent !== undefined
-          ? { [reasoningContentField]: providerReasoningContent }
-          : {}),
+        ...replayedReasoningFields(providerReasoningContent),
         tool_calls: message.toolCalls.map((toolCall) => ({
           id: toolCall.id,
           type: "function",
@@ -448,10 +462,7 @@ function toChatCompletionsMessages(
       content: message.role === "assistant"
         ? assistantContent(toOpenAIMessageContent(message.content), providerReasoningContent)
         : toOpenAIMessageContent(message.content),
-      ...(!usesThinkingContentBlocks && message.role === "assistant" &&
-      providerReasoningContent !== undefined
-        ? { [reasoningContentField]: providerReasoningContent }
-        : {}),
+      ...(message.role === "assistant" ? replayedReasoningFields(providerReasoningContent) : {}),
     });
   }
   if (sessionTail !== undefined) {
@@ -559,6 +570,20 @@ function projectRuntimeContextIntoToolResults(
     }
   }
   return projected;
+}
+
+/**
+ * A cache key shared by every request that starts with the same model and
+ * leading system message (`promptCacheKeyScope: "prefix"`). No session or
+ * user identity enters it.
+ */
+function prefixCacheKey(
+  model: string,
+  messages: ReadonlyArray<Record<string, unknown>>,
+): string | undefined {
+  const head = messages[0]?.role === "system" ? messages[0].content : undefined;
+  if (typeof head !== "string" || head.length === 0) return undefined;
+  return "agenc-" + createHash("sha256").update(model).update("\0").update(head).digest("hex").slice(0, 40);
 }
 
 export function buildChatCompletionsRequest(
@@ -671,9 +696,22 @@ export function buildChatCompletionsRequest(
       input.providerCapabilityHints?.sharesPromptPrefixAcrossSessions === true &&
         input.sharedPrefixTail !== false,
       input.providerCapabilityHints?.usesThinkingContentBlocks === true,
+      input.providerCapabilityHints?.replaysReasoningDetails === true,
     ),
     [maxTokenField]: maxTokens,
   };
+  const cacheKeyFields = input.providerCapabilityHints?.promptCacheKeyFields ?? [];
+  const promptCacheKey = cacheKeyFields.length === 0
+    ? undefined
+    : input.providerCapabilityHints?.promptCacheKeyScope === "prefix"
+      ? prefixCacheKey(input.model, body.messages as Array<Record<string, unknown>>) ??
+        input.options?.promptCacheKey?.trim()
+      : input.options?.promptCacheKey?.trim();
+  if (promptCacheKey) {
+    for (const field of cacheKeyFields) {
+      body[field] = normalizePromptCacheKey(promptCacheKey);
+    }
+  }
 
   const requestedToolChoice = input.options?.toolChoice;
   const disablesThinkingForForcedToolChoice =
@@ -806,8 +844,12 @@ export function buildChatCompletionsRequest(
   // adapter-populated; an undefined `acceptsX` flag preserves the
   // pre-hint behavior of "include if caller supplied a value", so
   // unmigrated callers don't regress.
+  const reasoningEffort = input.options?.reasoningEffort ??
+    (input.options?.disableThinkingForRecovery === true
+      ? undefined
+      : input.providerCapabilityHints?.defaultReasoningEffort);
   if (
-    input.options?.reasoningEffort !== undefined &&
+    reasoningEffort !== undefined &&
     !disablesThinkingForForcedToolChoice &&
     input.providerCapabilityHints?.acceptsReasoningEffort !== false &&
     // Providers with per-model effort enums (NVIDIA NIM) reject or
@@ -816,13 +858,13 @@ export function buildChatCompletionsRequest(
     (input.providerCapabilityHints?.reasoningEffortAllowedValues ===
       undefined ||
       input.providerCapabilityHints.reasoningEffortAllowedValues.has(
-        input.options.reasoningEffort,
+        reasoningEffort,
       ))
   ) {
     if (input.providerCapabilityHints?.reasoningEffortEnvelope === "openrouter") {
-      body.reasoning = { effort: input.options.reasoningEffort };
+      body.reasoning = { effort: reasoningEffort };
     } else {
-      body.reasoning_effort = input.options.reasoningEffort;
+      body.reasoning_effort = reasoningEffort;
     }
   }
   if (
@@ -860,8 +902,15 @@ export function buildChatCompletionsRequest(
   return body;
 }
 
+/**
+ * Request metadata for diagnostics and the context-window fit. A caller that
+ * already holds the admission-grade input count passes it as
+ * `accountedPromptTokens`; the whole-request wire estimate, which that count
+ * replaces, is then not serialized at all.
+ */
 export function collectChatCompletionsRequestMetadata(
   request: Record<string, unknown>,
+  accountedPromptTokens?: number,
 ): ChatCompletionsRequestMetadata {
   const messages = Array.isArray(request.messages)
     ? (request.messages as Array<Record<string, unknown>>)
@@ -872,10 +921,13 @@ export function collectChatCompletionsRequestMetadata(
   const roleSequence = messages.map((message) =>
     typeof message.role === "string" ? message.role : "unknown",
   );
-  const serializedPrompt = JSON.stringify({
-    messages: request.messages ?? [],
-    tools: request.tools ?? [],
-  });
+  const estimatedPromptTokens = accountedPromptTokens ?? estimateUtf8TokenUnits(
+    JSON.stringify({
+      messages: request.messages ?? [],
+      tools: request.tools ?? [],
+    }),
+    1,
+  );
   const maxTokens =
     positiveInteger(request.max_tokens as number | undefined) ??
     positiveInteger(request.max_completion_tokens as number | undefined);
@@ -892,12 +944,44 @@ export function collectChatCompletionsRequestMetadata(
     // Admission-grade calls replace this diagnostic wire estimate with the
     // complete TokenAccountingService result. Direct adapter callers still
     // get a UTF-8-aware conservative byte ceiling rather than UTF-16 chars/4.
-    estimatedPromptTokens: estimateUtf8TokenUnits(serializedPrompt, 1),
+    estimatedPromptTokens,
     ...(maxTokens !== undefined ? { maxTokens } : {}),
     ...(maxTokenField !== undefined ? { maxTokenField } : {}),
     toolsAttached: tools.length > 0,
     toolCount: tools.length,
   };
+}
+
+/**
+ * What the provider charged for one call: `usage.cost`, in USD. With the
+ * user's own provider key (`is_byok`) it is only OpenRouter's fee, and the
+ * provider bills the key `cost_details.upstream_inference_cost` on top.
+ * Without both parts the charge is unknown.
+ * https://openrouter.ai/docs/use-cases/usage-accounting
+ */
+function chargedUsd(usage: Record<string, unknown>): number | undefined {
+  const cost = usage.cost;
+  if (typeof cost !== "number" || !Number.isFinite(cost) || cost < 0) return undefined;
+  if (usage.is_byok !== true) return cost;
+  const details = usage.cost_details;
+  const upstream = details !== null && typeof details === "object" && !Array.isArray(details)
+    ? (details as Record<string, unknown>).upstream_inference_cost
+    : undefined;
+  return typeof upstream === "number" && Number.isFinite(upstream) && upstream > 0
+    ? cost + upstream
+    : undefined;
+}
+
+/**
+ * Venice's per-call charge: the top-level `cost` object, split by billing
+ * currency. DIEM credit is priced 1:1 with USD (every model_spec.pricing row
+ * lists the same usd and diem rates), so the charge is their sum.
+ */
+function topLevelChargedUsd(cost: unknown): number | undefined {
+  if (cost === null || typeof cost !== "object" || Array.isArray(cost)) return undefined;
+  const parts = [(cost as Record<string, unknown>).usd, (cost as Record<string, unknown>).diem]
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+  return parts.length > 0 ? parts.reduce((sum, value) => sum + value, 0) : undefined;
 }
 
 export function parseChatCompletionsResponse(
@@ -1065,6 +1149,13 @@ export function parseChatCompletionsResponse(
           isKnownEmptyProviderReasoning("", request.providerCapabilityHints.reasoningContentProvenance)
         ? ""
         : undefined;
+  // Gateways that return structured reasoning items get those back on the
+  // next request (reasoning-details.ts); the text stays the thinking display.
+  const reasoningDetailsReplay =
+    request.providerCapabilityHints?.replaysReasoningDetails === true
+      ? encodeReasoningDetailsReplay(message.reasoning_details)
+      : undefined;
+  const replayedProviderReasoning = reasoningDetailsReplay ?? providerReasoningContent;
   const rawContent =
     typeof message.content === "string"
       ? message.content
@@ -1138,9 +1229,9 @@ export function parseChatCompletionsResponse(
           ]),
         }
       : {}),
-    ...(providerReasoningContent !== undefined
+    ...(replayedProviderReasoning !== undefined
       ? {
-          providerReasoningContent,
+          providerReasoningContent: replayedProviderReasoning,
           ...(request.providerCapabilityHints?.reasoningContentProvenance !==
           undefined
             ? {
@@ -1172,6 +1263,11 @@ export function parseChatCompletionsResponse(
       ...(request.providerCapabilityHints?.acceptsServiceTier === true
         ? { speed: openAiServedSpeed(response.service_tier) }
         : {}),
+      ...(request.providerCapabilityHints?.reportsUsageCost === true
+        ? { providerCostUsd: chargedUsd(usageRecord) }
+        : request.providerCapabilityHints?.reportsTopLevelCost === true
+          ? { providerCostUsd: topLevelChargedUsd(response.cost) }
+          : {}),
     }),
     model:
       typeof response.model === "string" ? response.model : model,
