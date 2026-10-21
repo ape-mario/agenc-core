@@ -8,6 +8,7 @@ import { useQueuedMessage } from '../../context/QueuedMessageContext.js'
 import { ContentWidthProvider, insetContentWidth, useContentWidth } from '../../context/contentWidthContext.js'
 import { useTerminalSize } from '../../hooks/useTerminalSize.js'
 import Box from '../../ink/components/Box.js'
+import Link from '../../ink/components/Link.js'
 import wrapText from '../../ink/wrap-text.js'
 import { TerminalWriteContext } from '../../ink/useTerminalNotification.js'
 import ThemedBox from '../design-system/ThemedBox.js'
@@ -885,9 +886,9 @@ function AgencLogoMark({ compact = false }: { readonly compact?: boolean }): Rea
 
 // One line of keys for the cold start. Each fact appears once on the screen:
 // the folder, model and mode live in the status line under the prompt, so the
-// welcome carries only the name, the version and these keys. Segments are
-// ordered by teaching value and whole segments drop on narrow panes instead of
-// ellipsizing mid-word.
+// welcome carries only the name, the version, these keys and the repository
+// address. Segments are ordered by teaching value and whole segments drop on
+// narrow panes instead of ellipsizing mid-word.
 const WELCOME_HINT_SEGMENTS = [
   { keyName: '/', label: 'commands' },
   { keyName: '@', label: 'attach files' },
@@ -934,23 +935,47 @@ function WelcomeHintLine(): React.ReactNode {
   )
 }
 
+// The address under the keys. The label drops the scheme so it reads as an
+// address; the OSC 8 target carries the full URL.
+const AGENC_REPO_URL = 'https://github.com/tetsuo-ai/agenc-core'
+const AGENC_REPO_LABEL = 'github.com/tetsuo-ai/agenc-core'
+
+// Link emits OSC 8 when the terminal supports hyperlinks and prints the same
+// label plainly otherwise, which most terminals still detect as a link.
+function WelcomeRepoLink(): React.ReactNode {
+  return (
+    <Link url={AGENC_REPO_URL}>
+      <ThemedText color="inactive">{AGENC_REPO_LABEL}</ThemedText>
+    </Link>
+  )
+}
+
 // Reserve ten rows outside the mark: name + gap (2), transcript top
 // padding (1), and prompt/footer chrome including a wrapped placeholder (7).
 // Hints cost another gap and row; drop them before shrinking the brand mark.
+// The repository address costs one more gap and row and drops before the
+// hints. It only shows at its full width: a wrapped or cut address is worse
+// than none.
 export function welcomeColdPanelLayout(availableWidth: number, terminalRows: number): {
   readonly compactLogo: boolean
   readonly showHint: boolean
+  readonly showRepoLink: boolean
 } {
   const fullWidth = Math.max(...AGENC_LOGO_MARK_LINES.map(line => stringWidth(line)))
   const compactLogo = availableWidth < fullWidth || terminalRows < AGENC_LOGO_MARK_LINES.length + 10
   const logoRows = compactLogo ? AGENC_LOGO_MARK_COMPACT_LINES.length : AGENC_LOGO_MARK_LINES.length
-  return { compactLogo, showHint: terminalRows >= logoRows + 12 }
+  return {
+    compactLogo,
+    showHint: terminalRows >= logoRows + 12,
+    showRepoLink:
+      terminalRows >= logoRows + 14 && availableWidth >= stringWidth(AGENC_REPO_LABEL),
+  }
 }
 
 export function WelcomeColdPanel(): React.ReactNode {
   const availableWidth = useWelcomeAvailableWidth()
   const { rows: terminalRows } = useTerminalSize()
-  const { compactLogo, showHint } = welcomeColdPanelLayout(availableWidth, terminalRows)
+  const { compactLogo, showHint, showRepoLink } = welcomeColdPanelLayout(availableWidth, terminalRows)
 
   return (
     <Box
@@ -967,6 +992,7 @@ export function WelcomeColdPanel(): React.ReactNode {
         <ThemedText color="inactive">{` ${VERSION}`}</ThemedText>
       </Box>
       {showHint ? <WelcomeHintLine /> : null}
+      {showRepoLink ? <WelcomeRepoLink /> : null}
     </Box>
   )
 }
