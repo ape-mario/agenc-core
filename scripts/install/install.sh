@@ -61,7 +61,7 @@ PREFIX_EXPLICIT=0
 INSTALL_DAEMON=1
 SUPPORTED_NODE_MAJOR=26
 SUPPORTED_NODE_MINOR=5
-SUPPORTED_NODE_VERSION=26.5.0
+SUPPORTED_NODE_VERSION=26.12.1
 NODE_COMPAT_RELEASE_TAG="agenc-v0.11.2"
 LEGACY_BRIDGE_NODE_MAJOR=25
 LEGACY_BRIDGE_NODE_MINOR=9
@@ -220,9 +220,9 @@ node_contract() {
 bootstrap_modern_node() {
   case "${OS}-${ARCH}" in
     linux-x64)
-      NODE_DIST_FILE="node-v26.5.0-linux-x64.tar.gz"
-      NODE_DIST_SHA="22b5f47ad6ae78837e4c2b846019965ce1a06ba143de176102294a1bf44fc677"
-      NODE_DIST_BYTES=61529729
+      NODE_DIST_FILE="node-v26.12.1-linux-x64.tar.gz"
+      NODE_DIST_SHA="0fd1eb7770598f52a21995edf6ed35fc690400fa437c2386af329519e9143132"
+      NODE_DIST_BYTES=62907493
       NODE_COMPAT_FILE="agenc-node-bootstrap-libatomic-linux-x64.tar.gz"
       NODE_COMPAT_SHA="1f7bafeb33c504e59e0143d917354f70d40989e286e651ecabafbb9ad4c31833"
       NODE_COMPAT_BYTES=26074
@@ -230,9 +230,9 @@ bootstrap_modern_node() {
       NODE_COMPAT_LIBRARY_BYTES=28920
       ;;
     linux-arm64)
-      NODE_DIST_FILE="node-v26.5.0-linux-arm64.tar.gz"
-      NODE_DIST_SHA="308e5fe89a82461ba5a6cf15ff5221b2cdbd7ae87600aa72bb3c3fbdc66412d1"
-      NODE_DIST_BYTES=61388036
+      NODE_DIST_FILE="node-v26.12.1-linux-arm64.tar.gz"
+      NODE_DIST_SHA="a6c01af459dd8972ab3fb08ee5da81244d26ba8c4944a62d5bbba8c597ae154f"
+      NODE_DIST_BYTES=62602144
       NODE_COMPAT_FILE="agenc-node-bootstrap-libatomic-linux-arm64.tar.gz"
       NODE_COMPAT_SHA="327f0db1f8b6f2c2d787a1d95e20a76f0b94146785d1499f1d23c50186ad9d13"
       NODE_COMPAT_BYTES=27660
@@ -240,14 +240,14 @@ bootstrap_modern_node() {
       NODE_COMPAT_LIBRARY_BYTES=70232
       ;;
     darwin-x64)
-      NODE_DIST_FILE="node-v26.5.0-darwin-x64.tar.gz"
-      NODE_DIST_SHA="98293394c945a24e64e00b4177bf075ec963ea70b34d1d2e24bd4a71716d334f"
-      NODE_DIST_BYTES=58480209
+      NODE_DIST_FILE="node-v26.12.1-darwin-x64.tar.gz"
+      NODE_DIST_SHA="b85c2ea4420ad0bc4abf2dc6cf1f55130ed681f1cabf60cf3f526e4c9e2712ff"
+      NODE_DIST_BYTES=59800211
       ;;
     darwin-arm64)
-      NODE_DIST_FILE="node-v26.5.0-darwin-arm64.tar.gz"
-      NODE_DIST_SHA="ee920559aaa2391569cff4d737e3b83963430e3a14dedd91bfe0ff53171b5af9"
-      NODE_DIST_BYTES=57181366
+      NODE_DIST_FILE="node-v26.12.1-darwin-arm64.tar.gz"
+      NODE_DIST_SHA="1901d539912c02afa10d1cc126943a8855a7eedebe830119463470db5e6c59e8"
+      NODE_DIST_BYTES=58334853
       ;;
     *) fail "no pinned Node.js bootstrap distribution for ${OS}-${ARCH}" ;;
   esac
@@ -381,7 +381,7 @@ EOF
   BOOTSTRAP_NODE="${BOOTSTRAP_WORK}/${NODE_DIST_FILE%.tar.gz}/bin/node"
   [ -x "$BOOTSTRAP_NODE" ] || fail "pinned Node.js bootstrap executable is missing"
   "$BOOTSTRAP_NODE" -e '
-    if (process.versions.node !== "26.5.0" || process.versions.modules !== "147" ||
+    if (process.versions.node !== "26.12.1" || process.versions.modules !== "147" ||
         process.versions.napi !== "10" || process.platform !== process.argv[1] ||
         process.arch !== process.argv[2]) process.exit(1);
   ' "$OS" "$ARCH" >/dev/null 2>&1 ||

@@ -109,7 +109,7 @@ test("get.agenc.ag source preserves the landing page and release routes", () => 
   assert.ok(advertisedVersions.length > 0);
   assert.deepEqual([...new Set(advertisedVersions)], [version]);
   assert.doesNotMatch(landingPage, /PRE-RELEASE/);
-  assert.ok(landingPage.includes("PRIVATE NODE 26.5"));
+  assert.ok(landingPage.includes("PRIVATE NODE 26.12"));
   assert.ok(landingPage.includes("curl -fsSL https://get.agenc.ag/install.sh | sh"));
   for (const asset of ["agenc-logo.svg", "agenc-wordmark.svg"]) {
     const contents = readFileSync(
@@ -256,7 +256,7 @@ test("modern release identity advances while the installer legacy bridge remains
       nodeApiVersion: toolchain.nodeApiVersion,
     },
     {
-      nodeVersion: "26.5.0",
+      nodeVersion: "26.12.1",
       nodeMajor: NODE_MAJOR,
       nodeModuleAbi: NODE_MODULE_ABI,
       nodeApiVersion: NODE_API_VERSION,

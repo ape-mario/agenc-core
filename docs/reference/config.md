@@ -111,7 +111,7 @@ Directory synchronization support depends on the operating system and
 filesystem. An unsupported directory sync does not establish power-loss
 durability. A sync failure before publication stops the update; a failure
 after publication preserves artifacts not yet cleaned up and reports an
-indeterminate commit durability. See the [Node.js file synchronization contract](https://nodejs.org/download/release/v26.5.0/docs/api/fs.html#fsfsyncsyncfd).
+indeterminate commit durability. See the [Node.js file synchronization contract](https://nodejs.org/download/release/v26.12.1/docs/api/fs.html#fsfsyncsyncfd).
 
 The canonical JSON schema remains `state_version = 1`. After successful
 cleanup, the prior release can read the document. Finish any pending
