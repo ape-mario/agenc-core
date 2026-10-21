@@ -104,3 +104,23 @@ test("a model switch on the same gateway rebuilds the presented editor", () => {
   Object.assign(session.services, { providerService: { current: () => ({ provider: "openrouter", model: "deepseek/deepseek-v4.1-flash-1017" }) } });
   expect(registry.toLLMTools().find(t => t.function.name === "Edit")?.function.parameters.required).toEqual(["path", "edits"]);
 });
+
+// The native Flash route uses the existing multi-file editor; gateways and Pro
+// retain the measured batch surface until they have their own quality evidence.
+test("native Flash batches a change with apply_patch and retains discoverable editors", () => {
+  const session = gatewayOwner("deepseek", "deepseek-flash");
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, getSession: () => session });
+  expect(registry.toLLMTools().map(t => t.function.name).sort()).toEqual(["FileRead", "apply_patch", "exec_command", "system.searchTools"]);
+  registry.discoverToolNames?.(["Edit", "Write"]);
+  expect(registry.toLLMTools().map(t => t.function.name)).toEqual(expect.arrayContaining(["apply_patch", "Edit", "Write"]));
+  expect(registry.toLLMTools().find(t => t.function.name === "Edit")?.function.parameters.required).toEqual(["path", "edits"]);
+});
+
+test("switching native DeepSeek models rebuilds the initial editor catalog", () => {
+  const session = gatewayOwner("deepseek", "deepseek-flash");
+  const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, getSession: () => session });
+  expect(registry.toLLMTools().map(t => t.function.name)).toContain("apply_patch");
+  Object.assign(session.services, { providerService: { current: () => ({ provider: "deepseek", model: "deepseek-v4-pro" }) } });
+  expect(registry.toLLMTools().map(t => t.function.name)).not.toContain("apply_patch");
+  expect(registry.toLLMTools().map(t => t.function.name)).toEqual(expect.arrayContaining(["Edit", "Write"]));
+});
