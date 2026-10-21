@@ -8,13 +8,27 @@ import type { SuggestionItem } from '../../tui/components/PromptInput/PromptInpu
 import { getSkillUsageScore } from './skillUsageTracking.js'
 import { sanitizeSuggestionMetadataText } from './sanitizeSuggestionMetadataText.js'
 import {
-  compareSuggestionsByPriority,
+  compareSlashCommandMatches,
   hasNameOrAliasPrefixMatch,
 } from './sortBySearchPriority.js'
 import type { GlobalRuntimeState } from '../../config/runtime-state-repository.js'
 
 // Treat these characters as word separators for command search
 const SEPARATORS = /[:_-]/g
+
+/**
+ * Most project skills a bare '/' lists after the built-in commands: one
+ * window of picker rows, reached with a single up arrow from the top.
+ */
+const MAX_PROJECT_SKILLS_ON_BARE_SLASH = 5
+
+/**
+ * AgenC's own slash commands (the command registry), as opposed to skills,
+ * plugin commands and MCP prompts, which are all prompt commands.
+ */
+function isBuiltinCommand(cmd: Command): boolean {
+  return cmd.type === 'local' || cmd.type === 'local-jsx'
+}
 
 type CommandSearchItem = {
   descriptionKey: string[]
@@ -374,78 +388,24 @@ export function generateCommandSuggestions(
 
   const query = input.slice(1).toLowerCase().trim()
 
-  // When just typing '/' without additional text
+  // A bare '/' lists AgenC's own commands, then a few of the repository's
+  // skills. Every other skill, plugin command and MCP prompt waits until the
+  // typed text matches it: a shared catalog such as ~/.agents/skills can hold
+  // thousands of skills, and listing them all buried the built-ins.
   if (query === '') {
     const visibleCommands = commands.filter(cmd => !cmd.isHidden)
-
-    // Find recently used skills (only prompt commands have usage tracking)
-    const recentlyUsed: Command[] = []
-    const commandsWithScores = visibleCommands
-      .filter(cmd => cmd.type === 'prompt')
-      .map(cmd => ({
-        cmd,
-        score: getSkillUsageScore(getCommandName(cmd), runtimeState),
-      }))
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-
-    // Take top 5 recently used skills
-    for (const item of commandsWithScores.slice(0, 5)) {
-      recentlyUsed.push(item.cmd)
-    }
-
-    // Create a set of recently used command IDs to avoid duplicates
-    const recentlyUsedIds = new Set(recentlyUsed.map(cmd => getCommandId(cmd)))
-
-    // Categorize remaining commands (excluding recently used)
-    const builtinCommands: Command[] = []
-    const userCommands: Command[] = []
-    const projectCommands: Command[] = []
-    const policyCommands: Command[] = []
-    const otherCommands: Command[] = []
-
-    visibleCommands.forEach(cmd => {
-      // Skip if already in recently used
-      if (recentlyUsedIds.has(getCommandId(cmd))) {
-        return
-      }
-
-      if (cmd.type === 'local' || cmd.type === 'local-jsx') {
-        builtinCommands.push(cmd)
-      } else if (
-        cmd.type === 'prompt' &&
-        (cmd.source === 'userSettings' || cmd.source === 'localSettings')
-      ) {
-        userCommands.push(cmd)
-      } else if (cmd.type === 'prompt' && cmd.source === 'projectSettings') {
-        projectCommands.push(cmd)
-      } else if (cmd.type === 'prompt' && cmd.source === 'policySettings') {
-        policyCommands.push(cmd)
-      } else {
-        otherCommands.push(cmd)
-      }
-    })
-
-    // Sort each category alphabetically
-    const sortAlphabetically = (a: Command, b: Command) =>
+    const byName = (a: Command, b: Command) =>
       getCommandName(a).localeCompare(getCommandName(b))
-
-    builtinCommands.sort(sortAlphabetically)
-    userCommands.sort(sortAlphabetically)
-    projectCommands.sort(sortAlphabetically)
-    policyCommands.sort(sortAlphabetically)
-    otherCommands.sort(sortAlphabetically)
-
-    // Combine with built-in commands prioritized after recently used,
-    // so they remain visible even when many skills are installed
-    return ensureUniqueSuggestionIds([
-      ...recentlyUsed,
-      ...builtinCommands,
-      ...userCommands,
-      ...projectCommands,
-      ...policyCommands,
-      ...otherCommands,
-    ].map(cmd => createCommandSuggestionItem(cmd)))
+    const builtinCommands = visibleCommands.filter(isBuiltinCommand).sort(byName)
+    const projectSkills = visibleCommands
+      .filter(cmd => cmd.type === 'prompt' && cmd.source === 'projectSettings')
+      .sort(byName)
+      .slice(0, MAX_PROJECT_SKILLS_ON_BARE_SLASH)
+    return ensureUniqueSuggestionIds(
+      [...builtinCommands, ...projectSkills].map(cmd =>
+        createCommandSuggestionItem(cmd),
+      ),
+    )
   }
 
   // The Fuse index filters isHidden at build time and is keyed on the
@@ -472,13 +432,9 @@ export function generateCommandSuggestions(
   const fuse = getCommandFuse(commands)
   const searchResults = fuse.search(query)
 
-  // Sort results prioritizing exact/prefix command name matches over fuzzy description matches
-  // Priority order:
-  // 1. Exact name match (highest)
-  // 2. Exact alias match
-  // 3. Prefix name match
-  // 4. Prefix alias match
-  // 5. Fuzzy match (lowest)
+  // Only name and alias prefix matches are kept. They rank with an exact
+  // match first, then built-in commands before skills, then by the shared
+  // priority (exact, prefix with shorter names first, fuzzy score, usage).
   // Precompute per-item values once to avoid O(n log n) recomputation in comparator
   const withMeta = searchResults.map(r => {
     const name = r.item.commandName.toLowerCase()
@@ -487,23 +443,21 @@ export function generateCommandSuggestions(
       r.item.command.type === 'prompt'
         ? getSkillUsageScore(getCommandName(r.item.command), runtimeState)
         : 0
-    return { r, name, aliases, usage }
+    return {
+      r,
+      rank: {
+        name,
+        aliases,
+        usage,
+        score: r.score,
+        builtin: isBuiltinCommand(r.item.command),
+      },
+    }
   })
 
   const sortedResults = withMeta
-    .filter(item =>
-      hasNameOrAliasPrefixMatch(
-        { name: item.name, aliases: item.aliases },
-        query,
-      ),
-    )
-    .sort((a, b) =>
-      compareSuggestionsByPriority(
-        { name: a.name, aliases: a.aliases, usage: a.usage, score: a.r.score },
-        { name: b.name, aliases: b.aliases, usage: b.usage, score: b.r.score },
-        query,
-      ),
-    )
+    .filter(item => hasNameOrAliasPrefixMatch(item.rank, query))
+    .sort((a, b) => compareSlashCommandMatches(a.rank, b.rank, query))
 
   // Map search results to suggestion items
   // Note: We intentionally don't deduplicate here because commands with the same name
