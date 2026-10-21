@@ -5,8 +5,9 @@
  * key; nothing here reads another provider's credential.
  *
  * - Ollama Cloud: `POST https://ollama.com/api/web_search` (title, url and a
- *   content snippet per result). 0.008 USD per request, observed through
- *   `GET /api/usage?group_by=model` ("web_search", 2026-10-20).
+ *   content snippet per result). 0.005 USD plus 0.001 USD per requested
+ *   result, observed through `GET /api/usage?group_by=model` at 1, 3, 8 and
+ *   10 results ("web_search", 2026-10-21).
  * - OpenRouter: the `web` plugin with the Exa engine on one chat completion
  *   with the session's model; results arrive as `url_citation` annotations
  *   and the response's `usage.cost` is the charge (Exa auto: 0.007 USD per
@@ -27,14 +28,21 @@
 
 export const OLLAMA_WEB_SEARCH_URL = "https://ollama.com/api/web_search";
 export const OLLAMA_WEB_FETCH_URL = "https://ollama.com/api/web_fetch";
-/** USD per Ollama web search request (GET /api/usage, 2026-10-20). */
-export const OLLAMA_WEB_SEARCH_USD_PER_REQUEST = 0.008;
+/** Ollama search tariff observed through GET /api/usage, 2026-10-21. */
+const OLLAMA_WEB_SEARCH_BASE_USD = 0.005;
+const OLLAMA_WEB_SEARCH_RESULT_USD = 0.001;
 /** OpenRouter's Exa engine in auto mode: USD per request, up to ten results. */
 export const OPENROUTER_EXA_SEARCH_USD_PER_REQUEST = 0.007;
 /** Venice: USD per web search request. */
 export const VENICE_WEB_SEARCH_USD_PER_REQUEST = 0.01;
 /** Ollama's API returns at most ten results. */
 export const OLLAMA_WEB_SEARCH_MAX_RESULTS = 10;
+/** Fee for the result limit sent to Ollama, including the API's bounds. */
+export function ollamaWebSearchCostUsd(maxResults: number): number {
+  return OLLAMA_WEB_SEARCH_BASE_USD +
+    Math.max(1, Math.min(maxResults, OLLAMA_WEB_SEARCH_MAX_RESULTS)) * OLLAMA_WEB_SEARCH_RESULT_USD;
+}
+
 /** Upper bound of the prompt the search results add to a gateway's chat call. */
 export const GATEWAY_SEARCH_PROMPT_TOKENS_CEILING = 20_000;
 /** The answer is not used: only the results are. */
@@ -161,12 +169,13 @@ export async function runOllamaWebSearch(options: CallOptions): Promise<GatewayS
     max_results: Math.max(1, Math.min(options.maxResults, OLLAMA_WEB_SEARCH_MAX_RESULTS)),
   }, options);
   if (answer.reason !== undefined) return { kind: "failed", reason: answer.reason, costUsd: undefined };
+  const costUsd = ollamaWebSearchCostUsd(options.maxResults);
   const results = record(answer.json)?.results;
-  if (!Array.isArray(results)) return { kind: "failed", reason: "no results array", costUsd: OLLAMA_WEB_SEARCH_USD_PER_REQUEST };
+  if (!Array.isArray(results)) return { kind: "failed", reason: "no results array", costUsd };
   const hits = unique(results.map(entry => hit(record(entry)?.title, record(entry)?.url, record(entry)?.content)), options.maxResults);
   return hits.length > 0
-    ? { kind: "results", hits, costUsd: OLLAMA_WEB_SEARCH_USD_PER_REQUEST }
-    : { kind: "empty", costUsd: OLLAMA_WEB_SEARCH_USD_PER_REQUEST };
+    ? { kind: "results", hits, costUsd }
+    : { kind: "empty", costUsd };
 }
 
 /** Ollama Cloud's web fetch API with the session's Ollama key: title and readable content of one page. */

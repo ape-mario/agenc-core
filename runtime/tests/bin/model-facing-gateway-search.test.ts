@@ -24,7 +24,7 @@ describe("WebSearch with the session provider's own search", () => {
     vi.stubGlobal("fetch", fetch);
     const search = webSearch(session("ollama-cloud", { apiKey: "ollama-session", baseURL: "https://ollama.com/v1", model: "deepseek-v4.1-flash" }),
       { OPENROUTER_API_KEY: "independent", VENICE_API_KEY: "independent" });
-    expect(search.admissionEstimate?.({ query: "ollama" }).maxCostUsd).toBe(0.008);
+    expect(search.admissionEstimate?.({ query: "ollama", max_results: 3 }).maxCostUsd).toBe(0.008);
     const result = await search.execute({ query: "ollama web search", max_results: 3 });
     expect(fetch).toHaveBeenCalledOnce();
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
@@ -38,6 +38,42 @@ describe("WebSearch with the session provider's own search", () => {
     });
     expect(result.admissionUsage).toEqual({ inputTokens: 0, outputTokens: 0, costUsd: 0.008 });
     expect(summarizeWebSearchResult(result.content)).toMatchObject({ source: "Ollama web search" });
+  });
+
+  // Authenticated Ollama /api/usage receipts on 2026-10-21: one result
+  // costs $0.006 and eight cost $0.013. A flat $0.008 under-reserves the default.
+  it.each([
+    { requested: 1, sent: 1, cost: 0.006 },
+    { requested: 8, sent: 8, cost: 0.013 },
+    { requested: undefined, sent: 8, cost: 0.013 },
+    { requested: 100, sent: 8, cost: 0.013 },
+    { requested: 0, sent: 1, cost: 0.006 },
+  ])("Ollama reserves and records the fee for $requested results", async ({ requested, sent, cost }) => {
+    const fetch = vi.fn(async () => response({ results: Array.from({ length: sent }, (_, i) => ({
+      title: `Result ${i}`, url: `https://example.org/${i}`, content: "Search result",
+    })) }));
+    vi.stubGlobal("fetch", fetch);
+    const search = webSearch(session("ollama-cloud", { apiKey: "ollama-session", model: "deepseek-v4-pro:0813" }));
+    const args = { query: "Ollama API documentation", ...(requested === undefined ? {} : { max_results: requested }) };
+    expect(search.admissionEstimate?.(args).maxCostUsd).toBeCloseTo(cost, 9);
+    const result = await search.execute(args);
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).max_results).toBe(sent);
+    expect(result.admissionUsage?.costUsd).toBeCloseTo(cost, 9);
+  });
+
+  it("reserves the ten-result provider request used before domain filtering", async () => {
+    const fetch = vi.fn(async () => response({ results: [
+      { title: "Allowed", url: "https://example.org/a", content: "x" },
+    ] }));
+    vi.stubGlobal("fetch", fetch);
+    const search = webSearch(session("ollama-cloud", { apiKey: "ollama-session", model: "deepseek-v4-pro:0813" }));
+    const args = { query: "docs", max_results: 1, allowed_domains: ["example.org"] };
+    expect(search.admissionEstimate?.(args).maxCostUsd).toBeCloseTo(0.015, 9);
+    const result = await search.execute(args);
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).max_results).toBe(10);
+    expect(result.admissionUsage?.costUsd).toBeCloseTo(0.015, 9);
   });
 
   it("OpenRouter: the web plugin on the session model, its url_citation results and reported cost", async () => {
