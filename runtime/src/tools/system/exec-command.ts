@@ -1,3 +1,5 @@
+import { sessionDurableMemoryDirectoriesOf } from "../../services/extractMemories/memory-paths.js";
+import { canonicalAuthorityPath, protectDesktopAuthority } from "../../sandbox/desktop-authority-protection.js";
 import { observationCapableShell } from "../side-effect-free-shell.js";
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
@@ -522,10 +524,16 @@ export function runtimeSandboxForExec(
   const networkInterfaces = networkPolicyInterfaces(turn.network);
   const routineRun = routineRunOptions(context.invocation.session) !== undefined;
   const childTempRoot = runtimeChildTempRoot(context, sessionTempRoot, sandboxPolicyCwd);
-  const profile = permissionProfileForRuntimeContext(attempt.context, {
+  let profile = permissionProfileForRuntimeContext(attempt.context, {
     cwd: sandboxPolicyCwd,
     ...(network !== undefined ? { network } : {}),
   });
+  // Tool attempts build their own per-call profile instead of using the
+  // broker profile. Carry the same trusted memory reservations to this path;
+  // file tools continue to use the ordinary runtime profile and carve-outs.
+  for (const memoryRoot of sessionDurableMemoryDirectoriesOf(context.invocation.session, sandboxPolicyCwd)?.roots ?? []) {
+    profile = protectDesktopAuthority(profile, canonicalAuthorityPath(memoryRoot));
+  }
   return {
     permissionProfile: worktreeChildProfile(profile, worktreeConfinement, {
       escalated: attempt.escalated,

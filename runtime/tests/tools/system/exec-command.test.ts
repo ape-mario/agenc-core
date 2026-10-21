@@ -1,7 +1,10 @@
 import { createWriteStdinTool } from "../../../src/tools/system/write-stdin.js";
 import { PYTHON_SERVER_SOCKET_DENIED } from "../../helpers/python-server-denial.js";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { ConfigStore } from "../../../src/config/store.js";
+import { canWritePathWithCwd } from "../../../src/sandbox/engine/policy.js";
+import { effectivePermissionProfile } from "../../../src/sandbox/engine/policy-transforms.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -518,6 +521,39 @@ describe("exec_command tool", () => {
       expect(result.isError).toBeUndefined();
       expect(execCommand).toHaveBeenCalledTimes(1);
     });
+  });
+
+  test("reserves session memory on the runtime-context exec path even with additional grants", async () => {
+    const home = join(root, "agent-home");
+    const memory = join(root, "custom-memory");
+    const temp = join(root, "temp");
+    await Promise.all([home, memory, temp].map(dir => mkdir(dir)));
+    await writeFile(join(home, "config.toml"), `config_version = 2\nautoMemoryDirectory = ${JSON.stringify(memory)}\n`);
+    const configStore = new ConfigStore({ home, cwd: root, env: { AGENC_HOME: home } });
+    await configStore.reload();
+    for (const mode of ["default", "bypassPermissions"]) {
+      const args: Record<string, unknown> = {};
+      attachToolRuntimeContext(args, {
+        callId: "memory-shell", toolName: "exec_command", runtimeKind: "function",
+        classification: "exclusive", supportsParallelToolCalls: false,
+        source: { type: "model" }, submittedAtMs: 0, approvalPolicy: "never",
+        requestedSandboxMode: "workspace_write", sandboxMode: "workspace_write",
+        approvalResolved: true, rawArgs: "{}",
+        additionalPermissions: { fileSystem: { entries: [{ path: { kind: "path", path: memory }, access: "write" }] } },
+        invocation: {
+          session: { sessionConfiguration: { cwd: root },
+            permissionModeRegistry: { current: () => ({ mode }) },
+            services: { configStore, providerEnvironment: { AGENC_HOME: home }, runtimeOptions: { sessionTempRoot: temp } },
+          },
+          payload: { kind: "function", arguments: "{}" },
+          turn: { cwd: root, agencLinuxSandboxExe: "/bin/true" },
+        },
+      } as never);
+      const runtime = runtimeSandboxForExec(args, root)!;
+      const profile = effectivePermissionProfile(runtime.permissionProfile, runtime.additionalPermissions);
+      expect(canWritePathWithCwd(profile.fileSystem, join(memory, "note.md"), root, temp)).toBe(false);
+      expect(canWritePathWithCwd(profile.fileSystem, join(root, "control.txt"), root, temp)).toBe(true);
+    }
   });
 
   test("threads network policy interfaces into runtime sandbox requests", () => {
