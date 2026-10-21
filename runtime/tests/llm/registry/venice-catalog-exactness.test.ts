@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
+  VENICE_MODELS,
   parseVeniceModels,
   veniceCatalogEntry,
   VENICE_TOOL_CALLS_NOT_DELIVERED,
@@ -40,6 +41,10 @@ const listed = fixture.data.filter(row => row.type === "text" && row.model_spec.
 const parsed = new Map(parseVeniceModels(fixture).map(model => [model.model, model]));
 
 describe("every Venice text model's AgenC entry is its published row", () => {
+  test("every bundled fallback row still matches its live counterpart", () => {
+    const live = new Map(parseVeniceModels(fixture).map(row => [row.model, row]));
+    for (const row of VENICE_MODELS) expect(row).toEqual(live.get(row.model));
+  });
   test("AgenC lists exactly Venice's tool-calling text models", () => {
     expect(listed.length).toBeGreaterThan(100);
     expect([...parsed.keys()].sort()).toEqual(listed.map(row => row.id).sort());
