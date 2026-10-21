@@ -1,3 +1,4 @@
+import { sessionDurableMemoryDirectories } from "../services/extractMemories/memory-paths.js";
 import { deferSidecar } from "../session/deferred-sidecar.js";
 import { oneShotFastModeSelected } from "../one-shot-fast-mode.js";
 import { createWarmSessionSetupCeiling } from "./warm-session-setup-ceiling.js";
@@ -1195,6 +1196,7 @@ async function bootstrapLocalRuntimeSessionScoped(
     mode: initialSandboxExecutionAuthority.mode,
     cwd: workspaceRoot,
     env,
+    sessionMemoryRoots: cwd => sessionDurableMemoryDirectories({ configStore, providerEnvironment: env, runtimeOptions }, cwd)?.roots ?? [],
     sessionTempRoot,
     // A scheduled routine run: its commands write only in the workspace and
     // get a scratch folder there (or the workspace itself) as TMPDIR.

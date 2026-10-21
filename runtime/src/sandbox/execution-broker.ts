@@ -68,7 +68,7 @@ import {
 import { resolveSessionTempRoot } from "../session/runtime-options.js";
 import { protectRemoteControlAuthority, remoteControlAuthorityPaths } from "./remote-control-protection.js";
 import { cronLockAuthorityRoots, protectCronAuthority } from "./cron-authority-protection.js";
-import { desktopAuthorityRoot, protectDesktopAuthority } from "./desktop-authority-protection.js";
+import { canonicalAuthorityPath, desktopAuthorityRoot, protectDesktopAuthority } from "./desktop-authority-protection.js";
 import { protectAgencHomeUnderWritableRoot, sandboxAgencHome } from "./agenc-home-protection.js";
 import { protectDaemonSocket } from "./daemon-socket-protection.js";
 import {
@@ -282,6 +282,8 @@ export interface SandboxExecutionBrokerOptions {
   readonly allowLocalBinding?: boolean;
   readonly persistentSession?: boolean;
   readonly permissionProfile?: PermissionProfile;
+  /** Trusted session resolver, evaluated at the broker cwd (including worktree forks). */
+  readonly sessionMemoryRoots?: (cwd: string) => readonly string[];
   readonly platform?: NodeJS.Platform;
   readonly sandboxManager?: SandboxExecutionManager;
   /** Internal lineage marker propagated by forkForCwd. */
@@ -572,6 +574,7 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
   readonly #windowsSandboxPrivateDesktop: boolean;
   readonly #desktopAuthorityRoot: string;
   readonly #agencHome: string;
+  readonly #sessionMemoryRoots: SandboxExecutionBrokerOptions["sessionMemoryRoots"];
   readonly #cronAuthorityRoots: readonly string[];
   #allowGpu: boolean;
   #allowLocalBinding: boolean;
@@ -601,6 +604,7 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
     this.#env = { ...(options.env ?? process.env) };
     this.#desktopAuthorityRoot = desktopAuthorityRoot(undefined, this.#env);
     this.#agencHome = sandboxAgencHome(undefined, this.#env);
+    this.#sessionMemoryRoots = options.sessionMemoryRoots;
     this.#cronAuthorityRoots = cronLockAuthorityRoots();
     this.#platform = options.platform ?? process.platform;
     this.#sandboxManager = options.sandboxManager ?? defaultSandboxManager;
@@ -1006,6 +1010,7 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
       mode: this.mode,
       cwd: resolvedCwd,
       env: this.#env,
+      ...(this.#sessionMemoryRoots === undefined ? {} : { sessionMemoryRoots: this.#sessionMemoryRoots }),
       sessionTempRoot: this.#sessionTempRoot,
       ...(this.#explicitLinuxHelper !== undefined
         ? { agencLinuxSandboxExe: this.#explicitLinuxHelper }
@@ -1089,6 +1094,7 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
       mode: "read_only",
       cwd,
       env: this.#env,
+      ...(this.#sessionMemoryRoots === undefined ? {} : { sessionMemoryRoots: this.#sessionMemoryRoots }),
       sessionTempRoot: this.#sessionTempRoot,
       ...(this.#explicitLinuxHelper !== undefined ? { agencLinuxSandboxExe: this.#explicitLinuxHelper } : {}),
       windowsSandboxLevel: this.#windowsSandboxLevel,
@@ -1180,6 +1186,11 @@ export class SandboxExecutionBroker implements SandboxExecutionBrokerLike {
   }
 
   #protectProfile(profile: PermissionProfile): PermissionProfile {
+    // File tools write in-process. Shells must not inherit a workspace or temp
+    // grant over memory, including trusted custom/remote roots outside home.
+    for (const root of this.#sessionMemoryRoots?.(this.#cwd) ?? []) {
+      profile = protectDesktopAuthority(profile, canonicalAuthorityPath(root));
+    }
     return protectAgencHomeUnderWritableRoot(
       protectRemoteControlAuthority(protectDaemonSocket(protectCronAuthority(protectDesktopAuthority(
         profile, this.#desktopAuthorityRoot,

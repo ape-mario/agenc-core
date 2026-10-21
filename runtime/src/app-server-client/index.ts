@@ -5,6 +5,7 @@
  * daemon request setup and the minimal TUI session shell outside `bin/agenc.ts`.
  */
 
+import { sessionDurableMemoryDirectories } from "../services/extractMemories/memory-paths.js";
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
@@ -868,6 +869,7 @@ async function createBoundAgenCDaemonOnlyTuiContext(
       // execution policy must follow the attached worktree/session cwd.
       cwd: options.cwd,
       env,
+      sessionMemoryRoots: cwd => sessionDurableMemoryDirectories({ configStore, providerEnvironment: env, runtimeOptions }, cwd)?.roots ?? [],
       sessionTempRoot: runtimeOptions.sessionTempRoot,
       allowGpu: effectiveConfig.sandbox?.allow_gpu === true,
       allowLocalBinding: effectiveConfig.sandbox?.network?.allowLocalBinding === true,
