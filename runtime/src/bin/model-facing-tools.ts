@@ -1,3 +1,4 @@
+import { runOllamaWebFetch, OLLAMA_WEB_FETCH_USD_PER_REQUEST } from "../llm/providers/ollama-cloud/web-fetch.js";
 import { configuredSearchChain, runConfiguredSearchProviders } from "../tools/WebSearchTool/providers/live.js";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -1370,6 +1371,16 @@ function resolveGatewayWebSearchBackend(opts: ModelFacingToolOptions): GatewayWe
     ? undefined
     : { inputUsdPerToken: price.inputUsdPer1K / 1000, outputUsdPerToken: price.outputUsdPer1K / 1000 };
   return { provider: identity, apiKey, baseURL, model, rates };
+}
+
+/** Native fetch only uses the current session's direct Ollama Cloud key. */
+function ollamaWebFetchKey(opts: ModelFacingToolOptions): string | undefined {
+  const provider = currentSessionProvider(opts);
+  if (!provider || readProviderIdentity(provider) !== "ollama-cloud") return undefined;
+  const config = readProviderFactoryOptions(provider);
+  if (config.extra?.managedGateway === true || config.extra?.managedCredential === true) return undefined;
+  if ((stringValue(config.baseURL) ?? "https://ollama.com/v1").replace(/\/+$/, "") !== "https://ollama.com/v1") return undefined;
+  return stringValue(config.apiKey);
 }
 
 /** The most one gateway search can cost, or null when the session model has no price. */
@@ -3755,12 +3766,13 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
     isReadOnly: true,
     concurrencyClass: { kind: "shared_read" },
     recoveryCategory: "idempotent",
-    // The fetch itself is an unpriced HTTPS request, and the optional prompt
-    // extraction is charged at the model boundary (runAdmittedModelFacingCall).
+    // Direct HTTPS fetch is free; native Ollama fetch reserves its listed fee.
+    // Optional extraction is charged at the model boundary (runAdmittedModelFacingCall).
     // Without an explicit zero bound the default unpriced estimate held every
     // successful fetch as missing_tool_usage and marked the whole session's
     // cost unknown.
-    admissionEstimate: () => ({ maxInputTokens: 0, maxOutputTokens: 0, maxCostUsd: 0 }),
+    admissionEstimate: () => ({ maxInputTokens: 0, maxOutputTokens: 0,
+      maxCostUsd: ollamaWebFetchKey(opts) ? OLLAMA_WEB_FETCH_USD_PER_REQUEST : 0 }),
     inputSchema: {
       type: "object",
       properties: {
@@ -3796,7 +3808,30 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
         MIN_FETCH_BYTES,
         Math.min(MAX_FETCH_BYTES, maxChars * 4),
       );
+      let providerFetchFallback: string | undefined;
+      let providerFetchCost = 0;
+      const resultWithCharge = (result: ToolResult): ToolResult => ({ ...result,
+        admissionUsage: { inputTokens: 0, outputTokens: 0, costUsd: providerFetchCost } });
       try {
+        const apiKey = ollamaWebFetchKey(opts);
+        if (apiKey !== undefined) {
+          await assertLiveWebFetchHostAllowed(new URL(normalized).hostname, effectSignal);
+          const page = await runOllamaWebFetch({ apiKey, url: normalized, signal: effectSignal,
+            timeoutMs: numberValue(args.timeout_ms) });
+          providerFetchCost = page.costUsd;
+          if (page.kind === "content") {
+            const content = page.content.slice(0, maxChars);
+            const prompt = stringValue(args.prompt);
+            const extracted = prompt && content.length >= WEB_FETCH_EXTRACTION_MIN_CHARS
+              ? await runWebFetchExtraction(opts, { url: normalized, content, prompt, signal: effectSignal }) : undefined;
+            // Ollama does not report the final URL or origin HTTP status. Do not
+            // invent either from its successful API response, or trust links as fetches.
+            return resultWithCharge(json({ source: "ollama-cloud_web_fetch", provider: "ollama-cloud",
+              url: normalized, title: page.title, content, links: page.links,
+              truncated: page.content.length > maxChars, ...(extracted ? { extracted, prompt } : {}) }));
+          }
+          providerFetchFallback = page.reason;
+        }
         const initialParsed = new URL(normalized);
         const initialPreapproved = isPreapprovedHost(
           initialParsed.hostname,
@@ -3888,7 +3923,8 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
             } catch {
               /* extraction still useful without the persisted copy */
             }
-            return json({
+            return resultWithCharge(json({
+              ...(providerFetchFallback ? { provider_fetch_fallback: providerFetchFallback } : {}),
               status: response.status,
               ok: response.ok,
               url: normalized,
@@ -3906,11 +3942,12 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
                 0,
                 WEB_FETCH_EXTRACTION_PREVIEW_CHARS,
               ),
-            });
+            }));
           }
         }
-        return json(
+        return resultWithCharge(json(
           {
+            ...(providerFetchFallback ? { provider_fetch_fallback: providerFetchFallback } : {}),
             status: response.status,
             ok: response.ok,
             url: normalized,
@@ -3923,10 +3960,10 @@ function createWebFetchTool(opts: ModelFacingToolOptions): Tool {
             content: textBody,
           },
           response.ok ? undefined : true,
-        );
+        ));
       } catch (error) {
         effectSignal?.throwIfAborted();
-        return json({ error: `fetch failed: ${errorMessage(error)}` }, true);
+        return resultWithCharge(json({ error: `fetch failed: ${errorMessage(error)}` }, true));
       }
     },
   };
