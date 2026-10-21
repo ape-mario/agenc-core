@@ -32,7 +32,10 @@ import type {
   MemorySelectorRequest,
 } from "../../memory/recall-contract.js";
 import { closeFullCorpusMemoryIndexes } from "../../memory/find-relevant.js";
-import { getProjectMemoryPath } from "../../memory/paths.js";
+import {
+  buildProjectMemoryDirectory,
+  getProjectMemoryPath,
+} from "../../memory/paths.js";
 import {
   enterCanonicalSettingsAuthority,
   resetCanonicalSettingsAuthorityForTesting,
@@ -423,6 +426,57 @@ describe("relevantMemoriesProducer", () => {
       true,
     );
     expect(trackingState.surfacedRelevantMemoryBytes).toBeGreaterThan(0);
+  });
+
+  test("a daemon session recalls its own project memory, not the process project", async () => {
+    const daemonDir = join(root, "daemon-project");
+    mkdirSync(daemonDir, { recursive: true });
+    // The daemon process started in another project. Recall used that
+    // process-wide project memory and injected its files into every session.
+    setProjectRoot(daemonDir);
+    getProjectMemoryPath.cache?.clear?.();
+    installMemoryAuthority();
+    const daemonMemoryDir = buildProjectMemoryDirectory(agencHome, daemonDir);
+    const sessionMemoryDir = buildProjectMemoryDirectory(agencHome, cwd);
+    mkdirSync(daemonMemoryDir, { recursive: true });
+    mkdirSync(sessionMemoryDir, { recursive: true });
+    const leaked = writeMemory(
+      daemonMemoryDir,
+      "daemon-secret.md",
+      "Daemon project database password",
+      "THE PRODUCTION DATABASE PASSWORD IS hunter2.",
+    );
+    const owned = writeMemory(
+      sessionMemoryDir,
+      "session-build.md",
+      "Session project build notes",
+      "Run the session project build twice.",
+    );
+    const sessionKey = {
+      services: {
+        configStore: new ConfigStore({
+          home: agencHome,
+          env: { ...process.env, AGENC_HOME: agencHome },
+          cwd,
+        }),
+      },
+      sessionConfiguration: { cwd },
+    };
+    const trackingState = getAttachmentTrackingState(sessionKey);
+
+    const out = await relevantMemoriesProducer(
+      makeOpts({ sessionKey, userInput: null }),
+      trackingState,
+    );
+
+    expect(selectorCall).not.toHaveBeenCalled();
+    expect(out).toHaveLength(1);
+    if (out[0]?.kind !== "relevant_memories") {
+      throw new Error("expected relevant_memories");
+    }
+    const paths = out[0].memories.map((memory) => memory.path);
+    expect(paths).toContain(owned);
+    expect(paths).not.toContain(leaked);
   });
 
   test("session-start recall fires only on the first producer run", async () => {
