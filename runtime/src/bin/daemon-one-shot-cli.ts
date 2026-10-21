@@ -11,6 +11,7 @@ import { readPromptStdin } from "./prompt-stdin.js";
 import type { LLMMessage } from "../llm/types.js";
 import { normalizeUserImageInput, userImageInputsToContentParts } from "../prompts/attachments/user-image-input.js";
 import { resolveAgentRuntimeOptions, type AgentRuntimeOptions } from "../session/runtime-options.js";
+import { withDefaultLightMode } from "../session/light-mode-default.js";
 import { goalKickoffPrompt, goalSetRequestParams } from "../commands/goal.js";
 import { parseGoalCommand } from "../goal/intake.js";
 import { ConfigStore } from "../config/store.js";
@@ -1544,9 +1545,14 @@ export async function oneShotCLI(
     const platformTempRoot = invocation === undefined ? undefined : normalize(
       sessionEnv.TMPDIR || sessionEnv.TMP || sessionEnv.TEMP || "/tmp",
     );
+    // An explicit --light/--standard only. A fresh print run settles an unset
+    // mode from config.toml `light_mode` and the Light default once config is
+    // loaded; a continued session keeps the mode it recorded.
     const runtimeOptions = resolveAgentRuntimeOptions(sessionEnv, {
       simpleMode: startupCliFlags.simpleMode === true,
-    ...(startupCliFlags.lightMode === true ? { lightMode: true } : {}),
+      ...(startupCliFlags.lightMode !== undefined
+        ? { lightMode: startupCliFlags.lightMode }
+        : {}),
       dangerouslyBypassApprovalsAndSandbox:
         sandboxBypass.dangerouslyBypassApprovalsAndSandbox,
       // Print mode has no human attached: every permission request is
@@ -1706,7 +1712,7 @@ export async function oneShotCLI(
       ...(invocation !== undefined ? { clientId: invocation.clientId } : {}),
       prompt: daemonPrompt,
       env: sessionEnv,
-      runtimeOptions,
+      runtimeOptions: withDefaultLightMode(runtimeOptions, config.light_mode),
       cwd: daemonCwd,
       outputFormat,
       model: startup.model,

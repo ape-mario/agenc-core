@@ -246,6 +246,8 @@ function installDaemonCliDepsForTest(
     readonly resumePromptAgentError?: Error;
     readonly requestErrors?: Partial<Record<string, Error | readonly Error[]>>;
     readonly mcpManager?: unknown;
+    /** config.toml `light_mode` as the TUI context's loaded config reports it. */
+    readonly lightModeConfig?: boolean;
   } = {},
 ): {
   readonly agentId: string;
@@ -603,6 +605,9 @@ function installDaemonCliDepsForTest(
           ...defaultConfig(),
           model: options.model ?? "grok-4.3",
           model_provider: "grok",
+          ...(options.lightModeConfig !== undefined
+            ? { light_mode: options.lightModeConfig }
+            : {}),
         },
       });
       const config = configStore.current();
@@ -5124,6 +5129,126 @@ describe("main() smoke", () => {
         "agent.attach",
         "session.mcp.status",
       ]);
+    } finally {
+      vi.doUnmock("../tui/main.js");
+      for (const key of Object.keys(process.env)) {
+        if (!(key in prevEnv)) delete process.env[key];
+      }
+      process.argv = prevArgv;
+      Object.assign(process.env, prevEnv);
+      await rm(tmpHome, { recursive: true, force: true });
+      await rm(tmpCwd, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["no flag and no light_mode starts Light", [] as string[], undefined, true],
+    ["--standard starts standard", ["--standard"], undefined, false],
+    ["light_mode = false starts standard", [] as string[], false, false],
+    ["--light wins over light_mode = false", ["--light"], false, true],
+  ])("bootTUIEntry settles a new idle TUI session's mode: %s", async (_label, flags, lightModeConfig, expected) => {
+    const tmpHome = await mkdtemp(join(canonicalTmpdir(), "agenc-tui-mode-home-"));
+    const tmpCwd = await mkdtemp(join(canonicalTmpdir(), "agenc-tui-mode-cwd-"));
+    const prevArgv = process.argv;
+    const prevEnv = { ...process.env };
+
+    process.argv = ["node", "agenc", ...flags];
+    process.env.AGENC_HOME = tmpHome;
+    process.env.AGENC_WORKSPACE = tmpCwd;
+    process.env.XAI_API_KEY = "stub-key-for-test";
+    process.env.AGENC_CLI_ENTRY_DISABLE = "1";
+    const daemon = installDaemonCliDepsForTest({
+      agentId: "agent_tui_mode",
+      sessionId: "session_tui_mode",
+      cwd: tmpCwd,
+      ...(lightModeConfig !== undefined ? { lightModeConfig } : {}),
+    });
+
+    let resolveExit: (() => void) | null = null;
+    const waitUntilExit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveExit = resolve;
+        }),
+    );
+    let capturedSession: {
+      submit?: (message: string) => Promise<void>;
+      services?: { runtimeOptions?: { lightMode?: boolean } };
+    } | null = null;
+    vi.doMock("../tui/main.js", () => ({
+      bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
+        capturedSession = opts.session as typeof capturedSession;
+        return { unmount: vi.fn(), waitUntilExit };
+      }),
+    }));
+
+    try {
+      trustWorkspaceForTest(tmpHome, tmpCwd);
+      const pending = bootTUIEntry({});
+      const session = await waitForValue(
+        "deferred TUI session",
+        () => capturedSession,
+      );
+      // The footer reads this before the first prompt creates the session.
+      expect(session.services?.runtimeOptions?.lightMode).toBe(expected);
+      await session.submit?.("hello daemon");
+      resolveExit?.();
+      await expect(pending).resolves.toBe(0);
+      expect(daemon.startPromptAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          runtimeOptions: expect.objectContaining({ lightMode: expected }),
+        }),
+      );
+    } finally {
+      vi.doUnmock("../tui/main.js");
+      for (const key of Object.keys(process.env)) {
+        if (!(key in prevEnv)) delete process.env[key];
+      }
+      process.argv = prevArgv;
+      Object.assign(process.env, prevEnv);
+      await rm(tmpHome, { recursive: true, force: true });
+      await rm(tmpCwd, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["no light_mode starts Light", undefined, [] as string[], true],
+    ["light_mode = false starts standard", false, [] as string[], false],
+    ["--light wins over light_mode = false", false, ["--light"], true],
+  ])("bootTUIEntry settles a new TUI session started with a prompt: %s", async (_label, configured, flags, expected) => {
+    const tmpHome = await mkdtemp(join(canonicalTmpdir(), "agenc-tui-mode-prompt-home-"));
+    const tmpCwd = await mkdtemp(join(canonicalTmpdir(), "agenc-tui-mode-prompt-cwd-"));
+    const prevArgv = process.argv;
+    const prevEnv = { ...process.env };
+
+    process.argv = ["node", "agenc", ...flags, "inspect"];
+    process.env.AGENC_HOME = tmpHome;
+    process.env.AGENC_WORKSPACE = tmpCwd;
+    process.env.XAI_API_KEY = "stub-key-for-test";
+    process.env.AGENC_CLI_ENTRY_DISABLE = "1";
+    if (configured !== undefined) {
+      await writeFile(join(tmpHome, "config.toml"), `config_version = 2\nlight_mode = ${configured}\n`);
+    }
+    const daemon = installDaemonCliDepsForTest({
+      agentId: "agent_tui_mode_prompt",
+      sessionId: "session_tui_mode_prompt",
+      cwd: tmpCwd,
+    });
+    vi.doMock("../tui/main.js", () => ({
+      bootTUI: vi.fn(async () => ({
+        unmount: vi.fn(),
+        waitUntilExit: vi.fn().mockResolvedValue(undefined),
+      })),
+    }));
+
+    try {
+      trustWorkspaceForTest(tmpHome, tmpCwd);
+      await expect(bootTUIEntry({ initialPrompt: "inspect" })).resolves.toBe(0);
+      expect(daemon.startPromptAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          runtimeOptions: expect.objectContaining({ lightMode: expected }),
+        }),
+      );
     } finally {
       vi.doUnmock("../tui/main.js");
       for (const key of Object.keys(process.env)) {

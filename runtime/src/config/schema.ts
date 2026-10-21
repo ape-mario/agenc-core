@@ -997,6 +997,12 @@ export interface AgenCConfig {
   /** Stop disordered short-vocabulary model streams; false opts out. */
   readonly stream_degenerate_guard?: boolean;
   /**
+   * Mode for new sessions that did not choose one. Unset or true: Light.
+   * false: standard. `--light` and `--standard` override it; resumed sessions
+   * keep the mode they started with.
+   */
+  readonly light_mode?: boolean;
+  /**
    * Load rarely needed built-in tools through system.searchTools instead of
    * sending them with every request. Unset: on for standard sessions, off for
    * Light. The session's AGENC_DEFER_RARE_TOOLS overrides it.
@@ -1160,6 +1166,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "agent",
   "agents",
   "stream_degenerate_guard",
+  "light_mode",
   "defer_rare_tools",
   "lean_system_prompt",
   "stream_watchdog_timeout_ms",

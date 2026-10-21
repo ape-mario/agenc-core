@@ -842,7 +842,9 @@ export async function bootstrapLocalRuntimeSession(
     options.runtimeOptions ??
     resolveAgentRuntimeOptions(env, {
       simpleMode: cli.simpleMode === true,
-      ...(cli.lightMode === true ? { lightMode: true } : {}),
+      // Explicit flags only. This fallback also rebuilds existing sessions,
+      // so it never applies the new-session default.
+      ...(cli.lightMode !== undefined ? { lightMode: cli.lightMode } : {}),
       dangerouslyBypassApprovalsAndSandbox: (() => {
         const sandboxBypass = resolveStartupSandboxBypass(cli, {
           cwd: process.cwd(),

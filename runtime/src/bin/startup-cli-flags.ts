@@ -12,6 +12,8 @@ import {
   AUTONOMOUS_FLAG,
   BYPASS_APPROVALS_FLAG,
   DANGEROUS_BYPASS_FLAG,
+  LIGHT_FLAG,
+  STANDARD_FLAG,
 } from "./startup-flags.js";
 import { validateAndDedupeAdditionalWorkingDirectoryInputs } from "../contracts/additional-working-directories.js";
 
@@ -34,6 +36,12 @@ export interface StartupCliFlags {
   readonly bypassApprovals?: boolean;
   readonly autonomousMode?: boolean;
   readonly simpleMode?: boolean;
+  /**
+   * The session mode the user chose on the command line: `--light` is true,
+   * `--standard` is false. Absent when neither was passed: a new session then
+   * takes config.toml `light_mode`, then the Light default, and a resumed
+   * session keeps the mode it recorded.
+   */
   readonly lightMode?: boolean;
   readonly fullDurability?: boolean;
 }
@@ -101,7 +109,12 @@ export function readStartupCliFlags(
     : explicitPermissionMode;
   const autonomousMode = optionArgs.includes(AUTONOMOUS_FLAG);
   const simpleMode = optionArgs.includes("--bare");
-  const lightMode = optionArgs.includes("--light");
+  const light = optionArgs.includes(LIGHT_FLAG);
+  const standard = optionArgs.includes(STANDARD_FLAG);
+  if (light && standard) {
+    throw new Error(`Use either ${LIGHT_FLAG} or ${STANDARD_FLAG}, not both`);
+  }
+  const lightMode = light ? true : standard ? false : undefined;
   return Object.freeze({
     ...(taskTokenBudget !== undefined ? { taskTokenBudget } : {}),
     ...(budgetLevel !== undefined ? { budgetLevel } : {}),
@@ -118,7 +131,7 @@ export function readStartupCliFlags(
     ...(bypassApprovals ? { bypassApprovals: true } : {}),
     ...(autonomousMode ? { autonomousMode: true } : {}),
     ...(simpleMode ? { simpleMode: true } : {}),
-    ...(lightMode ? { lightMode: true } : {}),
+    ...(lightMode !== undefined ? { lightMode } : {}),
     ...(optionArgs.includes("--full-durability") ? { fullDurability: true } : {}),
   });
 }

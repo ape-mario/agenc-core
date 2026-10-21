@@ -23,6 +23,7 @@ import type { PhaseEvent } from "../phases/events.js";
 import { type Session, type IdleInputAdmission, type IdleInputOwnership, type McpSurfaceSnapshot } from "../session/session.js";
 import { AUTONOMOUS_SUBMIT_SOURCE, AutonomousKeepaliveScheduler, isAutonomousModeEnabled, type SessionSubmitOptions } from "../session/autonomous-mode.js";
 import { resolveAgentRuntimeOptions, runWithAgentRuntimeOptions, validateAgentRuntimeOptions, type AgentRuntimeOptions } from "../session/runtime-options.js";
+import { withDefaultLightMode } from "../session/light-mode-default.js";
 import type { Terminal } from "../session/turn-state.js";
 import { SchemaMismatchError, SessionLockedError } from "../session/session-store.js";
 import type { SlashCommandAppStateBridge } from "../commands/types.js";
@@ -213,7 +214,8 @@ export function formatCliHelpText(): string {
     "  --deadline-reserve <seconds>             Print mode: time before the deadline to wrap up",
     "  --no-tui                                 Force one-shot CLI mode",
     "  --bare                                   Run reduced startup and suppress all session hook extensions",
-    "  --light                                  Experimental: start with core tools and discover more",
+    "  --light                                  Start with core tools and discover more (default)",
+    "  --standard                               Start with the standard tool set instead of Light",
     "  -c, --continue                           Continue the latest project session",
     "  -r, --resume <session-id>                Resume a prior project session in the TUI",
     "  --profile <name>                         Use a named config profile",
@@ -1548,6 +1550,9 @@ async function createDeferredDaemonPromptTuiSession(params: {
   const baseServices = isRecord(base.services) ? base.services : {};
   const deferredServices = {
     ...baseServices,
+    // The options this session is created with, its settled Light or
+    // standard mode included, so the TUI shows what the daemon runs.
+    runtimeOptions: params.runtimeOptions,
     get providerEnvironment() {
       return liveSession?.services?.providerEnvironment ?? snapshotProviderEnvironment({
         ...params.env, ...sessionProviderKeys,
@@ -3295,9 +3300,13 @@ async function resumeColdDaemonSession(params: {
   });
   writeStartupSandboxBypassNotice(sandboxBypass);
   queueSandboxBypassTuiNotice(sandboxBypass);
+  // Only an explicit --light/--standard travels: the daemon keeps the mode
+  // the session recorded and never applies the new-session default here.
   const runtimeOptions = resolveAgentRuntimeOptions(sessionEnv, {
     simpleMode: startupFlags.simpleMode === true,
-    ...(startupFlags.lightMode === true ? { lightMode: true } : {}),
+    ...(startupFlags.lightMode !== undefined
+      ? { lightMode: startupFlags.lightMode }
+      : {}),
     dangerouslyBypassApprovalsAndSandbox:
       sandboxBypass.dangerouslyBypassApprovalsAndSandbox,
   });
@@ -3385,9 +3394,14 @@ export async function bootTUIEntry(
   });
   writeStartupSandboxBypassNotice(sandboxBypass);
   queueSandboxBypassTuiNotice(sandboxBypass);
+  // An explicit --light/--standard only. A new session settles an unset mode
+  // from config.toml `light_mode` and the Light default once config is
+  // loaded below; a resumed session keeps the mode it recorded.
   const runtimeOptions = resolveAgentRuntimeOptions(sessionEnv, {
     simpleMode: startupCliFlags.simpleMode === true,
-    ...(startupCliFlags.lightMode === true ? { lightMode: true } : {}),
+    ...(startupCliFlags.lightMode !== undefined
+      ? { lightMode: startupCliFlags.lightMode }
+      : {}),
     dangerouslyBypassApprovalsAndSandbox:
       sandboxBypass.dangerouslyBypassApprovalsAndSandbox,
   });
@@ -3502,6 +3516,12 @@ export async function bootTUIEntry(
             : {}),
         });
         const configStore = baseSession.services.configStore;
+        // The new session's mode: the flag, then config.toml `light_mode`,
+        // then Light. The footer and the daemon session read this one value.
+        const sessionRuntimeOptions = withDefaultLightMode(
+          runtimeOptions,
+          configStore.current().light_mode,
+        );
         const deferred = await createDeferredDaemonPromptTuiSession({
           baseSession,
           ...(args.resumeFailureMessage !== undefined
@@ -3509,7 +3529,7 @@ export async function bootTUIEntry(
           deps,
           agencHome: configStore.agencHome,
           env: sessionEnv,
-          runtimeOptions,
+          runtimeOptions: sessionRuntimeOptions,
           cwd: workspaceRoot,
           clientId: `agenc-tui-${process.pid}`,
           ...(startupCliFlags.provider !== undefined
@@ -3588,6 +3608,10 @@ export async function bootTUIEntry(
         onWarn: (message) => process.stderr.write(`${message}\n`),
       });
       const config = await configStore.reload();
+      const sessionRuntimeOptions = withDefaultLightMode(
+        runtimeOptions,
+        config.light_mode,
+      );
       const profileName = resolvedStartupProfileName(
         startupCliFlags,
         sessionEnv,
@@ -3614,7 +3638,7 @@ export async function bootTUIEntry(
       const started = await deps.startPromptAgent({
         prompt: objective,
         env: sessionEnv,
-        runtimeOptions,
+        runtimeOptions: sessionRuntimeOptions,
         cwd: daemonCwd,
         model: startup.model,
         provider: startup.provider,
@@ -3644,7 +3668,7 @@ export async function bootTUIEntry(
           agentId: started.agentId,
           clientId: `agenc-tui-${process.pid}`,
           startupCliFlags,
-          runtimeOptions,
+          runtimeOptions: sessionRuntimeOptions,
           initialComposerText:
             args.initialPrompt === undefined ? capturedEarlyInput : "",
         });
