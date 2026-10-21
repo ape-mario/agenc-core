@@ -579,8 +579,8 @@ in the permission mode its routine stores (`runtime/src/routines/`).
 A scheduled run has nobody attached. A tool action that would ask a person
 ends the run as `failed` instead of waiting. `run.error` is the
 client-visible field. `describePermissionDenial`
-(`runtime/src/routines/service.ts`) chooses a fixed string from the mode
-the run started with:
+(`runtime/src/routines/service.ts`) chooses a fixed string from the
+permission mode supplied by the writer, as described below:
 
 | Mode | `run.error` |
 | --- | --- |
