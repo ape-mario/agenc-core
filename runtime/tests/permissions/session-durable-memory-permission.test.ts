@@ -217,6 +217,19 @@ describe("file tool permissions for the memory files of a daemon session", () =>
     }
   });
 
+  inDaemon("allows memory deletion without approval but keeps explicit deny rules", async () => {
+    const session = await daemonSession();
+    const patch = createApplyPatchTool({ cwd, allowedPaths: [cwd] });
+    const target = join(projectMemory(), "forget-me.md");
+    const input = { input: `*** Begin Patch\n*** Delete File: ${target}\n*** End Patch`, cwd };
+    expect((await check(patch, input, evaluatorContext(session))).behavior).toBe("allow");
+    const permissions = applyPermissionUpdate(createEmptyToolPermissionContext(), {
+      type: "addRules", destination: "session", behavior: "deny",
+      rules: [{ toolName: "apply_patch", ruleContent: target }],
+    });
+    expect((await check(patch, input, evaluatorContext(session, permissions))).behavior).toBe("deny");
+  });
+
   inDaemon("keeps deny and ask rules on memory files", async () => {
     const session = await daemonSession();
     const write = createFileWriteTool({ allowedPaths: [cwd] });

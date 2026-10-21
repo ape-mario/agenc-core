@@ -223,7 +223,7 @@ describe("memory prompt", () => {
     // Rules about memories that already exist ride with the injected index.
     for (const rule of [
       "Read a topic file only when needed and an index only to update it", "search the memory directory with grep",
-      "Update a topic instead of duplicating it", "to forget, delete its file and index line",
+      "Update a topic instead of duplicating it", "to forget, delete its file with `apply_patch`",
       "fix or delete stale memories", "Ignore memory if asked",
     ]) {
       expect(memory.LIGHT_MEMORY_RECALL_RULES, rule).toContain(rule);
@@ -389,3 +389,14 @@ function installMemoryAuthority(): void {
     cwd: join(tempRoot, "repo"),
   }));
 }
+
+ it("names a supported file deletion and index edit in both memory prompts", () => {
+  const standard = memory.buildMemoryInstructionLines().join("\n");
+  const light = memory.buildLightMemoryInstructionLines().join("\n") + memory.LIGHT_MEMORY_RECALL_RULES;
+  for (const prompt of [standard, light]) {
+    expect(prompt).toContain("apply_patch");
+    expect(prompt).toContain("Delete File:");
+    expect(prompt).toContain("Edit");
+    expect(prompt).toContain("index line");
+  }
+ });
