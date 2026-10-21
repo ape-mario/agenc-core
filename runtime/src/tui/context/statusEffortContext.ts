@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { OffPeakSchedule } from "../../session/off-peak-pricing.js";
 
 /**
  * The effort the session runs at, for the status line ("high effort"). Null
@@ -21,4 +22,16 @@ export function useStatusContextUsage(): number | null {
 export const StatusTurnBusyContext = createContext(false);
 export function useStatusTurnBusy(): boolean {
   return useContext(StatusTurnBusyContext);
+}
+
+/** Percent of the session's input served from prompt cache; null hides it. */
+export const StatusPromptCacheContext = createContext<number | null>(null);
+export function useStatusPromptCache(): number | null {
+  return useContext(StatusPromptCacheContext);
+}
+
+/** Off-peak hours of the selected provider and model; null when none are recorded. */
+export const StatusOffPeakContext = createContext<OffPeakSchedule | null>(null);
+export function useStatusOffPeakSchedule(): OffPeakSchedule | null {
+  return useContext(StatusOffPeakContext);
 }

@@ -1473,6 +1473,12 @@ export function conservativeModelCost(registry: Readonly<Record<string, ModelCos
     costEstimated: true, label: "conservative estimate" };
 }
 
+/** Anthropic and Bedrock report cache reads and writes separately from input. */
+export function reportsCacheOutsideInput(provider: string | undefined): boolean {
+  const id = normalizeProviderMetadataIdentity(provider);
+  return id === "anthropic" || id === "bedrock" || id === "amazon-bedrock";
+}
+
 export interface CostResolution {
   readonly costUsd: number;
   readonly known: boolean;
@@ -1498,10 +1504,8 @@ export function computeUsdCostWithResolution(
   const entry = estimated ? conservativeModelCost(registry) : selected;
   if (estimated) {
     const outputTokens = Math.max(usage.outputTokens, usage.reasoningOutputTokens);
-    // Anthropic and Bedrock report cache reads/writes separately from input.
     // Preserve matched entries' cache semantics when only the call tier is unpriced.
-    const provider = normalizeProviderMetadataIdentity(usage.provider);
-    const separateCacheTokens = provider === "anthropic" || provider === "bedrock" || provider === "amazon-bedrock";
+    const separateCacheTokens = reportsCacheOutsideInput(usage.provider);
     const useProviderCacheSemantics = match === null || standardEntry.costEstimated === true;
     const cacheReadsIncluded = match?.entry.cachedInputIncludedInInputTokens ??
       (useProviderCacheSemantics && !separateCacheTokens);
