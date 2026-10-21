@@ -67,9 +67,12 @@ The script (source: `scripts/install/install.sh`):
    atomically promotes the complete runtime under the content-addressed ABI
    path; a SQLite `BEGIN IMMEDIATE` lock makes concurrent local installs safe
    and is released by the OS if an installer exits,
-8. installs an `agenc` wrapper to `--prefix`/bin (default `~/.local/bin`) that
-   points at the artifact's private Node executable and, on Linux, its private
-   compatibility-library directory (user services run with a minimal PATH),
+8. checks that the artifact's private Node is the exact version the manifest's
+   build record names (a local manifest has no build record and uses the
+   installer's own Node pin), then installs an `agenc` wrapper to
+   `--prefix`/bin (default `~/.local/bin`) that points at that Node executable
+   and, on Linux, its private compatibility-library directory (user services
+   run with a minimal PATH),
 9. installs and starts the daemon as a systemd user service (Linux) or
    launchd agent (macOS). Skip with `--no-daemon`.
 
