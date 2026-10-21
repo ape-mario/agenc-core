@@ -633,12 +633,16 @@ export function buildOpenAIResponsesRequest(
       effort: reasoningEffort,
     };
   }
-  // Reasoning replay should retain the provider's summary as well as
-  // its encrypted reasoning. Match stateless reasoning clients that ask for
-  // `auto`, but keep an explicit summary choice (including `none`) authoritative.
+  // Luna's API can spend additional time producing automatic summaries even
+  // for short tool turns. Its encrypted reasoning replays with an empty
+  // summary, so keep the model's summary default instead of forcing `auto`.
+  // Explicit summary choices, other models and ChatGPT keep their behavior.
+  const preserveLunaSummaryDefault = replayProvider === "openai" &&
+    input.chatgptBackend !== true &&
+    input.model.trim().toLowerCase() === "gpt-6-luna";
   // An omitted effort can still run reasoning at the model's default tier.
-  // Explicit summary choices and non-reasoning requests stay authoritative.
-  const useReplaySummaryDefault = replayProvider !== undefined &&
+  const useReplaySummaryDefault = !preserveLunaSummaryDefault &&
+    replayProvider !== undefined &&
     reasoningEffort !== "none" &&
     (reasoningEffort !== undefined ||
       !openAiModelDefaultsToNoReasoning(input.model)) &&
