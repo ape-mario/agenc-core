@@ -43,6 +43,7 @@ Order matches `buildDefaultRegistry`.
 | `/tasks` | `jobs`, `bashes` | Show live background tasks and spawned agents |
 | `/todos` | `todo` | Show the session todo lists |
 | `/config` | | Manage configuration — opens a picker |
+| `/theme` | | Choose the color theme. The picker previews each theme as the selection moves, Enter saves it as `tui.theme` and Esc keeps the current one; `/theme <name>` sets one directly. See [`/theme`](#theme) |
 | `/keybindings` | | Scaffold and edit canonical `tui.keybindings`, then reload config |
 | `/hooks` | | Inspect and test AgenC hook configuration |
 | `/skills` | | Manage project skills and show loaded skill roots |
@@ -73,7 +74,7 @@ Sources: `runtime/src/commands/*.ts(x)` modules imported by
 `buildDefaultRegistry` in `registry.ts` (`help`, `hello`, `status`, `auth`,
 `xai-auth`, `openai-auth`, `cost`, `model`, `provider`, `effort`, `resolve`, `swarm`,
 `ledger`, `permissions`, `plan`, `agent-management`, `tasks`, `todos`,
-`config`, `keybindings`, `hooks`, `skills`, `mcp`, `remote`, `plugins`, `memory/slash`,
+`config`, `theme`, `keybindings`, `hooks`, `skills`, `mcp`, `remote`, `plugins`, `memory/slash`,
 `resume`, `rewind`, `init`, `output-style`, `clear`, `session-compact`,
 `compaction-operator`, `coordinator`, `diff`, `protocol`, `exit`). Related:
 [grok-oauth.md](../grok-oauth.md), [cli.md](cli.md) (compaction operator),
@@ -177,6 +178,34 @@ remains available in transcript history. `/compact-rollback` and
 `compaction_committed` payload and retention pin. Both commands refuse during
 an active turn (`ACTIVE_TURN`). Syntax:
 [cli.md](cli.md#compaction-operator-commands).
+
+## `/theme`
+
+`/theme` opens a picker of the color themes `tui.theme` accepts: `auto`,
+`dark`, `light`, `light-daltonized`, `dark-daltonized`, `light-ansi`,
+`dark-ansi` and `olive`. Moving the selection repaints the screen in that
+theme, and the picker draws a short sample conversation, because the
+transcript is hidden while a picker is open.
+
+| Key | Effect |
+| --- | --- |
+| Up / Down (or `k` / `j`) | Move and preview |
+| Enter | Save the highlighted theme as `tui.theme` in your user `config.toml` and close |
+| Esc (or `q`) | Close and keep the theme you had. Ctrl+C or any other close does the same |
+
+`/theme <name>` saves a theme without the picker, in any case. An unknown
+name returns an error that lists the valid names and saves nothing. `auto`
+follows the terminal background: olive on a dark terminal, light on a light
+one.
+
+The saved theme is the same setting `/config` shows and first-run setup
+writes, so new sessions start with it, and `/config reload` after a hand edit
+of `config.toml` applies it at once. If a project, managed or command-line
+layer sets its own `tui.theme`, that layer still wins: `/theme` saves your
+choice and says which layer keeps its theme in effect.
+
+These are color themes only. The lean agent mode started with `--light` is a
+different setting.
 
 ## `/permissions`
 
