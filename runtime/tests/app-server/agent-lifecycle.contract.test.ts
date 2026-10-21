@@ -2788,6 +2788,43 @@ describe("AgenC background agent lifecycle", () => {
     } finally { promote.mockRestore(); }
   });
 
+  it.each([
+    ["an omitted mode takes a Light daemon default", undefined, true, true],
+    ["an omitted mode takes a standard daemon default", undefined, false, false],
+    ["an explicit standard choice wins over a Light default", false, true, false],
+    ["an explicit Light choice wins over a standard default", true, false, true],
+  ])("agent.create settles a new agent's mode: %s", async (_label, requested, daemonDefault, expected) => {
+    const starts: AgenCBackgroundAgentStartParams[] = [];
+    const runner: AgenCBackgroundAgentRunner = {
+      startAgent: async (params) => {
+        starts.push(params);
+        return { agentId: "agent_mode", startedAt: "2026-05-01T12:00:00.500Z", status: "running" };
+      },
+    };
+    const defaultLightMode = vi.fn(() => daemonDefault);
+    const agents = new AgenCDaemonAgentManager({
+      runner,
+      sessionManager: new AgenCDaemonSessionManager({ createSessionId: sequence(["session_mode"]) }),
+      defaultLightMode,
+    });
+    const created = await createTestAgent(agents, {
+      cwd: process.cwd(),
+      objective: "work",
+      runtimeOptions: {
+        ...TEST_AGENT_RUNTIME_OPTIONS,
+        ...(requested !== undefined ? { lightMode: requested } : {}),
+      },
+    });
+    // The settled value is what the session runs with and what is recorded,
+    // so a restart or a resume restores it without asking the default again.
+    expect(starts[0]?.runtimeOptions?.lightMode).toBe(expected);
+    expect(created.metadata).toMatchObject({
+      lightMode: expected,
+      runtimeOptions: { ...TEST_AGENT_RUNTIME_OPTIONS, lightMode: expected },
+    });
+    expect(defaultLightMode).toHaveBeenCalledTimes(requested === undefined ? 1 : 0);
+  });
+
   it.each([false, true])("agent.create persists actual Light mode (%s), ignoring caller metadata", async (lightMode) => {
     const selectedRuntimeOptions = { ...TEST_AGENT_RUNTIME_OPTIONS, lightMode };
     const sessions = new AgenCDaemonSessionManager({
@@ -3427,11 +3464,15 @@ describe("AgenC background agent lifecycle", () => {
       expect(listed?.metadata?.recovered).toBe(true);
       expect(listed?.metadata?.lightMode).toBe(lightMode);
       const restoreAgent = vi.fn(async () => true);
+      const defaultLightMode = vi.fn(() => true);
       const agents = new AgenCDaemonAgentManager({
         // The first project has the same ID but the opposite profile. Resume
         // must use the project bound by its validated canonical rollout.
         threadStore: resumeStore, sessionManager: sessions,
         runner: { ...noLiveAgentRunner(sessionId), restoreAgent },
+        // A Light daemon default never reaches a resume: a session recorded
+        // without a mode (before Light became the default) stays standard.
+        defaultLightMode,
       });
       await expect(createTestAgent(agents, {
         resumeSessionId: sessionId, resumeRolloutPath: fixture.rolloutPath,
@@ -3441,6 +3482,7 @@ describe("AgenC background agent lifecycle", () => {
       expect(restoreAgent).toHaveBeenCalledWith(expect.objectContaining({
         runtimeOptions: { ...TEST_AGENT_RUNTIME_OPTIONS, lightMode: lightMode === true },
       }));
+      expect(defaultLightMode).not.toHaveBeenCalled();
     } finally {
       resumeStore.close();
       threadStore.close();

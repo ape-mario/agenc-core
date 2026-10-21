@@ -5989,6 +5989,77 @@ backend = "local"
     }
   });
 
+  it.each([
+    ["no light_mode gives Light", undefined, true],
+    ["light_mode = false gives standard", false, false],
+  ])("foreground daemon settles a new agent created without a mode: %s", async (_label, configured, expected) => {
+    const agencHome = await tempAgencHome();
+    if (configured !== undefined) {
+      await writeFile(join(agencHome, "config.toml"), `config_version = 2\nlight_mode = ${configured}\n`);
+    }
+    const host = createHost(agencHome);
+    const io = createIo();
+    const signalProcess = createSignalProcess();
+    const pidPath = resolveAgenCDaemonPidPath(host.env, host.userHome);
+    const cookiePath = resolveAgenCDaemonCookiePath(host.env, host.userHome);
+    const socketPath = resolveAgenCDaemonSocketPath(host.env, host.userHome);
+    const startedModes: Array<boolean | undefined> = [];
+    const runner: AgenCBackgroundAgentRunner = {
+      startAgent: async (params) => {
+        startedModes.push(params.runtimeOptions?.lightMode);
+        return {
+          agentId: `agent_default_mode_${startedModes.length}`,
+          startedAt: "2026-05-01T15:00:00.000Z",
+          status: "running",
+        };
+      },
+    };
+
+    const running = runAgenCDaemonCli(
+      { kind: "command", action: "run" },
+      { host, io, signalProcess, runner },
+    );
+    let stopped = false;
+    try {
+      await expect(waitForPid(pidPath)).resolves.toBe(4100);
+      const authCookie = (await readFile(cookiePath, "utf8")).trim();
+      const client = createAgenCJsonLineDaemonRequestClient({
+        socketPath,
+        authCookie,
+        timeoutMs: 1000,
+      });
+      // An API client, phone or routine session that names no mode.
+      const defaulted = await client.request("agent.create", {
+        cwd: process.cwd(),
+        objective: "no mode chosen",
+        runtimeOptions: TEST_RUNTIME_OPTIONS,
+      });
+      expect(defaulted.metadata?.lightMode).toBe(expected);
+      // An explicit choice is kept whatever the daemon default is.
+      await client.request("agent.create", {
+        cwd: process.cwd(),
+        objective: "explicit standard",
+        runtimeOptions: { ...TEST_RUNTIME_OPTIONS, lightMode: false },
+      });
+      await client.request("agent.create", {
+        cwd: process.cwd(),
+        objective: "explicit light",
+        runtimeOptions: { ...TEST_RUNTIME_OPTIONS, lightMode: true },
+      });
+      expect(startedModes).toEqual([expected, false, true]);
+
+      signalProcess.emit("SIGTERM");
+      stopped = true;
+      await expect(running).resolves.toBe(0);
+    } finally {
+      if (!stopped) {
+        signalProcess.emit("SIGTERM");
+        await running.catch(() => {});
+      }
+      await rm(agencHome, { recursive: true, force: true });
+    }
+  });
+
   it("foreground daemon does not advertise running after startup signal", async () => {
     const agencHome = await tempAgencHome();
     const host = createHost(agencHome);
