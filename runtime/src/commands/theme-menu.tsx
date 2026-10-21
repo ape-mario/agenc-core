@@ -1,3 +1,4 @@
+import figures from "figures";
 import React from "react";
 
 import { TUI_THEME_SETTINGS } from "../config/schema.js";
@@ -21,10 +22,13 @@ interface ThemeMenuSaveResult {
 }
 
 const NAME_WIDTH = Math.max(...TUI_THEME_SETTINGS.map((setting) => setting.length)) + 2;
-/** The muted gray band under the highlighted row, as in the slash picker redesign. */
-const ACTIVE_ROW_COLOR = "lineSoft";
-/** Border, title row, one row per theme, and the hint row under a blank one. */
-const LIST_ROWS = 2 + 1 + TUI_THEME_SETTINGS.length + 2;
+/**
+ * The selected row matches the borderless slash list: a small pointer and
+ * the theme's muted gray fill (`muted3`), its name bold.
+ */
+const ACTIVE_ROW_COLOR = "muted3";
+/** The title row with the key hints, and one row per theme. */
+const LIST_ROWS = 1 + TUI_THEME_SETTINGS.length;
 /** The sample under the list: a blank row, its label, two messages, two diff lines. */
 const SAMPLE_ROWS = 6;
 
@@ -74,7 +78,7 @@ function ThemeMenuView({
   const choice = TUI_THEME_SETTINGS[activeIndex] ?? saved;
   const viewport = useModalOrTerminalSize(useTerminalSize());
   const glyphs = selectAgenCTuiGlyphs();
-  const marker = resolveAgenCTuiGlyphMode() === "ascii" ? ">" : "›";
+  const marker = resolveAgenCTuiGlyphMode() === "ascii" ? ">" : figures.pointerSmall;
 
   React.useEffect(() => {
     previewRef.current.setPreviewTheme(choice);
@@ -124,21 +128,18 @@ function ThemeMenuView({
     }
   });
 
-  // The picker paints its own surface, so the list stays readable while a
-  // theme meant for the other kind of terminal is previewed.
+  // No frame, like the slash list. The picker paints its own surface, so the
+  // list stays readable while a theme made for the other kind of terminal is
+  // previewed.
   return (
-    <ThemedBox
-      flexDirection="column"
-      borderStyle="single"
-      borderColor="text"
-      backgroundColor="surfaceBackground"
-      paddingX={1}
-    >
+    <ThemedBox flexDirection="column" backgroundColor="surfaceBackground" paddingX={1}>
       <Box flexDirection="row">
         <ThemedText color="inactive" bold>THEME</ThemedText>
         <Box flexGrow={1} />
         <ThemedText color="inactive">
-          {busy ? "saving" : `${TUI_THEME_SETTINGS.length} themes`}
+          {busy
+            ? "saving"
+            : `${glyphs.arrowUp}${glyphs.arrowDown} preview ${glyphs.separator} ${glyphs.enter} save ${glyphs.separator} esc cancel`}
         </ThemedText>
       </Box>
       {TUI_THEME_SETTINGS.map((setting, index) => {
@@ -153,19 +154,23 @@ function ThemeMenuView({
               <ThemedText color="text" bold>{active ? marker : " "}</ThemedText>
             </Box>
             <Box width={NAME_WIDTH} flexShrink={0}>
-              <ThemedText color={active ? "text" : "text2"} bold={active} wrap="truncate-end">
+              <ThemedText color="text" bold={active} wrap="truncate-end">
                 {setting}
               </ThemedText>
             </Box>
             <Box flexGrow={1} flexShrink={1} minWidth={0}>
-              <ThemedText color={active ? "text2" : "inactive"} wrap="truncate-end">
+              <ThemedText
+                color={active ? "text" : undefined}
+                dimColor={!active}
+                wrap="truncate-end"
+              >
                 {themeSettingNote(setting, saved)}
               </ThemedText>
             </Box>
           </ThemedBox>
         );
       })}
-      {/* Drawn only when it fits, so a short terminal keeps the hint row. */}
+      {/* Drawn only when it fits, so a short terminal keeps every theme row. */}
       {viewport.rows >= LIST_ROWS + SAMPLE_ROWS + (message === null ? 0 : 2)
         ? <ThemeSample />
         : null}
@@ -174,13 +179,6 @@ function ThemeMenuView({
           <ThemedText color="warning" wrap="wrap">{message}</ThemedText>
         </Box>
       ) : null}
-      <Box flexDirection="row" marginTop={1}>
-        <ThemedText color="inactive">{`${glyphs.arrowUp}${glyphs.arrowDown} preview`}</ThemedText>
-        <Box flexGrow={1} />
-        <ThemedText color="inactive">
-          {`${glyphs.enter} save ${glyphs.separator} esc cancel`}
-        </ThemedText>
-      </Box>
     </ThemedBox>
   );
 }

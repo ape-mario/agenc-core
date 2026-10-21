@@ -145,36 +145,38 @@ describe("/theme picker", () => {
     await openPicker();
     // TTY output can encode spaces with cursor movement rather than bytes.
     const rows = stripAnsi(output).split(/\r?\n/u).map((row) => row.replace(/\s+/gu, ""));
-    expect(rows).toContain("│THEME8themes│");
-    expect(rows).toContain("│›oliveolive,creamandwine,fordarkterminals(current)│");
+    // No frame: a title row with the key hints, then one row per theme.
+    expect(rows).toContain("THEME↑↓preview·↵save·esccancel");
+    expect(rows).toContain("›oliveolive,creamandwine,fordarkterminals(current)");
     for (const row of [
-      "│autooliveondarkterminals,lightonlightones│",
-      "│darkblackandpurple,fordarkterminals│",
-      "│lightforlightterminals│",
-      "│light-daltonizedcolor-blindfriendly,light│",
-      "│dark-daltonizedcolor-blindfriendly,dark│",
-      "│light-ansiyourterminal's16colors,light│",
-      "│dark-ansiyourterminal's16colors,dark│",
-      "│↑↓preview↵save·esccancel│",
+      "autooliveondarkterminals,lightonlightones",
+      "darkblackandpurple,fordarkterminals",
+      "lightforlightterminals",
+      "light-daltonizedcolor-blindfriendly,light",
+      "dark-daltonizedcolor-blindfriendly,dark",
+      "light-ansiyourterminal's16colors,light",
+      "dark-ansiyourterminal's16colors,dark",
     ]) {
       expect(rows).toContain(row);
     }
+    expect(rows.some((row) => /[│┌└]/u.test(row))).toBe(false);
     // Only the highlighted row carries the marker.
     expect(rows.filter((row) => row.includes("›"))).toHaveLength(1);
     // A sample conversation under the list, drawn with the message and diff components.
-    for (const row of ["│preview│", "│❯Fixtheloginredirect│", '│12-returnredirect("/")│', "│12+returnredirect(next)│"]) {
+    for (const row of ["preview", "❯Fixtheloginredirect", '12-returnredirect("/")', "12+returnredirect(next)"]) {
       expect(rows).toContain(row);
     }
     expect(seen).toEqual({ theme: "olive", setting: "olive" });
   });
 
-  it("leaves the sample out on a short terminal and keeps the key hints", async () => {
-    await mount(store, 18);
+  it("leaves the sample out on a short terminal and keeps every theme row", async () => {
+    await mount(store, 12);
     await openPicker();
     const rows = stripAnsi(output).split(/\r?\n/u).map((row) => row.replace(/\s+/gu, ""));
-    expect(rows).toContain("│›oliveolive,creamandwine,fordarkterminals(current)│");
-    expect(rows).toContain("│↑↓preview↵save·esccancel│");
-    expect(rows).not.toContain("│preview│");
+    expect(rows).toContain("THEME↑↓preview·↵save·esccancel");
+    expect(rows).toContain("autooliveondarkterminals,lightonlightones");
+    expect(rows).toContain("›oliveolive,creamandwine,fordarkterminals(current)");
+    expect(rows).not.toContain("preview");
   });
 
   it("previews each theme as the selection moves and Esc puts back the saved one", async () => {
