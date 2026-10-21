@@ -132,7 +132,17 @@ export class EndpointMetadataCache {
   failureHandler(provider: string): () => void {
     void this.revision;
     const scope = this.#scopes.get(provider);
-    return () => { if (scope !== undefined) this.invalidate(scope); };
+    return () => {
+      if (scope === undefined) return;
+      // Inference failures are not evidence that a reusable catalog changed.
+      // In particular, a 429 followed by a listing outage must not discard
+      // Venice's known context limit. Authority rotation and explicit refresh
+      // still revoke these entries through invalidate()/clear().
+      for (const entry of this.#downloaded.values()) {
+        if (entry.scope === scope && entry.keepStale) return;
+      }
+      this.invalidate(scope);
+    };
   }
 
   #current(scope: EndpointMetadataScope): boolean {
@@ -250,9 +260,9 @@ export function endpointMetadataForTransport(transport: typeof fetch): EndpointM
   return cache;
 }
 
-/** Observed model errors invalidate the default network partition. Conservatively
- * evict the provider's current scope even when its model request used a custom
- * transport. No error, URL, credential or payload is retained. */
+/** Observed model errors invalidate the default network partition except catalogs
+ * explicitly retained across failures. Conservatively evict other provider scopes
+ * even when the model request used a custom transport. No error is retained. */
 export function endpointMetadataFailureHandler(provider: string): () => void {
   return transports.get(globalThis.fetch)?.failureHandler(
     normalizeProviderMetadataIdentity(provider) ?? "",

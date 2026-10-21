@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { ModelMetadataResolver } from "../../src/llm/model-metadata.js";
 import { VeniceProvider } from "../../src/llm/providers/venice/index.js";
-import { EndpointMetadataCache } from "../../src/llm/endpoint-metadata-cache.js";
+import { EndpointMetadataCache, endpointMetadataFailureHandler } from "../../src/llm/endpoint-metadata-cache.js";
 import { clearPublishedModelCatalogs } from "../../src/llm/registry/published-model-catalog.js";
 const listing = (context = 1_000_000) => ({ data: [{ id: "gateway-cache-test", type: "text", model_spec: {
   availableContextTokens: context, maxCompletionTokens: 64000,
@@ -12,7 +12,18 @@ const response = () => new Response(JSON.stringify(listing()), { headers: { "con
 const config = { providers: { venice: { base_url: "https://api.venice.ai/api/v1" } } };
 
 describe("Venice model list reuse", () => {
-  afterEach(() => clearPublishedModelCatalogs());
+  afterEach(() => { clearPublishedModelCatalogs(); vi.unstubAllGlobals(); });
+  test("inference errors do not evict a reusable Venice list before a metadata outage", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(response())
+      .mockImplementation(async () => new Response("offline", { status: 503 }));
+    vi.stubGlobal("fetch", fetchImpl);
+    const resolver = () => new ModelMetadataResolver({ fetchImpl, env: { VENICE_API_KEY: "fixture" } });
+    expect((await resolver().discoverVeniceModels(config))?.[0]?.contextWindow).toBe(1_000_000);
+    // ProviderClientSession invokes this same hook for an HTTP 429/503.
+    endpointMetadataFailureHandler("venice")();
+    expect((await resolver().discoverVeniceModels(config))?.[0]?.contextWindow).toBe(1_000_000);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
   test("new provider sessions reuse one download through their underlying transport", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => response());
     for (let i = 0; i < 3; i++) {
