@@ -20,8 +20,8 @@ describe("DeepSeek per-call output default through gateways", () => {
 
   test.each([
     ["openrouter", "deepseek/deepseek-v4.1-flash-1017", 393_216],
-    // OpenRouter lists max_completion_tokens 384,000 for this route (live list, 2026-10-20).
-    ["openrouter", "deepseek/deepseek-v4-pro-0813", 384_000],
+    // OpenRouter lists max_completion_tokens 393,216 for this route (live list, 2026-10-21).
+    ["openrouter", "deepseek/deepseek-v4-pro-0813", 393_216],
     ["ollama-cloud", "deepseek-v4-pro:0813", 393_216],
     ["ollama-cloud", "deepseek-v4.1-flash", 393_216],
   ] as const)("%s %s reserves 64k a call; the route limit stays the ceiling", (provider, model, ceiling) => {
