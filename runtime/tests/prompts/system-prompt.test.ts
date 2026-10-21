@@ -1647,11 +1647,12 @@ describe("Light's model-family tuning follows the model through gateways", () =>
     ["openrouter", "deepseek/deepseek-v4.1-flash-1017"],
     ["ollama-cloud", "deepseek-v4.1-flash:1017"],
     ["venice", "deepseek-v4-1-flash-1017"],
-  ])("DeepSeek through %s gets the head DeepSeek's own API gets, task limits included", async (provider, model) => {
+  ])("DeepSeek through %s retains the batch-editor head and task limits", async (provider, model) => {
     const prompt = await head(provider, model);
     expect(prompt).toContain(LIGHT_LIMITED_FINISH);
     expect(prompt).not.toContain(LIGHT_FINISH);
-    expect(prompt).toBe(await head("deepseek", "deepseek-flash"));
+    expect(prompt).toBe(await head("deepseek", "deepseek-v4-pro"));
+    expect(prompt).not.toContain("Edit and create files with apply_patch");
     expect(await head(provider, model, { [LIGHT_TASK_LIMITS_ENV]: "0" })).toContain(LIGHT_FINISH);
   });
 
