@@ -383,3 +383,19 @@ repo state.
 - `AGENC.md`
 
 See [cli.md](cli.md) · persona/onboarding [onboarding.md](../onboarding.md).
+
+### Saving and forgetting during a session
+
+To forget a saved memory, use `apply_patch` with a `*** Delete File: <path>`
+hunk to delete its topic file, then use `Edit` to remove its line from that
+memory directory's `MEMORY.md`. These file tools use the session's memory
+permissions; an explicit deny still takes precedence. Memory changes do not
+require a separate sandbox escape approval.
+
+Shell commands see the session's memory directories as read-only, including
+trusted custom directories inside an otherwise writable workspace. Use the
+file tools for memory updates. Each agent must read an existing memory file
+itself before replacing it; another agent's read or write does not authorize a
+blind overwrite. This protects foreground saves from stale background
+extraction writes. Automatic recall searches the same session-owned memory
+directories used by the prompt and file tools.
