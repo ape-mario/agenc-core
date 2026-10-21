@@ -70,6 +70,29 @@ describe("AgenC home beneath writable roots", () => {
     expect(args).not.toContain(join(f.home, "desktop-control-authorities"));
   });
 
+  it("keeps ancestor anchors when an existing read-only parent covers memory", () => {
+    const f = fixture();
+    const ancestor = join(f.cwd, "data");
+    const parent = join(ancestor, "readonly");
+    const memory = join(parent, "memory");
+    mkdirSync(memory, { recursive: true });
+    const profile = permissionProfileForSandboxMode("workspace_write", { cwd: f.cwd });
+    const broker = new SandboxExecutionBroker({
+      mode: "workspace_write", cwd: f.cwd, sessionTempRoot: join(f.cwd, "tmp"),
+      env: { AGENC_HOME: f.home }, platform: "linux", sessionMemoryRoots: () => [memory],
+      permissionProfile: { ...profile, fileSystem: { ...profile.fileSystem, entries: [
+        ...profile.fileSystem.entries, { path: { kind: "path", path: parent }, access: "read" },
+      ] } },
+      probe: () => ({ kind: "ready", mode: "workspace_write", platform: "linux", helperPath: "/sandbox/helper" }),
+    });
+    const runtime = broker.runtimeSandbox("tool")!;
+    const args = createBwrapCommandArgs(["/bin/true"], runtime.permissionProfile.fileSystem, f.cwd, f.cwd,
+      { mountProc: false, networkMode: "isolated", sessionTempRoot: runtime.sessionTempRoot }).args.join("\n");
+    expect(args).toContain(`--bind\n${ancestor}\n${ancestor}`);
+    expect(args).toContain(`--ro-bind\n${parent}\n${parent}`);
+    expect(args).not.toContain(`--ro-bind\n${memory}\n${memory}`);
+  });
+
   it.each(["temp", "workspace"])("reserves home beneath a writable %s despite nested grants and aliases", (kind) => {
     const f = fixture();
     const cwd = kind === "workspace" ? f.root : f.cwd;
