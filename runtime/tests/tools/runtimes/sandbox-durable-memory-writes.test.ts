@@ -124,6 +124,26 @@ describe("durable memory writes under the workspace_write sandbox", () => {
     }
   });
 
+  it("keeps native memory writes available when AgenC home is workspace metadata", async () => {
+    await session.shutdown();
+    home = join(cwd, ".agenc");
+    mkdirSync(home);
+    process.env.AGENC_HOME = home;
+    const configStore = new ConfigStore({ home, env: { AGENC_HOME: home }, cwd });
+    session = mkSession({ cwd, services: { configStore,
+      runtimeOptions: resolveAgentRuntimeOptions({ AGENC_HOME: home }, { sessionTempRoot: root }),
+    } }).session;
+    const { project, global } = await promptedMemoryDirectories();
+    const tool = createFileWriteTool({ allowedPaths: [cwd] });
+    for (const target of [join(project, "note.md"), join(project, "MEMORY.md"), join(global, "note.md")]) {
+      expect(attempt(tool, { file_path: target, content: "note" }, { allowWrite: [cwd], denyWrite: [] })).not.toThrow();
+      expect(attempt(tool, { file_path: target, content: "note" }, { allowWrite: [cwd], denyWrite: [home] })).toThrow(/blocked/);
+    }
+    expect(attempt(tool, { file_path: join(home, "config.toml"), content: "x" }, { allowWrite: [cwd], denyWrite: [] })).toThrow(/blocked/);
+    const shell = { ...tool, name: "system.bash" } as unknown as Tool;
+    expect(attempt(shell, { command: `printf note > ${join(project, "note.md")}` }, { allowWrite: [cwd], denyWrite: [] })).toThrow(/blocked/);
+  });
+
   it("still blocks the rest of the AgenC home and honors an explicit deny", async () => {
     const { global } = await promptedMemoryDirectories();
     const tool = createFileWriteTool({ allowedPaths: [cwd] });
