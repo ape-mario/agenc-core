@@ -20,12 +20,15 @@ export default async function (session) {
   await session.waitForPrompt({ timeout: 15_000 });
 
   await session.type("@READ", { perCharMs: 60 });
+  // README.md already leads the list at "@RE"; wait for the row under the
+  // complete "@READ" query, then let the list settle before Enter.
   await waitForFrameText(
     session,
-    /› \+ README\.md/u,
+    /❯\s*@READ\n\s*› \+ README\.md/u,
     "filtered README.md picker selection",
     15_000,
   );
+  await sleep(120);
 
   session.send("\n");
   await waitForFrameText(
