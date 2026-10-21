@@ -44,6 +44,7 @@ const MINIMAL_TUI_NAMES = [
   "tasks",
   "todos",
   "config",
+  "theme",
   "keybindings",
   "hooks",
   "skills",
@@ -99,6 +100,7 @@ const DAEMON_TUI_NAMES = [
   "tasks",
   "todos",
   "config",
+  "theme",
   "keybindings",
   "hooks",
   "skills",
@@ -144,7 +146,6 @@ const REMOVED_TUI_NAMES = [
   "review",
   "sandbox",
   "terminal-setup",
-  "theme",
   "wiki",
 ] as const;
 

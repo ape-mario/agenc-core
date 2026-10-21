@@ -54,7 +54,7 @@ const CONFIG_DESCRIPTIONS: Readonly<Record<string, string>> = {
   profiles: "named groups of settings you can choose when starting a session.",
   tools: "controls which tools the agent can use, including web search.",
   agent: "sets limits on background work and how long completed work is kept.",
-  theme: "the colors used by the terminal interface.",
+  theme: "the colors used by the terminal interface. Use /theme to choose another.",
   updates: "controls automatic updates and which release channel to use.",
   warnings: "settings that could not be used as written. Review them in /config show.",
 };

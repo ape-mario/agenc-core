@@ -36,6 +36,7 @@ const MINIMAL_REGISTRY_NAMES = [
   "tasks",
   "todos",
   "config",
+  "theme",
   "keybindings",
   "hooks",
   "skills",
@@ -92,6 +93,7 @@ const DAEMON_TUI_REGISTRY_NAMES = [
   "tasks",
   "todos",
   "config",
+  "theme",
   "keybindings",
   "hooks",
   "skills",
@@ -146,7 +148,6 @@ const REMOVED_TUI_COMMANDS = [
   "review",
   "sandbox",
   "terminal-setup",
-  "theme",
   "vim",
   "wiki",
 ] as const;
