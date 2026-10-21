@@ -161,7 +161,7 @@ describe("reasoning summary default provenance", () => {
       model: "gpt-6-luna", messages, tools: [], options, reasoningReplayProvider: "openai",
     });
     expect(wire.reasoning).toEqual({
-      effort: "max", ...(summary === "none" ? {} : { summary: "auto" }),
+      effort: "max", ...(summary === "auto" ? { summary: "auto" } : {}),
     });
   });
 });
