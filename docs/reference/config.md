@@ -62,9 +62,12 @@ disagreement with existing canonical keybindings block the migration.
 
 Theme is an operator preference at `tui.theme` in `config.toml`. Accepted values are
 `auto`, `dark`, `light`, `light-daltonized`, `dark-daltonized`, `light-ansi`,
-and `dark-ansi`; `system` is not a value. `auto` first uses `$COLORFGBG` when
-available, otherwise starts with a dark fallback, and an OSC 11 terminal
-background response can then update the detected light/dark palette.
+`dark-ansi`, and `olive` (the default); `system` is not a value. `auto` shows
+olive on a dark terminal and light on a light one: it first uses `$COLORFGBG`
+when available, otherwise starts with a dark fallback, and an OSC 11 terminal
+background response can then update the detected light/dark palette. In the
+TUI, `/theme` previews the themes and saves the choice here; the open TUI
+also follows `/config reload` after a hand edit.
 
 `--bare` is the CLI ingress for the typed `runtimeOptions.simpleMode` value;
 embedding clients carry the same required typed value on the daemon protocol.
@@ -327,7 +330,7 @@ otherwise.
 | `providers.grok.enable_image_search` | `true` |
 | `providers.grok.enable_image_understanding` | `true` |
 | `providers.grok.enable_video_understanding` | `true` |
-| `tui.theme` | `dark` |
+| `tui.theme` | `olive` |
 | `tui.showTurnDuration` | `true` |
 | `tui.terminalProgressBarEnabled` | `true` |
 | `tui.copyOnSelect` | `true` |
@@ -821,7 +824,7 @@ discovered metadata.
 | Paths | Type / meaning |
 | --- | --- |
 | `tui` | TUI block. |
-| `tui.theme` | `auto`, `dark`, `light`, one of the daltonized palettes, or one of the ANSI palettes. |
+| `tui.theme` | `auto`, `dark`, `light`, `olive`, one of the daltonized palettes, or one of the ANSI palettes. Set it from the TUI with `/theme`. |
 | `tui.showTurnDuration`, `tui.terminalProgressBarEnabled`, `tui.copyOnSelect` | Turn-duration display, terminal progress, and selection-copy switches. |
 | `tui.flickerFreeMode`, `tui.prStatusFooterEnabled` | Flicker reduction and pull-request footer switches. |
 | `tui.gitStatusEnabled` | Show the git branch, changed file count, and upstream ahead/behind counts above the composer. Default `true`. Set to `false` to hide it. Hidden outside a git work tree. |
