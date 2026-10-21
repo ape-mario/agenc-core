@@ -387,7 +387,8 @@ See [cli.md](cli.md) · persona/onboarding [onboarding.md](../onboarding.md).
 ### Saving and forgetting during a session
 
 To forget a saved memory, use `apply_patch` with a `*** Delete File: <path>`
-hunk to delete its topic file, then use `Edit` to remove its line from that
+hunk to delete its topic file. If the tool is not listed, load it with
+`system.searchTools` and `query: "select:apply_patch"`. Then use `Edit` to remove its line from that
 memory directory's `MEMORY.md`. These file tools use the session's memory
 permissions; an explicit deny still takes precedence. Memory changes do not
 require a separate sandbox escape approval.

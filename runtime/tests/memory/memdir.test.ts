@@ -398,5 +398,7 @@ function installMemoryAuthority(): void {
     expect(prompt).toContain("Delete File:");
     expect(prompt).toContain("Edit");
     expect(prompt).toContain("index line");
+    expect(prompt).toContain("system.searchTools");
+    expect(prompt).toContain("select:apply_patch");
   }
  });
