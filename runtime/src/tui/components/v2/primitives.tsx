@@ -1959,6 +1959,9 @@ export function MenuModal<T>({
   modalMinHeight,
   rowMinHeight = 1,
   closeHint,
+  lead,
+  pinnedCount = 0,
+  activeRowColor = 'agencWash',
 }: {
   readonly title: string
   readonly count?: string
@@ -1982,6 +1985,16 @@ export function MenuModal<T>({
   readonly rowMinHeight?: number
   /** What Esc does, top right. Defaults to the popup's "esc to close". */
   readonly closeHint?: string
+  /** One line above the column headers, lined up with the first column, such as a search field. */
+  readonly lead?: ReactNode
+  /**
+   * How many items at the end of the list stay on screen under the rows that
+   * scroll, such as actions after a long list. A terminal too short to show
+   * them and one scrolling row scrolls every item instead.
+   */
+  readonly pinnedCount?: number
+  /** Background of the highlighted row. */
+  readonly activeRowColor?: ThemeColor
 }): React.ReactNode {
   const resolvedPreviewWidth = previewWidth ?? '40%'
   const resolvedListWidth = preview
@@ -1995,22 +2008,32 @@ export function MenuModal<T>({
   // Rows the list cannot use: the popup's top and bottom border, its title and
   // the rule under it, the column headers, and the footer with the rule above
   // it. Leave room for the description below the list on short terminals.
-  const chromeRows = (omitTopBorder ? 6 : 7) + (detail ? 4 : 0)
+  const chromeRows = (omitTopBorder ? 6 : 7) + (detail ? 4 : 0) + (lead ? 1 : 0)
   const maxVisibleItems = Math.max(
     1,
     Math.floor(Math.max(1, viewportRows - chromeRows) / rowHeight),
   )
-  const visibleCount = Math.min(items.length, maxVisibleItems)
+  const pinned =
+    pinnedCount > 0 && pinnedCount < items.length && pinnedCount < maxVisibleItems
+      ? pinnedCount
+      : 0
+  const scrolling = items.length - pinned
+  const visibleCount = Math.min(scrolling, maxVisibleItems - pinned)
   const clampedActiveIndex = Math.max(0, Math.min(activeIndex, Math.max(0, items.length - 1)))
+  // On a pinned item the scrolling rows show their end, next to it.
+  const anchorIndex = Math.min(clampedActiveIndex, scrolling - 1)
   const windowStart = Math.min(
-    Math.max(0, clampedActiveIndex - Math.floor(visibleCount / 2)),
-    Math.max(0, items.length - visibleCount),
+    Math.max(0, anchorIndex - Math.floor(visibleCount / 2)),
+    Math.max(0, scrolling - visibleCount),
   )
-  const visibleItems = items.slice(windowStart, windowStart + visibleCount)
-  const windowEnd = windowStart + visibleItems.length
+  const windowEnd = windowStart + visibleCount
+  const visibleIndexes = [
+    ...Array.from({ length: visibleCount }, (_, offset) => windowStart + offset),
+    ...Array.from({ length: pinned }, (_, offset) => scrolling + offset),
+  ]
   const scrollStatus =
-    items.length > visibleItems.length
-      ? `scroll ${windowStart + 1}-${windowEnd}/${items.length}`
+    scrolling > visibleCount
+      ? `scroll ${windowStart + 1}-${windowEnd}/${scrolling}`
       : undefined
   const constrainedMinHeight =
     modalMinHeight === undefined ? undefined : Math.min(modalMinHeight, viewportRows)
@@ -2035,6 +2058,12 @@ export function MenuModal<T>({
           width={resolvedListWidth}
           overflow="hidden"
         >
+          {lead ? (
+            <Box flexDirection="row" paddingX={paddingX} gap={columnGap} flexShrink={0}>
+              <Box width={2} flexShrink={0} />
+              {lead}
+            </Box>
+          ) : null}
           {/* The column headers stay put while a long list scrolls. */}
           <Box flexDirection="row" paddingX={paddingX} gap={columnGap} flexShrink={0}>
             <Box width={2} flexShrink={0} />
@@ -2048,15 +2077,14 @@ export function MenuModal<T>({
               </Box>
             ))}
           </Box>
-          {visibleItems.map((item, visibleIndex) => {
-            const index = windowStart + visibleIndex
+          {visibleIndexes.map(index => {
             const active = index === clampedActiveIndex
-            const cells = renderRow(item, index, active)
+            const cells = renderRow(items[index] as T, index, active)
             return (
               <ThemedBox
                 key={index}
                 flexDirection="row"
-                backgroundColor={active ? 'agencWash' : undefined}
+                backgroundColor={active ? activeRowColor : undefined}
                 paddingX={paddingX}
                 gap={columnGap}
                 minHeight={rowMinHeight}
