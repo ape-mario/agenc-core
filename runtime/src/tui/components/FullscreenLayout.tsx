@@ -21,6 +21,7 @@ import { truncateMiddleToWidth } from '../../utils/truncate.js';
 import { modelDisplayString } from '../../utils/model/model.js';
 import { getTotalCost } from '../../cost/tracker.js';
 import { formatUsdCost } from '../../session/cost.js';
+import { isOffPeakAt, msUntilNextUtcHour, type OffPeakSchedule } from '../../session/off-peak-pricing.js';
 import { isNullRenderingAttachment } from '../message-visibility.js';
 import { PromptDialogOverlay, PromptSuggestionsOverlay } from './PromptOverlaySurfaces.js';
 import { permissionModePlainLabel } from '../../permissions/mode-display.js';
@@ -28,7 +29,7 @@ import type { PermissionMode } from '../../permissions/types.js';
 import type { StickyPrompt } from './VirtualMessageList';
 import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
 import { PlanModeBanner } from './v2/primitives.js';
-import { useStatusEffort, useStatusContextUsage } from '../context/statusEffortContext.js';
+import { useStatusEffort, useStatusContextUsage, useStatusPromptCache, useStatusOffPeakSchedule } from '../context/statusEffortContext.js';
 import ThemedText from './design-system/ThemedText.js';
 import { LedgerStatus } from './LedgerStatus.js';
 import { swarmStatusPresentation } from './SwarmStatusIndicator.js';
@@ -523,6 +524,7 @@ export function FullscreenLayout(t0) {
  *  plain non-reactive getter over the cost sidecar, so the chrome polls it on
  *  a slow cadence instead of re-rendering per API response. */
 const SPEND_REFRESH_MS = 5_000;
+const PRICE_UNKNOWN_LABEL = 'price unknown';
 
 function useSessionSpendLabel(): string {
   const usage = useSessionUsage();
@@ -543,9 +545,29 @@ function useSessionSpendLabel(): string {
   if (usage === null) return '';
   // An estimated call was priced at the registry ceiling because its model
   // has no known price: that figure is not a cost, so say so instead.
-  if (usage?.costEstimated === true) return 'price unknown';
+  if (usage?.costEstimated === true) return PRICE_UNKNOWN_LABEL;
   if (usage !== undefined) return `${usage.hasUnknownCost ? '≥' : ''}${formatUsdCost(usage.costUsd)}`;
   return spend;
+}
+
+/** Whether a call made now bills off-peak. Re-checks on each whole UTC hour,
+ *  where every recorded window starts and ends. */
+function useOffPeakNow(schedule: OffPeakSchedule | null): boolean {
+  const [, setHourTick] = useState(0);
+  useEffect(() => {
+    if (schedule === null) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = (): void => {
+      timer = setTimeout(() => {
+        setHourTick(tick => tick + 1);
+        arm();
+      }, msUntilNextUtcHour(Date.now()) + 1_000);
+      timer.unref?.();
+    };
+    arm();
+    return () => clearTimeout(timer);
+  }, [schedule]);
+  return schedule !== null && isOffPeakAt(schedule, Date.now());
 }
 
 function DesignPlanModeBanner(): React.ReactNode {
@@ -594,6 +616,30 @@ export function statusLineSegments(
   };
 }
 
+export type StatusLineUsageLabels = {
+  readonly ctx: string | null;
+  readonly cache: string | null;
+  readonly spend: string | null;
+};
+
+/**
+ * The usage facts on the right of the status line, in order: context, the
+ * share of input served from prompt cache, then spend. "off-peak" qualifies
+ * the spend while a call made now bills at the provider's off-peak rate.
+ */
+export function statusLineUsageLabels(
+  contextPercent: number | null,
+  cachePercent: number | null,
+  spend: string | null,
+  offPeak: boolean,
+): StatusLineUsageLabels {
+  return {
+    ctx: contextPercent !== null ? `ctx ${contextPercent}%` : null,
+    cache: cachePercent !== null ? `cache ${cachePercent}%` : null,
+    spend: spend !== null && offPeak && spend !== PRICE_UNKNOWN_LABEL ? `${spend} off-peak` : spend,
+  };
+}
+
 /** Only the real home directory is represented by ~; preserve the remaining path. */
 export function workspacePathLabel(cwd: string, home: string = homedir()): string {
   const directory = resolve(cwd);
@@ -633,15 +679,18 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const spend = useSessionSpendLabel();
   const effort = useStatusEffort();
   const contextPercent = useStatusContextUsage();
+  const cachePercent = useStatusPromptCache();
+  const offPeakSchedule = useStatusOffPeakSchedule();
+  const offPeak = useOffPeakNow(offPeakSchedule);
   const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) === true;
   const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, spend, effort, lightMode);
   const bypass = mode === 'bypassPermissions';
-  const rightLabels = [
-    contextPercent !== null ? `ctx ${contextPercent}%` : null,
-    segments.spend,
-  ].filter((label): label is string => label !== null);
-  const rightWidth = stringWidth(rightLabels.join(' · '));
-  const leftWidth = Math.max(1, columns - 4 - rightWidth - (rightWidth > 0 ? 1 : 0));
+  const usage = statusLineUsageLabels(contextPercent, cachePercent, segments.spend, offPeak);
+  const rightItems = [
+    usage.ctx !== null ? { key: 'ctx', label: usage.ctx, color: contextPercent !== null && contextPercent >= 80 ? 'error' as const : 'text' as const } : null,
+    usage.cache !== null ? { key: 'cache', label: usage.cache, color: 'text' as const } : null,
+    usage.spend !== null ? { key: 'spend', label: usage.spend, color: 'text' as const } : null,
+  ].filter(item => item !== null);
   const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error' | 'accentSoft' | 'accent'; bold?: boolean }> = [
     ...(segments.folder !== null ? [{ key: 'folder', label: segments.folder, color: 'text2' as const }] : []),
     { key: 'model', label: segments.model, color: 'text' },
@@ -652,24 +701,36 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
     ...(shellCount > 0 ? [{ key: 'shells', label: `${shellCount} ${shellCount === 1 ? 'shell' : 'shells'}`, color: 'text' as const }] : []),
     ...(runningAgents > 0 ? [{ key: 'agents', label: `${runningAgents} ${runningAgents === 1 ? 'agent' : 'agents'}`, color: 'text' as const }] : []),
   ];
-  // Reserve the truthful context/cost block first. Drop cwd, shorten
-  // effort/mode, then drop swarm/effort/light before truncating the model.
+  // Reserve the truthful context/cost block first. Drop the cache share
+  // before anything else, then cwd, shorten effort/mode, then drop
+  // swarm/effort/light and the off-peak note before truncating the model.
   // Every segment remains in this single row even at a narrow width.
   const width = () => items.reduce((sum, item) => sum + stringWidth(item.label), Math.max(0, items.length - 1) * 3);
+  const space = (): number => {
+    const rightWidth = stringWidth(rightItems.map(item => item.label).join(' · '));
+    return Math.max(1, columns - 4 - rightWidth - (rightWidth > 0 ? 1 : 0));
+  };
   const drop = (key: string) => {
     const index = items.findIndex(item => item.key === key);
     if (index >= 0) items.splice(index, 1);
   };
-  if (width() > leftWidth) drop('folder');
-  if (width() > leftWidth) {
+  if (width() > space()) {
+    const cacheIndex = rightItems.findIndex(item => item.key === 'cache');
+    if (cacheIndex >= 0) rightItems.splice(cacheIndex, 1);
+  }
+  if (width() > space()) drop('folder');
+  if (width() > space()) {
     for (const item of items) {
       if (item.key === 'effort') item.label = item.label.replace(/ effort$/, '');
       if (item.key === 'mode') item.label = item.label.replace(/ mode$/, '');
     }
   }
   for (const key of ['swarm', 'effort', 'light']) {
-    if (width() > leftWidth) drop(key);
+    if (width() > space()) drop(key);
   }
+  const spendItem = rightItems.find(item => item.key === 'spend');
+  if (spendItem && segments.spend !== null && width() > space()) spendItem.label = segments.spend;
+  const leftWidth = space();
   const modelItem = items.find(item => item.key === 'model');
   if (modelItem && width() > leftWidth) {
     modelItem.label = truncateMiddleToWidth(modelItem.label, Math.max(1, stringWidth(modelItem.label) - (width() - leftWidth)));
@@ -686,13 +747,12 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
       </Box>
       <Box flexGrow={1} />
       <LedgerStatus />
-      {contextPercent !== null ? (
-        <ThemedText color={contextPercent >= 80 ? 'error' : 'text'} wrap="truncate-end">
-          {`ctx ${contextPercent}%`}
-        </ThemedText>
-      ) : null}
-      {contextPercent !== null && segments.spend !== null ? <ThemedText color="text">{' · '}</ThemedText> : null}
-      {segments.spend !== null ? <ThemedText color="text" wrap="truncate-end">{segments.spend}</ThemedText> : null}
+      {rightItems.map((item, index) => (
+        <React.Fragment key={item.key}>
+          {index > 0 ? <ThemedText color="text">{' · '}</ThemedText> : null}
+          <ThemedText color={item.color} wrap="truncate-end">{item.label}</ThemedText>
+        </React.Fragment>
+      ))}
     </Box>
   );
 }

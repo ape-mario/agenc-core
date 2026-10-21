@@ -97,8 +97,9 @@ import {
 import { useSettings } from "../hooks/useSettings.js";
 import { useMainLoopModel } from "../hooks/useMainLoopModel.js";
 import { GitStatusChrome } from "./GitStatusLine.js";
-import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext } from "../context/statusEffortContext.js";
+import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext, StatusPromptCacheContext, StatusOffPeakContext } from "../context/statusEffortContext.js";
 import { readSessionSelection } from "../../session/provider-model-selection.js";
+import { offPeakScheduleFor } from "../../session/off-peak-pricing.js";
 import {
   getSessionEffortLabelForContext,
   getUnsupportedEffortNoticeForContext,
@@ -3270,6 +3271,8 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       context,
     );
   }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel, effortCatalogRevision]);
+  // "off-peak" in the status line follows the route a call made now would use.
+  const statusOffPeakSchedule = offPeakScheduleFor(effortSelection.provider, effortSelection.model);
   const runLocalControlCommand = useCallback(async (parsed: ParsedSlashCommand): Promise<void> => {
     cancelTransientResult(true);
     try {
@@ -5163,6 +5166,8 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     <SessionUsageContext value={transcript.sessionUsage ?? null}>
     <StatusEffortContext value={statusEffortLabel}>
     <StatusContextUsageContext value={contextUsagePercent}>
+    <StatusPromptCacheContext value={transcript.promptCacheShare}>
+    <StatusOffPeakContext value={statusOffPeakSchedule}>
     <StatusTurnBusyContext value={isLoading || shellAbortController !== null}>
       <AnimatedTerminalTitle isAnimating={titleIsAnimating} title={title} />
       <GlobalKeybindingHandlers
@@ -5224,6 +5229,8 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       {exitFlow}
 
     </StatusTurnBusyContext>
+    </StatusOffPeakContext>
+    </StatusPromptCacheContext>
     </StatusContextUsageContext>
     </StatusEffortContext>
     </SessionUsageContext>

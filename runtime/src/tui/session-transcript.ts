@@ -12,6 +12,12 @@ import {
 import type { Event } from "../session/event-log.js";
 import type { AdmissionUsageSummary } from "../budget/admission-types.js";
 import { latestSessionUsage } from "../session/usage-summary.js";
+import {
+  EMPTY_PROMPT_CACHE_TALLY,
+  addPromptCacheUsage,
+  promptCacheSharePercent,
+  type PromptCacheTally,
+} from "../session/prompt-cache-share.js";
 import type {
   HistoryReplacedEvent,
   RuntimeTranscriptMessage,
@@ -1095,6 +1101,14 @@ function tokenCountCostUsd(event: SessionTranscriptEvent): number {
   if (unwrapped.type !== "token_count") return 0;
   const usage = usageFromTokenCountPayload(payloadRecord(unwrapped.payload));
   return computeUsdCostWithResolution(usage, DEFAULT_MODEL_COSTS).costUsd;
+}
+
+/** The session's prompt-cache tally after one event; only `token_count` adds. */
+function promptCacheAfter(tally: PromptCacheTally, event: SessionTranscriptEvent): PromptCacheTally {
+  const unwrapped = unwrap(event);
+  return unwrapped.type === "token_count"
+    ? addPromptCacheUsage(tally, payloadRecord(unwrapped.payload))
+    : tally;
 }
 
 function compactWhitespace(value: string): string {
@@ -3273,6 +3287,8 @@ interface TranscriptState {
   readonly maxSeq: number | null;
   readonly sessionCostUsd: number;
   readonly sessionUsage: AdmissionUsageSummary | null;
+  /** Like `sessionCostUsd`, survives the event ring buffer and clears. */
+  readonly promptCache: PromptCacheTally;
 }
 
 type TranscriptAction =
@@ -3529,6 +3545,7 @@ function buildTranscriptState(
   let maxSeq: number | null = null;
   let sessionCostUsd = 0;
   let sessionUsage: AdmissionUsageSummary | null = null;
+  let promptCache = EMPTY_PROMPT_CACHE_TALLY;
 
   for (const event of orderSequencedEvents(unorderedEvents)) {
     const key = eventKey(event);
@@ -3546,6 +3563,7 @@ function buildTranscriptState(
     keys.add(key);
     sessionCostUsd += tokenCountCostUsd(event);
     sessionUsage = latestSessionUsage(sessionUsage, event);
+    promptCache = promptCacheAfter(promptCache, event);
     pushStoredEvent(events, clampEventForStorage(event), keys, foldedKeys);
     maxSeq = maxEventSeq(maxSeq, event);
   }
@@ -3563,7 +3581,7 @@ function buildTranscriptState(
 
   evictOldestEvents(events, keys);
 
-  return { events, keys, foldedKeys, maxSeq, sessionCostUsd, sessionUsage };
+  return { events, keys, foldedKeys, maxSeq, sessionCostUsd, sessionUsage, promptCache };
 }
 
 function reducer(state: TranscriptState, action: TranscriptAction): TranscriptState {
@@ -3588,6 +3606,7 @@ function reducer(state: TranscriptState, action: TranscriptAction): TranscriptSt
           sessionCostUsd:
             state.sessionCostUsd + tokenCountCostUsd(action.event),
           sessionUsage: latestSessionUsage(state.sessionUsage, action.event),
+          promptCache: promptCacheAfter(state.promptCache, action.event),
         };
       }
 
@@ -3611,6 +3630,7 @@ function reducer(state: TranscriptState, action: TranscriptAction): TranscriptSt
         maxSeq: seq === null ? state.maxSeq : maxEventSeq(state.maxSeq, action.event),
         sessionCostUsd: state.sessionCostUsd + tokenCountCostUsd(action.event),
         sessionUsage: latestSessionUsage(state.sessionUsage, action.event),
+        promptCache: promptCacheAfter(state.promptCache, action.event),
       };
     }
     case "appendBatch": {
@@ -3634,6 +3654,7 @@ function reducer(state: TranscriptState, action: TranscriptAction): TranscriptSt
         const knownKeys = new Set(state.keys);
         let addedCostUsd = 0;
         let sessionUsage = state.sessionUsage;
+        let promptCache = state.promptCache;
         const fresh: SessionTranscriptEvent[] = [];
         for (const event of action.events) {
           const key = eventKey(event);
@@ -3642,6 +3663,7 @@ function reducer(state: TranscriptState, action: TranscriptAction): TranscriptSt
           fresh.push(event);
           addedCostUsd += tokenCountCostUsd(event);
           sessionUsage = latestSessionUsage(sessionUsage, event);
+          promptCache = promptCacheAfter(promptCache, event);
         }
         // Known events stay out of the rebuild: a replayed delta sorts ahead
         // of the stored event it was folded into, and would be added twice.
@@ -3653,6 +3675,7 @@ function reducer(state: TranscriptState, action: TranscriptAction): TranscriptSt
           ...rebuilt,
           sessionCostUsd: state.sessionCostUsd + addedCostUsd,
           sessionUsage,
+          promptCache,
         };
       }
       const keys = state.keys as Set<string>;
@@ -3660,6 +3683,7 @@ function reducer(state: TranscriptState, action: TranscriptAction): TranscriptSt
       let maxSeq = state.maxSeq;
       let sessionCostUsd = state.sessionCostUsd;
       let sessionUsage = state.sessionUsage;
+      let promptCache = state.promptCache;
       for (const event of action.events) {
         const key = eventKey(event);
         if (keys.has(key)) continue;
@@ -3667,6 +3691,7 @@ function reducer(state: TranscriptState, action: TranscriptAction): TranscriptSt
         keys.add(key);
         sessionCostUsd += tokenCountCostUsd(event);
         sessionUsage = latestSessionUsage(sessionUsage, event);
+        promptCache = promptCacheAfter(promptCache, event);
         const seq = eventSeq(event);
         maxSeq = seq === null ? maxSeq : maxEventSeq(maxSeq, event);
       }
@@ -3675,7 +3700,7 @@ function reducer(state: TranscriptState, action: TranscriptAction): TranscriptSt
       const foldedKeys = [...state.foldedKeys];
       for (const event of pending) pushStoredEvent(events, event, keys, foldedKeys);
       evictOldestEvents(events, keys);
-      return { events, keys, foldedKeys, maxSeq, sessionCostUsd, sessionUsage };
+      return { events, keys, foldedKeys, maxSeq, sessionCostUsd, sessionUsage, promptCache };
     }
   }
 }
@@ -3691,6 +3716,7 @@ export function createSessionTranscriptStateForTesting(
       maxSeq: null,
       sessionCostUsd: 0,
       sessionUsage: null,
+      promptCache: EMPTY_PROMPT_CACHE_TALLY,
     },
     { kind: "reset", events },
   );
@@ -3759,6 +3785,7 @@ export function useSessionTranscript(
     maxSeq: null,
     sessionCostUsd: 0,
     sessionUsage: null,
+    promptCache: EMPTY_PROMPT_CACHE_TALLY,
   });
 
   // A wholesale replacement can shrink a tall, scrolled transcript to a
@@ -3859,6 +3886,7 @@ export function useSessionTranscript(
       ...adapted,
       sessionCostUsd: state.sessionUsage?.costUsd ?? state.sessionCostUsd,
       sessionUsage: state.sessionUsage,
+      promptCacheShare: promptCacheSharePercent(state.promptCache),
     };
-  }, [state.events, state.sessionCostUsd, state.sessionUsage, startupMessages]);
+  }, [state.events, state.sessionCostUsd, state.sessionUsage, state.promptCache, startupMessages]);
 }
