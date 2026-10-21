@@ -100,6 +100,7 @@ import {
   isTerminalBackgroundDetected,
 } from "../utils/terminalBackground.js";
 import { getTheme, type ThemeName, type ThemeSetting } from "../utils/theme.js";
+import { themeSettingNote } from "../utils/themeSetting.js";
 import { applyTextStyles } from "../tui/ink/colorize.js";
 import type { Color } from "../tui/ink/styles.js";
 import { TerminalSizeContext } from "../tui/ink/components/TerminalSizeContext.js";
@@ -432,6 +433,7 @@ const STEP_TITLES: Readonly<Record<FirstRunOnboardingStepId, string>> =
     ready: "Ready",
   });
 
+// The same list, notes and saved setting as /theme (utils/themeSetting.ts).
 const THEME_CHOICES: readonly ThemeSetting[] = TUI_THEME_SETTINGS;
 
 /**
@@ -2603,17 +2605,6 @@ interface OnboardingCardView {
   readonly hint?: string;
 }
 
-const THEME_NOTES: Readonly<Record<ThemeSetting, string>> = {
-  auto: "olive on dark terminals, light on light ones",
-  dark: "black and purple, for dark terminals",
-  light: "for light terminals",
-  "light-daltonized": "color-blind friendly, light",
-  "dark-daltonized": "color-blind friendly, dark",
-  "light-ansi": "your terminal's 16 colors, light",
-  "dark-ansi": "your terminal's 16 colors, dark",
-  olive: "olive, cream and wine, for dark terminals",
-};
-
 /** Providers visible at once; the rest collapse into "n more" rows. */
 const PROVIDER_WINDOW = 8;
 
@@ -3007,9 +2998,7 @@ function onboardingCardView(
           state,
           THEME_CHOICES.map((theme) => ({
             label: theme,
-            note: theme === state.selectedTheme
-              ? `${THEME_NOTES[theme]} (current)`
-              : THEME_NOTES[theme],
+            note: themeSettingNote(theme, state.selectedTheme),
           })),
         ),
         hint: themeTip(),
