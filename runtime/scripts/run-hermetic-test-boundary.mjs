@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { createHermeticRunRoot } from "../tests/helpers/hermetic-env.mjs";
 
 export const PINNED_NODE_IMAGE =
-  "node:26.5.0-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271";
+  "node:26.12.1-bookworm@sha256:dc5ba49acad07ed5c0defe487a0f14726a8882064683460bcb8168e03e2f74f3";
 export const DOCKER_LOG_BOUNDARY_ARGS = Object.freeze(["--log-driver=none"]);
 export const DOCKER_GATE_LABEL_ARGS = Object.freeze([
   "--label",

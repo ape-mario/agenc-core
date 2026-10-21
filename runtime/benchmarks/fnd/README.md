@@ -145,7 +145,7 @@ across two independent filesystem pathnames.
 
 ## Commands
 
-Use Node 26.5.0 and npm 11.17.0. Capture into temporary paths so a local run
+Use Node 26.12.1 and npm 11.17.0. Capture into temporary paths so a local run
 cannot silently replace the reviewed artifact:
 
 ```sh

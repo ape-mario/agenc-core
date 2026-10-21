@@ -36,7 +36,7 @@ The script (source: `scripts/install/install.sh`):
 
 1. requires trusted operating-system download, SHA-256, and archive tools. It
    uses a compatible host Node 26 when present; otherwise it downloads and
-   verifies the exact Node 26.5.0 distribution into a private temporary
+   verifies the exact Node 26.12.1 distribution into a private temporary
    directory. Linux also bootstraps the exact reviewed `libatomic.so.1`
    compatibility payload needed to start that portable Node. No host Node
    installation is required; official macOS installs also require the system
@@ -234,15 +234,17 @@ The public runtime matrix is deliberately explicit:
 | Windows | x64 | Native Windows runtime |
 
 Standalone and Homebrew installations include the exact reviewed Node.js
-26.5.0 runtime, module ABI 147, and Node-API 10; they do not require host Node.
+26.12.1 runtime, module ABI 147, and Node-API 10; they do not require host Node.
 Source checkouts, the npm launcher, and the SDK require Node.js `>=26.5 <27`.
+Prefer 26.12.1 or newer on the host: earlier 26.x releases lack the October
+2026 Node.js security fixes.
 Node 26 is Current through 2026-10-28 and is scheduled to enter Active LTS on
 that date. Release artifacts remain pinned to one exact toolchain even though
 source/npm engine ranges permit compatible 26.x updates. Substituting another
 Node major into release artifacts is unsupported. Alpine/musl Linux, Linux
 armv7, and Windows arm64 are not in the release matrix; installers fail before
 the runtime download rather than attempting a best-effort install. Exact
-release inputs live in `release-toolchain.json` (currently Node.js 26.5.0, ABI
+release inputs live in `release-toolchain.json` (currently Node.js 26.12.1, ABI
 147, Node-API 10, and npm 11.17.0).
 
 Lifecycle sources: [Node.js releases](https://nodejs.org/en/about/previous-releases)
@@ -392,7 +394,7 @@ brew install tetsuo-ai/agenc/agenc
 ```
 
 When an owner publishes the tap, the formula installs the architecture-specific
-macOS runtime artifact and its bundled Node 26.5.0. Homebrew upgrades AgenC
+macOS runtime artifact and its bundled Node 26.12.1. Homebrew upgrades AgenC
 and that Node together with `brew upgrade agenc`; `agenc update` is not the
 update path for formula installs.
 
@@ -797,7 +799,7 @@ closed if source visibility changes. The installers default to
 `releases/latest/download/agenc-runtime-manifest-v2.json` there. A regression
 test pins that default.
 
-Release builds require exactly Node.js 26.5.0 and npm 11.17.0 as declared by
+Release builds require exactly Node.js 26.12.1 and npm 11.17.0 as declared by
 `release-toolchain.json` and the root `packageManager`. Start with `npm ci`;
 the committed lockfile and reviewed lifecycle-script allowlist are the
 dependency authority. Before assembling a release, run

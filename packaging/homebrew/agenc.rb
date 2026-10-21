@@ -13,7 +13,7 @@ class Agenc < Formula
   sha256 Hardware::CPU.arm? ? arm64_sha256 : x64_sha256
   license "MIT"
 
-  # The runtime artifact includes its reviewed Node 26.5.0 executable. Keep
+  # The runtime artifact includes its reviewed Node 26.12.1 executable. Keep
   # ripgrep as the only host tool dependency used by the coding-agent surface.
   depends_on macos: :ventura
   depends_on "ripgrep"

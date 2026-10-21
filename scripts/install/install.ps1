@@ -43,7 +43,7 @@ try {
 $env:NODE_USE_ENV_PROXY = "1"
 $SupportedNodeMajor = 26
 $SupportedNodeMinor = 5
-$SupportedNodeVersion = "26.5.0"
+$SupportedNodeVersion = "26.12.1"
 $LegacyBridgeNodeMajor = 25
 $LegacyBridgeNodeMinor = 9
 $MaxManifestBytes = 1MB
@@ -731,9 +731,9 @@ if ($env:AGENC_INSTALL_VERSION -ceq "0.7.2") {
   if ($arch -ne "x64") {
     Fail "no pinned Node.js bootstrap distribution exists for win-$arch"
   }
-  $nodeDistributionFile = "node-v26.5.0-win-x64.zip"
-  $nodeDistributionSha256 = "d3b2277dbcccfdf24ef6302928f64f484cff1d77a6d3caa3a28f4d20ce9158f6"
-  $nodeDistributionBytes = 41113391
+  $nodeDistributionFile = "node-v26.12.1-win-x64.zip"
+  $nodeDistributionSha256 = "b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4"
+  $nodeDistributionBytes = 41901456
   $bootstrapWork = Join-Path ([IO.Path]::GetTempPath()) "agenc-node-bootstrap-$PID-$([Guid]::NewGuid())"
   New-Item -ItemType Directory -Path $bootstrapWork | Out-Null
   if ($actualWindows) {
@@ -781,7 +781,7 @@ if ($env:AGENC_INSTALL_VERSION -ceq "0.7.2") {
   }
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   [System.IO.Compression.ZipFile]::ExtractToDirectory($nodeDistributionArchive, $bootstrapWork)
-  $nodeBin = Join-Path $bootstrapWork "node-v26.5.0-win-x64\node.exe"
+  $nodeBin = Join-Path $bootstrapWork "node-v26.12.1-win-x64\node.exe"
   if (-not (Test-Path -LiteralPath $nodeBin -PathType Leaf)) {
     Fail "pinned Node.js bootstrap executable is missing"
   }
@@ -791,7 +791,7 @@ if ($env:AGENC_INSTALL_VERSION -ceq "0.7.2") {
   }
   & $nodeBin -e (ConvertTo-NativeArgument @'
 const allowOverride = process.argv[1] === "true";
-if (process.versions.node !== "26.5.0" || process.versions.modules !== "147" ||
+if (process.versions.node !== "26.12.1" || process.versions.modules !== "147" ||
     process.versions.napi !== "10" || (!allowOverride && (
       process.platform !== "win32" || process.arch !== "x64"
     ))) process.exit(1);

@@ -590,7 +590,7 @@ describe("reproducible install and release contract", () => {
     ).toHaveLength(2);
     expect(workflow).not.toContain('require(\\"./runtime/package.json');
     expect(workflow).not.toMatch(/run:\s+npm install(?! --global)/);
-    expect(workflow).toContain('NODE_VERSION: "26.5.0"');
+    expect(workflow).toContain('NODE_VERSION: "26.12.1"');
     expect(workflow).toContain('NPM_VERSION: "11.17.0"');
     expect(workflow).toContain(
       "Untagged candidate build or immutable tagged promotion",
@@ -1123,56 +1123,56 @@ describe("reproducible install and release contract", () => {
     });
     expect(nativeContract.nodeDistributions).toEqual({
       "linux-x64": {
-        file: "node-v26.5.0-linux-x64.tar.gz",
+        file: "node-v26.12.1-linux-x64.tar.gz",
         sha256:
-          "22b5f47ad6ae78837e4c2b846019965ce1a06ba143de176102294a1bf44fc677",
-        bytes: 61_529_729,
+          "0fd1eb7770598f52a21995edf6ed35fc690400fa437c2386af329519e9143132",
+        bytes: 62_907_493,
       },
       "linux-arm64": {
-        file: "node-v26.5.0-linux-arm64.tar.gz",
+        file: "node-v26.12.1-linux-arm64.tar.gz",
         sha256:
-          "308e5fe89a82461ba5a6cf15ff5221b2cdbd7ae87600aa72bb3c3fbdc66412d1",
-        bytes: 61_388_036,
+          "a6c01af459dd8972ab3fb08ee5da81244d26ba8c4944a62d5bbba8c597ae154f",
+        bytes: 62_602_144,
       },
       "darwin-x64": {
-        file: "node-v26.5.0-darwin-x64.tar.gz",
+        file: "node-v26.12.1-darwin-x64.tar.gz",
         sha256:
-          "98293394c945a24e64e00b4177bf075ec963ea70b34d1d2e24bd4a71716d334f",
-        bytes: 58_480_209,
+          "b85c2ea4420ad0bc4abf2dc6cf1f55130ed681f1cabf60cf3f526e4c9e2712ff",
+        bytes: 59_800_211,
       },
       "darwin-arm64": {
-        file: "node-v26.5.0-darwin-arm64.tar.gz",
+        file: "node-v26.12.1-darwin-arm64.tar.gz",
         sha256:
-          "ee920559aaa2391569cff4d737e3b83963430e3a14dedd91bfe0ff53171b5af9",
-        bytes: 57_181_366,
+          "1901d539912c02afa10d1cc126943a8855a7eedebe830119463470db5e6c59e8",
+        bytes: 58_334_853,
       },
       "win-x64": {
-        file: "node-v26.5.0-win-x64.zip",
+        file: "node-v26.12.1-win-x64.zip",
         sha256:
-          "d3b2277dbcccfdf24ef6302928f64f484cff1d77a6d3caa3a28f4d20ce9158f6",
-        bytes: 41_113_391,
+          "b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4",
+        bytes: 41_901_456,
       },
     });
     expect(nativeContract.nodeHeaders).toMatchObject({
-      file: "node-v26.5.0-headers.tar.gz",
+      file: "node-v26.12.1-headers.tar.gz",
       sha256:
-        "b02b9c5922e7fd7bae30d9e97c293059175aa9d267b81d2866d52696445b5cbd",
-      bytes: 9_963_460,
+        "a983cdcea96e85d137b9b807cc776bb5564fc9e3e1c9185d59bbfaa781efd08f",
+      bytes: 10_317_866,
     });
     expect(nativeContract.nodeImportLibraries["win-x64"]).toEqual({
       file: "node.lib",
-      url: "https://nodejs.org/dist/v26.5.0/win-x64/node.lib",
+      url: "https://nodejs.org/dist/v26.12.1/win-x64/node.lib",
       sha256:
-        "56f06350037085fce04930befd98327afc86ee46f52af6f6f8a68a03630e8380",
-      bytes: 3_026_982,
+        "caad0090dc3add94c06abd01e395e8ec0f1586c10071bda1f99480445d695f6f",
+      bytes: 3_029_908,
     });
     expect(nativeContract.nodeHeaders.windowsCommonGypi).toEqual({
       schemaVersion: 1,
       path: "include/node/common.gypi",
       sourceSha256:
-        "48c0c45ddfcf0de738fd7d9fc23c02768f2816686e099027af6373bd062e53b7",
+        "d8048c8c74dbc930646a6fadb55789e383179d137cc9fbc6c886afdf60b13454",
       releaseSha256:
-        "ddeb29bbdbcd29a167aa4799794c4a5c56222184f06361d8a2c0bfc310d9b266",
+        "360fde1115657a7a65078a8e7f393a2d5c2bebbe7cd131cd3b753c2f99ecfff6",
       transformation: "disable-debug-information-and-full-paths",
     });
     expect(nativeContract.linux.rpmContentInventory).toEqual({
@@ -1263,7 +1263,7 @@ describe("reproducible install and release contract", () => {
       "utf8",
     );
     expect(workflow).toContain("environment: npm-production");
-    expect(workflow).toContain('NODE_VERSION: "26.5.0"');
+    expect(workflow).toContain('NODE_VERSION: "26.12.1"');
     expect(
       workflow.match(/nodeDistributions"\]\["linux-x64"\]\["bytes"\]/g),
     ).toHaveLength(2);
@@ -2048,7 +2048,7 @@ describe("reproducible install and release contract", () => {
       "utf8",
     );
     expect(toolchain).toMatchObject({
-      nodeVersion: "26.5.0",
+      nodeVersion: "26.12.1",
       nodeMajor: 26,
       nodeModuleAbi: "147",
       nodeApiVersion: "10",
@@ -2078,10 +2078,10 @@ describe("reproducible install and release contract", () => {
       toolchain.docker.runtimeImage,
     ]);
     expect(toolchain.docker.buildImage).toBe(
-      "node:26.5.0-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271",
+      "node:26.12.1-bookworm@sha256:dc5ba49acad07ed5c0defe487a0f14726a8882064683460bcb8168e03e2f74f3",
     );
     expect(toolchain.docker.runtimeImage).toBe(
-      "node:26.5.0-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb",
+      "node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe",
     );
     expect(toolchain.docker.debianSnapshot.timestamp).toMatch(
       /^[0-9]{8}T[0-9]{6}Z$/,

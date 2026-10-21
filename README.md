@@ -142,7 +142,7 @@ Ledger verification, and the independently versioned SDK.
 
 ## Requirements
 
-- Standalone installations carry a private, verified **Node.js 26.5.0** runtime
+- Standalone installations carry a private, verified **Node.js 26.12.1** runtime
   (module ABI 147); no host Node installation is required. Source checkouts,
   the npm launcher, and the SDK require Node.js `>=26.5 <27`; see the
   [supported-host matrix](docs/install.md#supported-hosts).
@@ -368,7 +368,7 @@ check:e2e-all
 check:unused                # knip (informational)
 ```
 
-The full `npm test` release gate runs on a Linux Docker host in a pinned Node 26.5.0
+The full `npm test` release gate runs on a Linux Docker host in a pinned Node 26.12.1
 image with no external network interface (private loopback only), a recursively
 read-only checkout, private IPC/tmpfs state, and a seccomp/ptrace process-tree
 supervisor. Before repository code executes, both the client and a trusted

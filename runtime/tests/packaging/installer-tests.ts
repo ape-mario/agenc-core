@@ -490,7 +490,7 @@ function writeInstrumentedInstallPs1(dir: string): string {
 }
 
 function makeBootstrapNodeDistribution(dir: string): string {
-  const distribution = join(dir, "node-v26.5.0-linux-x64");
+  const distribution = join(dir, "node-v26.12.1-linux-x64");
   const bin = join(distribution, "bin");
   mkdirSync(bin, { recursive: true });
   const node = join(bin, "node");
@@ -498,8 +498,8 @@ function makeBootstrapNodeDistribution(dir: string): string {
     mode: 0o755,
   });
   chmodSync(node, 0o755);
-  const archive = join(dir, "node-v26.5.0-linux-x64.tar.gz");
-  const result = spawnSync("tar", ["-czf", archive, "-C", dir, "node-v26.5.0-linux-x64"]);
+  const archive = join(dir, "node-v26.12.1-linux-x64.tar.gz");
+  const result = spawnSync("tar", ["-czf", archive, "-C", dir, "node-v26.12.1-linux-x64"]);
   expect(result.status, result.stderr?.toString()).toBe(0);
   return archive;
 }
@@ -545,12 +545,12 @@ function writeBootstrapFixtureInstallSh(
   let source = readFileSync(INSTALL_SH, "utf8");
   source = replaceExactlyOnce(
     source,
-    'NODE_DIST_SHA="22b5f47ad6ae78837e4c2b846019965ce1a06ba143de176102294a1bf44fc677"',
+    'NODE_DIST_SHA="0fd1eb7770598f52a21995edf6ed35fc690400fa437c2386af329519e9143132"',
     `NODE_DIST_SHA="${sha256(readFileSync(archive))}"`,
   );
   source = replaceExactlyOnce(
     source,
-    "NODE_DIST_BYTES=61529729",
+    "NODE_DIST_BYTES=62907493",
     `NODE_DIST_BYTES=${statSync(archive).size}`,
   );
   source = replaceExactlyOnce(
@@ -578,14 +578,14 @@ function writeBootstrapFixtureInstallSh(
 }
 
 function makeBootstrapWindowsNodeDistribution(dir: string): string {
-  const distribution = join(dir, "node-v26.5.0-win-x64");
+  const distribution = join(dir, "node-v26.12.1-win-x64");
   mkdirSync(distribution, { recursive: true });
   const node = join(distribution, "node.exe");
   writeFileSync(node, `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} "$@"\n`, {
     mode: 0o755,
   });
   chmodSync(node, 0o755);
-  const archive = join(dir, "node-v26.5.0-win-x64.zip");
+  const archive = join(dir, "node-v26.12.1-win-x64.zip");
   const result = spawnSync(
     "pwsh",
     [
@@ -615,12 +615,12 @@ function writeBootstrapFixtureInstallPs1(
   let source = readFileSync(INSTALL_PS1, "utf8");
   source = replaceExactlyOnce(
     source,
-    '$nodeDistributionSha256 = "d3b2277dbcccfdf24ef6302928f64f484cff1d77a6d3caa3a28f4d20ce9158f6"',
+    '$nodeDistributionSha256 = "b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4"',
     `$nodeDistributionSha256 = "${sha256(readFileSync(archive))}"`,
   );
   source = replaceExactlyOnce(
     source,
-    "$nodeDistributionBytes = 41113391",
+    "$nodeDistributionBytes = 41901456",
     `$nodeDistributionBytes = ${statSync(archive).size}`,
   );
   if (options.bootstrapUrl !== undefined) {
@@ -3083,7 +3083,7 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
       },
     });
     expect(res.status, res.stderr).toBe(0);
-    expect(res.stderr).toContain("using private Node.js 26.5.0 bootstrap");
+    expect(res.stderr).toContain("using private Node.js 26.12.1 bootstrap");
     const installed = paths(home, artifact.sha);
     expect(parseInstallShWrapper(installed.wrapper)).toMatchObject({
       nodeBin: installed.privateNode,
@@ -3389,7 +3389,7 @@ function registerInstallPs1Tests(): void {
       }, installerPath);
 
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-      expect(result.stdout).toContain("using private Node.js 26.5.0 bootstrap");
+      expect(result.stdout).toContain("using private Node.js 26.12.1 bootstrap");
       const installed = windowsPaths(home, artifact.sha);
       expect(parseGeneratedWrapper(installed.wrapper)).toMatchObject({
         nodeBin: installed.privateNode,
