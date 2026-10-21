@@ -31,7 +31,7 @@ export function lightEditsWithApplyPatch(
   providerName: string | undefined,
   model?: string,
 ): boolean {
-  return modelFamilyFor(providerName, model) === "openai";
+  return modelFamilyFor(providerName, model) === "openai" || providerName === "deepseek";
 }
 
 /** `AGENC_LIGHT_TASK_LIMITS=1` or `=0` in the session environment overrides the provider default. */
