@@ -94,7 +94,10 @@ export type SqliteDatabase = BetterSqlite3.Database;
  *   call that cannot change external state (an idempotent tool call's
  *   in-flight row). No recovery, unknown-outcome gate, budget or effect
  *   decision reads it: those use canonical events, effect projections and
- *   side-effecting rows, which stay FULL. It commits like `"rebuildable"`:
+ *   side-effecting rows, which stay FULL. Output-only progress updates may
+ *   also use this mode: they preserve the already-committed call identity,
+ *   arguments, status and recovery category. An orphan backfill or a category
+ *   change still uses FULL. It commits like `"rebuildable"`:
  *   a process death keeps it; a power loss before the next FULL commit can
  *   drop it, leaving the index as it would be had the call not started.
  */
