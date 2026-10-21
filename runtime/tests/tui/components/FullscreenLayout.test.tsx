@@ -290,11 +290,30 @@ describe("FullscreenLayout modal viewport", () => {
     expect(output).not.toContain("2 agents");
   });
 
-  test("omits the Light label without changing other status facts", () => {
-    const regular = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort");
+  test("labels only a standard session; Light, the default, has no label", () => {
+    const unspecified = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort");
     const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort", true);
-    expect(light).toEqual(regular);
-    expect(light.light).toBeNull();
+    const standard = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort", false);
+    expect(light).toEqual(unspecified);
+    expect(light.harness).toBeNull();
+    expect(standard).toEqual({ ...light, harness: "standard" });
+  });
+
+  test.each([
+    [false, true],
+    [true, false],
+    [undefined, false],
+  ])("renders the standard marker when the session lightMode is %s: %s", async (lightMode, marked) => {
+    const state = getDefaultAppState();
+    const output = await renderToString(
+      <AppStateProvider initialState={{ ...state, ...(lightMode !== undefined ? { lightMode } : {}) }}>
+        {fullscreen(<FullscreenLayout scrollable={<Text>research</Text>} bottom={<Text>prompt</Text>} />)}
+      </AppStateProvider>,
+      { columns: 180, rows: 24 },
+    );
+    expect(output).toContain("asks first");
+    if (marked) expect(output).toMatch(/asks first · standard/u);
+    else expect(output).not.toMatch(/\bstandard\b/u);
   });
 
   test("shows each status fact once with plain mode labels", () => {
@@ -305,7 +324,7 @@ describe("FullscreenLayout modal viewport", () => {
       model: "grok-4-fast",
       effort: null,
       mode: "never asks",
-      light: null,
+      harness: null,
       spend: "$0.04",
     });
     expect(
@@ -339,7 +358,7 @@ describe("FullscreenLayout modal viewport", () => {
       model: "grok-4-fast",
       effort: null,
       mode: "asks first",
-      light: null,
+      harness: null,
       spend: null,
     });
   });
