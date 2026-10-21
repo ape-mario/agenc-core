@@ -592,8 +592,18 @@ function appendWritableRoot(
   // cannot be renamed, so `mv home; mkdir home` cannot replace the trust root.
   // Apply these before the root's ordinary carve-outs, never over their masks.
   const canonicalRoot = canonicalAuthorityPath(root.root);
+  // An existing read-only directory already covers its descendants. Mounting
+  // a missing nested reservation after that ro-bind makes bwrap try mkdir on
+  // the read-only host tree (e.g. home's Desktop authority or memory roots).
+  // Use physical containment so a symlink to a different writable tree cannot
+  // make a real restriction disappear.
+  const coveredByReadOnlyDirectory = (target: string) => root.readOnlySubpaths.some(parent =>
+    parent !== target && fs.existsSync(parent) && fs.lstatSync(parent).isDirectory() &&
+    isWithinAuthorityPath(canonicalAuthorityPath(target), canonicalAuthorityPath(parent)),
+  );
   const anchors = new Set<string>();
   for (const reserved of root.reservedReadOnlyPaths ?? []) {
+    if (coveredByReadOnlyDirectory(reserved)) continue;
     for (let ancestor = path.dirname(reserved);
       ancestor !== canonicalRoot && isWithinAuthorityPath(ancestor, canonicalRoot);
       ancestor = path.dirname(ancestor)) {
@@ -604,6 +614,7 @@ function appendWritableRoot(
   for (const ancestor of [...anchors].sort((a, b) => a.length - b.length)) appendBindIfExists(args, ancestor);
   const handledProtectedNames = new Set<string>();
   for (const subpath of root.readOnlySubpaths) {
+    if (coveredByReadOnlyDirectory(subpath)) continue;
     if (fs.existsSync(subpath)) {
       rejectSymlinkCrossing(subpath, root.root, "read-only subpath");
       appendReadOnlyIfExists(args, subpath);
