@@ -200,9 +200,10 @@ export function buildMemoryInstructionLines(): string[] {
   return [
     `# ${AUTO_MEM_DISPLAY_NAME}`,
     '',
-    `You have file-based memory: a global directory for user-level facts across projects and a project directory for this repository, both listed under "Memory directories". Each holds one markdown file per memory and a \`${ENTRYPOINT_NAME}\` index.`,
-    '- Save at once when the user asks you to remember something; when they ask you to forget something, delete the file with `apply_patch` (`*** Delete File: <path>`) and remove its index line with Edit. Also save who the user is and how they want to work, feedback they gave or confirmed (with the reason), project context that is not in the code (decisions and why, deadlines, incidents, owners) and pointers to external systems. Never save code patterns, file paths, git history, fix recipes, AGENC.md content or in-progress task state; if asked to save an activity log, save what was non-obvious about it.',
-    `- One fact per file: \`<topic>.md\` with frontmatter \`name\`, \`description\` (one specific line used to judge relevance later) and \`type\` (${MEMORY_TYPES.join(', ')}), then the fact; feedback and project memories add a **Why:** line and a **How to apply:** line. Then add \`- [Title](topic.md): one-line hook\` to that directory's \`${ENTRYPOINT_NAME}\` (an index: one line per file, under 150 characters, no frontmatter; only its first ${MAX_ENTRYPOINT_LINES} lines load). Update an existing file on the topic instead of adding a duplicate.`,
+    `"Memory directories" lists global memory (user-level, across projects) and project memory (this repository). Each holds one markdown file per memory and a \`${ENTRYPOINT_NAME}\` index.`,
+    '- Save at once when the user asks you to remember something. Also save who the user is and how they want to work, feedback they gave or confirmed (with the reason), project context that is not in the code (decisions and why, deadlines, incidents, owners) and pointers to external systems. Never save code patterns, file paths, git history, fix recipes, AGENC.md content or in-progress task state; if asked to save an activity log, save what was non-obvious about it.',
+    '- To forget, load `apply_patch` via `system.searchTools` (`query: "select:apply_patch"`) if unlisted, delete the file (`*** Delete File: <path>`), and remove its index line with Edit. Do not use shell removal or `system.delete`.',
+    `- One fact per file: \`<topic>.md\` with frontmatter \`name\`, \`description\` (one specific relevance line) and \`type\` (${MEMORY_TYPES.join(', ')}), then the fact; feedback and project memories add a **Why:** line and a **How to apply:** line. Then add \`- [Title](topic.md): one-line hook\` to that directory's \`${ENTRYPOINT_NAME}\` (an index: one line per file, under 150 characters, no frontmatter; only its first ${MAX_ENTRYPOINT_LINES} lines load). Update an existing file on the topic instead of adding a duplicate.`,
     `- Indexes are injected when available; omitted indexes are empty or unavailable. Do not list or probe memory paths. For recall, use injected indexes and attached memories first; read a topic file only when needed, or search with ${memorySearchExample()}. Read an index only to update it. Verify past claims before acting; fix or delete stale memories. Ignore memory if asked.`,
   ]
 }
@@ -236,7 +237,7 @@ export function buildLightMemoryInstructionLines(): string[] {
  * only exists when an index has content.
  */
 export const LIGHT_MEMORY_RECALL_RULES =
-  'Read a topic file only when needed and an index only to update it; search the memory directory with grep. Update a topic instead of duplicating it; to forget, delete its file with `apply_patch` (`*** Delete File: <path>`) and remove its index line with Edit; fix or delete stale memories. Ignore memory if asked.'
+  'Read a topic file only when needed and an index only to update it; search the memory directory with grep. Update a topic instead of duplicating it; to forget, delete its file with `apply_patch` (`*** Delete File: <path>`) and remove its index line with Edit. If unlisted, load `apply_patch` with `system.searchTools` (`query: "select:apply_patch"`). Do not use shell commands or `system.delete` for memory deletion; fix or delete stale memories. Ignore memory if asked.'
 
 /** Opening words of Light's memory rules; their presence means the rules are in front of the model. */
 export const LIGHT_MEMORY_RULES_MARKER =
@@ -250,7 +251,7 @@ export function buildLightMemoryOnRequestText(
 ): string {
   return [
     buildLightMemoryInstructionLines().join('\n'),
-    'To forget a memory, delete its file with `apply_patch` (`*** Delete File: <path>`) and remove its index line with Edit.',
+    'To forget, load `apply_patch` via `system.searchTools` (`query: "select:apply_patch"`) if unlisted, delete the file (`*** Delete File: <path>`), and remove its index line with Edit. Do not use shell removal or `system.delete`.',
     buildLightMemoryDirectoryLines(projectMemoryDir, extraGuidelines, globalMemoryDir).join('\n'),
   ].join('\n\n')
 }
