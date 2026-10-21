@@ -253,3 +253,31 @@ it("accepts an explicit private launch model at the invocation-scoped endpoint",
   expect(f.output().stderr).not.toContain("unknown model");
   expect(f.call).toHaveBeenCalledWith("agent.create", expect.objectContaining({ model: "private-deployment" }), expect.anything());
 });
+
+it.each([
+  ["no flag and no light_mode starts Light", [] as string[], undefined, true],
+  ["--light alone is the default, Light", ["--light"], undefined, true],
+  ["--standard starts standard", ["--standard"], undefined, false],
+  ["light_mode = false starts standard", [], false, false],
+  ["light_mode = true starts Light", [], true, true],
+  ["--light wins over light_mode = false", ["--light"], false, true],
+  ["--standard wins over light_mode = true", ["--standard"], true, false],
+])("settles a fresh print session's mode: %s", async (_label, flags, configured, expected) => {
+  if (configured !== undefined) {
+    writeFileSync(join(home, "config.toml"), `config_version = 2\nlight_mode = ${configured}\n`);
+  }
+  process.argv = ["node", "agenc", "-p", ...flags, "hello"];
+  expect(await oneShotCLI("hello")).toBe(0);
+  const created = request.mock.calls.find(([method]) => method === "agent.create");
+  expect(created?.[1]).toMatchObject({ runtimeOptions: expect.objectContaining({ lightMode: expected }) });
+});
+
+it("sends only an explicit mode flag when continuing, so the session keeps its recorded mode", async () => {
+  writeFileSync(join(home, "config.toml"), "config_version = 2\nlight_mode = false\n");
+  process.argv = ["node", "agenc", "-c", "-p", "next"];
+  expect(await oneShotCLI("next", [], undefined, { kind: "latest" })).toBe(23);
+  expect(mocks.continuation.mock.calls[0]?.[0].runtimeOptions).not.toHaveProperty("lightMode");
+  process.argv = ["node", "agenc", "-c", "-p", "--standard", "next"];
+  expect(await oneShotCLI("next", [], undefined, { kind: "latest" })).toBe(23);
+  expect(mocks.continuation.mock.calls[1]?.[0].runtimeOptions).toMatchObject({ lightMode: false });
+});

@@ -211,8 +211,10 @@ function thinRuntimeAuthority(env: Readonly<Record<string, string>>):
   const script = `
     import { resolveAgentRuntimeOptions } from ${JSON.stringify(modulePath)};
     try {
+      // A fresh print with no --light/--standard and no light_mode starts in
+      // Light, the default mode, exactly like the thin CLI process.
       const options = resolveAgentRuntimeOptions(process.env, {
-        nonInteractive: true, exactOutput: false, relaxedOneShot: true,
+        lightMode: true, nonInteractive: true, exactOutput: false, relaxedOneShot: true,
       });
       process.stdout.write(JSON.stringify({ options }));
     } catch (error) { process.stdout.write(JSON.stringify({ error: error.message })); }

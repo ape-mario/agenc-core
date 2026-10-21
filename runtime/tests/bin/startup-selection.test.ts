@@ -101,6 +101,25 @@ describe("readStartupCliFlags --permission-mode validation", () => {
     expect(readStartupCliFlags(["node", "agenc", "explain", "--light"])).not.toHaveProperty("lightMode");
   });
 
+  it("parses --standard as an explicit standard choice, only before the prompt", () => {
+    expect(readStartupCliFlags(["node", "agenc", "--standard", "explain"])).toEqual({ lightMode: false });
+    expect(readStartupCliFlags(["node", "agenc", "-p", "--standard", "explain"])).toEqual({ lightMode: false });
+    expect(readStartupCliFlags(["node", "agenc", "--", "--standard"])).not.toHaveProperty("lightMode");
+    expect(readStartupCliFlags(["node", "agenc", "explain", "--standard"])).not.toHaveProperty("lightMode");
+  });
+
+  it("leaves the mode unset without a flag, so config and the Light default decide", () => {
+    expect(readStartupCliFlags(["node", "agenc"])).not.toHaveProperty("lightMode");
+    expect(readStartupCliFlags(["node", "agenc", "-p", "explain"])).not.toHaveProperty("lightMode");
+  });
+
+  it("rejects --light together with --standard", () => {
+    expect(() => readStartupCliFlags(["node", "agenc", "--light", "--standard", "explain"]))
+      .toThrow("Use either --light or --standard, not both");
+    expect(() => readStartupCliFlags(["node", "agenc", "--standard", "-p", "--light"]))
+      .toThrow("Use either --light or --standard, not both");
+  });
+
   it("parses --bare only in the startup option region", () => {
     expect(
       readStartupCliFlags(["node", "agenc", "--bare", "explain"]),
