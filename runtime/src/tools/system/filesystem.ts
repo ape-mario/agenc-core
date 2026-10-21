@@ -19,6 +19,7 @@
  * @module
  */
 
+import { isUnderMemoryRoots } from "../../permissions/path-validation.js";
 import { createHash } from "node:crypto";
 import {
   opendir,
@@ -366,6 +367,11 @@ function getWorkspaceReadSnapshot(
   if (snapshot.isPartialView === true) {
     return undefined;
   }
+  // Durable memory has concurrent foreground and extraction writers. A
+  // sibling's post-write snapshot is not evidence that this model saw those
+  // bytes: borrowing it can silently erase a just-saved MEMORY.md link.
+  // Keep memory reads local to the reader; ordinary workspace sharing remains.
+  if (isUnderMemoryRoots(canonicalPath, durableMemoryRootsForCall())) return undefined;
   return snapshot;
 }
 
