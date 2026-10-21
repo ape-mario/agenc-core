@@ -611,7 +611,7 @@ static int visit_direct_children(direct_child_action action,
     return AGENC_BROKER_FAILURE;
   }
   for (;;) {
-    pid_t child_pid;
+    pid_t child_pid = 0;
     int read_result = read_direct_child(stream, &child_pid);
 
     if (read_result == AGENC_BROKER_CHILD_READ_END) {
