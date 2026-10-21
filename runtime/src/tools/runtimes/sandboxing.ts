@@ -645,7 +645,10 @@ export function agencHomeCarveOutAllowsWrite(
   sessionTempRoot: string,
 ): boolean {
   if (policy.kind !== "restricted") return false;
-  return canWritePathWithCwd({
+  // The caller already verified a native plan/memory/project-store target.
+  // Skip generic workspace metadata protection (e.g. HOME as workspace with
+  // AGENC_HOME=HOME/.agenc), but retain explicit denies and reservations.
+  return canWriteRuntimeOwnedPathWithCwd({
     ...policy,
     entries: policy.entries.map((entry) =>
       entry.access === "read" && entry.path.kind === "special" &&
