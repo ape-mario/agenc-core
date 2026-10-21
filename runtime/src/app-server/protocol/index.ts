@@ -1433,7 +1433,12 @@ export function isAgenCDaemonNotificationMethod(
 
 export interface AgentRuntimeOptionsParams extends JsonObject {
   readonly simpleMode: boolean;
-  /** Deferred tool exposure; omitted means false. Instructions, schemas and execution policy are unchanged. */
+  /**
+   * Light mode: deferred tool exposure. Instructions, schemas and execution
+   * policy are unchanged. A new agent that omits it starts in the daemon
+   * default (config.toml `light_mode`, else Light); send false for standard.
+   * A resume keeps the mode the session recorded.
+   */
   readonly lightMode?: boolean;
   /** Omission by an older client is normalized to false. */
   readonly dangerouslyBypassApprovalsAndSandbox?: boolean;
@@ -1769,7 +1774,12 @@ export interface RunStartParams extends JsonObject {
   readonly envOverrides?: { readonly [key: string]: string };
   /** The engineering goal / issue text driving the change. */
   readonly goal: string;
-  /** Run the Goal and all of its child sessions in Light mode. Defaults to standard mode. */
+  /**
+   * Run the Goal and all of its child sessions in Light mode (true) or
+   * standard mode (false). Omitted: a new Goal takes the daemon default
+   * (config.toml `light_mode`, else Light) and a continuation keeps its
+   * source Goal's mode.
+   */
   readonly lightMode?: boolean;
   /** Absolute directory inside the target git repository (daemon cwd default). */
   readonly cwd?: string;

@@ -182,6 +182,7 @@ import {
   validateAgentRuntimeOptions,
   type AgentRuntimeOptions,
 } from "../session/runtime-options.js";
+import { resolveDefaultLightMode } from "../session/light-mode-default.js";
 
 import { RoutineService } from "../routines/service.js";
 
@@ -1002,6 +1003,9 @@ async function runAgenCDaemonForegroundLocked(
       threadStore,
       // DAE-02: prefer client/workspace env over frozen OS cwd when params omit cwd.
       defaultCwd: () => resolveDaemonDefaultCwd(host.env),
+      // A new agent created without a mode (an API client, a phone or
+      // Telegram session, a routine run) starts in the operator's default.
+      defaultLightMode: () => resolveDefaultLightMode(activeConfig.light_mode),
       snapshotFlush: (snapshot) =>
         writeAgenCDaemonSnapshot(snapshotPath, snapshot),
       broadcastSessionEvent: async (sessionId, event) => {
@@ -1183,6 +1187,7 @@ async function runAgenCDaemonForegroundLocked(
         snapshotPolicies.recordAgentRun(run);
       },
       warn: (message) => io.stderr.write(`agenc: ${message}\n`),
+      defaultLightMode: () => resolveDefaultLightMode(activeConfig.light_mode),
     });
     const workflowControlService = new DaemonWorkflowControlService(workflowWiring.controller);
     const health = createLazyDaemonHealth({

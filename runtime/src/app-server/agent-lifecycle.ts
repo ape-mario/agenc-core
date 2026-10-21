@@ -393,6 +393,13 @@ export interface AgenCDaemonAgentManagerOptions {
     ids: readonly string[],
     signal?: AbortSignal,
   ) => Promise<void> | undefined;
+  /**
+   * Mode for a new agent whose `runtimeOptions` leave `lightMode` unset: the
+   * daemon's config.toml `light_mode`, then Light. The value is recorded with
+   * the session, so a restart or resume never re-reads it. Resumed agents
+   * keep their recorded mode. Without it an unset mode stays standard.
+   */
+  readonly defaultLightMode?: () => boolean;
 }
 
 export interface AgenCDaemonAgentToolOutputReadParams {
@@ -624,6 +631,7 @@ export class AgenCDaemonAgentManager {
         signal?: AbortSignal,
       ) => Promise<void> | undefined)
     | undefined;
+  readonly #defaultLightMode: (() => boolean) | undefined;
   #shuttingDown = false;
   #shutdownDisposition: "cancel" | "suspend_idle" = "cancel";
   #activeCreates = 0;
@@ -681,6 +689,7 @@ export class AgenCDaemonAgentManager {
     this.#cancelRunTreeDurable = options.cancelRunTreeDurable;
     this.#voidBudgetHoldsForAgents = options.voidBudgetHoldsForAgents;
     this.#waitForStartupRestore = options.waitForStartupRestore;
+    this.#defaultLightMode = options.defaultLightMode;
   }
 
   createAgent(
@@ -1044,9 +1053,21 @@ export class AgenCDaemonAgentManager {
         params.toolPolicy,
         retainedMetadata,
       );
-      const requestedRuntimeOptions = validateAgentRuntimeOptions(
+      const validatedRuntimeOptions = validateAgentRuntimeOptions(
         params.runtimeOptions,
       );
+      // A new agent whose creator chose no mode starts in the daemon default.
+      // The settled value is recorded below like an explicit one. A resume
+      // passes its request through: the retained mode decides it.
+      const requestedRuntimeOptions =
+        resumeSessionId === undefined &&
+        validatedRuntimeOptions.lightMode === undefined &&
+        this.#defaultLightMode !== undefined
+          ? Object.freeze({
+              ...validatedRuntimeOptions,
+              lightMode: this.#defaultLightMode(),
+            })
+          : validatedRuntimeOptions;
       const retainedRuntimeOptions =
         resumeSessionId === undefined
           ? undefined
