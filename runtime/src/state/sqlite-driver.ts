@@ -99,7 +99,9 @@ export type SqliteDatabase = BetterSqlite3.Database;
  *   arguments, status and recovery category. An orphan backfill or a category
  *   change still uses FULL. It commits like `"rebuildable"`:
  *   a process death keeps it; a power loss before the next FULL commit can
- *   drop it, leaving the index as it would be had the call not started.
+ *   drop it. An idempotent call can disappear from the observer index;
+ *   output-only progress rolls back to earlier output while preserving the
+ *   durable call identity, arguments, status and recovery category.
  */
 export type StateCommitDurability = "full" | "rebuildable" | "observational";
 
