@@ -2197,6 +2197,71 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
     }
   }, 30_000);
 
+  test("the installed private Node must match the manifest build record, not the installer pin", () => {
+    const artifact = makeSyntheticArtifact(work);
+    const manifest = remoteManifest(artifact, "linux", "unused");
+    const mismatched = structuredClone(manifest);
+    mismatched.build.nodeVersion = "v26.0.1";
+    const fixture = startHttpsFixture(work, {
+      "/release-manifest.json": { bodyText: JSON.stringify(manifest) },
+      "/mismatched-manifest.json": { bodyText: JSON.stringify(mismatched) },
+      "/repo-artifact.tar.gz": { bodyBase64: readFileSync(artifact.tarball).toString("base64") },
+    });
+    const fetchRewrite = writeGithubArtifactFetchRewrite(work);
+    const toolchain = JSON.parse(readFileSync(RELEASE_TOOLCHAIN, "utf8")) as {
+      nodeVersion: string;
+    };
+    // An installer whose own Node pin differs from the artifact's private
+    // Node, as when a pinned older release predates the installer's pin.
+    const installerPath = join(work, "older-node-pin-install.sh");
+    writeFileSync(
+      installerPath,
+      replaceExactlyOnce(
+        readFileSync(writeInstrumentedInstallSh(work), "utf8"),
+        `SUPPORTED_NODE_VERSION=${toolchain.nodeVersion}\n`,
+        "SUPPORTED_NODE_VERSION=26.0.1\n",
+      ),
+      { mode: 0o755 },
+    );
+    const common = {
+      NODE_EXTRA_CA_CERTS: fixture.ca,
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --require=${fetchRewrite}`.trim(),
+      AGENC_INSTALL_TEST_GITHUB_ARTIFACT_URL: `${fixture.baseUrl}/repo-artifact.tar.gz`,
+    };
+    try {
+      const recorded = runInstaller({
+        home: join(work, "manifest-node"),
+        manifestUrl: `${fixture.baseUrl}/release-manifest.json`,
+        args: ["--no-daemon"],
+        installerPath,
+        envOverrides: common,
+      });
+      expect(recorded.status, recorded.stderr).toBe(0);
+
+      const mismatch = runInstaller({
+        home: join(work, "manifest-node-mismatch"),
+        manifestUrl: `${fixture.baseUrl}/mismatched-manifest.json`,
+        args: ["--no-daemon"],
+        installerPath,
+        envOverrides: common,
+      });
+      expect(mismatch.status).not.toBe(0);
+      expect(mismatch.stderr).toContain("installed private Node.js identity is invalid");
+
+      // A local manifest has no verified build record, so the installer pin applies.
+      const local = runInstaller({
+        home: join(work, "local-manifest-pin"),
+        manifest: writeManifest(work, artifact),
+        args: ["--no-daemon"],
+        installerPath,
+      });
+      expect(local.status).not.toBe(0);
+      expect(local.stderr).toContain("installed private Node.js identity is invalid");
+    } finally {
+      fixture.stop();
+    }
+  }, 30_000);
+
   test("official manifests require complete canonical dual provenance identities", () => {
     const artifact = makeSyntheticArtifact(work);
     const base = remoteManifest(
@@ -2954,6 +3019,22 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
     }
   });
 
+  test("standalone installers bind the installed private Node to the manifest build record", () => {
+    const sh = readFileSync(INSTALL_SH, "utf8");
+    const ps1 = readFileSync(INSTALL_PS1, "utf8");
+    expect(sh).toContain(
+      'legacy || trustMode === "explicitLocal" ? "" : m.build?.nodeVersion ?? "",',
+    );
+    expect(sh).toContain('MANIFEST_NODE_VERSION="$(printf \'%s\\n\' "$SELECTED" | sed -n 18p)"');
+    expect(sh).toContain('PRIVATE_NODE_VERSION="${MANIFEST_NODE_VERSION#v}"');
+    expect(sh).toContain(
+      '[ -n "$PRIVATE_NODE_VERSION" ] || PRIVATE_NODE_VERSION="$SUPPORTED_NODE_VERSION"',
+    );
+    expect(sh.match(/process\.versions\.node !== process\.argv\[3\]/g)).toHaveLength(2);
+    expect(ps1).toContain("([string]$manifest.build.nodeVersion).Substring(1)");
+    expect(ps1).toContain("process.versions.node !== expectedVersion");
+  });
+
   test("PowerShell bootstrap uses one cancellation deadline for headers and every body read", () => {
     const ps1 = readFileSync(INSTALL_PS1, "utf8");
     // A single cancellation source guards every network wait; each wait is
@@ -3548,6 +3629,33 @@ function registerInstallPs1Tests(): void {
       expect(second.status, second.stderr).toBe(0);
       expect(second.stdout).toContain("already installed");
       expect(existsSync(backup)).toBe(false);
+    });
+
+    test("PowerShell checks a local manifest's private Node against the installer pin", () => {
+      const home = join(work, "older-node-pin-home");
+      mkdirSync(home, { recursive: true, mode: 0o700 });
+      const artifact = makeSyntheticArtifact(work);
+      const manifest = writeManifest(work, artifact, {
+        platform: "win",
+        arch: "x64",
+      });
+      const toolchain = JSON.parse(readFileSync(RELEASE_TOOLCHAIN, "utf8")) as {
+        nodeVersion: string;
+      };
+      const installerPath = join(work, "older-node-pin-install.ps1");
+      writeFileSync(
+        installerPath,
+        replaceExactlyOnce(
+          readFileSync(INSTALL_PS1, "utf8"),
+          `$SupportedNodeVersion = "${toolchain.nodeVersion}"`,
+          '$SupportedNodeVersion = "26.0.1"',
+        ),
+      );
+      const result = runPowerShell(home, manifest, join(home, ".agenc"), {}, installerPath);
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        "installed private Node.js identity is invalid",
+      );
     });
 
     test("PowerShell writes a WinSW definition from installed absolute paths", () => {

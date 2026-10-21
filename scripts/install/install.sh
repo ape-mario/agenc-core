@@ -1490,6 +1490,7 @@ SELECTED="$(node -e '
     legacy ? "" : a.buildProvenanceBytes ?? "",
     legacy ? "" : a.bins.node,
     legacy ? "" : a.bins.nodeLibrary ?? "",
+    legacy || trustMode === "explicitLocal" ? "" : m.build?.nodeVersion ?? "",
   ].join("\n"));
 ' "$MANIFEST_FILE" "$OS" "$ARCH" "$NODE_MODULE_ABI" "$MANIFEST_URL" "$PIN_VERSION" "$OFFICIAL_REPO" "$EXPECTED_MANIFEST_REPO" "$MANIFEST_TRUST" "$MAX_ARTIFACT_BYTES" "$MAX_SIGSTORE_BUNDLE_BYTES")" || \
   fail "manifest rejected (${OS}-${ARCH})"
@@ -1511,6 +1512,7 @@ ARTIFACT_BUILD_PROVENANCE_SHA="$(printf '%s\n' "$SELECTED" | sed -n 14p)"
 ARTIFACT_BUILD_PROVENANCE_BYTES="$(printf '%s\n' "$SELECTED" | sed -n 15p)"
 NODE_BIN_REL="$(printf '%s\n' "$SELECTED" | sed -n 16p)"
 NODE_LIBRARY_REL="$(printf '%s\n' "$SELECTED" | sed -n 17p)"
+MANIFEST_NODE_VERSION="$(printf '%s\n' "$SELECTED" | sed -n 18p)"
 
 PROVENANCE_EXPECTATION_BASE64=""
 PROVENANCE_RECEIPT_BASE64=""
@@ -2809,21 +2811,28 @@ fi
 # --- wrapper -----------------------------------------------------------------
 
 # Modern artifacts carry their own exact Node runtime. The bootstrap Node is
-# temporary and must never leak into the durable wrapper.
+# temporary and must never leak into the durable wrapper. The private Node must
+# be the exact Node the release manifest's build record names, so a pinned
+# older release keeps installing after this installer pins a newer Node. A
+# local manifest has no verified build record and uses the installer's pin.
 if [ -n "$NODE_BIN_REL" ]; then
+  PRIVATE_NODE_VERSION="${MANIFEST_NODE_VERSION#v}"
+  [ -n "$PRIVATE_NODE_VERSION" ] || PRIVATE_NODE_VERSION="$SUPPORTED_NODE_VERSION"
   if [ -n "$PRIVATE_NODE_LIBRARY" ]; then
     LD_LIBRARY_PATH="$PRIVATE_NODE_LIBRARY" "$PRIVATE_NODE_BIN" -e '
-      if (process.versions.node !== "26.5.0" || process.versions.modules !== "147" ||
+      if (!/^\d+\.\d+\.\d+$/.test(process.argv[3]) ||
+          process.versions.node !== process.argv[3] || process.versions.modules !== "147" ||
           process.versions.napi !== "10" || process.platform !== process.argv[1] ||
           process.arch !== process.argv[2]) process.exit(1);
-    ' "$OS" "$ARCH" >/dev/null 2>&1 ||
+    ' "$OS" "$ARCH" "$PRIVATE_NODE_VERSION" >/dev/null 2>&1 ||
       fail "installed private Node.js identity is invalid"
   else
     "$PRIVATE_NODE_BIN" -e '
-      if (process.versions.node !== "26.5.0" || process.versions.modules !== "147" ||
+      if (!/^\d+\.\d+\.\d+$/.test(process.argv[3]) ||
+          process.versions.node !== process.argv[3] || process.versions.modules !== "147" ||
           process.versions.napi !== "10" || process.platform !== process.argv[1] ||
           process.arch !== process.argv[2]) process.exit(1);
-    ' "$OS" "$ARCH" >/dev/null 2>&1 ||
+    ' "$OS" "$ARCH" "$PRIVATE_NODE_VERSION" >/dev/null 2>&1 ||
       fail "installed private Node.js identity is invalid"
   fi
 fi
