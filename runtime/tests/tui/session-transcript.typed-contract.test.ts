@@ -71,11 +71,16 @@ it("keeps provider switch diagnostics in the event log while retaining rejection
   const events: SessionTranscriptEvent[] = [
     { type: "warning", payload: { cause: "provider_switched", message: "provider deepseek -> deepseek; model deepseek-flash -> deepseek-flash; previous_response_id reset" } },
     { type: "warning", payload: { cause: "provider_switched", message: "provider deepseek -> openai; model deepseek-flash -> gpt-5; previous_response_id reset" } },
+    // The line the owner saw on 0.19.11, with the effort fallback appended.
+    { type: "warning", payload: { cause: "provider_switched", message: "provider venice -> deepseek; model venice-uncensored-1-2 -> deepseek-flash; previous_response_id reset; deepseek-flash does not support xhigh reasoning effort, so the session now uses its default effort." } },
     { type: "warning", payload: { cause: "provider_switch_rejected", message: "Model switch blocked: incompatible history" } },
   ];
   const transcript = adaptTranscriptEvents(events);
   expect(transcript.messages).toHaveLength(1);
-  expect(JSON.stringify(transcript.messages)).toContain("Model switch blocked");
-  expect(JSON.stringify(transcript.messages)).not.toContain("previous_response_id");
-  expect(events).toHaveLength(3);
+  const rendered = JSON.stringify(transcript.messages);
+  expect(rendered).toContain("Model switch blocked");
+  expect(rendered).not.toContain("previous_response_id");
+  expect(rendered).not.toContain("provider venice -> deepseek");
+  expect(rendered).not.toContain("session now uses its default effort");
+  expect(events).toHaveLength(4);
 });
