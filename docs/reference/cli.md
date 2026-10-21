@@ -57,6 +57,8 @@ From `formatCliHelpText()`:
 | `--task-token-budget <tokens>` | Set a numeric task allowance; `0` disables it. Explicit CLI and project values override saved `/budget` choices. |
 | `--no-tui` | Force one-shot CLI mode (no interactive TUI) |
 | `--bare` | Use reduced startup mode; immutably suppress every session hook extension point and skip LSP, plugin sync, and skill discovery while keeping authentication active |
+| `--light` | Start a new session in Light mode, the default: core tools first, other tools through `system.searchTools`. Overrides `light_mode = false`. |
+| `--standard` | Start a new session in standard mode instead of Light. Overrides `light_mode`. Passing both `--light` and `--standard` is an error. |
 | `-c`, `--continue` | Continue the latest project session. In the TUI this reopens it; with `-p`, piped stdin or `--no-tui` the prompt runs as one more turn of that session and the process exits with the turn's outcome (`agenc -c -p "next step"`). |
 | `-r`, `--resume <session-id>` | Resume a prior project session. TUI by default; headless (`-p`, piped stdin, `--no-tui`) runs the prompt as one more turn of that session. |
 | `--config <path>` | Load an explicit schema-v2 `config.toml` layer for this invocation |
@@ -68,6 +70,18 @@ From `formatCliHelpText()`:
 | `--bypass-approvals` | Skip approval prompts, sandbox escalation requests included: commands start in the OS sandbox, and one that asks to run outside it (`sandbox_permissions: "require_escalated"`) is allowed without a prompt. In a workspace-write sandbox the model is told it may ask only for GUI apps, blocked network, and one retry of an operation the user asked for that the sandbox refused on a protected path such as `.git` metadata, and to keep file changes inside the workspace; elsewhere it is told such requests are rejected. Same session-only `bypassPermissions` opt-in as `--permission-mode bypassPermissions`. On a host that cannot sandbox at all the run continues without kernel confinement and prints one stderr notice naming the reason. Conflicts with a different `--permission-mode`. |
 | `--dangerously-bypass-approvals-and-sandbox` | Bypass approvals and sandbox checks everywhere (the explicit no-sandbox opt-out) |
 | `--image <file\|url\|data-url>` | Attach a startup image |
+
+### Session mode
+
+New sessions start in Light mode, in the TUI and in print mode (`-p`). To
+start in standard mode, pass `--standard` or set `light_mode = false` in
+`config.toml` (see [config.md](config.md#core-and-runtime-selection)). A flag
+wins over the config, and `--light` overrides `light_mode = false`. A resumed
+or continued session (`-r`, `-c`) keeps the mode it started with; the flags
+apply only to new sessions. Sessions started before Light became the default
+keep the mode they started with. The status line shows `standard` for a
+standard session and no label for Light. Swarm teammates are started with the
+leader's mode.
 
 ### Print-mode notes
 
@@ -426,10 +440,13 @@ model name can be overridden per child. The command returns after the
 durable intake commit (`runId`, `specDigest`, `baseCommit`); `--follow`
 then tails the run journal until the terminal result.
 
-The `run.start` RPC and SDK `startRun` accept `lightMode: true` to run the
-Goal and its child sessions in Light mode. Omit it for standard mode. The
-frozen setting appears in `run.status.workflow.lightMode` and is inherited
-by a continuation unless that request supplies its own boolean value.
+The `run.start` RPC and SDK `startRun` accept `lightMode` to choose the mode
+of the Goal and its child sessions: `true` for Light, `false` for standard.
+When it is omitted, a new Goal takes the daemon default, which is
+`light_mode` from the daemon's `config.toml` and otherwise Light.
+`agenc run start` has no mode flag and uses that default. The frozen setting
+appears in `run.status.workflow.lightMode` and is inherited by a continuation
+unless that request supplies its own boolean value.
 
 Workflow runs default to `acceptEdits` when `--permission-mode` is omitted.
 Use `--permission-mode default` for normal per-tool approval checks. `run start`

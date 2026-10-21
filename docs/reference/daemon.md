@@ -412,11 +412,25 @@ reviews are still pending. See
 and
 [provider-aware-token-accounting.md](../design/provider-aware-token-accounting.md#session-context-estimate).
 
+#### Session mode (Light)
+
+`agent.create` carries the session mode as `runtimeOptions.lightMode`:
+`true` for Light, `false` for standard. A new agent that omits it starts in
+the daemon default, which is `light_mode` from the daemon's `config.toml`
+(read at start and on `agenc daemon reload`) and otherwise Light. The settled
+value is recorded with the session, so a restart, an attach or a cold resume
+restores it and never applies the default again. A resume keeps the recorded
+mode; a session recorded without one (created before Light became the
+default) stays standard. The CLI always sends an explicit value for a new
+session, resolved from `--light`, `--standard`, its own `light_mode` and the
+default. Phone, Telegram and routine sessions use the daemon default.
+
 #### Goal Light mode
 
 `run.start` accepts optional `lightMode: boolean`. When `true`, the Goal and
-its child sessions use Light mode; when omitted, they use standard mode. The
-frozen value appears at `run.status.workflow.lightMode` and survives recovery.
+its child sessions use Light mode; when `false`, standard mode. When it is
+omitted, a new Goal uses the daemon default described above. The frozen value
+appears at `run.status.workflow.lightMode` and survives recovery.
 Continuations inherit their source Goal's mode unless the new `run.start`
 request explicitly sets it. `initialize.result.capabilities["run.start.lightMode"]`
 advertises support when `run.start` is available.
