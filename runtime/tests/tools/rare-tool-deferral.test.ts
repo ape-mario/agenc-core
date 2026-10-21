@@ -115,6 +115,24 @@ describe("deferred rare tools", () => {
     expect(advertised(tools)).not.toContain("ExitPlanMode");
   });
 
+  test("a Light session in plan mode sees AskUserQuestion and ExitPlanMode, and its own set again after it", () => {
+    let mode = "default";
+    const tools = buildToolRegistry({
+      workspaceRoot: "/tmp",
+      requireAdmission: false,
+      sandboxExecutionBroker: explicitDangerBroker,
+      lightMode: true,
+      getSession: () => ({ services: { permissionModeRegistry: { current: () => ({ mode }) } } }) as never,
+    });
+    const light = [SYSTEM_SEARCH_TOOLS_NAME, "exec_command", "FileRead", "Edit", "Write"];
+    expect(advertised(tools)).toEqual(light);
+    mode = "plan";
+    // The Light set keeps its place; the plan-mode tools follow it.
+    expect(advertised(tools)).toEqual([...light, "AskUserQuestion", "ExitPlanMode"]);
+    mode = "acceptEdits";
+    expect(advertised(tools)).toEqual(light);
+  });
+
   test("ignore the daemon's process environment", () => {
     vi.stubEnv(DEFER_RARE_TOOLS_ENV, "1");
     try {
