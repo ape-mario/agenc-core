@@ -25,13 +25,17 @@ export const LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES: ReadonlySet<string> = new Set
 /**
  * Light sessions on a GPT-family model start with apply_patch instead of Edit
  * and Write: OpenAI's own API, or a gateway serving the same model by its id
- * (OpenRouter `openai/gpt-6-luna`, Venice `openai-gpt-6-luna`).
+ * (OpenRouter `openai/gpt-6-luna`, Venice `openai-gpt-6-luna`). Native DeepSeek
+ * Flash also uses the multi-file editor so one change can update source, tests
+ * and documentation together. Other DeepSeek models/routes retain batch Edit
+ * until measured; Edit and Write remain discoverable on every route.
  */
 export function lightEditsWithApplyPatch(
   providerName: string | undefined,
   model?: string,
 ): boolean {
-  return modelFamilyFor(providerName, model) === "openai" || providerName === "deepseek";
+  return modelFamilyFor(providerName, model) === "openai" ||
+    (providerName === "deepseek" && model?.trim().toLowerCase() === "deepseek-flash");
 }
 
 /** `AGENC_LIGHT_TASK_LIMITS=1` or `=0` in the session environment overrides the provider default. */
