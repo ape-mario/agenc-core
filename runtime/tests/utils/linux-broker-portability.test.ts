@@ -67,6 +67,13 @@ describe.runIf(process.platform === "linux" && process.arch === "x64")("portable
   it("rejects ambiguous Docker mount paths", () => {
     expect(() => portableBrokerDockerArgs("/runtime,other", "/out")).toThrow("commas");
   });
+  it("compiles the standalone broker with size optimization and strict warnings", () => {
+    const broker = join(temporary(), "agenc-process-broker");
+    childProcess.execFileSync("cc", ["-Os", "-static", "-std=c11", "-Wall", "-Wextra", "-Werror",
+      resolve(import.meta.dirname, "../../native/agenc-process-broker.c"), "-o", broker]);
+    expect(childProcess.execFileSync(broker, ["--describe-protocol"], { encoding: "utf8" }))
+      .toBe("AGB2 owner-pid seccomp-snapshot-sealed-v1\n");
+  });
   it("builds the unchanged broker source with sealed namespace init and explicit PIE", () => {
     // The native sealed-init admission intentionally requires a dist directory.
     const output = join(temporary(), "dist");
