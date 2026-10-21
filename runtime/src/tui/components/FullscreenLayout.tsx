@@ -31,6 +31,7 @@ import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
 import { PlanModeBanner } from './v2/primitives.js';
 import { useStatusEffort, useStatusContextUsage, useStatusPromptCache, useStatusOffPeakSchedule } from '../context/statusEffortContext.js';
 import ThemedText from './design-system/ThemedText.js';
+import { useTheme } from './design-system/ThemeProvider.js';
 import { LedgerStatus } from './LedgerStatus.js';
 import { swarmStatusPresentation } from './SwarmStatusIndicator.js';
 import { stringWidth } from '../ink/stringWidth.js';
@@ -616,28 +617,60 @@ export function statusLineSegments(
   };
 }
 
-export type StatusLineUsageLabels = {
-  readonly ctx: string | null;
-  readonly cache: string | null;
-  readonly spend: string | null;
+/** One run of the status line's usage block, in one theme color. */
+export type StatusLineUsageSpan = {
+  readonly text: string;
+  readonly color: 'text' | 'text2' | 'error' | 'accentSoft' | 'accent';
 };
+
+export type StatusLineUsageItem = {
+  readonly key: 'ctx' | 'cache' | 'spend';
+  readonly spans: readonly StatusLineUsageSpan[];
+};
+
+const OFF_PEAK_NOTE = ' off-peak';
 
 /**
  * The usage facts on the right of the status line, in order: context, the
- * share of input served from prompt cache, then spend. "off-peak" qualifies
- * the spend while a call made now bills at the provider's off-peak rate.
+ * share of input served from prompt cache, then spend. Their names and the
+ * "off-peak" note use secondary ink and the figures use the value color, so
+ * the numbers read at a glance. A context share of 80% or more shows as an
+ * error. "off-peak" qualifies a dollar figure while a call made now bills at
+ * the provider's off-peak rate; a spend that is not a figure ("price
+ * unknown") keeps primary ink and gets no note.
  */
-export function statusLineUsageLabels(
+export function statusLineUsageItems(
   contextPercent: number | null,
   cachePercent: number | null,
   spend: string | null,
   offPeak: boolean,
-): StatusLineUsageLabels {
-  return {
-    ctx: contextPercent !== null ? `ctx ${contextPercent}%` : null,
-    cache: cachePercent !== null ? `cache ${cachePercent}%` : null,
-    spend: spend !== null && offPeak && spend !== PRICE_UNKNOWN_LABEL ? `${spend} off-peak` : spend,
-  };
+  valueColor: 'accentSoft' | 'accent' = 'accentSoft',
+): StatusLineUsageItem[] {
+  const items: StatusLineUsageItem[] = [];
+  if (contextPercent !== null) {
+    items.push({ key: 'ctx', spans: [
+      { text: 'ctx ', color: 'text2' },
+      { text: `${contextPercent}%`, color: contextPercent >= 80 ? 'error' : valueColor },
+    ] });
+  }
+  if (cachePercent !== null) {
+    items.push({ key: 'cache', spans: [
+      { text: 'cache ', color: 'text2' },
+      { text: `${cachePercent}%`, color: valueColor },
+    ] });
+  }
+  if (spend !== null) {
+    const figure = /^≥?\$/u.test(spend);
+    items.push({ key: 'spend', spans: !figure
+      ? [{ text: spend, color: 'text' }]
+      : [{ text: spend, color: valueColor }, ...(offPeak ? [{ text: OFF_PEAK_NOTE, color: 'text2' as const }] : [])] });
+  }
+  return items;
+}
+
+/** The visible text of one usage fact. */
+function usageItemText(item: StatusLineUsageItem): string {
+  return item.spans.map(span => span.text).join('');
 }
 
 /** Only the real home directory is represented by ~; preserve the remaining path. */
@@ -683,14 +716,14 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const offPeakSchedule = useStatusOffPeakSchedule();
   const offPeak = useOffPeakNow(offPeakSchedule);
   const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) === true;
+  const [themeName] = useTheme();
   const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, spend, effort, lightMode);
   const bypass = mode === 'bypassPermissions';
-  const usage = statusLineUsageLabels(contextPercent, cachePercent, segments.spend, offPeak);
-  const rightItems = [
-    usage.ctx !== null ? { key: 'ctx', label: usage.ctx, color: contextPercent !== null && contextPercent >= 80 ? 'error' as const : 'text' as const } : null,
-    usage.cache !== null ? { key: 'cache', label: usage.cache, color: 'text' as const } : null,
-    usage.spend !== null ? { key: 'spend', label: usage.spend, color: 'text' as const } : null,
-  ].filter(item => item !== null);
+  // ANSI magenta on black falls under 4.5:1 in several stock palettes
+  // (PuTTY, Ubuntu, the Windows console), so the dark ANSI theme shows the
+  // figures in its bright accent instead.
+  const valueColor = themeName === 'dark-ansi' ? 'accent' : 'accentSoft';
+  const rightItems = statusLineUsageItems(contextPercent, cachePercent, segments.spend, offPeak, valueColor);
   const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error' | 'accentSoft' | 'accent'; bold?: boolean }> = [
     ...(segments.folder !== null ? [{ key: 'folder', label: segments.folder, color: 'text2' as const }] : []),
     { key: 'model', label: segments.model, color: 'text' },
@@ -707,7 +740,7 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   // Every segment remains in this single row even at a narrow width.
   const width = () => items.reduce((sum, item) => sum + stringWidth(item.label), Math.max(0, items.length - 1) * 3);
   const space = (): number => {
-    const rightWidth = stringWidth(rightItems.map(item => item.label).join(' · '));
+    const rightWidth = stringWidth(rightItems.map(usageItemText).join(' · '));
     return Math.max(1, columns - 4 - rightWidth - (rightWidth > 0 ? 1 : 0));
   };
   const drop = (key: string) => {
@@ -728,8 +761,11 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   for (const key of ['swarm', 'effort', 'light']) {
     if (width() > space()) drop(key);
   }
-  const spendItem = rightItems.find(item => item.key === 'spend');
-  if (spendItem && segments.spend !== null && width() > space()) spendItem.label = segments.spend;
+  const spendIndex = rightItems.findIndex(item => item.key === 'spend');
+  const spendItem = rightItems[spendIndex];
+  if (spendItem && width() > space()) {
+    rightItems[spendIndex] = { ...spendItem, spans: spendItem.spans.filter(span => span.text !== OFF_PEAK_NOTE) };
+  }
   const leftWidth = space();
   const modelItem = items.find(item => item.key === 'model');
   if (modelItem && width() > leftWidth) {
@@ -749,8 +785,12 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
       <LedgerStatus />
       {rightItems.map((item, index) => (
         <React.Fragment key={item.key}>
-          {index > 0 ? <ThemedText color="text">{' · '}</ThemedText> : null}
-          <ThemedText color={item.color} wrap="truncate-end">{item.label}</ThemedText>
+          {index > 0 ? <ThemedText color="text2">{' · '}</ThemedText> : null}
+          <Text wrap="truncate-end">
+            {item.spans.map((span, spanIndex) => (
+              <ThemedText key={spanIndex} color={span.color}>{span.text}</ThemedText>
+            ))}
+          </Text>
         </React.Fragment>
       ))}
     </Box>
