@@ -1556,14 +1556,16 @@ export function computeUsdCostWithResolution(
     entry.webSearchUsdPerRequest !== undefined
       ? usage.webSearchRequests * entry.webSearchUsdPerRequest
       : 0;
+  const tokenCostUsd = inputCost + outputCost + cachedCost + cacheCreationCost + reasoningCost + webSearchCost;
+  // Ollama's account ledger rounds each request up to $0.00001 (verified
+  // against /api/usage and /api/balance, 2026-10-21). Do this before requests
+  // are accumulated; rounding a session total would lose the per-call charge.
+  // The epsilon removes floating-point dust at an exact billing boundary.
+  const costUsd = tokenCostUsd > 0 && usage.singleCall === true && normalizeProviderMetadataIdentity(usage.provider) === "ollama-cloud"
+    ? Math.ceil(tokenCostUsd * 100_000 - 1e-9) / 100_000
+    : tokenCostUsd;
   return {
-    costUsd:
-      inputCost +
-      outputCost +
-      cachedCost +
-      cacheCreationCost +
-      reasoningCost +
-      webSearchCost,
+    costUsd,
     known: match !== null && documented && !estimated,
     ...(estimated ? { costEstimated: true } : {}),
     ...(match ? { matchedKey: match.key } : {}),
@@ -2374,10 +2376,9 @@ export class CostSidecar implements Sidecar {
         this.currentProvider = provider ?? null;
         this.lastUsageKey = key;
         {
-          // A call served in fast mode, or one long enough for per-request
-          // long-context rates, is priced at its own rates and recorded as
-          // explicit cost, so the per-model bucket (priced at standard
-          // rates) never counts its tokens a second time.
+          // Per-request rates and Ollama billing precision are recorded as
+          // explicit call costs. The per-model bucket must not reprice their
+          // combined tokens or count them a second time.
           const callDelta: ModelUsage = {
             model,
             ...(provider !== undefined ? { provider } : {}),
@@ -2399,7 +2400,7 @@ export class CostSidecar implements Sidecar {
           const standardEntry = resolveModelCostEntry(callDelta, this.registry)?.entry;
           const callCost = computeUsdCostWithResolution(callDelta, this.registry);
           if (
-            callDelta.providerCostUsd !== undefined ||
+            callDelta.providerCostUsd !== undefined || provider === "ollama-cloud" ||
             !callCost.known || (callDelta.cacheCreation1hInputTokens ?? 0) > 0 ||
             (standardEntry !== undefined &&
               selectCallRates(standardEntry, callPricingOf(callDelta, standardEntry)).rates !== standardEntry)

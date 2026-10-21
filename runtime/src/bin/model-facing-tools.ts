@@ -76,7 +76,7 @@ import {
 import {
   GATEWAY_SEARCH_MAX_OUTPUT_TOKENS,
   GATEWAY_SEARCH_PROMPT_TOKENS_CEILING,
-  OLLAMA_WEB_SEARCH_USD_PER_REQUEST,
+  ollamaWebSearchCostUsd,
   OPENROUTER_EXA_SEARCH_USD_PER_REQUEST,
   runOllamaWebSearch,
   runOpenRouterWebSearch,
@@ -1373,8 +1373,8 @@ function resolveGatewayWebSearchBackend(opts: ModelFacingToolOptions): GatewayWe
 }
 
 /** The most one gateway search can cost, or null when the session model has no price. */
-function gatewaySearchCeilingUsd(backend: GatewayWebSearchBackend): number | null {
-  if (backend.provider === "ollama-cloud") return OLLAMA_WEB_SEARCH_USD_PER_REQUEST;
+function gatewaySearchCeilingUsd(backend: GatewayWebSearchBackend, maxResults: number): number | null {
+  if (backend.provider === "ollama-cloud") return ollamaWebSearchCostUsd(maxResults);
   if (backend.rates === undefined) return null;
   const tokens = GATEWAY_SEARCH_PROMPT_TOKENS_CEILING * backend.rates.inputUsdPerToken +
     GATEWAY_SEARCH_MAX_OUTPUT_TOKENS * backend.rates.outputUsdPerToken;
@@ -1414,17 +1414,25 @@ async function runGatewayWebSearch(
   });
 }
 
+function webSearchResultLimit(args: Record<string, unknown>): number {
+  return Math.max(1, Math.min(numberValue(args.max_results) ?? MAX_SEARCH_RESULTS, MAX_SEARCH_RESULTS));
+}
+
 /**
  * WebSearch's charge bound. A configured endpoint is unpriced; DeepSeek's
  * search is $0.00075 per successful request; an Ollama Cloud, OpenRouter or
  * Venice session's own search costs what its provider lists; the keyless
  * chain is free. The Grok native path reserves its own model call.
  */
-function webSearchMaxCostUsd(opts: ModelFacingToolOptions): number | null {
+function webSearchMaxCostUsd(opts: ModelFacingToolOptions, args: Record<string, unknown>): number | null {
   if (configuredWebSearchEndpoint(opts) !== undefined ||
       configuredSearchChain(requireModelFacingRequestEnvironment(opts), opts.toolsConfig).providers.length > 0) return null;
   const gateway = resolveGatewayWebSearchBackend(opts);
-  if (gateway !== undefined) return gatewaySearchCeilingUsd(gateway);
+  if (gateway !== undefined) {
+    const filters = webSearchFilters(args);
+    const filtered = filters.allowedDomains.length > 0 || filters.blockedDomains.length > 0;
+    return gatewaySearchCeilingUsd(gateway, filtered ? 10 : webSearchResultLimit(args));
+  }
   return resolveDeepSeekWebSearchBackend(opts) !== undefined
     ? DEEPSEEK_SEARCH_USD_PER_REQUEST
     : 0;
@@ -4167,10 +4175,10 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
       isReadOnly: true,
       concurrencyClass: { kind: "shared_read" },
       recoveryCategory: "idempotent",
-      admissionEstimate: () => ({
+      admissionEstimate: (args) => ({
         maxInputTokens: 0,
         maxOutputTokens: 0,
-        maxCostUsd: webSearchMaxCostUsd(opts),
+        maxCostUsd: webSearchMaxCostUsd(opts, args),
       }),
       inputSchema: {
         type: "object",
@@ -4191,13 +4199,7 @@ function createWebTools(opts: ModelFacingToolOptions): readonly Tool[] {
         const filters = webSearchFilters(args);
         const endpoint = configuredWebSearchEndpoint(opts);
         const chain = configuredSearchChain(requestEnvironment, opts.toolsConfig);
-        const maxResults = Math.max(
-          1,
-          Math.min(
-            numberValue(args.max_results) ?? MAX_SEARCH_RESULTS,
-            MAX_SEARCH_RESULTS,
-          ),
-        );
+        const maxResults = webSearchResultLimit(args);
         const nativeResult = await runGrokNativeWebSearch(
           opts,
           args,
