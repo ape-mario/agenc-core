@@ -712,8 +712,11 @@ requests, non-reasoning models, reasoning effort `none`, and other providers
 using this adapter keep their existing behavior. Switching provider or model
 does not replay mismatched reasoning state.
 
-An unset `reasoning_summary` requests `auto` while replay is enabled. Explicit
-summary choices are preserved: `none` disables summaries while encrypted
+An unset `reasoning_summary` requests `auto` while replay is enabled, except for
+`gpt-6-luna` on the platform API: summaries stay off by default while encrypted
+reasoning still replays. ChatGPT sign-in and other models keep their existing
+automatic-summary default. Explicit summary choices are preserved, including
+`auto` to request summaries on Luna; `none` disables summaries while encrypted
 reasoning still replays. Set `AGENC_OPENAI_REASONING_REPLAY=0` to disable
 retention and replay, or use `false`, `no` or `off`; see [env.md](env.md).
 The switch is captured with each session, including ChatGPT sign-in sessions.

@@ -151,8 +151,11 @@ enable it only when a reasoning effort is selected. ChatGPT still requests
 encrypted content for its stateless backend contract when replay is disabled;
 the opt-out prevents retaining or replaying that content.
 
-With replay enabled, an unset `reasoning_summary` requests `auto`, including
-when the model's default effort already enables reasoning. An explicit summary
+With replay enabled, an unset `reasoning_summary` requests `auto`, except for
+`gpt-6-luna` on the OpenAI platform API, which keeps summaries off by default.
+Luna still retains and replays its encrypted reasoning. ChatGPT sign-in and
+other models keep the automatic-summary default, including when the model's
+default effort already enables reasoning. An explicit summary
 setting, including `none`, takes precedence. Summary `none` suppresses summaries;
 it does not disable encrypted reasoning replay. Set the environment switch to
 `0` to disable replay as well. Replayed input and retained history can increase
