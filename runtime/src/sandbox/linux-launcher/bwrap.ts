@@ -603,10 +603,13 @@ function appendWritableRoot(
   );
   const anchors = new Set<string>();
   for (const reserved of root.reservedReadOnlyPaths ?? []) {
-    if (coveredByReadOnlyDirectory(reserved)) continue;
     for (let ancestor = path.dirname(reserved);
       ancestor !== canonicalRoot && isWithinAuthorityPath(ancestor, canonicalRoot);
       ancestor = path.dirname(ancestor)) {
+      // Keep anchors above the covering read-only directory: otherwise its
+      // writable ancestors could be renamed and replaced. Descendants need
+      // no separate anchors and may not exist on the read-only host tree.
+      if (coveredByReadOnlyDirectory(ancestor)) continue;
       if (!fs.existsSync(ancestor)) throw new Error(`cannot enforce missing reserved authority ancestor: ${ancestor}`);
       anchors.add(ancestor);
     }
