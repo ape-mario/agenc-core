@@ -29,6 +29,7 @@ import {
   createTuiGateProject,
   createTuiGateState,
   startTuiGateDaemon,
+  stopTuiGateDaemon,
   teardownTuiGateState,
   TUI_GATE_TRUST_TIMESTAMP,
   tuiGateEnvironment,
@@ -459,6 +460,83 @@ test("teardown serializes with an in-flight daemon start", async () => {
       assert.notEqual(record.exit, null);
     }
   } finally {
+    rmSync(state.root, { recursive: true, force: true });
+    rmSync(fake.root, { recursive: true, force: true });
+  }
+});
+
+// Like the real foreground daemon: it removes its socket on SIGTERM but leaves
+// its own daemon.pid for the next stop, restart or start to clear once the
+// process is gone. FAKE_EXIT_PID makes it leave a different pid instead.
+function fakeForegroundDaemonCli() {
+  const root = mkdtempSync(path.join(tmpdir(), "agenc-tui-fake-foreground-"));
+  const script = path.join(root, "agenc.mjs");
+  writeFileSync(script, [
+    "import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';",
+    "import path from 'node:path';",
+    "const action = process.argv[3];",
+    "const home = process.env.AGENC_HOME;",
+    "const pidPath = path.join(home, 'daemon.pid');",
+    "const socketPath = path.join(home, 'daemon.sock');",
+    "if (action === 'status') {",
+    "  try {",
+    "    const pid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);",
+    "    process.kill(pid, 0);",
+    "    if (existsSync(socketPath)) { console.log(`AgenC daemon running (pid ${pid})`); process.exit(0); }",
+    "  } catch {}",
+    "  process.exit(1);",
+    "}",
+    "process.on('SIGTERM', () => {",
+    "  rmSync(socketPath, { force: true });",
+    "  if (process.env.FAKE_EXIT_PID) writeFileSync(pidPath, `${process.env.FAKE_EXIT_PID}\\n`);",
+    "  process.exit(0);",
+    "});",
+    "mkdirSync(home, { recursive: true });",
+    "writeFileSync(pidPath, `${process.pid}\\n`);",
+    "writeFileSync(socketPath, 'fake socket\\n');",
+    "setInterval(() => {}, 1000);",
+    "",
+  ].join("\n"));
+  return { root, script };
+}
+
+test("a restart accepts the pid file an exited foreground daemon leaves", async () => {
+  const fake = fakeForegroundDaemonCli();
+  const state = await createTuiGateState({ prefix: "agenc-tui-stale-pid-" });
+  const pidPath = path.join(state.agencHome, "daemon.pid");
+  try {
+    const first = await startTuiGateDaemon(state, fake.script);
+    await stopTuiGateDaemon(state);
+    assert.notEqual(state.daemonProcesses.get(first).exit, null);
+    assert.equal(readFileSync(pidPath, "utf8").trim(), String(first));
+    // The next start must replace that pid before it counts as ready.
+    const second = await startTuiGateDaemon(state, fake.script);
+    assert.notEqual(second, first);
+    assert.equal(readFileSync(pidPath, "utf8").trim(), String(second));
+    await teardownTuiGateState(state);
+    assert.equal(existsSync(state.root), false);
+  } finally {
+    rmSync(state.root, { recursive: true, force: true });
+    rmSync(fake.root, { recursive: true, force: true });
+  }
+});
+
+test("a stop still fails when daemon.pid names a process the gate does not own", async () => {
+  const fake = fakeForegroundDaemonCli();
+  const exited = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
+  await new Promise((resolve) => exited.once("exit", resolve));
+  const state = await createTuiGateState({
+    prefix: "agenc-tui-foreign-pid-",
+    injectedEnv: { FAKE_EXIT_PID: String(exited.pid) },
+  });
+  try {
+    await startTuiGateDaemon(state, fake.script);
+    await assert.rejects(
+      stopTuiGateDaemon(state),
+      new RegExp(`survived process cleanup: daemon\\.pid names pid ${exited.pid}`, "u"),
+    );
+  } finally {
+    await teardownTuiGateState(state).catch(() => {});
     rmSync(state.root, { recursive: true, force: true });
     rmSync(fake.root, { recursive: true, force: true });
   }
