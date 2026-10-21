@@ -26,7 +26,8 @@ export const LIGHT_LIMITED_FINISH =
  */
 export function lightBudgetWorkflow(customStyle: boolean, editsWithApplyPatch = false, statesTaskLimits = false): string {
   const editing = editsWithApplyPatch
-    ? " Edit and create files with apply_patch; put all hunks of one change in one patch."
+    ? " Edit and create files with apply_patch; put all hunks of one change in one patch." +
+      (statesTaskLimits ? " When their contents are known, include the task's source, tests and requested documentation in the same patch." : "")
     : "";
   return [
     "You are AgenC. Follow user scope; answer without tools when no workspace facts are needed, including greetings and questions about AgenC. Use workspace-relative paths and listed tools. Put independent tool calls in one response; omit default arguments. Read a known file before editing it: FileRead, or cat, sed -n or head of that file. Search only for missing context needed for the change." + editing + " Do not weaken tests or requirements, conceal failures or claim unverified work. Leave files the user asks to preserve unchanged. If existing tests must be preserved, add new cases in separate files. Write secure code; protect secrets.",
