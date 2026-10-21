@@ -3,7 +3,7 @@ import type { ProviderSlug } from "../config/provider-model-authority.js";
 import TextInput from "../tui/components/TextInput.js";
 import ThemedText from "../tui/components/design-system/ThemedText.js";
 import { MenuModal, Popup } from "../tui/components/v2/primitives.js";
-import { Box, useInput } from "../tui/ink.js";
+import { Box, useInput, type Key } from "../tui/ink.js";
 import { useInputCapture } from "../tui/keybindings/useKeybinding.js";
 import { clearSharedDoublePressState } from "../tui/hooks/useDoublePress.js";
 import {
@@ -13,6 +13,7 @@ import {
 } from "./config-context.js";
 import { openLocalJsxCommand } from "./local-jsx-command.js";
 import { nextMenuIndex, previousMenuIndex } from "./menu-navigation.js";
+import { searchModels } from "./model-search.js";
 import {
   chooseProviderAuth,
   chooseProviderModel,
@@ -76,6 +77,24 @@ type ModelEntry =
   | { readonly kind: "replace-key" }
   | { readonly kind: "remove-key" };
 
+/** Takes the place of the models when none matches the search. */
+type NoMatch = { readonly kind: "no-match" };
+
+/** A row of the models screen as it is shown. */
+type ShownEntry = ModelEntry | NoMatch;
+
+/** Above this many models the search line shows before anything is typed. */
+const SEARCH_LINE_MIN_MODELS = 20;
+
+/** The highlighted row on this screen: a muted gray band, as in the slash command picker. */
+const ACTIVE_ROW_COLOR = "lineSoft";
+
+/** The in-use mark's column on the models screen; the model column follows it. */
+const MODEL_MARK_WIDTH = 3;
+
+/** In-use mark, model, note, capabilities. */
+const MODEL_COLUMNS: readonly number[] = [MODEL_MARK_WIDTH, 44, 8, 38];
+
 type ConnectChoice = "sign-in" | "paste-key";
 
 type View =
@@ -96,9 +115,34 @@ type ModelsLoad = {
 } | null;
 
 /** Which entry the cursor is on, so it stays there when the list changes. */
-function entryIdentity(entry: ModelEntry | undefined): string | undefined {
+function entryIdentity(entry: ShownEntry | undefined): string | undefined {
   if (entry === undefined) return undefined;
   return entry.kind === "model" ? `model:${entry.row.model}` : entry.kind;
+}
+
+/**
+ * The models screen for a search: the matching models, best first, then the
+ * account and key rows, which a search never hides. No search shows every entry.
+ */
+function searchEntries(entries: readonly ModelEntry[], query: string): readonly ShownEntry[] {
+  if (query.trim().length === 0) return entries;
+  const models = entries.filter(
+    (entry): entry is Extract<ModelEntry, { kind: "model" }> => entry.kind === "model",
+  );
+  const matches = searchModels(models, query, (entry) => ({
+    ids: [entry.row.displayModel, entry.row.model],
+    ...(entry.row.label === undefined ? {} : { label: entry.row.label }),
+  }));
+  return [
+    ...(matches.length === 0 ? [{ kind: "no-match" } as const] : matches),
+    ...entries.filter((entry) => entry.kind !== "model"),
+  ];
+}
+
+/** The text a key adds to the search: printable characters, also when pasted. */
+function searchInput(input: string, key: Key): string {
+  if (key.ctrl || key.meta || key.super || key.return || key.tab || key.escape) return "";
+  return input.replace(/\p{Cc}/gu, "");
 }
 
 function dotColor(row: ProvidersHubRow): "success" | "error" | "inactive" {
@@ -175,9 +219,28 @@ function infoLines(row: ProvidersHubRow): readonly string[] {
   }
 }
 
+/** "type to search", or what is typed with a cursor after it, over the model column. */
+function SearchLine({ query }: { readonly query: string }): React.ReactNode {
+  return (
+    <Box flexDirection="row" paddingLeft={MODEL_MARK_WIDTH + 1}>
+      {query.length === 0 ? (
+        <ThemedText color="inactive">type to search</ThemedText>
+      ) : (
+        <>
+          <ThemedText color="inactive">search: </ThemedText>
+          <ThemedText color="text2" wrap="truncate-start">{query}</ThemedText>
+          <ThemedText color="text2" inverse> </ThemedText>
+        </>
+      )}
+    </Box>
+  );
+}
+
 function ModelsView({
   row,
   entries,
+  shown,
+  query,
   activeIndex,
   busy,
   notice,
@@ -185,7 +248,11 @@ function ModelsView({
   note,
 }: {
   readonly row: ProvidersHubRow;
+  /** Every entry, before the search. */
   readonly entries: readonly ModelEntry[];
+  /** The entries the search leaves, as listed. */
+  readonly shown: readonly ShownEntry[];
+  readonly query: string;
   readonly activeIndex: number;
   readonly busy: boolean;
   readonly notice: Notice;
@@ -195,22 +262,36 @@ function ModelsView({
   readonly note?: string;
 }): React.ReactNode {
   const models = entries.filter((entry) => entry.kind === "model").length;
+  const noun = models === 1 ? "model" : "models";
+  const matched = shown.filter((entry) => entry.kind === "model").length;
+  const searching = query.length > 0;
   return (
     <MenuModal
       title={row.name}
-      count={`${models} ${models === 1 ? "model" : "models"}`}
+      count={searching ? `${matched} of ${models} ${noun}` : `${models} ${noun}`}
       summary={row.status}
       headerRight={busy ? "working" : loading ? "loading models" : undefined}
-      closeHint="esc to go back"
+      closeHint={searching ? "esc to clear search" : "esc to go back"}
       hint={notice?.text}
       {...(note === undefined ? {} : {
         detail: <ThemedText color="warning" wrap="wrap">{note}</ThemedText>,
       })}
-      columns={[3, 44, 8, 38]}
+      {...(searching || models > SEARCH_LINE_MIN_MODELS ? { lead: <SearchLine query={query} /> } : {})}
+      columns={MODEL_COLUMNS}
       headers={["", "model", "", "capabilities"]}
-      items={entries}
+      items={shown}
+      pinnedCount={shown.filter((entry) => entry.kind !== "model" && entry.kind !== "no-match").length}
       activeIndex={activeIndex}
+      activeRowColor={ACTIVE_ROW_COLOR}
       renderRow={(entry, _index, active) => {
+        if (entry.kind === "no-match") {
+          return [
+            <ThemedText key="mark" color="subtle"> </ThemedText>,
+            <ThemedText key="label" color="inactive">no models match</ThemedText>,
+            <ThemedText key="note" color="inactive"> </ThemedText>,
+            <ThemedText key="tags" color="inactive"> </ThemedText>,
+          ];
+        }
         if (entry.kind !== "model") {
           return [
             <ThemedText key="mark" color="subtle"> </ThemedText>,
@@ -231,14 +312,15 @@ function ModelsView({
           <ThemedText key="note" color="inactive" wrap="truncate-end">
             {entry.row.current ? "in use" : entry.row.isDefault ? "default" : ""}
           </ThemedText>,
-          <ThemedText key="tags" color="muted3" wrap="truncate-end">
+          // One step brighter on the highlighted row, so the tags stay readable on its band.
+          <ThemedText key="tags" color={active ? "inactive" : "muted3"} wrap="truncate-end">
             {entry.row.tags ?? ""}
           </ThemedText>,
         ];
       }}
       footer={[
         { keyName: "enter", label: "use" },
-        { keyName: "esc", label: "back" },
+        { keyName: "esc", label: searching ? "clear" : "back" },
       ]}
     />
   );
@@ -322,6 +404,7 @@ function ConnectView({
       headers={["", "connect with"]}
       items={CONNECT_CHOICES}
       activeIndex={activeIndex}
+      activeRowColor={ACTIVE_ROW_COLOR}
       renderRow={(choice, _index, active) => [
         <ThemedText key="mark" color="subtle"> </ThemedText>,
         <ThemedText key="label" color={active ? "text" : "text2"} bold={active}>
@@ -424,11 +507,16 @@ export function ProvidersHubView({
       : { kind: "models", row, entries: modelEntries(row, services.modelsFor(row.provider)) };
   });
   const [modelsLoad, setModelsLoad] = React.useState<ModelsLoad>(null);
+  /** What is typed on the models screen; empty shows every model. */
+  const [modelQuery, setModelQuery] = React.useState("");
   // A model list that arrives later applies to the screen shown then.
   const viewRef = React.useRef(view);
   viewRef.current = view;
   const modelIndexRef = React.useRef(modelIndex);
   modelIndexRef.current = modelIndex;
+  // Keys can arrive faster than renders: each one reads what the last one set.
+  const modelQueryRef = React.useRef(modelQuery);
+  modelQueryRef.current = modelQuery;
   const loadGeneration = React.useRef(0);
   const mounted = React.useRef(true);
   React.useEffect(() => () => {
@@ -458,9 +546,18 @@ export function ProvidersHubView({
         const current = viewRef.current;
         if (current.kind !== "models" || current.row.provider !== row.provider) return;
         const entries = modelEntries(current.row, services.modelsFor(row.provider));
-        const active = entryIdentity(current.entries[modelIndexRef.current]);
-        setView({ ...current, entries });
-        setModelIndex(Math.max(0, entries.findIndex((entry) => entryIdentity(entry) === active)));
+        // The search stays; the cursor stays on its entry when the new list has it.
+        const query = modelQueryRef.current;
+        const active = entryIdentity(searchEntries(current.entries, query)[modelIndexRef.current]);
+        const next: View = { ...current, entries };
+        const index = Math.max(
+          0,
+          searchEntries(entries, query).findIndex((entry) => entryIdentity(entry) === active),
+        );
+        viewRef.current = next;
+        modelIndexRef.current = index;
+        setView(next);
+        setModelIndex(index);
       });
     },
     [services],
@@ -492,6 +589,12 @@ export function ProvidersHubView({
     };
   }, [services]);
 
+  /** Start the models screen without a search. */
+  const clearModelSearch = React.useCallback(() => {
+    modelQueryRef.current = "";
+    setModelQuery("");
+  }, []);
+
   const openModels = React.useCallback(
     (row: ProvidersHubRow, message?: string) => {
       const entries = modelEntries(row, services.modelsFor(row.provider));
@@ -501,11 +604,12 @@ export function ProvidersHubView({
       const next: View = { kind: "models", row, entries };
       viewRef.current = next;
       modelIndexRef.current = Math.max(0, current);
+      clearModelSearch();
       setView(next);
       // Also after a key is saved or replaced: the list is read with that key.
       refreshModels(row);
     },
-    [services, refreshModels],
+    [services, refreshModels, clearModelSearch],
   );
 
   /** Re-read the snapshot and return this provider's fresh row. */
@@ -598,6 +702,32 @@ export function ProvidersHubView({
     });
   };
 
+  const moveModelCursor = (index: number): void => {
+    modelIndexRef.current = index;
+    setModelIndex(index);
+  };
+
+  /**
+   * Search the models for `next`. A new search starts on its best match; an
+   * emptied one keeps the cursor on the model it was on, or the one in use.
+   */
+  const searchModelList = (entries: readonly ModelEntry[], next: string): void => {
+    const previous = modelQueryRef.current;
+    const sameSearch = next.trim().toLowerCase() === previous.trim().toLowerCase();
+    let index = 0;
+    if (sameSearch) {
+      index = modelIndexRef.current;
+    } else if (next.trim().length === 0) {
+      const highlighted = entryIdentity(searchEntries(entries, previous)[modelIndexRef.current]);
+      const kept = entries.findIndex((entry) => entryIdentity(entry) === highlighted);
+      const inUse = entries.findIndex((entry) => entry.kind === "model" && entry.row.current);
+      index = Math.max(0, kept >= 0 ? kept : inUse);
+    }
+    modelQueryRef.current = next;
+    setModelQuery(next);
+    moveModelCursor(index);
+  };
+
   useInputCapture((input, key) => {
     if (input !== "c" || !key.ctrl) return false;
     signInAbort.current?.abort();
@@ -661,25 +791,42 @@ export function ProvidersHubView({
       return;
     }
     if (view.kind === "models") {
-      if (key.escape || input === "q") {
+      // A provider's own list can replace the entries while this view is
+      // open, a moment before this handler sees them: use what is on screen.
+      const entries = viewRef.current.kind === "models" ? viewRef.current.entries : view.entries;
+      const query = modelQueryRef.current;
+      const onScreen = searchEntries(entries, query);
+      // Esc clears a search first, then goes back.
+      if (key.escape) {
+        if (query.length > 0) {
+          searchModelList(entries, "");
+          return;
+        }
         setNotice(null);
         setView({ kind: "list" });
         return;
       }
-      // A provider's own list can replace the entries while this view is
-      // open, a moment before this handler sees them: use what is on screen.
-      const onScreen = viewRef.current.kind === "models" ? viewRef.current.entries : view.entries;
       if (key.upArrow) {
-        setModelIndex((index) => previousMenuIndex(index, onScreen.length));
+        moveModelCursor(previousMenuIndex(modelIndexRef.current, onScreen.length));
         return;
       }
       if (key.downArrow) {
-        setModelIndex((index) => nextMenuIndex(index, onScreen.length));
+        moveModelCursor(nextMenuIndex(modelIndexRef.current, onScreen.length));
         return;
       }
-      if (!key.return) return;
+      if (key.backspace || key.delete) {
+        if (query.length > 0) searchModelList(entries, query.slice(0, -1));
+        return;
+      }
+      if (!key.return) {
+        const typed = searchInput(input, key);
+        // A search starts at its first visible character.
+        const next = query.length === 0 ? typed.trimStart() : query + typed;
+        if (next !== query) searchModelList(entries, next);
+        return;
+      }
       const entry = onScreen[modelIndexRef.current];
-      if (entry === undefined) return;
+      if (entry === undefined || entry.kind === "no-match") return;
       if (entry.kind === "replace-key") {
         setKeyValue("");
         setNotice(null);
@@ -697,6 +844,7 @@ export function ProvidersHubView({
         if (updated.connection === "current" || updated.connection === "connected") {
           setView({ kind: "models", row: updated, entries: modelEntries(updated, services.modelsFor(updated.provider)) });
           setModelIndex(0);
+          clearModelSearch();
         } else {
           setView({ kind: "list" });
         }
@@ -709,6 +857,7 @@ export function ProvidersHubView({
           const updated = refreshed(view.row);
           setView({ kind: "models", row: updated, entries: modelEntries(updated, services.modelsFor(updated.provider)) });
           setModelIndex(0);
+          clearModelSearch();
           setNotice({ text: result.message, failed: !result.ok });
         });
         return;
@@ -725,6 +874,7 @@ export function ProvidersHubView({
           modelIndexRef.current = 0;
           setView(models);
           setModelIndex(0);
+          clearModelSearch();
           refreshModels(updated);
         }
         return;
@@ -797,6 +947,8 @@ export function ProvidersHubView({
       <ModelsView
         row={view.row}
         entries={view.entries}
+        shown={searchEntries(view.entries, modelQuery)}
+        query={modelQuery}
         activeIndex={modelIndex}
         busy={busy}
         notice={notice}
@@ -820,6 +972,7 @@ export function ProvidersHubView({
       headers={["", "provider", "status", "model"]}
       items={shown}
       activeIndex={listIndex}
+      activeRowColor={ACTIVE_ROW_COLOR}
       detail={highlighted ? <ThemedText color="text2" wrap="wrap">
         {highlighted.access === "local" || highlighted.access === "environment" || highlighted.access === "managed"
           ? highlighted.connection === "current" || highlighted.connection === "connected"

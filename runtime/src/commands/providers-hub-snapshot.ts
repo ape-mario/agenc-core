@@ -12,6 +12,7 @@ import { modelCapabilityTags } from "./model-capability-tags.js";
 
 import { hasSavedProviderKey } from "../auth/provider-keys.js";
 import { PROVIDER_AUTH_ENV } from "../llm/provider-auth-selection.js";
+import { resolveRegisteredModelCatalogEntry } from "../llm/registry/model-catalog.js";
 import type { ProviderSlug } from "../config/provider-model-authority.js";
 import {
   providerCredentialEnvironmentLabel,
@@ -78,6 +79,8 @@ export type ProvidersHubModelRow = {
   readonly isDefault: boolean;
   /** Capability tags such as "vision · thinking · free" (model-capability-tags). */
   readonly tags?: string;
+  /** The catalog's name for the model ("Google: Gemma 4 31B"), which search also reads. */
+  readonly label?: string;
 };
 
 function plainStatus(row: ProviderMenuRow, keySaved: boolean): string {
@@ -281,11 +284,15 @@ export function readProvidersHubModels(
   const snapshot = readModelMenuSnapshot(ctx);
   return snapshot.rows
     .filter((row) => row.provider === provider && row.selectable)
-    .map((row) => ({
-      model: row.model,
-      displayModel: row.displayModel,
-      current: row.status === "current",
-      isDefault: row.status === "default",
-      tags: modelCapabilityTags(provider, row.displayModel),
-    }));
+    .map((row) => {
+      const label = resolveRegisteredModelCatalogEntry({ provider, model: row.displayModel })?.displayName;
+      return {
+        model: row.model,
+        displayModel: row.displayModel,
+        current: row.status === "current",
+        isDefault: row.status === "default",
+        tags: modelCapabilityTags(provider, row.displayModel),
+        ...(label === undefined ? {} : { label }),
+      };
+    });
 }
