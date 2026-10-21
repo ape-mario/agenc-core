@@ -2,7 +2,7 @@
  * The daemon's in-flight index row for an idempotent call is observer state:
  * no recovery, unknown-outcome gate, budget or effect decision reads it. It
  * commits without its own fsync and leaves the connection at FULL; every
- * side-effecting or interactive row keeps its FULL commit.
+ * side-effecting or interactive authority transition keeps its FULL commit.
  */
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -74,11 +74,11 @@ describe("observer index rows for idempotent calls", () => {
     expect(row(reader, "read")).toEqual({ status: "completed", recovery_category: "idempotent" });
   });
 
-  it.each(["side-effecting", "interactive"])("keeps FULL commits for %s rows", (category) => {
+  it.each(["side-effecting", "interactive"])("keeps FULL start/completion commits for %s while output-only progress is observational", (category) => {
     const { driver, policy } = setup();
     const levels = watchLevels(driver);
     call(policy, "write", "Write", category);
-    expect(levels).toEqual([2, 2, 2]);
+    expect(levels).toEqual([2, 1, 2]);
     expect(row(driver, "write")?.status).toBe("completed");
   });
 
