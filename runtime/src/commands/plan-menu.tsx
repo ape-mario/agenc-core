@@ -2,6 +2,7 @@ import React from "react";
 
 import type { PermissionMode } from "../permissions/types.js";
 import { Box, useInput } from "../tui/ink.js";
+import type { Key } from "../tui/ink.js";
 import ThemedBox from "../tui/components/design-system/ThemedBox.js";
 import ThemedText from "../tui/components/design-system/ThemedText.js";
 import {
@@ -111,6 +112,30 @@ export function createPlanDashboardSnapshot(params: {
   };
 }
 
+type EditorState = {
+  readonly planText: string;
+  readonly activeIndex: number;
+  readonly editing: boolean;
+  readonly adding: boolean;
+  readonly draft: string;
+};
+
+type Press = {
+  readonly input: string;
+  readonly key: Key;
+  readonly pasted: boolean;
+};
+
+/**
+ * Typed text reaches useInput as one event per run, so "e ADDED" is a single
+ * input. Split it into the keys a slow typist would send. Pasted text, control
+ * keys and shortcuts stay whole.
+ */
+function pressesFor(input: string, key: Key, pasted: boolean): Press[] {
+  if (input.length < 2 || pasted || key.ctrl || key.meta) return [{ input, key, pasted }];
+  return Array.from(input, character => ({ input: character, key, pasted }));
+}
+
 function PlanDashboardView({
   snapshot,
   onDone,
@@ -120,14 +145,26 @@ function PlanDashboardView({
   readonly onDone: () => void;
   readonly onPlanTextChange?: (nextPlanText: string, previousPlanText: string) => void | Promise<void>;
 }): React.ReactNode {
-  const [planText, setPlanText] = React.useState(snapshot.planText ?? "");
+  const [editor, setEditor] = React.useState<EditorState>(() => ({
+    planText: snapshot.planText ?? "",
+    activeIndex: 0,
+    editing: false,
+    adding: false,
+    draft: "",
+  }));
+  const { planText, activeIndex, editing, adding, draft } = editor;
   const sourceItems = React.useMemo(() => planSourceItems(planText), [planText]);
-  const [activeIndex, setActiveIndex] = React.useState(0);
-  const [editing, setEditing] = React.useState(false);
-  const [draft, setDraft] = React.useState("");
-  const [adding, setAdding] = React.useState(false);
   const [notice, setNotice] = React.useState<string | undefined>();
   const saving = React.useRef(false);
+  // Keys that share a stdin read all run before React re-renders. Each key
+  // reads the state the previous one left here and mirrors it into `editor`
+  // for rendering, the way useTextInput keeps its live value.
+  const live = React.useRef(editor);
+  // Keys that arrive while a save is in flight wait here and run in order
+  // once it ends, as they would for a typist who pauses.
+  const queued = React.useRef<Press[]>([]);
+  const draining = React.useRef(false);
+  const finished = React.useRef(false);
   const items: readonly { state: PlanItemState; text: string }[] = sourceItems.length > 0
     ? sourceItems
     : [{ state: "pending", text: "No plan written yet." }];
@@ -136,47 +173,77 @@ function PlanDashboardView({
     : items;
   const windowStart = Math.max(0, activeIndex - 11);
 
-  const persistPlan = React.useCallback(async (nextPlanText: string) => {
+  React.useLayoutEffect(() => {
+    finished.current = false;
+    return () => {
+      finished.current = true;
+      queued.current = [];
+    };
+  }, []);
+
+  const update = (patch: Partial<EditorState>): void => {
+    live.current = { ...live.current, ...patch };
+    setEditor(live.current);
+  };
+
+  const close = (): void => {
+    finished.current = true;
+    queued.current = [];
+    onDone();
+  };
+
+  const persistPlan = async (nextPlanText: string): Promise<void> => {
     if (saving.current) return;
     saving.current = true;
     setNotice("saving plan");
     try {
-      await onPlanTextChange?.(nextPlanText, planText);
-      setPlanText(nextPlanText);
-      setActiveIndex(index => Math.min(index, Math.max(0, planSourceItems(nextPlanText).length - 1)));
+      await onPlanTextChange?.(nextPlanText, live.current.planText);
+      if (finished.current) return;
+      update({
+        planText: nextPlanText,
+        activeIndex: Math.min(live.current.activeIndex, Math.max(0, planSourceItems(nextPlanText).length - 1)),
+        editing: false,
+        adding: false,
+      });
       setNotice("plan updated");
-      setEditing(false);
-      setAdding(false);
     } catch (error) {
+      if (finished.current) return;
       setNotice(`Failed to save plan: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       saving.current = false;
     }
-  }, [onPlanTextChange, planText]);
+    runQueued();
+  };
 
-  const commitDraft = React.useCallback(() => {
-    if (draft.trim().length === 0) return;
-    const entry = sourceItems[activeIndex];
-    if (adding || entry === undefined) {
-      const previous = adding ? sourceItems[activeIndex - 1] : undefined;
-      const at = previous?.lineEnd ?? planText.length;
-      const newline = previous?.newline || planText.match(/\r\n|\n|\r/u)?.[0] || "\n";
-      const separator = at > 0 && !/[\r\n]$/u.test(planText.slice(0, at)) ? newline : "";
-      void persistPlan(`${planText.slice(0, at)}${separator}- [ ] ${draft}${newline}${planText.slice(at)}`);
+  const commitDraft = (): void => {
+    const state = live.current;
+    if (state.draft.trim().length === 0) return;
+    const entries = planSourceItems(state.planText);
+    const entry = entries[state.activeIndex];
+    if (state.adding || entry === undefined) {
+      const previous = state.adding ? entries[state.activeIndex - 1] : undefined;
+      const at = previous?.lineEnd ?? state.planText.length;
+      const newline = previous?.newline || state.planText.match(/\r\n|\n|\r/u)?.[0] || "\n";
+      const separator = at > 0 && !/[\r\n]$/u.test(state.planText.slice(0, at)) ? newline : "";
+      void persistPlan(`${state.planText.slice(0, at)}${separator}- [ ] ${state.draft}${newline}${state.planText.slice(at)}`);
     } else {
-      void persistPlan(`${planText.slice(0, entry.start)}${draft}${planText.slice(entry.end)}`);
+      void persistPlan(`${state.planText.slice(0, entry.start)}${state.draft}${state.planText.slice(entry.end)}`);
     }
-  }, [activeIndex, adding, draft, planText, sourceItems, persistPlan]);
+  };
 
-  useInput((input, key) => {
-    if (saving.current) return;
-    if (editing) {
+  const press = ({ input, key, pasted }: Press): void => {
+    const state = live.current;
+    // A paste is text, even when it consists of one command character. Keep
+    // that distinction while queued so it is interpreted in the right mode.
+    if (pasted) {
+      if (state.editing) update({ draft: `${state.draft}${input}` });
+      return;
+    }
+    if (state.editing) {
       if (key.escape) {
-        if (adding) {
-          setActiveIndex(index => Math.max(0, index - 1));
-          setAdding(false);
-        }
-        setEditing(false);
+        update(state.adding
+          ? { activeIndex: Math.max(0, state.activeIndex - 1), adding: false, editing: false }
+          : { editing: false });
         return;
       }
       if (key.return) {
@@ -184,45 +251,66 @@ function PlanDashboardView({
         return;
       }
       if (key.backspace || key.delete) {
-        setDraft(value => value.slice(0, -1));
+        update({ draft: state.draft.slice(0, -1) });
         return;
       }
       if (input && !key.ctrl && !key.meta) {
-        setDraft(value => `${value}${input}`);
+        update({ draft: `${state.draft}${input}` });
       }
       return;
     }
 
     if (key.escape || input === "q") {
-      onDone();
+      close();
       return;
     }
     if (key.upArrow || input === "k") {
-      setActiveIndex(index => Math.max(0, index - 1));
+      update({ activeIndex: Math.max(0, state.activeIndex - 1) });
       return;
     }
+    const entries = planSourceItems(state.planText);
+    const count = Math.max(1, entries.length);
     if (key.downArrow || input === "j") {
-      setActiveIndex(index => Math.min(items.length - 1, index + 1));
+      update({ activeIndex: Math.min(count - 1, state.activeIndex + 1) });
       return;
     }
     if (input === "e") {
-      setDraft(sourceItems[activeIndex]?.text ?? "");
-      setEditing(true);
+      update({ draft: entries[state.activeIndex]?.text ?? "", editing: true });
       return;
     }
-    if (input === "d" && items.length > 1) {
-      const entry = sourceItems[activeIndex];
-      if (entry !== undefined) void persistPlan(`${planText.slice(0, entry.lineStart)}${planText.slice(entry.lineEnd)}`);
+    if (input === "d" && count > 1) {
+      const entry = entries[state.activeIndex];
+      if (entry !== undefined) void persistPlan(`${state.planText.slice(0, entry.lineStart)}${state.planText.slice(entry.lineEnd)}`);
       return;
     }
     if (input === "a") {
-      setAdding(true);
-      setActiveIndex(activeIndex + 1);
-      setDraft("new plan step");
-      setEditing(true);
+      update({ adding: true, activeIndex: state.activeIndex + 1, draft: "new plan step", editing: true });
       return;
     }
-    if (key.return) onDone();
+    if (key.return) close();
+  };
+
+  const runQueued = (): void => {
+    // A save callback can throw synchronously and try to resume this drain
+    // before it has consumed the triggering key.
+    if (draining.current) return;
+    draining.current = true;
+    const pending = queued.current;
+    let done = 0;
+    try {
+      while (done < pending.length && !saving.current && !finished.current) {
+        press(pending[done++]!);
+      }
+    } finally {
+      queued.current = finished.current ? [] : pending.slice(done);
+      draining.current = false;
+    }
+  };
+
+  useInput((input, key, event) => {
+    if (finished.current) return;
+    for (const next of pressesFor(input, key, event.keypress.isPasted)) queued.current.push(next);
+    runQueued();
   });
 
   return (
