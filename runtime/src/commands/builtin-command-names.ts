@@ -47,6 +47,7 @@ const BUILT_IN_COMMAND_NAMES: ReadonlySet<string> = new Set([
   "todos",
   "todo",
   "config",
+  "theme",
   "keybindings",
   "hooks",
   "skills",

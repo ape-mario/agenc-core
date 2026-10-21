@@ -23,6 +23,7 @@ import { exitCommand } from "./exit.js";
 import { clearCommand } from "./clear.js";
 import { permissionsCommand } from "./permissions.js";
 import { configCommand } from "./config.js";
+import { themeCommand } from "./theme.js";
 import { keybindingsCommand } from "./keybindings.js";
 import hooksCommand from "./hooks.js";
 import { planCommand } from "./plan.js";
@@ -156,9 +157,9 @@ function commandSupportsSurface(
  *
  * Presentation order matches the runtime stabilization minimal surface:
  * /help, /hello, /status, auth commands, /cost, /model, /provider, /permissions,
- * /plan, /agents, /tasks, /todos, /config, /keybindings, /hooks, /skills, /mcp, /plugins,
- * /memory, /resume, /init, /output-style, /clear, /compact, /context, /diff,
- * protocol commands, /exit.
+ * /plan, /agents, /tasks, /todos, /config, /theme, /keybindings, /hooks, /skills,
+ * /mcp, /plugins, /memory, /resume, /init, /output-style, /clear, /compact,
+ * /context, /diff, protocol commands, /exit.
  */
 export function buildDefaultRegistry(
   options: BuildDefaultRegistryOptions = {},
@@ -186,6 +187,7 @@ export function buildDefaultRegistry(
     tasksCommand,
     todosCommand,
     configCommand,
+    themeCommand,
     keybindingsCommand,
     hooksCommand,
     skillsCommand,

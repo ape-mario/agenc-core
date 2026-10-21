@@ -72,6 +72,7 @@ const MINIMAL_NAMES = [
   "tasks",
   "todos",
   "config",
+  "theme",
   "keybindings",
   "hooks",
   "skills",
@@ -180,9 +181,9 @@ describe("AgenC command surface compatibility", () => {
     expect(names.has("output-style")).toBe(true);
     expect(names.has("style")).toBe(true);
     expect(names.has("claim")).toBe(true);
+    expect(names.has("theme")).toBe(true);
     expect(names.has("files")).toBe(false);
     expect(names.has("reload-plugins")).toBe(false);
-    expect(names.has("theme")).toBe(false);
     expect(names.has("color")).toBe(false);
     expect(names.has("ide")).toBe(false);
     expect(names.has("install-github-app")).toBe(false);
