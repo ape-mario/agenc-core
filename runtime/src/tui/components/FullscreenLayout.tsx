@@ -22,7 +22,7 @@ import { modelDisplayString } from '../../utils/model/model.js';
 import { getTotalCost } from '../../cost/tracker.js';
 import { formatUsdCost } from '../../session/cost.js';
 import { isNullRenderingAttachment } from '../message-visibility.js';
-import { PromptDialogOverlay, PromptSuggestionsOverlay } from './PromptOverlaySurfaces.js';
+import { PromptDialogOverlay, PromptSuggestionsList } from './PromptOverlaySurfaces.js';
 import { permissionModePlainLabel } from '../../permissions/mode-display.js';
 import type { PermissionMode } from '../../permissions/types.js';
 import type { StickyPrompt } from './VirtualMessageList';
@@ -77,6 +77,24 @@ export function calculateFullscreenLayoutBudget(
     showBottomChrome,
     bottomMaxHeight: Math.max(1, Math.ceil(contentRows / 2)),
   };
+}
+
+/**
+ * Rows the slash and mention suggestion list may take under the prompt: the
+ * share of the content area that the bottom slot can never claim. The
+ * transcript gives these rows up while the list is open, so the prompt and
+ * the status line always keep theirs.
+ */
+export function calculateSuggestionListRows(terminalRows: number): number {
+  const rows = Number.isFinite(terminalRows)
+    ? Math.max(0, Math.trunc(terminalRows))
+    : 0;
+  const budget = calculateFullscreenLayoutBudget(rows);
+  const contentRows = Math.max(
+    1,
+    rows - (budget.showBottomChrome ? BOTTOM_CHROME_ROWS : 0),
+  );
+  return Math.max(0, contentRows - budget.bottomMaxHeight);
 }
 
 export function calculateFileTreeGutterWidth(columns: number): number {
@@ -473,14 +491,16 @@ export function FullscreenLayout(t0) {
     } else {
       t13 = $[23];
     }
-    const t15 = <PromptSuggestionsOverlay availableRows={layoutBudget.bottomMaxHeight} />;
+    // The suggestion list sits under the prompt, between the bottom slot and
+    // the status line, outside the slot's clip.
+    const t15 = <PromptSuggestionsList availableRows={calculateSuggestionListRows(terminalRows)} />;
     const t16 = <PromptDialogOverlay />;
     const t14Content = <Box flexGrow={1} flexDirection="column" overflow="hidden">{t8}<DesignPlanModeBanner />{t11}{t12}{t13}{t16}</Box>;
     const showFileTreeGutter = shouldShowFileTreeGutter(columns, terminalRows, modal != null) && fileTreeGutter !== undefined && fileTreeGutter !== null && fileTreeGutter !== false;
     const t14 = showFileTreeGutter ? <Box flexGrow={1} flexDirection="row" overflow="hidden">{fileTreeGutter}{t14Content}</Box> : t14Content;
     let t17;
     if ($[31] !== bottom || $[38] !== layoutBudget.bottomMaxHeight) {
-      t17 = <Box flexDirection="column" flexShrink={0} width="100%" maxHeight={layoutBudget.bottomMaxHeight}>{t15}<Box flexDirection="column" width="100%" flexGrow={1} overflowY="hidden">{bottom}</Box></Box>;
+      t17 = <Box flexDirection="column" flexShrink={0} width="100%" maxHeight={layoutBudget.bottomMaxHeight}><Box flexDirection="column" width="100%" flexGrow={1} overflowY="hidden">{bottom}</Box></Box>;
       $[31] = bottom;
       $[38] = layoutBudget.bottomMaxHeight;
       $[32] = t17;
@@ -503,7 +523,7 @@ export function FullscreenLayout(t0) {
     } else {
       t18 = $[37];
     }
-    return <PromptOverlayProvider>{layoutBudget.showScrollable ? t14 : null}{t17}{layoutBudget.showBottomChrome ? <StatusLineChrome columns={columns} /> : null}{t18}</PromptOverlayProvider>;
+    return <PromptOverlayProvider>{layoutBudget.showScrollable ? t14 : null}{t17}{t15}{layoutBudget.showBottomChrome ? <StatusLineChrome columns={columns} /> : null}{t18}</PromptOverlayProvider>;
   }
   let t8;
   if ($[42] !== bottom || $[43] !== modal || $[44] !== overlay || $[45] !== scrollable) {

@@ -7,6 +7,7 @@ import {
   calculateFileTreeGutterWidth,
   calculateFullscreenLayoutBudget,
   calculateModalViewport,
+  calculateSuggestionListRows,
   FullscreenLayout,
   shouldShowFileTreeGutter,
   statusLineSegments,
@@ -19,6 +20,7 @@ import { Box, Text } from "../ink.js";
 import { createRoot } from "../ink/root.js";
 import { renderToString } from "../../utils/staticRender.js";
 import { FullscreenModeProvider } from "../context/fullscreenModeContext.js";
+import { useSetPromptOverlay } from "../context/promptOverlayContext.js";
 
 function fullscreen(node: React.ReactNode): React.ReactNode {
   return <FullscreenModeProvider enabled={true}>{node}</FullscreenModeProvider>;
@@ -53,6 +55,58 @@ describe("FullscreenLayout modal viewport", () => {
     [24, { showScrollable: true, showBottomChrome: true, bottomMaxHeight: 12 }],
   ])("keeps a positive bottom slot budget at terminal height %i", (rows, expected) => {
     expect(calculateFullscreenLayoutBudget(rows)).toEqual(expected);
+  });
+
+  test.each([
+    [0, 0],
+    [1, 0],
+    [4, 2],
+    [5, 2],
+    [12, 5],
+    [24, 11],
+    [30, 14],
+    [Number.NaN, 0],
+  ])("gives the suggestion list the rows the bottom slot cannot claim at height %s", (rows, expected) => {
+    expect(calculateSuggestionListRows(rows)).toBe(expected);
+  });
+
+  test("draws the suggestion list right under the prompt and above the status line", async () => {
+    function PromptWithSuggestions(): React.ReactNode {
+      useSetPromptOverlay({
+        suggestions: [
+          { id: "help:local", displayText: "/help", description: "Show help" },
+          { id: "status:local", displayText: "/status", description: "Show status" },
+        ],
+        selectedSuggestion: 1,
+        maxColumnWidth: 16,
+        suggestionType: "command",
+      });
+      return <Text>prompt row</Text>;
+    }
+
+    const output = await renderToString(
+      <AppStateProvider initialState={getDefaultAppState()}>
+        {fullscreen(
+          <FullscreenLayout
+            scrollable={<Text>transcript body</Text>}
+            bottom={<PromptWithSuggestions />}
+          />,
+        )}
+      </AppStateProvider>,
+      { columns: 100, rows: 20 },
+    );
+    const rows = output.split("\n");
+    const prompt = rows.findIndex((row) => row.includes("prompt row"));
+    const transcript = rows.findIndex((row) => row.includes("transcript body"));
+    const status = rows.findLastIndex((row) => row.trim().length > 0);
+
+    expect(transcript).toBeLessThan(prompt);
+    expect(rows[prompt + 1]).toMatch(/^ {5}\/help {4}Show help/u);
+    expect(rows[prompt + 2]).toMatch(/^ {3}› \/status {2}Show status/u);
+    expect(status).toBeGreaterThan(prompt + 2);
+    expect(rows[status]).not.toContain("/status");
+    expect(output).not.toMatch(/[┌┐└┘│]/u);
+    expect(output).not.toContain("SLASH COMMANDS");
   });
 
   test("sizes and gates the optional file-tree gutter for wide fullscreen sessions", () => {

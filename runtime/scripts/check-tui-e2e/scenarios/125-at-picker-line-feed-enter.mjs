@@ -20,14 +20,11 @@ export default async function (session) {
   await session.waitForPrompt({ timeout: 15_000 });
 
   await session.type("@READ", { perCharMs: 60 });
-  await session.waitFor(/FILES & RESOURCES/u, {
-    timeout: 15_000,
-    label: "files/resources picker",
-  });
   await waitForFrameText(
     session,
-    /❯ \+ README\.md/u,
+    /› \+ README\.md/u,
     "filtered README.md picker selection",
+    15_000,
   );
 
   session.send("\n");
