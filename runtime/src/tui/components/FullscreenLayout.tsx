@@ -608,7 +608,8 @@ export type StatusLineSegments = {
   readonly model: string;
   readonly effort: string | null;
   readonly mode: string;
-  readonly light: string | null;
+  /** `standard` for a session that opted out of Light; null for Light. */
+  readonly harness: string | null;
   readonly spend: string | null;
 };
 
@@ -624,15 +625,16 @@ export function statusLineSegments(
   mode: PermissionMode,
   spend: string,
   effort: string | null = null,
-  lightMode = false,
+  lightMode = true,
 ): StatusLineSegments {
   return {
     folder: columns >= STATUS_FOLDER_MIN_COLUMNS ? folder : null,
     model: modelLabel,
     effort,
     mode: statusModeLabel(mode),
-    // Light is the default harness; it is shown in /status, not the status line.
-    light: null,
+    // Light is the default harness and needs no label. A standard session
+    // (--standard or light_mode = false) is marked so the opt-out is visible.
+    harness: lightMode ? null : 'standard',
     spend: spend === '' ? null : spend,
   };
 }
@@ -735,7 +737,8 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const cachePercent = useStatusPromptCache();
   const offPeakSchedule = useStatusOffPeakSchedule();
   const offPeak = useOffPeakNow(offPeakSchedule);
-  const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) === true;
+  // Unset means the default (Light). A session sets it from its runtime options.
+  const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) !== false;
   const [themeName] = useTheme();
   const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, spend, effort, lightMode);
   const bypass = mode === 'bypassPermissions';
@@ -749,14 +752,14 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
     { key: 'model', label: segments.model, color: 'text' },
     ...(segments.effort !== null ? [{ key: 'effort', label: segments.effort, color: 'text' as const }] : []),
     { key: 'mode', label: segments.mode, color: bypass ? 'error' : 'text', bold: bypass },
-    ...(segments.light !== null ? [{ key: 'light', label: segments.light, color: 'text' as const }] : []),
+    ...(segments.harness !== null ? [{ key: 'harness', label: segments.harness, color: 'text' as const }] : []),
     ...(swarmMode ? [{ key: 'swarm', ...swarmStatusPresentation(runningAgents) }] : []),
     ...(shellCount > 0 ? [{ key: 'shells', label: `${shellCount} ${shellCount === 1 ? 'shell' : 'shells'}`, color: 'text' as const }] : []),
     ...(runningAgents > 0 ? [{ key: 'agents', label: `${runningAgents} ${runningAgents === 1 ? 'agent' : 'agents'}`, color: 'text' as const }] : []),
   ];
   // Reserve the truthful context/cost block first. Drop the cache share
   // before anything else, then cwd, shorten effort/mode, then drop
-  // swarm/effort/light and the off-peak note before truncating the model.
+  // swarm/effort/harness and the off-peak note before truncating the model.
   // Every segment remains in this single row even at a narrow width.
   const width = () => items.reduce((sum, item) => sum + stringWidth(item.label), Math.max(0, items.length - 1) * 3);
   const space = (): number => {
@@ -778,7 +781,7 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
       if (item.key === 'mode') item.label = item.label.replace(/ mode$/, '');
     }
   }
-  for (const key of ['swarm', 'effort', 'light']) {
+  for (const key of ['swarm', 'effort', 'harness']) {
     if (width() > space()) drop(key);
   }
   const spendIndex = rightItems.findIndex(item => item.key === 'spend');
