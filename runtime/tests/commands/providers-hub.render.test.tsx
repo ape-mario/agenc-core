@@ -206,6 +206,50 @@ describe("providers screen", () => {
     }
   });
 
+  it("shows OpenRouter models without a zero-retention endpoint as unavailable, with the way out", async () => {
+    const openrouter = row({
+      provider: "openrouter",
+      name: "OpenRouter",
+      connection: "current",
+      status: "key saved",
+      model: "x-ai/grok-4.5",
+      keySaved: true,
+    });
+    const services = fakeServices({
+      modelsFor: () => [
+        { model: "x-ai/grok-4.5", displayModel: "x-ai/grok-4.5", current: true, isDefault: true },
+        { model: "google/gemini-2.5-flash", displayModel: "google/gemini-2.5-flash", current: false, isDefault: false, zdrUnavailable: true },
+      ],
+    });
+    const onDone = vi.fn();
+    const screen = await mount(
+      <ProvidersHubView
+        initial={{ currentProvider: "openrouter", currentModel: "x-ai/grok-4.5", rows: [openrouter] }}
+        initialProvider="openrouter"
+        services={services}
+        onDone={onDone}
+      />,
+    );
+    try {
+      const models = screen.screen();
+      expect(models).toMatch(/google\/gemini-2\.5-flash\s+no zdr/u);
+      expect(models).not.toContain("no zero-retention endpoint serves this model");
+
+      // Highlighted, it says why and how to use it anyway; Enter does not use it.
+      await screen.press("\u001b[B");
+      const detail = screen.screen().replace(/\s*│\s*\n\s*│\s*/gu, " ");
+      expect(detail).toContain(
+        "no zero-retention endpoint serves this model. to use it, set zero_data_retention = false under [providers.openrouter].",
+      );
+      await screen.press("\r");
+      await sleep(60);
+      expect(services.choose).not.toHaveBeenCalled();
+      expect(onDone).not.toHaveBeenCalled();
+    } finally {
+      screen.unmount();
+    }
+  });
+
   it("removes a saved key from the model list", async () => {
     const services = fakeServices();
     const screen = await mount(

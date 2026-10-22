@@ -111,6 +111,10 @@ import {
 } from "../../registry/provider-info.js";
 import { getSelectedProviderEnvironment } from "../../../utils/model/providers.js";
 import { isEnvDefinedFalsy } from "../../../utils/envBoolean.js";
+import {
+  openRouterDataPolicyErrorMessage,
+  readOpenRouterDataPolicyRefusal,
+} from "../openrouter/data-policy.js";
 const OPENAI_RESPONSES_INVALID_FUNCTION_CALL_MESSAGE =
   "OpenAI Responses stream emitted invalid function_call";
 const OPENAI_STREAM_FAILED_MESSAGE = "OpenAI stream failed";
@@ -693,6 +697,14 @@ function mapOpenAIHttpFailureToError(args: {
     return new LLMProviderError(
       args.providerName,
       openRouterBudgetLimitErrorMessage(),
+      args.status,
+    );
+  }
+  const dataPolicyRefusal = readOpenRouterDataPolicyRefusal(args);
+  if (dataPolicyRefusal !== undefined) {
+    return new LLMProviderError(
+      args.providerName,
+      openRouterDataPolicyErrorMessage(dataPolicyRefusal),
       args.status,
     );
   }
@@ -2747,6 +2759,17 @@ export class OpenAIProvider implements LLMProvider {
     // Keep the raw transport error for existing auth/fallback classification.
     if (isInitialProviderHttpRejection(error) && !this.config.managedRequestId) {
       markLLMInitialHttpRejection(error, this.name, error.status, singleWireAttempt);
+      // OpenRouter refused while routing, before it chose an endpoint (no
+      // endpoint meets the data policy): nothing ran, so admission can
+      // release the reservation at zero instead of holding it as unknown.
+      if (singleWireAttempt === true && readOpenRouterDataPolicyRefusal({
+        providerName: this.name,
+        status: error.status,
+        message: error.message,
+        body: error.body,
+      }) !== undefined) {
+        markLLMPreGenerationRejection(error, this.name);
+      }
     }
     return error;
   }

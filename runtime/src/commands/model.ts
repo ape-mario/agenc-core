@@ -38,6 +38,11 @@ import {
   validateHistoryCompatibility,
 } from "../llm/shape-request.js";
 import { readCommandConfig } from "./config-context.js";
+import { openRouterModelHasZdrEndpoint } from "../llm/registry/openrouter-zdr-endpoints.js";
+import {
+  OPENROUTER_ZDR_OFF_HINT,
+  openRouterZeroDataRetentionEnabled,
+} from "../llm/zero-data-retention.js";
 import { modelMenuFallback, readModelMenuSnapshot } from "./model-menu-snapshot.js";
 import { asRecord } from "../utils/record.js";
 import {
@@ -348,6 +353,24 @@ function unverifiedModelNotice(provider: ProviderSlug, model: string): string {
     `Unverified custom model "${model}": absent from AgenC's bundled catalog. Check the spelling with /model.\n`;
 }
 
+/**
+ * While OpenRouter requests ask for zero data retention, a model OpenRouter
+ * lists no zero-retention endpoint for would be refused on every request. Say
+ * so now. Unchecked until the TUI has read OpenRouter's list.
+ */
+function openRouterZdrRefusal(
+  ctx: SlashCommandContext,
+  provider: ProviderSlug,
+  model: string,
+): string | undefined {
+  if (provider !== "openrouter" || !openRouterZeroDataRetentionEnabled(readCommandConfig(ctx))) {
+    return undefined;
+  }
+  return openRouterModelHasZdrEndpoint(model) === false
+    ? `No zero-retention endpoint serves openrouter/${model}, so OpenRouter would refuse it. ${OPENROUTER_ZDR_OFF_HINT}`
+    : undefined;
+}
+
 export const modelCommand: SlashCommand = {
   name: "model",
   description: "Choose a model (or pass a model name)",
@@ -384,6 +407,10 @@ export const modelCommand: SlashCommand = {
           text: unverifiedModelNotice(selection.provider, selection.model) +
             `Model unchanged: ${selection.provider}/${selection.model}.`,
         };
+      }
+      const zdrRefusal = openRouterZdrRefusal(ctx, selection.provider, selection.model);
+      if (zdrRefusal !== undefined) {
+        return { kind: "text", text: zdrRefusal };
       }
       const outcome = await applyModelSwitch(
         ctx.session,

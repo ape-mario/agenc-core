@@ -660,11 +660,12 @@ export interface ProviderConfig {
   readonly default_model?: string;
   /**
    * Request-level zero data retention. Accepted only under
-   * `providers.openrouter`: every request carries `provider.zdr = true`, so
-   * OpenRouter routes only to endpoints with a zero-data-retention policy
-   * and a model without one is refused instead of silently falling back.
-   * Other providers control retention per account, project or team on their
-   * own console and reject this field (see docs/reference/providers.md).
+   * `providers.openrouter`, and on by default there: every request carries
+   * `provider.zdr = true`, so OpenRouter routes only to endpoints with a
+   * zero-data-retention policy and a model without one is refused instead of
+   * silently falling back. `false` turns it off. Other providers control
+   * retention per account, project or team on their own console and reject
+   * this field (see docs/reference/providers.md).
    */
   readonly zero_data_retention?: boolean;
   readonly context_window_tokens?: number;

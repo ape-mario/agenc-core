@@ -13,6 +13,8 @@ import { modelCapabilityTags } from "./model-capability-tags.js";
 import { hasSavedProviderKey } from "../auth/provider-keys.js";
 import { PROVIDER_AUTH_ENV } from "../llm/provider-auth-selection.js";
 import { resolveRegisteredModelCatalogEntry } from "../llm/registry/model-catalog.js";
+import { openRouterModelHasZdrEndpoint } from "../llm/registry/openrouter-zdr-endpoints.js";
+import { openRouterZeroDataRetentionEnabled } from "../llm/zero-data-retention.js";
 import type { ProviderSlug } from "../config/provider-model-authority.js";
 import {
   providerCredentialEnvironmentLabel,
@@ -81,6 +83,11 @@ export type ProvidersHubModelRow = {
   readonly tags?: string;
   /** The catalog's name for the model ("Google: Gemma 4 31B"), which search also reads. */
   readonly label?: string;
+  /**
+   * OpenRouter while requests ask for zero data retention: the model has no
+   * zero-retention endpoint, so OpenRouter would refuse it.
+   */
+  readonly zdrUnavailable?: true;
 };
 
 function plainStatus(row: ProviderMenuRow, keySaved: boolean): string {
@@ -282,6 +289,8 @@ export function readProvidersHubModels(
   provider: ProviderSlug,
 ): readonly ProvidersHubModelRow[] {
   const snapshot = readModelMenuSnapshot(ctx);
+  const checksZdr = provider === "openrouter" &&
+    openRouterZeroDataRetentionEnabled(readCommandConfig(ctx));
   return snapshot.rows
     .filter((row) => row.provider === provider && row.selectable)
     .map((row) => {
@@ -293,6 +302,9 @@ export function readProvidersHubModels(
         isDefault: row.status === "default",
         tags: modelCapabilityTags(provider, row.displayModel),
         ...(label === undefined ? {} : { label }),
+        ...(checksZdr && openRouterModelHasZdrEndpoint(row.displayModel) === false
+          ? { zdrUnavailable: true as const }
+          : {}),
       };
     });
 }

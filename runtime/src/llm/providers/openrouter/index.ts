@@ -17,11 +17,12 @@ function buildOpenRouterHeaders(
 }
 
 /**
- * Request-level zero data retention: `provider.zdr = true` restricts routing
- * to endpoints with a zero-data-retention policy (OR-ed with the account
- * setting on OpenRouter's side). A model with no such endpoint is refused by
- * OpenRouter rather than silently served elsewhere.
- * https://openrouter.ai/docs/features/provider-routing
+ * Request-level zero data retention, on by default (provider-request.ts):
+ * `provider.zdr = true` restricts routing to endpoints with a
+ * zero-data-retention policy (OR-ed with the account setting on OpenRouter's
+ * side). A model with no such endpoint is refused by OpenRouter rather than
+ * silently served elsewhere (see data-policy.ts for that refusal).
+ * https://openrouter.ai/docs/guides/features/zdr
  *
  * The managed AgenC gateway pins its own routing block (one reviewed
  * endpoint, `zdr: true`, `data_collection: "deny"`) and refuses any request
