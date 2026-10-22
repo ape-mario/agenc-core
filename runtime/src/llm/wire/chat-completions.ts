@@ -892,6 +892,7 @@ export function buildChatCompletionsRequest(
       };
     }
   }
+  applyPromptCacheControl(body, input.providerCapabilityHints?.promptCacheControl);
   if (input.providerCapabilityHints?.imageInputContract === "cerebras_v2") {
     assertCerebrasRequestPayloadSize(body);
   } else if (
@@ -900,6 +901,43 @@ export function buildChatCompletionsRequest(
     assertKimiRequestPayloadSize(body);
   }
   return body;
+}
+
+/**
+ * Mark the request for prompt caching where the provider caches only on
+ * request. A top-level marker follows the conversation on its own; otherwise
+ * the leading system prompt gets the one marker.
+ */
+function applyPromptCacheControl(
+  body: Record<string, unknown>,
+  mode: ChatCompletionsCapabilityHints["promptCacheControl"],
+): void {
+  if (mode === "top_level") {
+    body.cache_control = { type: "ephemeral" };
+    return;
+  }
+  if (mode !== "system_prompt" || !Array.isArray(body.messages)) return;
+  const first = (body.messages as Array<Record<string, unknown>>)[0];
+  if (first?.role === "system") markLastTextPartForCache(first);
+}
+
+function markLastTextPartForCache(message: Record<string, unknown>): void {
+  const marker = { type: "ephemeral" };
+  if (typeof message.content === "string") {
+    if (message.content.length > 0) {
+      message.content = [{ type: "text", text: message.content, cache_control: marker }];
+    }
+    return;
+  }
+  if (!Array.isArray(message.content)) return;
+  const parts = message.content as unknown[];
+  for (let index = parts.length - 1; index >= 0; index -= 1) {
+    const part = parts[index];
+    if (part !== null && typeof part === "object" && (part as { type?: unknown }).type === "text") {
+      parts[index] = { ...(part as Record<string, unknown>), cache_control: marker };
+      return;
+    }
+  }
 }
 
 /**

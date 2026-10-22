@@ -103,6 +103,15 @@ export interface ChatCompletionsCapabilityHints {
    * sees on DeepSeek's own API.
    */
   readonly sharesPromptPrefixAcrossSessions?: boolean;
+  /**
+   * Ask for prompt caching where the provider caches only on request.
+   * `top_level` adds one `cache_control` marker that the provider moves to the
+   * end of the conversation (Claude through OpenRouter). `system_prompt` marks
+   * the system prompt, so its tokens and the tools are read from cache on
+   * every later call (Gemini through OpenRouter; in live probes a marker on
+   * the newest message was not reused by the next request).
+   */
+  readonly promptCacheControl?: "top_level" | "system_prompt";
   /** Explain encoded function aliases when instructions use canonical names. */
   readonly includeToolNameAliases?: boolean;
   /**
@@ -505,6 +514,13 @@ export function chatCompletionsCapabilityHintsForProvider(
       ? {
           reasoningEffortEnvelope: "openrouter" as const,
           reportsUsageCost: true,
+          // Claude and Gemini cache through OpenRouter only when the request
+          // asks: without a marker every call paid full input price.
+          ...(/^~?anthropic\//u.test(normalizedModel)
+            ? { promptCacheControl: "top_level" as const }
+            : /^~?google\/gemini/u.test(normalizedModel)
+              ? { promptCacheControl: "system_prompt" as const }
+              : {}),
           // OpenRouter returns reasoning as `reasoning` (and structured
           // `reasoning_details`); `reasoning_content` is its accepted alias.
           reasoningContentField: "reasoning" as const,
