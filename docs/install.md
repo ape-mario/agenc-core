@@ -177,6 +177,35 @@ launcher package, so they update with `npm install -g @tetsuo-ai/agenc@latest`
 instead (`agenc update` detects this and says so). Re-running the install
 one-liner also updates in place.
 
+### Update download limits
+
+Each download that `agenc update` makes has its own limits: the manifest, the
+runtime artifact, the Sigstore bundles and the GitHub CLI it uses for
+provenance checks. A slow link finishes as long as bytes keep arriving. A
+stalled transfer fails fast.
+
+| Limit | Value |
+| --- | --- |
+| Connect, TLS and response headers, per request and redirect hop | 30s |
+| No data while the body downloads (stall) | 30s |
+| Whole transfer with a signed size | `max(120s, ceil(bytes / 128 KiB/s) + 30s)`, about 17 minutes for a 127 MB runtime |
+| Manifest, whose size is not signed in advance | 120s |
+| Each local check: hashing, extraction, verifier runs | 120s each, separate from download time |
+
+The size-scaled cap is the same formula the standalone installer uses, so a
+link that can install can also update. On a terminal, the runtime and GitHub
+CLI downloads show percent, megabytes and rate on one line. Piped or
+redirected output gets no progress lines. A failed transfer prints one line
+that names it, for example `runtime artifact download stalled: no data for
+30 s (57.3 of 127.0 MB received)`, followed by the fix: rerun `agenc update`,
+or reinstall with the installer or npm. Size, checksum, archive and provenance
+checks are unchanged, and none is skipped.
+
+The updater that runs is the installed one. Up to 0.19.12 it shared one fixed
+120s budget across the whole download and verification chain, so updating
+from those versions on a link slower than about 2 MB/s still needs the
+installer or npm once.
+
 The 0.10.0 standalone updater runs on Node 25 / ABI 141 and cannot select the
 new ABI 147 artifact. Upgrade an existing standalone 0.10.0 installation by
 rerunning the one-line installer once. The resulting private-Node wrapper and
