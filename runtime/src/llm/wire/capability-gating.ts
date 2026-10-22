@@ -585,7 +585,7 @@ export function chatCompletionsCapabilityHintsForProvider(
       omitsToolControlsWithoutTools: true,
       // The live API sends the trace as `reasoning` (stream deltas and
       // messages, checked 2026-10-22); the docs name it `reasoning_content`.
-      // Either is shown as thinking. Neither is sent back.
+      // Either is shown as thinking.
       reasoningContentField: "reasoning" as const,
       reasoningContentFallbackField: "reasoning_content" as const,
       // A stable key per session routes its requests to a server that holds
@@ -594,6 +594,14 @@ export function chatCompletionsCapabilityHintsForProvider(
       // header is the routing hint the provider reads.
       promptCacheKeyFields: ["prompt_cache_key"] as const,
       promptCacheKeyHeaders: ["x-abliteration-session-id"] as const,
+      // Large V2 (GLM-5.3) gets each tool step's trace back, under the
+      // documented message field, so it keeps its reasoning across the steps
+      // of a turn. The other models do not get it back.
+      ...(normalizedModel === "abliterated-model-large-v2" ? {
+        replaysReasoningContent: true,
+        reasoningContentField: "reasoning_content" as const,
+        reasoningContentFallbackField: "reasoning" as const,
+      } : {}),
     } : {}),
     ...(slug === "groq" ? {
       acceptsDirectImageInput: acceptsToolResultImages,

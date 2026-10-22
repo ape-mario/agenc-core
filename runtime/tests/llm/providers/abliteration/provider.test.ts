@@ -49,7 +49,7 @@ import {
   LLMRateLimitError,
   LLMServerError,
 } from "../../../../src/llm/errors.js";
-import type { LLMMessage, LLMTool } from "../../../../src/llm/types.js";
+import type { LLMMessage, LLMResponse, LLMTool } from "../../../../src/llm/types.js";
 
 const fixture = JSON.parse(readFileSync(new URL("../../fixtures/abliteration-models.json", import.meta.url), "utf8"));
 const provider = "abliteration" as ProviderName;
@@ -304,29 +304,60 @@ describe("abliteration.ai built-in provider", () => {
     expect(new Headers(http.chat.mock.calls[0]?.[1]?.headers).has("x-abliteration-session-id")).toBe(false);
   });
 
-  test("reads the reasoning trace as thinking, keeps it out of the answer, and does not replay it", async () => {
-    const http = chatFetch(
-      // The live API sends `reasoning` (2026-10-22).
-      reply({ content: "Paris.", reasoning: "The capital of France." }),
-      // The docs name it `reasoning_content`.
-      reply({ content: "Lyon.", reasoning_content: "Another city." }),
-      reply(),
-    );
-    const client = createProvider(provider, { apiKey: key, model: V2, extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } });
-    const first = await client.chat([{ role: "user", content: "Capital?" }]);
-    expect(first.content).toBe("Paris.");
-    expect(first.thinking?.map(block => block.text).join("")).toBe("The capital of France.");
-    const second = await client.chat([{ role: "user", content: "Another?" }]);
-    expect(second.content).toBe("Lyon.");
-    expect(second.thinking?.map(block => block.text).join("")).toBe("Another city.");
-    await client.chat([
-      { role: "user", content: "Capital?" },
-      { role: "assistant", content: first.content, providerReasoningContent: first.providerReasoningContent, providerReasoningProvenance: first.providerReasoningProvenance },
-      { role: "user", content: "Thanks" },
-    ]);
-    const assistant = (http.body(2).messages as Array<Record<string, unknown>>).find(message => message.role === "assistant")!;
-    expect(assistant).not.toHaveProperty("reasoning");
-    expect(assistant).not.toHaveProperty("reasoning_content");
+  test("reads the reasoning trace as thinking under either field name and keeps it out of the answer", async () => {
+    for (const model of [V2, BASE, LARGE]) {
+      const http = chatFetch(
+        // The live API sends `reasoning` (2026-10-22).
+        reply({ content: "Paris.", reasoning: "The capital of France." }),
+        // The docs name it `reasoning_content`.
+        reply({ content: "Lyon.", reasoning_content: "Another city." }),
+      );
+      const client = createProvider(provider, { apiKey: key, model, extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } });
+      const first = await client.chat([{ role: "user", content: "Capital?" }]);
+      expect(first.content).toBe("Paris.");
+      expect(first.thinking?.map(block => block.text).join("")).toBe("The capital of France.");
+      const second = await client.chat([{ role: "user", content: "Another?" }]);
+      expect(second.content).toBe("Lyon.");
+      expect(second.thinking?.map(block => block.text).join("")).toBe("Another city.");
+    }
+  });
+
+  test("sends Large V2's trace back as reasoning_content on later requests, and only Large V2's own", async () => {
+    const step = reply({ content: "", reasoning: "Read a.txt first.", tool_calls: [{ id: "call_a", type: "function", function: { name: "mcp__fixture__read", arguments: '{"path":"a.txt"}' } }] });
+    const history = (first: LLMResponse): LLMMessage[] => [
+      { role: "user", content: "Read a.txt" },
+      { role: "assistant", content: first.content, toolCalls: first.toolCalls, providerReasoningContent: first.providerReasoningContent, providerReasoningProvenance: first.providerReasoningProvenance },
+      { role: "tool", toolCallId: first.toolCalls[0]!.id, toolName: tool.function.name, content: "ok" },
+    ];
+    const assistantOf = (body: Record<string, any>) => (body.messages as Array<Record<string, unknown>>).find(message => message.role === "assistant")!;
+    const hints = chatCompletionsCapabilityHintsForProvider("abliteration", V2);
+    expect(hints).toMatchObject({ replaysReasoningContent: true, reasoningContentField: "reasoning_content", reasoningContentFallbackField: "reasoning" });
+
+    const v2 = chatFetch(step.clone(), reply(), reply());
+    const client = createProvider(provider, { apiKey: key, model: V2, tools: [tool], extra: { fetchImpl: v2.fetchImpl, maxRetries: 0 } });
+    const first = await client.chat([{ role: "user", content: "Read a.txt" }]);
+    expect(first.content).toBe("");
+    expect(first.thinking?.map(block => block.text).join("")).toBe("Read a.txt first.");
+    await client.chat(history(first));
+    expect(assistantOf(v2.body(1))).toMatchObject({ reasoning_content: "Read a.txt first." });
+    expect(assistantOf(v2.body(1))).not.toHaveProperty("reasoning");
+    expectDocumentedRequest(v2.body(1));
+    // A trace another model wrote is not sent to Large V2.
+    await client.chat(history({ ...first, providerReasoningProvenance: { provider: "abliteration", model: BASE } }));
+    expect(assistantOf(v2.body(2))).not.toHaveProperty("reasoning_content");
+    expect(assistantOf(v2.body(2))).not.toHaveProperty("reasoning");
+
+    // The other two models keep the trace on screen and do not get it back.
+    for (const model of [BASE, LARGE]) {
+      expect(chatCompletionsCapabilityHintsForProvider("abliteration", model)).toMatchObject({ reasoningContentField: "reasoning", reasoningContentFallbackField: "reasoning_content" });
+      expect(chatCompletionsCapabilityHintsForProvider("abliteration", model).replaysReasoningContent).toBeUndefined();
+      const http = chatFetch(step.clone(), reply());
+      const other = createProvider(provider, { apiKey: key, model, tools: [tool], extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } });
+      const otherFirst = await other.chat([{ role: "user", content: "Read a.txt" }]);
+      await other.chat(history(otherFirst));
+      expect(assistantOf(http.body(1))).not.toHaveProperty("reasoning_content");
+      expect(assistantOf(http.body(1))).not.toHaveProperty("reasoning");
+    }
   });
 
   test("prices cached input at a tenth of the input rate", () => {
@@ -536,7 +567,8 @@ describe("abliteration.ai built-in provider", () => {
     expect(followUp!.body).not.toHaveProperty("tool_choice");
     expect(followUp!.body.messages.map((message: Record<string, unknown>) => message.role)).toEqual(["user", "assistant", "tool"]);
     expect(followUp!.body.messages[1]).toMatchObject({ tool_calls: [{ id: "call_read", type: "function", function: { name: "mcp__fixture__read", arguments: '{"path":"a.txt"}' } }] });
-    expect(followUp!.body.messages[1]).not.toHaveProperty("reasoning_content");
+    // The streamed step's trace goes back with its tool call, under the documented field.
+    expect(followUp!.body.messages[1]).toMatchObject({ reasoning_content: "Read the fixture first." });
     expect(followUp!.body.messages[1]).not.toHaveProperty("reasoning");
     expectDocumentedRequest(followUp!.body);
     expect(JSON.stringify({ first, second })).not.toContain(key);

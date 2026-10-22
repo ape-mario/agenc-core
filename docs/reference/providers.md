@@ -1257,7 +1257,10 @@ for the hardest tasks.
 
 The reasoning trace is shown as thinking and never as the answer. The live
 API sends it as `reasoning`; the docs name it `reasoning_content`, and AgenC
-reads either. It is not sent back on later requests.
+reads either. On Large V2, AgenC sends each step's trace back as
+`reasoning_content` with that step's message on the session's later requests,
+so the model keeps its reasoning across the tool steps of a turn. A trace
+another model wrote is not sent. The other two models do not get it back.
 
 ### Prompt caching
 
