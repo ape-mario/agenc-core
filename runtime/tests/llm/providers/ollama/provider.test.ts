@@ -6,7 +6,9 @@ import { hangingStreamAfterFirstChunk } from "./ollama-test-helpers.js";
 import { isTransientProviderError } from "../../../../src/recovery/api-errors.js";
 import {
   LLMAuthenticationError,
+  LLMModelLoadError,
   LLMProviderError,
+  LLMRateLimitError,
   LLMServerError,
 } from "../../../../src/llm/errors.js";
 import type { LLMChatOptions, LLMMessage } from "../../../../src/llm/types.js";
@@ -592,6 +594,12 @@ describe("providers/ollama entrypoint", () => {
     [503, "server busy, please try again.  maximum pending requests exceeded", LLMServerError, true],
     [401, "unauthorized", LLMAuthenticationError, false],
     [404, "model \"qwen3:8b\" not found, try pulling it first", LLMProviderError, false],
+    // Ollama could not load the model: the same answer on every retry.
+    [500, "model requires more system memory (23.4 GiB) than is available (7.9 GiB)", LLMModelLoadError, false],
+    [500, "llama runner process has terminated: exit status 2", LLMModelLoadError, false],
+    [403, "forbidden", LLMAuthenticationError, false],
+    // A rate limit is waited out by its own path, not retried as an outage.
+    [429, "too many requests, please slow down", LLMRateLimitError, false],
   ] as const)("keeps the HTTP %s the ollama SDK reports on status_code", async (status, message, ErrorKind, transient) => {
     // The SDK's ResponseError carries the status as `status_code`, not `status`.
     const responseError = Object.assign(new Error(message), { name: "ResponseError", error: message, status_code: status });
@@ -603,7 +611,7 @@ describe("providers/ollama entrypoint", () => {
       (caught: unknown) => caught,
     );
     expect(error).toBeInstanceOf(ErrorKind);
-    expect((error as Error).message).toContain(status === 401 ? "ollama" : message.slice(0, 20));
+    expect((error as Error).message).toContain(status === 401 || status === 403 || status === 429 ? "ollama" : message.slice(0, 20));
     // A 5xx is an outage the turn retries; a missing model or a bad key is not.
     expect(isTransientProviderError(error)).toBe(transient);
   });

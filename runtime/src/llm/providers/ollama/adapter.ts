@@ -43,6 +43,7 @@ import {
 import { createOllamaToolNameProjection, projectOllamaHistoryToolNames } from "./tool-naming.js";
 import {
   LLMInvalidResponseError,
+  LLMModelLoadError,
   LLMProviderError,
   mapLLMError,
   isLLMPreGenerationRejection,
@@ -552,6 +553,10 @@ function extractOllamaContent(parts: LLMContentPart[]): {
   }
   return { content: textPieces.join("\n"), images };
 }
+
+/** Ollama's messages for a model it could not load (server/sched.go, llm/server.go). */
+const OLLAMA_MODEL_LOAD_FAILURE =
+  /requires more system memory|not enough memory|insufficient memory|out of memory|unable to allocate|failed to allocate|llama runner process has terminated|llama runner process no longer running|error loading model|unable to load model|failed to load model|model runner has unexpectedly stopped/iu;
 
 export class OllamaProvider implements LLMProvider {
   readonly name = "ollama";
@@ -1442,6 +1447,14 @@ export class OllamaProvider implements LLMProvider {
     // instead of a server error the turn retries, and a 401 from a cloud model
     // was not an authentication error.
     const statusCode = typeof e?.status_code === "number" ? e.status_code : undefined;
+    // A 500 can also be Ollama failing to load the model (its scheduler's
+    // default branch: not enough memory, a runner that exits while loading).
+    // That answer does not change on a retry, so it ends the turn at once with
+    // Ollama's message instead of waiting out an outage. 503 (busy) and other
+    // 500s stay retryable.
+    if (statusCode === 500 && OLLAMA_MODEL_LOAD_FAILURE.test(String(e?.message ?? ""))) {
+      return new LLMModelLoadError(this.name, String(e.message), statusCode);
+    }
     const source = statusCode !== undefined && e?.status === undefined && e?.statusCode === undefined
       ? Object.assign(new Error(String(e?.message ?? err)), { name: e?.name, status: statusCode, cause: err })
       : err;
