@@ -77,6 +77,7 @@ import {
   serializeProviderToolArguments,
 } from "../../wire/shared.js";
 import { ThinkTagStreamFilter } from "../../wire/think-tags.js";
+import { HarmonyLeakHold } from "../../wire/harmony-leak.js";
 import { ReasoningDetailsAccumulator } from "../../wire/reasoning-details.js";
 import {
   advertisedResponsesToolNames,
@@ -2222,6 +2223,8 @@ export class OpenAIProvider implements LLMProvider {
       // filter reroutes those spans to the same hidden channel so the
       // transcript never shows literal tags.
       const thinkFilter = new ThinkTagStreamFilter();
+      // A gpt-oss call some hosts send as harmony text is held, not shown.
+      const harmonyHold = new HarmonyLeakHold(requestModel);
       let model = requestModel;
       let finishReason: LLMResponse["finishReason"] = "stop";
       let sawFinishReason = false;
@@ -2338,7 +2341,8 @@ export class OpenAIProvider implements LLMProvider {
             const split = thinkFilter.push(contentDelta);
             if (split.text.length > 0) {
               content += split.text;
-              onChunk({ content: split.text, done: false });
+              const shown = harmonyHold.push(split.text);
+              onChunk({ content: shown, done: false });
             }
             if (split.reasoning.length > 0) {
               reasoningContent += split.reasoning;
@@ -2568,7 +2572,8 @@ export class OpenAIProvider implements LLMProvider {
       const filterTail = thinkFilter.flush();
       if (filterTail.text.length > 0) {
         content += filterTail.text;
-        onChunk({ content: filterTail.text, done: false });
+        const shown = harmonyHold.push(filterTail.text);
+        if (shown.length > 0) onChunk({ content: shown, done: false });
       }
       if (filterTail.reasoning.length > 0) {
         reasoningContent += filterTail.reasoning;
@@ -2671,6 +2676,11 @@ export class OpenAIProvider implements LLMProvider {
           { discardedReasoningContent, conflictingReasoningModel },
         ),
       );
+      // Held text that did not become a tool call is the answer after all.
+      const heldText = harmonyHold.flush();
+      if (heldText.length > 0 && parsed.content.length > 0) {
+        onChunk({ content: heldText, done: false });
+      }
       onChunk({
         content: "",
         done: true,
