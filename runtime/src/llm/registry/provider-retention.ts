@@ -86,7 +86,7 @@ export const PROVIDER_RETENTION: Readonly<Record<BuiltInProviderSlug, ProviderRe
   "openai-compatible": facts({ retention: "local", summary: LOCAL_SUMMARY, docs: [] }),
   openrouter: facts({
     retention: "request-zdr",
-    summary: "Every request carries provider.zdr, so OpenRouter uses only endpoints that keep nothing.",
+    summary: "Every request carries provider.zdr, so OpenRouter uses only endpoints that keep nothing. OpenRouter itself keeps prompts only if the account turned on prompt logging.",
     requestPrivacy: ["provider.zdr: true"],
     docs: [
       "https://openrouter.ai/docs/guides/features/zdr",

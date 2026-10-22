@@ -87,7 +87,8 @@ leader's mode.
 
 The line under the prompt shows the folder, model, effort, permission mode and
 session markers on the left, and the context share, cache share, spend and a
-`ZDR` badge on the right. Nothing is dropped at a narrow width. Facts first
+`ZDR` badge on the right. At a narrow width the line keeps its facts as long as
+it can. Facts first
 take short forms, one at a time: `high effort` becomes `high`, `asks first`
 becomes `asks`, `cache 82%` becomes `c 82%`, `$0.041 off-peak` becomes
 `$0.041 op`, `price unknown` becomes `no price`, and the folder becomes its

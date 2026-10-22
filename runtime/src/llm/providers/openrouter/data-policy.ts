@@ -47,7 +47,7 @@ export function openRouterDataPolicyErrorMessage(refusal: OpenRouterDataPolicyRe
   return refusal === "zero-data-retention"
     ? [
         "OpenRouter has no zero-data-retention endpoint for this model, so it refused the request.",
-        "Choose a model marked ZDR in /model, or set zero_data_retention = false under [providers.openrouter].",
+        "Choose a model in /model that is not marked no ZDR, or set zero_data_retention = false under [providers.openrouter].",
         "If your OpenRouter account itself requires ZDR, change that at https://openrouter.ai/settings/privacy.",
       ].join(" ")
     : [
