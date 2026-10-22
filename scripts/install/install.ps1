@@ -14,6 +14,10 @@
 #   AGENC_INSTALL_VERSION       pin a release version
 #   AGENC_HOME                  runtime install root (default ~\.agenc)
 #   AGENC_INSTALL_PREFIX        shim prefix (default $env:LOCALAPPDATA\agenc)
+#   AGENC_NO_MODIFY_PATH=1      do not add <prefix>\bin to the user PATH
+#
+# The installer adds <prefix>\bin to the user PATH (HKCU\Environment) once,
+# keeps the existing entries as they are, and never changes the machine PATH.
 # Test seams: AGENC_INSTALL_PLATFORM / AGENC_INSTALL_ARCH override platform
 # detection. AGENC_INSTALL_BOOTSTRAP_NODE_ARCHIVE may point at a local copy of
 # the exact pinned Node distribution; production bytes and sha256 still apply.
@@ -2710,9 +2714,91 @@ if (!/^\d+\.\d+\.\d+$/.test(expectedVersion) ||
     Fail "shim activation returned an invalid result"
   }
 
-  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-  if ($userPath -notlike "*$binDir*") {
-    Write-Log "NOTE: $binDir is not on your PATH. Add it via:  setx PATH `"$binDir;%PATH%`""
+  # BEGIN AGENC USER PATH
+  # PATH entries match case-insensitively, ignoring surrounding spaces,
+  # trailing slashes and %VARIABLE% spelling. A longer path that only
+  # contains the directory is a different entry.
+  function ConvertTo-AgencPathEntryKey([string]$Entry) {
+    $expanded = [Environment]::ExpandEnvironmentVariables($Entry.Trim()).Trim()
+    return $expanded.TrimEnd([char[]]@('\', '/'))
+  }
+  function Test-AgencPathEntry([string]$PathValue, [string]$Directory) {
+    $wanted = ConvertTo-AgencPathEntryKey $Directory
+    foreach ($entry in $PathValue.Split(';')) {
+      if (-not $entry.Trim()) { continue }
+      $key = ConvertTo-AgencPathEntryKey $entry
+      if ([string]::Equals($key, $wanted, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
+  }
+  # Returns PathValue with Directory appended, or $null when Directory is
+  # already an entry. The existing value is kept unchanged as the prefix.
+  function Get-AgencPathWithEntry([string]$PathValue, [string]$Directory) {
+    if (Test-AgencPathEntry $PathValue $Directory) { return $null }
+    if (-not $PathValue.Trim()) { return $Directory }
+    if ($PathValue.EndsWith(";")) { return "$PathValue$Directory" }
+    return "$PathValue;$Directory"
+  }
+  function Test-AgencModifyPathAllowed([string]$OptOut) {
+    return $OptOut.Trim() -notin @("1", "true", "yes")
+  }
+  # Appends Directory to the user Path in HKCU\Environment. It reads the raw
+  # value and writes it back with the same registry type, so REG_EXPAND_SZ
+  # entries such as %USERPROFILE%\... stay unexpanded. The machine Path is
+  # never read or written. KeyPath exists for tests.
+  function Add-AgencUserPathEntry([string]$Directory, [string]$KeyPath = "Environment") {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($KeyPath)
+    try {
+      $current = $key.GetValue("Path", $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+      $updated = Get-AgencPathWithEntry ([string]$current) $Directory
+      if ($null -eq $updated) { return $false }
+      $kind = [Microsoft.Win32.RegistryValueKind]::ExpandString
+      if ($null -ne $current) { $kind = $key.GetValueKind("Path") }
+      if ($kind -ne [Microsoft.Win32.RegistryValueKind]::String -and
+          $kind -ne [Microsoft.Win32.RegistryValueKind]::ExpandString) {
+        throw "the user Path has registry type $kind"
+      }
+      $key.SetValue("Path", $updated, $kind)
+      return $true
+    } finally {
+      $key.Close()
+    }
+  }
+  # Tells Explorer and new terminals that the user environment changed, as
+  # [Environment]::SetEnvironmentVariable does after its registry write.
+  function Send-AgencEnvironmentChange {
+    if (-not ("AgencInstall.EnvironmentNotice" -as [type])) {
+      Add-Type -Namespace AgencInstall -Name EnvironmentNotice -MemberDefinition @'
+[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam,
+  string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+'@
+    }
+    $result = [UIntPtr]::Zero
+    [void][AgencInstall.EnvironmentNotice]::SendMessageTimeout(
+      [IntPtr]0xffff, 0x1A, [UIntPtr]::Zero, "Environment", 2, 1000, [ref]$result)
+  }
+  # END AGENC USER PATH
+
+  if ($actualWindows -and (Test-AgencModifyPathAllowed $env:AGENC_NO_MODIFY_PATH)) {
+    # The shim is installed, so a PATH write failure only costs the shortcut.
+    $pathAdded = $false
+    try {
+      $pathAdded = Add-AgencUserPathEntry $binDir
+    } catch {
+      Write-Log "could not add $binDir to your user PATH ($($_.Exception.Message)); run agenc as $shim"
+    }
+    if ($pathAdded) {
+      try { Send-AgencEnvironmentChange } catch { }
+      Write-Log "added $binDir to your user PATH; open a new terminal to use agenc"
+    }
+    # The outer finally restores the caller's PATH. Include binDir in it so
+    # the session that ran the installer can run agenc too.
+    $sessionPath = Get-AgencPathWithEntry ([string]$priorNodeEnvironment["PATH"]) $binDir
+    if ($null -ne $sessionPath) { $priorNodeEnvironment["PATH"] = $sessionPath }
+  } elseif ($actualWindows -and
+      -not (Test-AgencPathEntry ([string][Environment]::GetEnvironmentVariable("Path", "User")) $binDir)) {
+    Write-Log "AGENC_NO_MODIFY_PATH is set, so $binDir was not added to your PATH; run agenc as $shim"
   }
 
   $systemRoot = [Environment]::GetEnvironmentVariable("SystemRoot")

@@ -3338,6 +3338,9 @@ function registerInstallPs1Tests(): void {
         AGENC_INSTALL_MANIFEST_URL: manifest ?? "",
         AGENC_INSTALL_PLATFORM: "win32",
         AGENC_INSTALL_ARCH: "x64",
+        // On a Windows host the installer would add the temporary prefix to
+        // the real user PATH.
+        AGENC_NO_MODIFY_PATH: "1",
         ...envOverrides,
       };
       const result = spawnSync("pwsh", ["-NoProfile", "-File", installerPath], {
