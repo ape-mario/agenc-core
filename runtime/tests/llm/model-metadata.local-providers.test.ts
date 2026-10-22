@@ -584,6 +584,43 @@ describe("local providers resolve the real context window", () => {
     expect(configured.contextWindow).toBe(65_536);
   });
 
+  test("Ollama Cloud and compatible endpoints on Ollama's port keep the trained length", async () => {
+    // Core sends num_ctx only from the native local provider. Ollama Cloud
+    // serves its models at their full length, and the OpenAI-compatible
+    // surface takes no num_ctx, so neither is capped at 32,768.
+    const longShow = {
+      capabilities: ["completion", "tools"],
+      model_info: { "general.architecture": "kimi", "kimi.context_length": 262_144 },
+    };
+    const cloud = recordingFetch({ "https://ollama.com/api/show": { json: longShow } });
+    const cloudResolved = await new ModelMetadataResolver({
+      fetchImpl: cloud.impl,
+      env: { OLLAMA_API_KEY: "ollama-cloud-key" },
+    }).resolve({ provider: "ollama-cloud", model: "unlisted-long-model", config: EMPTY_CONFIG });
+    expect(cloudResolved.contextWindow).toBe(262_144);
+    expect(cloud.calls.map((call) => call.url)).toContain("https://ollama.com/api/show");
+
+    for (
+      const [provider, envKey] of [
+        ["openai-compatible", "OPENAI_COMPATIBLE_BASE_URL"],
+        ["lmstudio", "LMSTUDIO_BASE_URL"],
+      ] as const
+    ) {
+      const compatible = recordingFetch({
+        "http://127.0.0.1:11434/v1/models": { json: OLLAMA_V1_MODELS },
+        "http://127.0.0.1:11434/api/show": { json: longShow },
+      });
+      const resolved = await new ModelMetadataResolver({
+        fetchImpl: compatible.impl,
+        env: { [envKey]: "http://127.0.0.1:11434/v1" },
+      }).resolve({ provider, model: "qwen2.5-coder:1.5b", config: EMPTY_CONFIG });
+      expect(resolved.contextWindow, provider).toBe(262_144);
+      expect(compatible.calls.map((call) => call.url), provider).toContain(
+        "http://127.0.0.1:11434/api/show",
+      );
+    }
+  });
+
   test("a malformed context length is ignored rather than trusted", async () => {
     for (
       const value of [0, -1, 1.5, "32768", null] as const
