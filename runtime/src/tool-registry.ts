@@ -29,7 +29,7 @@ import { prepareModelToolArgs, validateToolPreflight } from "./tools/execution.j
 
 import type { LLMTool, LLMToolCall } from "./llm/types.js";
 import { lightPresentation, standardPresentation } from "./tools/light-presentation.js";
-import { LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES, LIGHT_INITIAL_TOOL_NAMES, lightEditsWithApplyPatch, lightUsesBatchEdit } from "./tools/light-profile.js";
+import { LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES, LIGHT_INITIAL_TOOL_NAMES, lightEditsWithApplyPatch, lightUsesBatchEdit, lightUsesGlmTuning } from "./tools/light-profile.js";
 import type { FunctionCallOutputContentItem } from "./tools/context.js";
 import type {
   Tool,
@@ -1491,7 +1491,9 @@ export function buildToolRegistry(
         const tool = toolToLLMTool(spec.tool);
         if (spec.tool.metadata?.source !== "builtin") return tool;
         if (options.lightMode === true) {
-          return lightPresentation(tool, { leanExec, leanSearch, leanRead, lightSession: true });
+          const identity = sessionModelIdentity();
+          return lightPresentation(tool, { leanExec, leanSearch, leanRead, lightSession: true,
+            glmServerChecks: lightUsesGlmTuning(identity.provider, identity.model) });
         }
         // Standard sessions with the default deferral send compact wording for
         // the core tools (same fields, same schema) and the lean exec_command

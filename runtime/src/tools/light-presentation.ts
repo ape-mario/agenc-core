@@ -1,5 +1,8 @@
 import type { LLMTool } from "../llm/types.js";
 
+export const LIGHT_GLM_SERVER_CHECKS =
+  "For a server check, start the server in the background, query it, then stop it with kill $! in the same command. Never use wait on a server: it keeps the command blocked until its timeout.";
+
 // Presentation only; execution and discovery retain the canonical tool. The
 // shared Light wording keeps every field, alternative, default and validation
 // keyword on the wire (null removes only a redundant property description,
@@ -67,12 +70,16 @@ export function lightPresentation(
     readonly leanSearch?: boolean;
     readonly leanRead?: boolean;
     readonly lightSession?: boolean;
+    readonly glmServerChecks?: boolean;
   } = {},
 ): LLMTool {
   const canonical = tool.function.name === "Edit" && (tool.function.parameters.properties as Record<string, unknown> | undefined)?.edits !== undefined
     ? tool
     : lightPresentationCanonical(tool);
-  const presented = options.lightSession === true ? withLightSessionFields(canonical) : canonical;
+  const sessionTool = options.lightSession === true ? withLightSessionFields(canonical) : canonical;
+  const presented = options.lightSession === true && options.glmServerChecks === true && tool.function.name === "exec_command"
+    ? { ...sessionTool, function: { ...sessionTool.function, description: `${sessionTool.function.description} ${LIGHT_GLM_SERVER_CHECKS}` } }
+    : sessionTool;
   if (options.leanExec === true && tool.function.name === "exec_command") {
     return withOnlyFields(presented, LEAN_EXEC_FIELDS, LEAN_EXEC_POINTER);
   }
