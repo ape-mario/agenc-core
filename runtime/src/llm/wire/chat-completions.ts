@@ -5,7 +5,7 @@ import { oneShotFastModeActive } from "../../one-shot-fast-mode.js";
  * @module
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { isKnownEmptyProviderReasoning } from "../types.js";
 import { withResponseDetailSystemPrompt } from "../../prompts/response-detail.js";
 import type {
@@ -984,6 +984,42 @@ function topLevelChargedUsd(cost: unknown): number | undefined {
   return parts.length > 0 ? parts.reduce((sum, value) => sum + value, 0) : undefined;
 }
 
+/**
+ * Tool-call ids the conversation already holds. Some providers number calls
+ * per response (Venice's Kimi returns "FileRead:0", "FileRead:1" every time),
+ * so a later response repeats an id that is already in history.
+ */
+function historyToolCallIds(messages: readonly LLMMessage[]): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const message of messages) {
+    for (const call of message.toolCalls ?? []) ids.add(call.id);
+    if (message.toolCallId !== undefined) ids.add(message.toolCallId);
+  }
+  return ids;
+}
+
+/** Kimi-style ids that count calls within one response ("FileRead:0", "functions.FileRead:1"). */
+const PER_RESPONSE_TOOL_CALL_ID = /^(?:functions\.)?[A-Za-z0-9_.-]+:\d+$/u;
+
+/**
+ * Give a call an id of its own when its id is one the conversation may already
+ * hold: an id the request history contains, or a per-response counter, which
+ * repeats on every later response (compaction can drop the earlier one from the
+ * request while the session still remembers it). The durable tool-pair store
+ * refuses a repeated id, and a session that hits it can take no more turns.
+ * Every other id is kept as the provider sent it.
+ */
+function renameRepeatedToolCallId(
+  id: string,
+  used: ReadonlySet<string>,
+  responseNonce: () => string,
+): string {
+  if (!used.has(id) && !PER_RESPONSE_TOOL_CALL_ID.test(id)) return id;
+  return "call_" + createHash("sha256")
+    .update(responseNonce()).update("\0").update(id)
+    .digest("hex").slice(0, 32);
+}
+
 export function parseChatCompletionsResponse(
   model: string,
   response: Record<string, unknown>,
@@ -993,6 +1029,11 @@ export function parseChatCompletionsResponse(
     readonly conflictingReasoningModel: boolean;
   },
 ): LLMResponse {
+  let historyIds: ReadonlySet<string> | undefined;
+  const usedToolCallIds = (): ReadonlySet<string> =>
+    (historyIds ??= historyToolCallIds(request.messages));
+  let nonce: string | undefined;
+  const responseNonce = (): string => (nonce ??= randomUUID());
   // Keep hashed aliases request-scoped. Meta's auto-only compatibility
   // contract strips the complete tool catalog when callers select `none`;
   // using the unfiltered input catalog here would let an unadvertised hashed
@@ -1070,7 +1111,7 @@ export function parseChatCompletionsResponse(
         ? decodeMcpToolNameFromWire(call.function.name, advertisedToolNames) : "";
       if (!name || name.length > 256) return [];
       const rawId = typeof call.id === "string" && call.id.length > 0 ? call.id : `incomplete-${index}`;
-      const id = request.toolCallIdNamespace === undefined ? rawId
+      const id = request.toolCallIdNamespace === undefined ? renameRepeatedToolCallId(rawId, usedToolCallIds(), responseNonce)
         : "call_" + createHash("sha256").update(request.toolCallIdNamespace).update("\0").update(rawId).digest("hex").slice(0, 32);
       return [{ id, name }];
     }) : [];
@@ -1117,8 +1158,13 @@ export function parseChatCompletionsResponse(
   // Some routed providers restart at call_0 for every response. Keep canonical
   // history globally unique while preserving IDs across retries of one attempt.
   // Validate the original response first so duplicate IDs within it still fail.
-  const toolCalls = request.toolCallIdNamespace === undefined ? wireToolCalls :
-    wireToolCalls.map(call => ({...call,id:"call_" + createHash("sha256")
+  // Other providers keep their ids unless one repeats an id the history holds.
+  const toolCalls = request.toolCallIdNamespace === undefined
+    ? wireToolCalls.map(call => {
+      const id = renameRepeatedToolCallId(call.id, usedToolCallIds(), responseNonce);
+      return id === call.id ? call : { ...call, id };
+    })
+    : wireToolCalls.map(call => ({...call,id:"call_" + createHash("sha256")
       .update(request.toolCallIdNamespace!).update("\0").update(call.id)
       .digest("hex").slice(0,32)}));
   const reasoningContentField =
