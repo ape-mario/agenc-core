@@ -220,7 +220,9 @@ iwr -useb https://get.agenc.ag/install.ps1 | iex
 ```
 
 Source: `scripts/install/install.ps1`. Same manifest/verify/extract contract;
-installs an `agenc.cmd` shim under `%LOCALAPPDATA%\agenc\bin` and writes a
+installs an `agenc.cmd` shim under `%LOCALAPPDATA%\agenc\bin`, adds that
+folder to the user `Path` once (set `AGENC_NO_MODIFY_PATH=1` to skip; see
+`scripts/install/README.md`), and writes a
 WinSW 2.12.0 definition, `agenc-daemon.xml` in the install prefix, with those
 absolute paths, the installing-user `<domain>` and `<user>`, and that user's
 `AGENC_HOME` (the user-profile known folder plus `.agenc`, which is
