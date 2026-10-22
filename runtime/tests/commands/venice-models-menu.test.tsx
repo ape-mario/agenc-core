@@ -70,6 +70,12 @@ async function fakeVenice(options: { readonly modelsStatus?: number } = {}) {
   const authorizations: string[] = [];
   const server = createServer((req, res) => {
     authorizations.push(req.headers.authorization ?? "");
+    // The key check before a key is saved (useApiKeyVerification): Venice
+    // answers 200 for a key it knows.
+    if (req.url === "/api/v1/api_keys/rate_limits") {
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ data: {} }));
+      return;
+    }
     if (req.url !== "/api/v1/models") {
       res.writeHead(404).end();
       return;
