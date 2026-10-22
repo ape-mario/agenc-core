@@ -10,8 +10,16 @@ const INVENTORY_REPOSITORY = "actions/runner-images";
 const MAX_INVENTORY_BYTES = 1024 * 1024;
 const MAX_RELEASE_INDEX_BYTES = 8 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 30_000;
-const RELEASE_INDEX_URL =
-  "https://api.github.com/repos/actions/runner-images/releases?per_page=100&page=1";
+// GitHub lists runner-images releases newest first, 100 to a page. An image
+// GitHub no longer refreshes often (macos-15 Intel: its stable release of
+// 2026-08-24 had left the first page by 2026-10-22) is still the image the
+// runner serves, so the index is read page by page until every target has a
+// stable release, within a fixed page budget.
+const RELEASE_INDEX_PAGE_SIZE = 100;
+const MAX_RELEASE_INDEX_PAGES = 10;
+function releaseIndexUrl(page) {
+  return `https://api.github.com/repos/actions/runner-images/releases?per_page=${RELEASE_INDEX_PAGE_SIZE}&page=${page}`;
+}
 // GitHub's own rollout feed per image label: the badge source in the
 // actions/runner-images README. It reads {"label":"<deployed>","message":
 // "Deployed"} or {"label":"<deployed>","message":"Deploying to <next>"}.
@@ -552,11 +560,12 @@ async function readBoundedBytes(response, maximumBytes, label) {
   return bytes;
 }
 
-async function fetchOfficialReleaseIndex(fetchImpl) {
+async function fetchReleaseIndexPage(fetchImpl, page) {
+  const url = releaseIndexUrl(page);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetchImpl(RELEASE_INDEX_URL, {
+    const response = await fetchImpl(url, {
       headers: {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -568,7 +577,7 @@ async function fetchOfficialReleaseIndex(fetchImpl) {
     if (!response.ok || response.status !== 200) {
       fail(`official runner release index returned HTTP ${response.status}`);
     }
-    if (response.url && response.url !== RELEASE_INDEX_URL) {
+    if (response.url && response.url !== url) {
       fail("official runner release index response URL changed");
     }
     const bytes = await readBoundedBytes(
@@ -576,14 +585,74 @@ async function fetchOfficialReleaseIndex(fetchImpl) {
       MAX_RELEASE_INDEX_BYTES,
       "official runner release index",
     );
+    let releases;
     try {
-      return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+      releases = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
     } catch {
       fail("official runner release index is not valid UTF-8 JSON");
     }
+    if (!Array.isArray(releases)) {
+      fail("official runner release index must be an array");
+    }
+    return releases;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function hasStableReleaseForEveryTarget(releases) {
+  return Object.values(TARGET_CONTRACTS).every(({ releasePrefix }) =>
+    releases.some(
+      (release) =>
+        release !== null &&
+        typeof release === "object" &&
+        typeof release.tag_name === "string" &&
+        release.tag_name.startsWith(releasePrefix) &&
+        release.draft === false &&
+        release.prerelease === false,
+    ),
+  );
+}
+
+/**
+ * The release index up to the page that holds a stable release of every
+ * target. Newer prereleases sort before their image's stable release, so
+ * they are already read by then. A release published between two page reads
+ * pushes the list down by one, so an entry seen on an earlier page can come
+ * back unchanged at the top of the next one; that copy is dropped. A changed
+ * copy, or a duplicate within one page, is kept and fails the index checks.
+ */
+async function fetchOfficialReleaseIndex(fetchImpl) {
+  const releases = [];
+  const seen = new Map();
+  for (let page = 1; page <= MAX_RELEASE_INDEX_PAGES; page += 1) {
+    const batch = await fetchReleaseIndexPage(fetchImpl, page);
+    for (const release of batch) {
+      const earlier =
+        typeof release?.tag_name === "string" ? seen.get(release.tag_name) : undefined;
+      if (
+        earlier !== undefined &&
+        earlier.draft === release.draft &&
+        earlier.prerelease === release.prerelease &&
+        earlier.target_commitish === release.target_commitish
+      ) {
+        continue;
+      }
+      releases.push(release);
+    }
+    for (const release of batch) {
+      if (typeof release?.tag_name === "string" && !seen.has(release.tag_name)) {
+        seen.set(release.tag_name, release);
+      }
+    }
+    if (
+      batch.length < RELEASE_INDEX_PAGE_SIZE ||
+      hasStableReleaseForEveryTarget(releases)
+    ) {
+      break;
+    }
+  }
+  return releases;
 }
 
 /** Returns the parsed rollout feed for one target, or null on any failure. */
