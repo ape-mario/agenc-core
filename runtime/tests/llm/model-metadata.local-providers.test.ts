@@ -557,6 +557,33 @@ describe("local providers resolve the real context window", () => {
     expect(resolved.contextWindow).toBe(32768);
   });
 
+  test("local Ollama admits against the window Core runs it at, not the trained length", async () => {
+    // gpt-oss:20b reports 131,072; Core sends num_ctx 32,768 and must plan
+    // against the same number, or Ollama drops the oldest messages silently.
+    for (const [trained, expected] of [[131_072, 32_768], [262_144, 32_768], [8_192, 8_192]] as const) {
+      const { impl } = recordingFetch({
+        "http://127.0.0.1:11434/api/show": { json: { model_info: { "gptoss.context_length": trained } } },
+      });
+      const resolved = await new ModelMetadataResolver({
+        fetchImpl: impl,
+        env: { OLLAMA_BASE_URL: "http://127.0.0.1:11434" },
+      }).resolve({ provider: "ollama", model: "gpt-oss:20b", config: EMPTY_CONFIG });
+      expect(resolved.contextWindow, String(trained)).toBe(expected);
+    }
+    // A configured window still wins.
+    const { impl } = recordingFetch({
+      "http://127.0.0.1:11434/api/show": { json: { model_info: { "gptoss.context_length": 131_072 } } },
+    });
+    const configured = await new ModelMetadataResolver({
+      fetchImpl: impl,
+      env: { OLLAMA_BASE_URL: "http://127.0.0.1:11434" },
+    }).resolve({
+      provider: "ollama", model: "gpt-oss:20b",
+      config: mergeConfigs(defaultConfig(), { providers: { ollama: { context_window_tokens: 65_536 } } }) as AgenCConfig,
+    });
+    expect(configured.contextWindow).toBe(65_536);
+  });
+
   test("a malformed context length is ignored rather than trusted", async () => {
     for (
       const value of [0, -1, 1.5, "32768", null] as const
