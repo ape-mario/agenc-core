@@ -164,9 +164,11 @@ describe("a read-only call that cannot take the read-only route", () => {
   /**
    * Router stand-in: calls named in `ordinary` miss the read-only route, as
    * when its sandbox cannot be prepared, and run through the hook the
-   * executor hands to concurrently scheduled shell calls.
+   * executor hands to concurrently scheduled shell calls. `arrive` delays a
+   * call's route decision, as the router's own checks do before it.
    */
-  function routedHarness(ordinary: ReadonlySet<string>, durations: Record<string, number | Promise<void>>, abortSignal?: AbortSignal) {
+  function routedHarness(ordinary: ReadonlySet<string>, durations: Record<string, number | Promise<void>>,
+    abortSignal?: AbortSignal, arrive: Record<string, number> = {}) {
     const tool: Tool = createExecCommandTool({ cwd });
     const registry = {
       tools: [tool],
@@ -200,6 +202,8 @@ describe("a read-only call that cannot take the read-only route", () => {
           active -= 1;
           return { content: `ran ${toolCall.id}` };
         };
+        const arrival = arrive[toolCall.id];
+        if (arrival !== undefined) await delay(arrival, undefined, { signal: opts.signal });
         return ordinary.has(toolCall.id) && opts.runAloneOffReadOnlyRoute !== undefined
           ? opts.runAloneOffReadOnlyRoute(run)
           : run();
@@ -240,6 +244,29 @@ describe("a read-only call that cannot take the read-only route", () => {
     expect(concurrentDuring.a).toEqual([1, 1]);
     expect(concurrentDuring.b).toEqual([1, 1]);
     expect(timeline.filter((entry) => entry.startsWith("start:"))).toHaveLength(3);
+  });
+
+  // Seen on macOS: a zsh session shell keeps read-only command lines off the
+  // read-only route, so two of them from one response both fall back. The
+  // first waits for the second while that one still runs its route checks;
+  // the second then waits for the first one's turn.
+  test.each([
+    { late: "b", order: ["a", "b"] },
+    { late: "a", order: ["b", "a"] },
+  ])("a fallback that arrives later ($late) wakes the one already waiting", async ({ late, order }) => {
+    const { exec, timeline, concurrentDuring } = routedHarness(
+      new Set(["a", "b"]), { a: 1, b: 1 }, undefined, { [late]: 20 },
+    );
+    exec.addTool(block("a"), execCall("a", "cat package.json | head -3"));
+    exec.addTool(block("b"), execCall("b", "cat README.md | head -3"));
+    exec.dispatchPending();
+    exec.close();
+    const outcome = await Promise.race([drain(exec), delay(2_000).then(() => "deadlocked" as const)]);
+    if (outcome === "deadlocked") exec.discard("test cleanup");
+    expect(outcome).toEqual(["a", "b"]);
+    expect(timeline).toEqual(order.flatMap((id) => [`start:${id}`, `end:${id}`]));
+    expect(concurrentDuring.a).toEqual([1, 1]);
+    expect(concurrentDuring.b).toEqual([1, 1]);
   });
 
   test("calls that take the read-only route still overlap", async () => {

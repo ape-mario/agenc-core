@@ -1074,6 +1074,11 @@ export class StreamingToolExecutor {
    */
   private async runAlone<T>(tool: TrackedTool, run: () => Promise<T>, signal: AbortSignal): Promise<T> {
     this.aloneWaiting.add(tool);
+    // Joining the waiters is a state change too: a call already waiting here
+    // stops counting this one as executing. Wake it, or a waiter that saw
+    // this call still checking its route sleeps while this call waits for
+    // its turn, and neither ever runs.
+    this.signalProgress();
     const previous = this.aloneTail;
     let releaseTurn!: () => void;
     this.aloneTail = new Promise<void>((resolve) => { releaseTurn = resolve; });
