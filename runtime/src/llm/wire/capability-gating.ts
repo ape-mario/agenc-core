@@ -531,6 +531,12 @@ export function chatCompletionsCapabilityHintsForProvider(
             replaysReasoningDetails: true,
             promptCacheKeyFields: ["prompt_cache_key"] as const,
           } : {}),
+          // OpenRouter's parameter lists often leave out parallel_tool_calls
+          // although the upstreams take it and default to parallel calls, so
+          // Core sent false to most models (Claude, Gemini, Grok, Qwen) and
+          // they read files one at a time. Leave the field to the upstream
+          // default; GPT models keep the explicit true they get on OpenAI.
+          ...(gatewayFamily !== "openai" ? { acceptsParallelToolCalls: false } : {}),
         }
       : {}),
     ...(slug === "openai" ? { gatesTemperatureOnOpenAiReasoning: true } : {}),

@@ -237,6 +237,25 @@ describe("gateway request shape", () => {
     expect(reply.usage.providerCostUsd).toBeCloseTo(0.000288, 9);
     expect(reply.providerReasoningContent).toBe("think");
   });
+
+  test.each([
+    "x-ai/grok-build-0.1",
+    "qwen/qwen3-coder",
+    "anthropic/claude-sonnet-5.5",
+    "google/gemini-3.8-flash",
+    "z-ai/glm-5.3",
+  ])("OpenRouter %s gets no parallel_tool_calls: the upstream default allows parallel calls", (model) => {
+    // Core asks for serial calls whenever OpenRouter's parameter list omits the
+    // field; sending that false made these models read files one at a time.
+    for (const parallelToolCalls of [false, true]) {
+      const body = buildChatCompletionsRequest({
+        model, messages: [{ role: "user", content: "read a.txt and b.txt" }], tools: TOOLS,
+        providerCapabilityHints: chatCompletionsCapabilityHintsForProvider("openrouter", model),
+        options: { parallelToolCalls },
+      });
+      expect(body.parallel_tool_calls).toBeUndefined();
+    }
+  });
 });
 
 describe("streamed reasoning_details", () => {
