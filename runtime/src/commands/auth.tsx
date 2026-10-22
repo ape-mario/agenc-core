@@ -24,7 +24,7 @@ import {
   visibleSubscriptionManagedModelsForTier,
 } from "./subscription-managed-models.js";
 
-type AuthAction = "login" | "logout" | "whoami" | "subscription" | "usage";
+type AuthAction = "login" | "logout" | "whoami" | "subscription";
 
 const TUI_AUTH_SESSION_ID = "tui" as const;
 const SUBSCRIPTION_URL = "https://id.agenc.ag/subscription" as const;
@@ -65,10 +65,11 @@ export const subscriptionCommand: SlashCommand = {
 
 export const usageCommand: SlashCommand = {
   name: "usage",
-  description: "Show hosted model usage for your AgenC plan",
+  description: "Show AgenC plan usage and connected provider balances",
+  argumentHint: "[provider]",
   immediate: true,
   supportsNonInteractive: true,
-  execute: async (ctx) => executeAuthCommand("usage", ctx),
+  execute: async (ctx) => executeUsageCommand(ctx),
 };
 
 export const authCommands: readonly SlashCommand[] = [
@@ -145,19 +146,56 @@ async function executeAuthCommand(
         text: formatSubscriptionCommandResult(tier),
       };
     }
-    if (action === "usage") {
-      const usage = await resolveLlmUsage(backend);
-      return {
-        kind: "text",
-        text: formatUsageCommandResult(usage.usage, tier, usage.error),
-      };
-    }
 
     return {
       kind: "text",
       text: `${formatAgenCAuthIdentity(result.identity)}${formatSubscriptionStatus(tier)}`,
     };
   });
+}
+
+/**
+ * `/usage` shows the AgenC account and every connected provider with a usage
+ * API, fetched together. `/usage <provider>` shows one provider in detail.
+ */
+async function executeUsageCommand(
+  ctx: SlashCommandContext,
+): Promise<SlashCommandResult> {
+  return safeExecute(async () => {
+    const args = ctx.argsRaw.trim().split(/\s+/u).filter((part) => part.length > 0);
+    if (args.length > 1) {
+      return { kind: "error", message: "Usage: /usage [provider]" };
+    }
+    const providerUsage = await import("./provider-usage.js");
+    const [provider] = args;
+    if (provider !== undefined) {
+      return await providerUsage.readProviderUsageDetail(ctx, provider);
+    }
+    const [account, providers] = await Promise.all([
+      readAccountUsageText(ctx),
+      providerUsage.readProviderUsageSection(ctx),
+    ]);
+    return {
+      kind: "text",
+      text: `${providerUsage.usageHeading(ctx, "AgenC account")}\n${account}\n\n${providers}`,
+    };
+  });
+}
+
+async function readAccountUsageText(ctx: SlashCommandContext): Promise<string> {
+  try {
+    const backend = createSlashAuthBackend(ctx);
+    const result = await backend.whoami({ sessionId: TUI_AUTH_SESSION_ID });
+    if (!result.authenticated) {
+      return "Not logged in. Run /login to sign in with Google.";
+    }
+    const tier = await resolveSubscriptionTier(backend);
+    const usage = await resolveLlmUsage(backend);
+    return formatUsageCommandResult(usage.usage, tier, usage.error);
+  } catch (error) {
+    // Provider balances still show when the account lookup fails.
+    return `Account usage unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  }
 }
 
 function managedSubscriptionTier(
