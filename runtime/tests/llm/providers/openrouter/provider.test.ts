@@ -234,3 +234,44 @@ describe("OpenRouterProvider", () => {
     expect(headers.get("x-title")).toBe("AgenC Test");
   });
 });
+
+describe("OpenRouter tool-result images", () => {
+  // A 1x1 PNG, the shape FileRead returns for an image file.
+  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+  test.each([
+    ["moonshotai/kimi-k2.7-code", true],
+    ["google/gemini-3.8-flash", true],
+    ["minimax/minimax-m3", true],
+    ["qwen/qwen3-coder-next", false],
+    ["deepseek/deepseek-v4-flash", false],
+  ] as const)("%s sees a tool-result image: %s", async (model, sees) => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      id: "chatcmpl_img", model,
+      choices: [{ message: { role: "assistant", content: "red" }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const provider = new OpenRouterProvider({ apiKey: "or-test", model, fetchImpl });
+
+    await provider.chat([
+      { role: "user", content: "What color is shape.png?" },
+      { role: "assistant", content: "", toolCalls: [{ id: "call_read", name: "FileRead", arguments: "{}" }] },
+      { role: "tool", toolCallId: "call_read", content: [
+        { type: "text", text: "Read image shape.png (221B, image/png)" },
+        { type: "image_url", image_url: { url: png } },
+      ] },
+    ]);
+
+    const body = JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body)) as { messages: Array<Record<string, unknown>> };
+    const tool = body.messages.find(message => message.role === "tool");
+    const relayed = JSON.stringify(body.messages.slice(body.messages.indexOf(tool!) + 1));
+    if (sees) {
+      // The image reaches the model in the user message that follows the tool result.
+      expect(relayed).toContain("image_url");
+      expect(String(tool!.content)).not.toContain("Image not shown");
+    } else {
+      expect(JSON.stringify(body)).not.toContain("image_url");
+      expect(String(tool!.content)).toContain("Image not shown");
+    }
+  });
+});
