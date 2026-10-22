@@ -288,6 +288,51 @@ describe("/usage providers section", () => {
     ]);
   });
 
+  it("never sends a key to a custom Ollama Cloud or Kimi endpoint and keeps the overrides other adapters honor", async () => {
+    const environment = {
+      OLLAMA_API_KEY: "ollama-key-0001",
+      MOONSHOT_API_KEY: "kimi-key-0005",
+      OPENROUTER_API_KEY: "openrouter-key-0002",
+      OPENROUTER_BASE_URL: "http://127.0.0.1:8080/or/api/v1",
+      VENICE_API_KEY: "venice-key-0004",
+    };
+    const config = {
+      providers: {
+        "ollama-cloud": { base_url: "https://collector.example/v1" },
+        kimi: { base_url: "https://api.moonshot.cn/v1" },
+        venice: { base_url: "https://venice-proxy.example/api/v1" },
+      },
+    };
+    // Every endpoint answers, so a request that should not happen would succeed.
+    const routes: Readonly<Record<string, UsageRoute>> = {
+      "collector.example/api/balance": LIVE_USAGE_ROUTES["ollama.com/api/balance"]!,
+      "collector.example/api/usage?range=24h&group_by=model": LIVE_USAGE_ROUTES["ollama.com/api/usage?range=24h&group_by=model"]!,
+      "collector.example/api/usage?range=7d&group_by=model": LIVE_USAGE_ROUTES["ollama.com/api/usage?range=7d&group_by=model"]!,
+      "api.moonshot.cn/v1/users/me/balance": LIVE_USAGE_ROUTES["api.moonshot.ai/v1/users/me/balance"]!,
+      "127.0.0.1:8080/or/api/v1/credits": LIVE_USAGE_ROUTES["openrouter.ai/api/v1/credits"]!,
+      "127.0.0.1:8080/or/api/v1/key": LIVE_USAGE_ROUTES["openrouter.ai/api/v1/key"]!,
+      "venice-proxy.example/api/v1/api_keys/rate_limits": LIVE_USAGE_ROUTES["api.venice.ai/api/v1/api_keys/rate_limits"]!,
+    };
+    const summary = await section({ environment, config, routes });
+    expect(summary.text).toBe([
+      "Providers",
+      "Ollama Cloud      usage unavailable (custom endpoint)",
+      "OpenRouter        credits: $55.82 left of $65.00",
+      "Venice AI         balance: $39.60",
+      "Kimi (Moonshot)   usage unavailable (custom endpoint)",
+    ].join("\n"));
+    expect(summary.requests.map((request) => `${new URL(request.url).host} ${request.authorization}`).sort()).toEqual([
+      "127.0.0.1:8080 Bearer openrouter-key-0002",
+      "127.0.0.1:8080 Bearer openrouter-key-0002",
+      "venice-proxy.example Bearer venice-key-0004",
+    ]);
+    for (const name of ["ollama", "kimi"]) {
+      const { result, requests } = await detail(name, { environment, config, routes });
+      expect(text(result).split("\n").slice(1)).toEqual(["usage unavailable (custom endpoint)"]);
+      expect(requests).toEqual([]);
+    }
+  });
+
   it("says which providers it can read when none is connected, without a request", async () => {
     const { text: rendered, requests } = await section({ environment: { MISTRAL_API_KEY: "mistral-key" }, columns: 80 });
     expect(rendered).toBe([

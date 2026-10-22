@@ -139,10 +139,15 @@ Cloud, since a local Ollama server has no account.
 | Kimi (Moonshot) | available balance and money owed | voucher and cash balance | `GET /v1/users/me/balance` |
 | abliteration.ai | credits left | credits used | `GET /v1/credits` |
 
-Each request goes to the provider's own resolved base URL (the registry default,
-`providers.<id>.base_url` in config, or the provider's `*_BASE_URL` override),
-so a key only travels where that provider's chat requests already go. Redirects
-are refused and keys are never printed. Providers whose APIs need an admin or
+Each request goes only to the origin the provider's chat adapter would use, so a
+key never travels where that provider's chat requests could not. OpenRouter,
+DeepSeek, Venice and abliteration.ai follow their resolved base URL (the
+registry default, `providers.<id>.base_url` in config, or the provider's
+`*_BASE_URL` override). The Ollama Cloud and Kimi adapters are pinned to
+`https://ollama.com/v1` and `https://api.moonshot.ai/v1` and refuse any other
+endpoint, so with a different `base_url` their usage shows
+`usage unavailable (custom endpoint)` and no request is sent. Redirects are
+refused and keys are never printed. Providers whose APIs need an admin or
 management key for billing (OpenAI, Anthropic, xAI, Mistral) or document no
 balance API for API keys (Gemini, Groq, Cerebras, NVIDIA NIM, Meta, Qwen, Z.AI, MiniMax, GitHub
 Copilot, Amazon Bedrock) are not listed. AgenC-managed routes have no key of
