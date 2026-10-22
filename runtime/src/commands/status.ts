@@ -24,10 +24,20 @@ import {
 } from "./types.js";
 import { readSessionSelection } from "../session/provider-model-selection.js";
 import { createStatusDashboardSnapshot } from "./status-menu-snapshot.js";
+import { capturedProviderEnvironment, readCommandConfig } from "./config-context.js";
+import type { EnvSnapshot } from "../config/env.js";
+import {
+  resolveZeroDataRetentionStatus,
+  type ZeroDataRetentionStatus,
+} from "../llm/zero-data-retention.js";
 
 export interface StatusLine {
   key: string;
   value: string;
+  /** A longer explanation for the dashboard's detail line. */
+  detail?: string;
+  /** How the dashboard marks the row; "info" when unset. */
+  state?: "ok" | "warn" | "info";
 }
 
 interface StatusServices {
@@ -300,6 +310,45 @@ function readPermissionMode(
 }
 
 /**
+ * The status line's ZDR badge, explained: whether the provider and model a
+ * call made now would use keep prompts and responses, and why.
+ */
+export function zeroDataRetentionStatusLine(status: ZeroDataRetentionStatus): StatusLine {
+  switch (status.state) {
+    case "zdr":
+      return { key: "Zero data retention", value: "on (green ZDR)", detail: status.reason, state: "ok" };
+    case "retained":
+      return { key: "Zero data retention", value: "data may be kept (red ZDR)", detail: status.reason, state: "warn" };
+    case "unknown":
+      return { key: "Zero data retention", value: "unknown (dim ZDR?)", detail: status.reason, state: "info" };
+  }
+}
+
+function providerEnvironmentOrEmpty(ctx: SlashCommandContext): EnvSnapshot {
+  try {
+    return capturedProviderEnvironment(ctx);
+  } catch {
+    // Without a captured environment only configured addresses count.
+    return {};
+  }
+}
+
+function zeroDataRetentionLineFor(ctx: SlashCommandContext): StatusLine | undefined {
+  try {
+    const selection = readSessionSelection(ctx.session, { includePending: true });
+    const status = resolveZeroDataRetentionStatus({
+      provider: selection.provider,
+      model: selection.model,
+      config: readCommandConfig(ctx) ?? {},
+      env: providerEnvironmentOrEmpty(ctx),
+    });
+    return status === undefined ? undefined : zeroDataRetentionStatusLine(status);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Render StatusLine[] into a column-aligned text block.
  */
 export function formatStatus(lines: ReadonlyArray<StatusLine>): string {
@@ -335,6 +384,11 @@ export const statusCommand: SlashCommand = {
       const sessionUsage = ctx.appState?.getSessionUsage?.() ??
         ctx.session.services?.executionAdmission?.getUsageSummary?.();
       const lines = collectStatus(ctx.session, ctx.cwd, undefined, snapshot, sessionUsage);
+      const zeroDataRetention = zeroDataRetentionLineFor(ctx);
+      if (zeroDataRetention !== undefined) {
+        const provider = lines.findIndex(line => line.key === "Provider");
+        lines.splice(provider >= 0 ? provider + 1 : lines.length, 0, zeroDataRetention);
+      }
       const dashboard = createStatusDashboardSnapshot({
         lines,
         git: await collectGitStatus(ctx.cwd),

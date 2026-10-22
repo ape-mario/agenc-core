@@ -83,6 +83,21 @@ keep the mode they started with. The status line shows `standard` for a
 standard session and no label for Light. Swarm teammates are started with the
 leader's mode.
 
+### Status line
+
+The line under the prompt shows the folder, model, effort, permission mode and
+session markers on the left, and the context share, cache share, spend and a
+`ZDR` badge on the right. Nothing is dropped at a narrow width. Facts first
+take short forms, one at a time: `high effort` becomes `high`, `asks first`
+becomes `asks`, `cache 82%` becomes `c 82%`, `$0.041 off-peak` becomes
+`$0.041 op`, `price unknown` becomes `no price`, and the folder becomes its
+last name. Then the folder and the model are shortened in the middle. When one
+row still cannot hold everything, the usage figures and the badge move to a
+second row and the prompt area gives up that row. The badge is green when the
+provider and model keep no data, red when data may be kept, and a dim `ZDR?`
+when AgenC cannot tell; `/status` says why
+([providers.md](providers.md#zero-data-retention)).
+
 ### Print-mode notes
 
 - A print-mode turn that stops with `compact_failed` (compaction could not shrink the context even after the degraded ladder) is re-entered once with a runtime-authored continuation turn on the same session before the run exits 1; `AGENC_ONE_SHOT_COMPACT_RETRIES` sets the count (`0` disables). The exit code is the last turn's outcome.

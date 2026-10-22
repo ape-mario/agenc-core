@@ -9,6 +9,7 @@ import {
   calculateModalViewport,
   calculateSuggestionListRows,
   FullscreenLayout,
+  folderName,
   shouldShowFileTreeGutter,
   statusLineSegments,
   workspacePathLabel,
@@ -291,9 +292,9 @@ describe("FullscreenLayout modal viewport", () => {
   });
 
   test("labels only a standard session; Light, the default, has no label", () => {
-    const unspecified = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort");
-    const light = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort", true);
-    const standard = statusLineSegments(100, "~/project", "deepseek-flash", "default", "$0.04", "max effort", false);
+    const unspecified = statusLineSegments("~/project", "deepseek-flash", "default", "$0.04", "max effort");
+    const light = statusLineSegments("~/project", "deepseek-flash", "default", "$0.04", "max effort", true);
+    const standard = statusLineSegments("~/project", "deepseek-flash", "default", "$0.04", "max effort", false);
     expect(light).toEqual(unspecified);
     expect(light.harness).toBeNull();
     expect(standard).toEqual({ ...light, harness: "standard" });
@@ -318,7 +319,7 @@ describe("FullscreenLayout modal viewport", () => {
 
   test("shows each status fact once with plain mode labels", () => {
     expect(
-      statusLineSegments(100, "~/project", "grok-4-fast", "bypassPermissions", "$0.04"),
+      statusLineSegments("~/project", "grok-4-fast", "bypassPermissions", "$0.04"),
     ).toEqual({
       folder: "~/project",
       model: "grok-4-fast",
@@ -328,31 +329,41 @@ describe("FullscreenLayout modal viewport", () => {
       spend: "$0.04",
     });
     expect(
-      statusLineSegments(100, "~/project", "grok-4-fast", "acceptEdits", "$0.00").mode,
+      statusLineSegments("~/project", "grok-4-fast", "acceptEdits", "$0.00").mode,
     ).toBe("edits freely");
     expect(
-      statusLineSegments(100, "~/project", "grok-4-fast", "plan", "$0.00").mode,
+      statusLineSegments("~/project", "grok-4-fast", "plan", "$0.00").mode,
     ).toBe("plan only");
   });
 
-  test("drops the folder on narrow terminals and leaves git to the composer", () => {
+  test("keeps the folder at every width; the layout shortens it instead of dropping it", () => {
     expect(
-      statusLineSegments(72, "~/project", "grok-4-fast", "default", "$0.00"),
-    ).toMatchObject({ folder: null });
-    expect(
-      statusLineSegments(60, "~/project", "grok-4-fast", "default", "$0.00"),
-    ).toMatchObject({ folder: null, model: "grok-4-fast" });
+      statusLineSegments("~/project", "grok-4-fast", "default", "$0.00"),
+    ).toMatchObject({ folder: "~/project", model: "grok-4-fast" });
+    expect(folderName("/home/paul/claude-agenc/agenc-core/runtime", "/home/paul")).toBe("runtime");
+    expect(folderName("/home/paul", "/home/paul")).toBe("~");
+    expect(folderName("/", "/home/paul")).toBe("/");
+  });
+
+  test.each([
+    [24, 1, { showScrollable: true, showBottomChrome: true, bottomMaxHeight: 12 }, 11],
+    [24, 2, { showScrollable: true, showBottomChrome: true, bottomMaxHeight: 11 }, 11],
+    [9, 2, { showScrollable: true, showBottomChrome: true, bottomMaxHeight: 4 }, 3],
+    [4, 2, { showScrollable: true, showBottomChrome: false, bottomMaxHeight: 2 }, 2],
+  ] as const)("gives a %i-row terminal's status line %i rows and the rest to content", (rows, statusRows, budget, suggestions) => {
+    expect(calculateFullscreenLayoutBudget(rows, statusRows)).toEqual(budget);
+    expect(calculateSuggestionListRows(rows, statusRows)).toBe(suggestions);
   });
 
   test("shows the session effort next to the model", () => {
     expect(
-      statusLineSegments(100, "~/project", "deepseek-flash", "default", "", "high effort").effort,
+      statusLineSegments("~/project", "deepseek-flash", "default", "", "high effort").effort,
     ).toBe("high effort");
   });
 
   test("hides the spend until usage arrives", () => {
     expect(
-      statusLineSegments(100, "~/project", "grok-4-fast", "default", ""),
+      statusLineSegments("~/project", "grok-4-fast", "default", ""),
     ).toEqual({
       folder: "~/project",
       model: "grok-4-fast",

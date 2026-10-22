@@ -97,7 +97,9 @@ import {
 import { useSettings } from "../hooks/useSettings.js";
 import { useMainLoopModel } from "../hooks/useMainLoopModel.js";
 import { GitStatusChrome } from "./GitStatusLine.js";
-import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext, StatusPromptCacheContext, StatusOffPeakContext } from "../context/statusEffortContext.js";
+import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext, StatusPromptCacheContext, StatusOffPeakContext, StatusZdrContext } from "../context/statusEffortContext.js";
+import { resolveZeroDataRetentionStatus } from "../../llm/zero-data-retention.js";
+import { readVeniceMenuModels } from "../../commands/venice-menu-models.js";
 import { readSessionSelection } from "../../session/provider-model-selection.js";
 import { offPeakScheduleFor } from "../../session/off-peak-pricing.js";
 import {
@@ -3273,6 +3275,31 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
   }, [props.session, remoteAuthSessionContext, statusEffortValue, resolvedMainLoopModel, effortCatalogRevision]);
   // "off-peak" in the status line follows the route a call made now would use.
   const statusOffPeakSchedule = offPeakScheduleFor(effortSelection.provider, effortSelection.model);
+  // So does the ZDR badge. It re-reads when the provider's live lists arrive
+  // (OpenRouter's zero-retention endpoints, Venice's private models).
+  const statusZdrConfig = configStore.current();
+  // The command context changes with every usage update; the badge reads it
+  // only for Venice's list, which the catalog revision already tracks.
+  const statusZdrContextRef = useRef(createSlashCommandContext);
+  statusZdrContextRef.current = createSlashCommandContext;
+  const statusZdr = useMemo(() => {
+    if (effortSelection.provider === "unknown" || effortSelection.model === "unknown") return null;
+    let veniceModels: ReturnType<typeof readVeniceMenuModels>;
+    if (effortSelection.provider === "venice") {
+      try {
+        veniceModels = readVeniceMenuModels(statusZdrContextRef.current(""));
+      } catch {
+        // The bundled list answers.
+      }
+    }
+    return resolveZeroDataRetentionStatus({
+      provider: effortSelection.provider,
+      model: effortSelection.model,
+      config: statusZdrConfig,
+      env: remoteAuthSessionContext.environment,
+      ...(veniceModels !== undefined ? { veniceModels } : {}),
+    }) ?? null;
+  }, [effortSelection.provider, effortSelection.model, statusZdrConfig, remoteAuthSessionContext, effortCatalogRevision]);
   const runLocalControlCommand = useCallback(async (parsed: ParsedSlashCommand): Promise<void> => {
     cancelTransientResult(true);
     try {
@@ -5168,6 +5195,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     <StatusContextUsageContext value={contextUsagePercent}>
     <StatusPromptCacheContext value={transcript.promptCacheShare}>
     <StatusOffPeakContext value={statusOffPeakSchedule}>
+    <StatusZdrContext value={statusZdr}>
     <StatusTurnBusyContext value={isLoading || shellAbortController !== null}>
       <AnimatedTerminalTitle isAnimating={titleIsAnimating} title={title} />
       <GlobalKeybindingHandlers
@@ -5229,6 +5257,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       {exitFlow}
 
     </StatusTurnBusyContext>
+    </StatusZdrContext>
     </StatusOffPeakContext>
     </StatusPromptCacheContext>
     </StatusContextUsageContext>

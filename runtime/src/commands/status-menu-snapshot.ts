@@ -74,10 +74,12 @@ function rowFromStatusLine(line: StatusLine): StatusDashboardRow {
       ? "context"
       : lower.includes("permission")
         ? "permissions"
-        : lower.includes("model") || lower.includes("provider")
-          ? "model"
-          : "session";
-  return row(section, line.key, line.value, "info", `${line.key}: ${line.value}`);
+        : lower.includes("retention")
+          ? "privacy"
+          : lower.includes("model") || lower.includes("provider")
+            ? "model"
+            : "session";
+  return row(section, line.key, line.value, line.state ?? "info", line.detail ?? `${line.key}: ${line.value}`);
 }
 
 function appStateRows(appState: unknown): StatusDashboardRow[] {
