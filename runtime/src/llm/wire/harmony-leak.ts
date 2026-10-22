@@ -21,8 +21,9 @@
 import { randomUUID } from "node:crypto";
 
 const GPT_OSS_MODEL = /(?:^|[/:_-])gpt-oss(?:$|[-_.:])/iu;
-const TRAILING_CALL =
-  /<\|channel\|>\s*commentary\s+to=functions\.([A-Za-z0-9_.:-]+)\s*(?:<\|constrain\|>\s*[A-Za-z]+\s*)?<\|message\|>([\s\S]*?)<\|call\|>\s*$/u;
+const CALL_END = "<|call|>";
+const RECIPIENT = "to=functions.";
+const TOOL_NAME = /^[A-Za-z0-9_.:-]+/u;
 const HARMONY_HEADER = /<\|start\|>\s*assistant|<\|channel\|>\s*(?:analysis|commentary|final)\b/gu;
 const HARMONY_TOKEN = /<\|(?:start|end|channel|message|constrain|call|return)\|>/gu;
 
@@ -44,21 +45,26 @@ export function recoverLeakedHarmonyToolCall(
   content: string,
   advertisedToolNames: readonly string[],
 ): LeakedHarmonyToolCall | undefined {
-  if (!content.includes("<|call|>")) return undefined;
-  const match = TRAILING_CALL.exec(content);
-  if (match === null) return undefined;
-  const name = match[1]!;
-  if (!advertisedToolNames.includes(name)) return undefined;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(match[2]!.trim());
-  } catch {
-    return undefined;
-  }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
-  const reasoning = content
-    .slice(0, match.index)
-    // What is left of the header the host cut off, for example ` to=files`.
+  const text = content.trimEnd();
+  if (!text.endsWith(CALL_END)) return undefined;
+  const at = text.lastIndexOf(RECIPIENT);
+  if (at < 0) return undefined;
+  // After the recipient: the tool name, an optional content type, an optional
+  // message marker, then the arguments up to `<|call|>`. Hosts that drop the
+  // channel header leave the bare ` to=functions.<name> {args}<|call|>`.
+  const call = text.slice(at + RECIPIENT.length, text.length - CALL_END.length);
+  const name = TOOL_NAME.exec(call)?.[0];
+  if (name === undefined || !advertisedToolNames.includes(name)) return undefined;
+  const body = call
+    .slice(name.length)
+    .replace(/^\s*<\|constrain\|>\s*[A-Za-z]+/u, "")
+    .replace(/^\s*<\|message\|>/u, "")
+    .trim();
+  const parsed = jsonObject(body);
+  if (parsed === undefined) return undefined;
+  const reasoning = text
+    .slice(0, at)
+    // What is left of a header the host cut off, for example ` to=files`.
     .replace(/^\s*to=\S*/u, "")
     .replace(HARMONY_HEADER, "\n")
     .replace(HARMONY_TOKEN, "\n")
@@ -67,10 +73,47 @@ export function recoverLeakedHarmonyToolCall(
   return { name, arguments: JSON.stringify(parsed), reasoning };
 }
 
+function jsonObject(text: string): Record<string, unknown> | undefined {
+  if (!text.startsWith("{")) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * A gpt-oss Chat Completions message whose only tool call came back as
- * harmony text, rewritten as the structured call; any other message is
- * returned unchanged.
+ * Some hosts also parse gpt-oss's analysis text into an extra tool call (a
+ * name like `...` and prose as its arguments) next to the real one. When a
+ * response has a valid call to an advertised tool, calls that are neither
+ * advertised nor carry JSON arguments are that analysis, not calls.
+ */
+export function withoutHarmonyAnalysisCalls<T extends { readonly name: string; readonly arguments: string }>(
+  model: string,
+  calls: readonly T[],
+  advertisedToolNames: readonly string[],
+): { readonly calls: readonly T[]; readonly analysis: string } {
+  if (!isGptOssModel(model) || calls.length < 2) return { calls, analysis: "" };
+  const advertised = (call: T) => advertisedToolNames.includes(call.name);
+  const jsonArguments = (call: T) => call.arguments.trim().length === 0 || jsonObject(call.arguments.trim()) !== undefined;
+  if (!calls.some((call) => advertised(call) && jsonArguments(call))) return { calls, analysis: "" };
+  const isAnalysis = (call: T) => !advertised(call) && !jsonArguments(call);
+  const analysis = calls.filter(isAnalysis);
+  if (analysis.length === 0) return { calls, analysis: "" };
+  return {
+    calls: calls.filter((call) => !isAnalysis(call)),
+    analysis: analysis.map((call) => call.arguments.trim()).filter((text) => text.length > 0).join("\n"),
+  };
+}
+
+/**
+ * A gpt-oss Chat Completions message with its tool call recovered: a call
+ * that came back as harmony text becomes the structured call, and analysis a
+ * host parsed into an extra call goes back to reasoning. Any other message
+ * is returned unchanged.
  */
 export function withRecoveredHarmonyToolCall(
   model: string,
@@ -78,8 +121,24 @@ export function withRecoveredHarmonyToolCall(
   advertisedToolNames: readonly string[],
   reasoningField: string,
 ): Record<string, unknown> {
-  if (!isGptOssModel(model) || typeof message.content !== "string") return message;
-  if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) return message;
+  if (!isGptOssModel(model)) return message;
+  if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+    const wire = message.tool_calls as Array<Record<string, unknown>>;
+    const view = wire.map((call, index) => {
+      const fn = (call.function ?? {}) as Record<string, unknown>;
+      return { index, name: String(fn.name ?? ""), arguments: typeof fn.arguments === "string" ? fn.arguments : JSON.stringify(fn.arguments ?? {}) };
+    });
+    const { calls, analysis } = withoutHarmonyAnalysisCalls(model, view, advertisedToolNames);
+    if (calls.length === view.length) return message;
+    const existing = typeof message[reasoningField] === "string" ? message[reasoningField] as string : "";
+    const reasoning = [existing, analysis].filter((text) => text.length > 0).join("\n");
+    return {
+      ...message,
+      ...(reasoning.length > 0 ? { [reasoningField]: reasoning } : {}),
+      tool_calls: calls.map((call) => wire[call.index]),
+    };
+  }
+  if (typeof message.content !== "string") return message;
   const recovered = recoverLeakedHarmonyToolCall(message.content, advertisedToolNames);
   if (recovered === undefined) return message;
   const existing = typeof message[reasoningField] === "string" ? message[reasoningField] as string : "";

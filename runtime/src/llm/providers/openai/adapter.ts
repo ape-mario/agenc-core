@@ -77,7 +77,7 @@ import {
   serializeProviderToolArguments,
 } from "../../wire/shared.js";
 import { ThinkTagStreamFilter } from "../../wire/think-tags.js";
-import { HarmonyLeakHold } from "../../wire/harmony-leak.js";
+import { HarmonyLeakHold, withoutHarmonyAnalysisCalls } from "../../wire/harmony-leak.js";
 import { ReasoningDetailsAccumulator } from "../../wire/reasoning-details.js";
 import {
   advertisedResponsesToolNames,
@@ -2590,14 +2590,23 @@ export class OpenAIProvider implements LLMProvider {
       const includeToolCalls =
         finishReason === "stop" || finishReason === "tool_calls";
       let toolCallRecovery: LLMResponse["toolCallRecovery"];
+      // gpt-oss analysis that a host parsed into an extra call is reasoning.
+      const harmonyCalls = withoutHarmonyAnalysisCalls(
+        requestModel,
+        Array.from(toolCallAccumulator.values()),
+        requestOptions.tools.map((tool) => tool.function.name),
+      );
+      if (harmonyCalls.analysis.length > 0) {
+        reasoningContent += (reasoningContent.length > 0 ? "\n" : "") + harmonyCalls.analysis;
+      }
       const toolCalls = includeToolCalls
-        ? Array.from(toolCallAccumulator.values()).flatMap((toolCall) => {
+        ? harmonyCalls.calls.flatMap((toolCall) => {
           const validation = validateToolCallDetailed(toolCall);
           // Admit correction only for a solitary, advertised native call.
           // A conversational preamble does not make its arguments valid.
           // Never expose the rejected arguments as an executable tool call.
           if (validation.failure?.code === "invalid_json" &&
-              toolCallAccumulator.size === 1 && finishReason === "tool_calls" &&
+              harmonyCalls.calls.length === 1 && finishReason === "tool_calls" &&
               toolCall.name.length <= 256 && /^[A-Za-z0-9_.:-]+$/.test(toolCall.name) &&
               requestOptions.tools.some(tool => tool.function.name === toolCall.name)) {
             toolCallRecovery = { source: "native", reason: "invalid_arguments",
