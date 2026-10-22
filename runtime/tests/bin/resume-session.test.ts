@@ -117,6 +117,37 @@ function writeRollout(
   return writeRolloutAtSlug(slug, sessionId, iso, mtimeSec, cwd);
 }
 
+/** A rollout whose session header names its originator and source. */
+function writeRolloutWithMeta(
+  cwd: string,
+  sessionId: string,
+  mtimeSec: number,
+  meta: { readonly originator: string; readonly source?: string },
+): string {
+  const sessionDir = join(projectDir(cwd), "sessions", sessionId);
+  mkdirSync(sessionDir, { recursive: true });
+  const file = join(sessionDir, `rollout-2026-01-01T10-00-00-000Z-${sessionId}.jsonl`);
+  writeFileSync(
+    file,
+    `${JSON.stringify({
+      type: "session_meta",
+      payload: {
+        sessionId,
+        timestamp: "2026-01-01T00:00:00.000Z",
+        cwd,
+        agencVersion: "0.19.12",
+        rolloutSchemaVersion: 5,
+        ...meta,
+      },
+    })}\n${JSON.stringify({
+      type: "response_item",
+      payload: { role: "user", content: `seed for ${sessionId}` },
+    })}\n`,
+  );
+  utimesSync(file, mtimeSec, mtimeSec);
+  return file;
+}
+
 /**
  * Write under the LEGACY project-slug layout
  * (`~/.agenc/projects/<sanitizePath(cwd)>/sessions/<id>/rollout-*.jsonl`).
@@ -157,6 +188,62 @@ describe("resume-session CLI lookup", () => {
       expect(BigInt(resolved.cwdDev)).toBeGreaterThan(0n);
       expect(BigInt(resolved.cwdIno)).toBeGreaterThan(0n);
     }
+  });
+
+  it("--continue skips newer sub-agent, hook-agent and review sessions", () => {
+    // After a turn, memory extraction (a sub-agent) writes the newest rollout
+    // in the project; --continue must still open the user's conversation.
+    const root = writeRolloutWithMeta(workHome, "conv-userroot1", 1, {
+      originator: "agenc-cli",
+      source: "interactive-root",
+    });
+    writeRolloutWithMeta(workHome, "a1b2c3d4-0000-4000-8000-000000000001", 4, {
+      originator: "agenc-subagent",
+    });
+    writeRolloutWithMeta(workHome, "a1b2c3d4-0000-4000-8000-000000000002", 3, {
+      originator: "agenc-hook-agent",
+    });
+    writeRolloutWithMeta(workHome, "a1b2c3d4-0000-4000-8000-000000000003", 2, {
+      originator: "agenc-review-delegate",
+    });
+
+    expect(resolveLatestSessionId(workHome)).toMatchObject({
+      kind: "ok",
+      sessionId: "conv-userroot1",
+      rolloutPath: root,
+    });
+  });
+
+  it("--continue is not stopped by a background session still being written", () => {
+    const root = writeRolloutWithMeta(workHome, "conv-userroot2", 1, {
+      originator: "agenc-cli",
+      source: "interactive-root",
+    });
+    const live = writeRolloutWithMeta(workHome, "a1b2c3d4-0000-4000-8000-000000000004", 2, {
+      originator: "agenc-subagent",
+    });
+    // The extraction appends while the search reads its header.
+    __setResumeSessionTestHooksForTest({
+      afterCandidateMetadataRead: (path) => {
+        if (path === live) writeFileSync(path, `${JSON.stringify({ type: "response_item", payload: {} })}\n`, { flag: "a" });
+      },
+    });
+
+    expect(resolveLatestSessionId(workHome)).toMatchObject({
+      kind: "ok",
+      sessionId: "conv-userroot2",
+      rolloutPath: root,
+    });
+  });
+
+  it("an explicit session id still resolves a sub-agent session", () => {
+    const sub = writeRolloutWithMeta(workHome, "a1b2c3d4-0000-4000-8000-000000000005", 2, {
+      originator: "agenc-subagent",
+    });
+
+    expect(
+      resolveResumeSessionId(workHome, "a1b2c3d4-0000-4000-8000-000000000005"),
+    ).toMatchObject({ kind: "ok", rolloutPath: sub });
   });
 
   it("resolves exact and unique-prefix session ids", () => {

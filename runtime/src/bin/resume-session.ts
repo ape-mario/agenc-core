@@ -29,6 +29,7 @@ import {
   resolveCanonicalSessionCwd,
 } from "../session/session-store.js";
 import { canonicalRolloutHoldsNoInput } from "../session/rollout-input.js";
+import type { SessionMetaLine } from "../session/event-log.js";
 import { projectStorageKey } from "../utils/project-storage-key.js";
 import {
   DEFAULT_MAX_STARTUP_RECOVERY_MS,
@@ -294,11 +295,27 @@ function boundedEntries(
   return entries;
 }
 
+/**
+ * A session the user started in the TUI: the only kind the daemon resumes
+ * (agent.create in app-server/agent-lifecycle.ts). Sub-agents, hook agents and
+ * review delegates (memory extraction among them) keep their own rollouts in
+ * the same project, and right after a turn they are newer than the user's.
+ * Older roots predate `source` and say only `agenc-cli`.
+ */
+function isTopLevelInteractiveSession(meta: SessionMetaLine): boolean {
+  if (meta.originator === "agenc-cli") {
+    return meta.source === "interactive-root" || meta.source === undefined;
+  }
+  return meta.source === "interactive-root-reviewed-rollback" &&
+    /^c2-reviewed-rollback:[a-f0-9]{64}$/u.test(meta.originator);
+}
+
 function candidateFromPath(
   sessionId: string,
   rolloutPath: string,
   mtimeNs: bigint,
   budget: SearchBudget,
+  topLevelOnly = false,
 ): ResumeCandidate | null {
   if (!isSafeSessionIdSegment(sessionId)) return null;
   if (Date.now() >= budget.deadlineMs) {
@@ -346,6 +363,12 @@ function candidateFromPath(
         return null;
       }
       meta = readAndValidateSchemaVersionFd(fd);
+      if (topLevelOnly && meta !== null && !isTopLevelInteractiveSession(meta)) {
+        // Not a session --continue can open. Skip it before the stability
+        // checks: its owner may still be appending to it (a memory extraction
+        // that runs after the user's last turn), which is no reason to fail.
+        return null;
+      }
       resumeSessionTestHooks.afterCandidateMetadataRead?.(rolloutPath);
       const observed = lstatSync(rolloutPath, { bigint: true });
       if (
@@ -549,6 +572,7 @@ function candidateUnderProjectDir(
   projectDir: string,
   sessionId: string,
   budget: SearchBudget,
+  topLevelOnly = false,
 ): ResumeCandidate | null {
   const sessionDir = join(projectDir, "sessions", sessionId);
   const discoveredFiles = boundedEntries(
@@ -592,12 +616,13 @@ function candidateUnderProjectDir(
   const selected = candidates[0];
   return selected === undefined
     ? null
-    : candidateFromPath(sessionId, selected.path, selected.mtimeNs, budget);
+    : candidateFromPath(sessionId, selected.path, selected.mtimeNs, budget, topLevelOnly);
 }
 
 function candidatesUnderProjectDir(
   projectDir: string,
   budget: SearchBudget,
+  topLevelOnly = false,
 ): readonly ResumeCandidate[] {
   const sessions = boundedEntries(
     join(projectDir, "sessions"),
@@ -609,7 +634,7 @@ function candidatesUnderProjectDir(
   for (const entry of sessions) {
     if (budget.incompleteReason !== undefined) break;
     if (!entry.directory || !isSafeSessionIdSegment(entry.name)) continue;
-    const candidate = candidateUnderProjectDir(projectDir, entry.name, budget);
+    const candidate = candidateUnderProjectDir(projectDir, entry.name, budget, topLevelOnly);
     if (candidate !== null) candidates.push(candidate);
   }
   return candidates;
@@ -632,9 +657,10 @@ function projectCandidatesCrossSlug(
   cwd: string,
   agencHome: string,
   budget: SearchBudget,
+  topLevelOnly = false,
 ): readonly ResumeCandidate[] {
   const candidates = localProjectDirs(cwd, agencHome).flatMap((projectDir) =>
-    candidatesUnderProjectDir(projectDir, budget),
+    candidatesUnderProjectDir(projectDir, budget, topLevelOnly),
   );
   const byPath = new Map<string, ResumeCandidate>();
   for (const candidate of candidates)
@@ -767,7 +793,8 @@ export function resolveLatestSessionId(
   agencHome: string,
 ): ResumeSessionResolution {
   const search = budget(agencHome);
-  const candidates = projectCandidatesCrossSlug(cwd, agencHome, search);
+  // --continue means the user's own conversation, never a background agent's.
+  const candidates = projectCandidatesCrossSlug(cwd, agencHome, search, true);
   const stopped = incomplete("--continue", search);
   if (stopped !== undefined) return stopped;
   // A session that records no input is one a TUI provisioned and could not
