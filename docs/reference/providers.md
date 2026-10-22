@@ -986,35 +986,85 @@ its default tier, so a call without Fast sends none.
 
 ## Zero data retention
 
-Only one built-in provider takes a request-level zero-data-retention control:
-`[providers.openrouter] zero_data_retention = true` adds `provider.zdr = true`
-to every request (OR-ed with the account setting on OpenRouter's side), so
-routing is restricted to endpoints with a zero-data-retention policy and a
-model without one is refused. The desktop shows this as a switch on the
-OpenRouter card. Everywhere else retention is an account, project or team
-setting, so the config field is rejected and the desktop card states the
-provider's policy instead. Verified 2026-09-12 against each provider's
-documentation:
+Zero data retention (ZDR) is on by default wherever a provider's API lets a
+request ask for it. Only OpenRouter has such a control: every request with
+your own OpenRouter key carries `provider.zdr = true`, so OpenRouter routes
+only to endpoints with a zero-data-retention policy (OR-ed with the account
+setting on OpenRouter's side) and refuses a model that has none instead of
+serving it elsewhere. To allow endpoints that may keep data:
 
-| Provider | Default retention | Zero data retention | AgenC |
+```toml
+[providers.openrouter]
+zero_data_retention = false
+```
+
+The managed AgenC route sends no routing block: its gateway pins its own
+(`zdr: true`, `data_collection: "deny"`). Subagents, reviewers and the
+WebSearch tool's OpenRouter search carry the same choice as the session.
+OpenRouter's ZDR covers the model endpoint, not the web plugin's search
+engine.
+
+`/model` and `/providers` read OpenRouter's public list of ZDR endpoints
+(`GET https://openrouter.ai/api/v1/endpoints/zdr`, no key) while ZDR is on.
+A model with no ZDR endpoint stays listed, shows `no ZDR`, and says how to
+use it anyway; Enter refuses it, and so does `/model openrouter:<id>` once the
+list has been read. Router and alias
+ids (`openrouter/auto`, `~vendor/model-latest`) are not checked, and nothing is
+marked while the list cannot be read. If OpenRouter still refuses a model
+(HTTP 404, "No endpoints found matching your data policy"), the turn ends with
+that explanation, no retry, and its admission reservation released at zero.
+
+Measured 2026-10-22 on OpenRouter with the request body AgenC sends (three
+calls of 33K to 49K prompt tokens per model, ZDR on and off): Claude Sonnet
+5.5 moved from Claude Platform on AWS to Google Vertex at the same price;
+DeepSeek V4.1 Flash and GLM-5.3 stayed on the same ZDR endpoints (Relace,
+InferenceNet) with the same cost and a 100% cache share on later calls. ZDR
+cost nothing measurable in cache share, price or first-token time.
+
+Elsewhere retention is a provider policy or an account, project or team
+setting, so the config field is rejected under every other provider table.
+Read on 2026-10-22 from each provider's documentation:
+
+| Provider | What happens to API prompts and responses | ZDR | Status line |
 | --- | --- | --- | --- |
-| OpenRouter | Depends on the upstream endpoint | Per request (`provider.zdr`) and per account (privacy settings) | `zero_data_retention` switch |
-| OpenAI | 30 days for abuse monitoring; Responses state 30 days when `store` is true | Per organization or project, on request and approval; `store` is then forced false | Requests already send `store: false`; ZDR itself is granted by OpenAI |
-| Anthropic | Per the commercial retention policy | Organization-level agreement | Account level |
-| xAI Grok | 30 days encrypted, no training | Team-level in the xAI Console (enterprise); every response carries `x-zero-data-retention: true/false` and ZDR disables the stateful Responses, Files, Collections and Batch APIs | Account level |
-| Google Gemini | Prompts logged for abuse monitoring (paid: 55 days) | Per project, on request | Account level |
-| Groq | No retention of inputs and outputs by default; temporary logs up to 30 days for troubleshooting or abuse | Self-serve in the console Data Controls, globally or per feature | Account level |
-| Mistral | 30-day abuse monitoring window | Organization setting on paid plans, after approval; stateless endpoints only | Account level |
-| Cerebras | Does not retain prompts, requests or responses | Standard policy, nothing to enable | Always on |
-| Ollama Cloud | "Prompt or response data is never logged or trained on"; partners must run zero-data-retention policies | Standard policy, nothing to enable | Always on |
-| DeepSeek | Retained on servers in China while the account exists | None offered | Not available |
-| MiniMax | Purpose- and law-based retention | None documented | Not available |
-| AgenC managed | Requests are routed through the gateway to zero-data-retention endpoints only (`zdr: true`, `data_collection: "deny"`) | Built in | Always on |
-| Local servers (Ollama, LM Studio, OpenAI-compatible) | Nothing leaves the machine unless the endpoint is remote | Not applicable | Local |
+| OpenRouter | Depends on the endpoint | Per request (`provider.zdr`), on by default | Green; red when off or the model has no ZDR endpoint ([zdr](https://openrouter.ai/docs/guides/features/zdr), [routing](https://openrouter.ai/docs/guides/routing/provider-selection)) |
+| Ollama Cloud | Not stored or logged | Policy | Green ([faq](https://docs.ollama.com/faq)) |
+| Cerebras | Not retained | Policy | Green ([privacy](https://cerebras.ai/privacy-policy)) |
+| abliteration.ai | Processed in memory, never stored | Policy | Green ([data handling](https://abliteration.ai/data-handling)) |
+| AgenC (managed) | Routed only to ZDR endpoints by the gateway | Built in | Green |
+| Venice AI | Private models keep nothing; anonymized models run on third-party hosts | Per model | Green for private models, red for anonymized ([privacy](https://docs.venice.ai/overview/privacy)) |
+| Ollama, LM Studio, OpenAI-compatible | Stays on this computer | Local | Green on a loopback address, dim `ZDR?` elsewhere |
+| xAI Grok | Kept 30 days for abuse auditing | Team setting in the xAI Console | Red ([security](https://docs.x.ai/developers/faq/security)) |
+| OpenAI | Abuse logs up to 30 days | Approved organization or project; AgenC sends `store: false` | Red ([your data](https://developers.openai.com/api/docs/guides/your-data)) |
+| Anthropic | Up to 30 days, flagged content longer | Organization agreement | Red ([retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention)) |
+| Groq | Not kept by default, but may be logged up to 30 days for troubleshooting or abuse | Console Data Controls | Red ([your data](https://console.groq.com/docs/your-data)) |
+| Mistral | 30 days for abuse monitoring | On request | Red ([zdr](https://docs.mistral.ai/admin/monitor-comply/zero-data-retention)) |
+| Meta | Kept as needed for the service | Per organization; AgenC sends `store: false` | Red ([zdr](https://dev.meta.ai/help/policies-and-privacy/zero-data-retention)) |
+| QwenCloud Pay-As-You-Go | Up to 30 days | Enterprise workspaces | Red ([retention](https://www.alibabacloud.com/help/en/model-studio/data-retention-policy)) |
+| QwenCloud Token Plan | Up to 30 days | Not covered by the ZDR program | Red ([faq](https://www.alibabacloud.com/help/en/model-studio/token-plan-faq)) |
+| Kimi (Moonshot) | Kept while the account is active | Enterprise, on request | Red ([zdr](https://platform.kimi.ai/docs/guide/zero-data-retention)) |
+| Amazon Bedrock | May be kept for abuse detection | Account `data_retention_mode: none` | Red ([retention](https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html)) |
+| GitHub Copilot | Upstream models under ZDR; individual plans may train on interactions | Plan setting | Red ([hosting](https://docs.github.com/en/copilot/reference/ai-models/model-hosting)) |
+| Gemini API | Logged for abuse monitoring; the free tier trains on prompts | Only on Vertex AI | Red ([zdr](https://ai.google.dev/gemini-api/docs/zdr)) |
+| Z.AI, Z.AI Coding Plan | No-storage promise covers business customers; cache retention unannounced | None for individuals | Red ([privacy](https://docs.z.ai/legal-agreement/privacy-policy), [faq](https://docs.z.ai/help/faq)) |
+| DeepSeek | Kept while the account exists | None | Red ([privacy](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html)) |
+| MiniMax | Kept as long as necessary | None | Red ([privacy](https://platform.minimax.io/protocol/privacy-policy)) |
+| NVIDIA NIM | Trial terms let NVIDIA keep and use prompts | None | Red ([trial terms](https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf)) |
 
-Kimi, Qwen, Z.AI, Meta, NVIDIA NIM and GitHub Copilot publish no
-zero-data-retention control for their APIs; treat them as retaining data per
-their terms.
+The status line shows `ZDR` after the usage figures: green when the provider
+and model keep nothing (the request-level control is on, the provider's policy
+keeps nothing, or the server runs on this computer), red when data may be kept
+(including providers whose ZDR is an account setting AgenC cannot see), and a
+dim `ZDR?` when the requests go to an address whose policy AgenC cannot know:
+a local provider pointed at another machine, or a provider that would
+otherwise be green pointed at a custom base URL. `/status` explains the
+current state in one line. The table lives in
+`runtime/src/llm/registry/provider-retention.ts`.
+
+xAI's Responses `store` stays on by default: xAI keeps every request for 30
+days whether or not it is stored, so `store: false` would not change
+retention, and it was the dominant cause of slow Grok turns (see the Grok
+adapter). `AGENC_XAI_STORE=0` turns it off.
 
 ## DeepSeek
 

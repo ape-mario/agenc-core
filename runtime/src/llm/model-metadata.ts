@@ -9,6 +9,10 @@ import { recordPublishedModelCosts } from "./registry/published-model-costs.js";
 import { recordPublishedModelCatalog, recordPublishedModelDetail } from "./registry/published-model-catalog.js";
 import { openRouterCatalogEntry, openRouterRowFromListing } from "./registry/openrouter-models.js";
 import {
+  OPENROUTER_ZDR_ENDPOINTS_URL,
+  recordOpenRouterZdrEndpoints,
+} from "./registry/openrouter-zdr-endpoints.js";
+import {
   OLLAMA_CLOUD_ORIGIN,
   ollamaCloudCatalogEntry,
   parseOllamaCloudShow,
@@ -652,6 +656,16 @@ export class ModelMetadataResolver {
     const response = await this.fetchJson(OPENROUTER_MODELS_URL, { timeoutMs: this.liveModelListTimeoutMs() });
     this.recordOpenRouterListing(response);
     return response !== undefined;
+  }
+
+  /**
+   * OpenRouter's public list of zero-data-retention endpoints (no key). The
+   * picker and the status line read it to tell which models still work while
+   * requests carry `provider.zdr`.
+   */
+  async discoverOpenRouterZdrEndpoints(): Promise<boolean> {
+    const response = await this.fetchJson(OPENROUTER_ZDR_ENDPOINTS_URL, { timeoutMs: this.liveModelListTimeoutMs() });
+    return recordOpenRouterZdrEndpoints(response);
   }
 
   /**

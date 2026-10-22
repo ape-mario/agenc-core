@@ -26,11 +26,16 @@ import { providerEnvironmentFromCommandContext } from "./config-context.js";
 import { saveXaiOauthCredentials } from "../utils/xaiOauthCredentials.js";
 import {
   filterProvidersHubRows,
+  readProvidersHubModels,
   readProvidersHubSnapshot,
   withLocalProbe,
   type ProvidersHubRow,
   type ProvidersHubSnapshot,
 } from "./providers-hub-snapshot.js";
+import {
+  recordOpenRouterZdrEndpoints,
+  resetOpenRouterZdrEndpointsForTesting,
+} from "../llm/registry/openrouter-zdr-endpoints.js";
 import type { SlashCommandContext } from "./types.js";
 
 const homes: string[] = [];
@@ -44,6 +49,7 @@ function tempHome(): { readonly home: HomeContext; readonly environment: EnvSnap
 
 afterEach(() => {
   vi.restoreAllMocks();
+  resetOpenRouterZdrEndpointsForTesting();
   for (const path of homes.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 
@@ -204,6 +210,44 @@ describe("providers screen snapshot", () => {
     expect(filterProvidersHubRows(rows, "SEEK").map((entry) => entry.provider)).toEqual(["deepseek"]);
     expect(filterProvidersHubRows(rows, "gro").map((entry) => entry.provider)).toEqual(["grok"]);
     expect(filterProvidersHubRows(rows, "  ")).toHaveLength(2);
+  });
+});
+
+describe("OpenRouter models under zero data retention", () => {
+  const marked = (rows: ReturnType<typeof readProvidersHubModels>) =>
+    rows.filter(row => row.zdrUnavailable === true).map(row => row.displayModel);
+
+  it("marks models that have no zero-retention endpoint once OpenRouter's list is read", () => {
+    const { home, environment: base } = tempHome();
+    const environment = { ...base, OPENROUTER_API_KEY: "sk-or-test" };
+    const ctx = ctxFor({ home, environment, provider: "openrouter", model: "x-ai/grok-4.5" });
+    // Unchecked until the list arrives: nothing is marked from a guess.
+    expect(marked(readProvidersHubModels(ctx, "openrouter"))).toEqual([]);
+
+    recordOpenRouterZdrEndpoints({ data: [{ model_id: "x-ai/grok-4.5" }, { model_id: "openai/gpt-5" }] });
+    const rows = readProvidersHubModels(ctx, "openrouter");
+    const unavailable = marked(rows);
+    expect(unavailable).toContain("google/gemini-2.5-flash");
+    expect(unavailable).not.toContain("x-ai/grok-4.5");
+    expect(unavailable).not.toContain("openai/gpt-5");
+    // Still listed, so a person sees it and why it is unavailable.
+    expect(rows.map(row => row.displayModel)).toContain("google/gemini-2.5-flash");
+  });
+
+  it("marks nothing once zero data retention is turned off, and nothing for other providers", () => {
+    const { home, environment: base } = tempHome();
+    const environment = { ...base, OPENROUTER_API_KEY: "sk-or-test", DEEPSEEK_API_KEY: "sk-test" };
+    recordOpenRouterZdrEndpoints({ data: [{ model_id: "x-ai/grok-4.5" }] });
+    const optedOut = ctxFor({
+      home,
+      environment,
+      provider: "openrouter",
+      model: "x-ai/grok-4.5",
+      config: { providers: { openrouter: { zero_data_retention: false } } },
+    });
+    expect(marked(readProvidersHubModels(optedOut, "openrouter"))).toEqual([]);
+    const deepseek = ctxFor({ home, environment, provider: "deepseek", model: "deepseek-flash" });
+    expect(marked(readProvidersHubModels(deepseek, "deepseek"))).toEqual([]);
   });
 });
 

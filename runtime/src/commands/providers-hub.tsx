@@ -44,6 +44,15 @@ import {
   readVeniceMenuModels,
   VENICE_MODEL_LIST_UNAVAILABLE_NOTE,
 } from "./venice-menu-models.js";
+import {
+  ensureOpenRouterZdrEndpoints,
+  OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE,
+} from "./live-model-catalog.js";
+import { openRouterZdrEndpointsKnown } from "../llm/registry/openrouter-zdr-endpoints.js";
+import {
+  OPENROUTER_ZDR_OFF_HINT,
+  openRouterZeroDataRetentionEnabled,
+} from "../llm/zero-data-retention.js";
 
 export type ProvidersHubServices = {
   readonly reload: () => ProvidersHubSnapshot;
@@ -94,6 +103,10 @@ const MODEL_MARK_WIDTH = 3;
 
 /** In-use mark, model, note, capabilities. */
 const MODEL_COLUMNS: readonly number[] = [MODEL_MARK_WIDTH, 44, 8, 38];
+
+/** Why an OpenRouter model is shown as unavailable, and how to use it anyway. */
+const OPENROUTER_NO_ZDR_DETAIL =
+  `No zero-retention endpoint serves this model. ${OPENROUTER_ZDR_OFF_HINT}`;
 
 type ConnectChoice = "sign-in" | "paste-key";
 
@@ -265,6 +278,13 @@ function ModelsView({
   const noun = models === 1 ? "model" : "models";
   const matched = shown.filter((entry) => entry.kind === "model").length;
   const searching = query.length > 0;
+  const highlighted = shown[activeIndex];
+  const details = [
+    ...(note === undefined ? [] : [note]),
+    ...(highlighted?.kind === "model" && highlighted.row.zdrUnavailable === true
+      ? [OPENROUTER_NO_ZDR_DETAIL]
+      : []),
+  ];
   return (
     <MenuModal
       title={row.name}
@@ -273,8 +293,8 @@ function ModelsView({
       headerRight={busy ? "working" : loading ? "loading models" : undefined}
       closeHint={searching ? "esc to clear search" : "esc to go back"}
       hint={notice?.text}
-      {...(note === undefined ? {} : {
-        detail: <ThemedText color="warning" wrap="wrap">{note}</ThemedText>,
+      {...(details.length === 0 ? {} : {
+        detail: <ThemedText color="warning" wrap="wrap">{details.join(" ")}</ThemedText>,
       })}
       {...(searching || models > SEARCH_LINE_MIN_MODELS ? { lead: <SearchLine query={query} /> } : {})}
       columns={MODEL_COLUMNS}
@@ -302,15 +322,17 @@ function ModelsView({
             <ThemedText key="tags" color="inactive"> </ThemedText>,
           ];
         }
+        const noZdr = entry.row.zdrUnavailable === true;
         return [
           <ThemedText key="mark" color={entry.row.current ? "agenc" : "subtle"}>
             {entry.row.current ? "●" : " "}
           </ThemedText>,
-          <ThemedText key="model" color={active ? "text" : "text2"} bold={active} wrap="truncate-middle">
+          <ThemedText key="model" color={active ? "text" : noZdr ? "inactive" : "text2"} bold={active} wrap="truncate-middle">
             {entry.row.displayModel}
           </ThemedText>,
-          <ThemedText key="note" color="inactive" wrap="truncate-end">
-            {entry.row.current ? "in use" : entry.row.isDefault ? "default" : ""}
+          // A model OpenRouter would refuse says so before anything else.
+          <ThemedText key="note" color={noZdr ? "warning" : "inactive"} wrap="truncate-end">
+            {noZdr ? "no ZDR" : entry.row.current ? "in use" : entry.row.isDefault ? "default" : ""}
           </ThemedText>,
           // One step brighter on the highlighted row, so the tags stay readable on its band.
           <ThemedText key="tags" color={active ? "inactive" : "muted3"} wrap="truncate-end">
@@ -880,6 +902,10 @@ export function ProvidersHubView({
         return;
       }
       if (entry.kind !== "model") return;
+      if (entry.row.zdrUnavailable === true) {
+        setNotice({ text: OPENROUTER_NO_ZDR_DETAIL, failed: true });
+        return;
+      }
       run(async () => {
         const result = await services.choose(view.row.provider, entry.row.model);
         if (result.ok) {
@@ -1017,14 +1043,24 @@ function servicesFor(ctx: SlashCommandContext): ProvidersHubServices {
       return new Set(running);
     },
     modelsFor: (provider) => readProvidersHubModels(ctx, provider),
-    refreshModels: (provider) => provider !== "venice" || readVeniceMenuModels(ctx) !== undefined
-      ? null
-      : loadVeniceMenuModels(ctx).then(
-          (result) => result.source === "bundled" && result.reason === "unavailable"
-            ? { note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }
-            : {},
-          () => ({ note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }),
-        ),
+    refreshModels: (provider) => {
+      if (provider === "openrouter") {
+        // Models without a zero-retention endpoint are marked once the list is read.
+        if (!openRouterZeroDataRetentionEnabled(readCommandConfig(ctx)) || openRouterZdrEndpointsKnown()) return null;
+        return ensureOpenRouterZdrEndpoints(ctx).then(
+          (known) => known ? {} : { note: OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE },
+          () => ({ note: OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE }),
+        );
+      }
+      return provider !== "venice" || readVeniceMenuModels(ctx) !== undefined
+        ? null
+        : loadVeniceMenuModels(ctx).then(
+            (result) => result.source === "bundled" && result.reason === "unavailable"
+              ? { note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }
+              : {},
+            () => ({ note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }),
+          );
+    },
     connect: (provider, apiKey) => connectProviderWithKey(ctx, provider, apiKey),
     choose: (provider, model) => chooseProviderModel(ctx, provider, model),
     forget: (provider) => forgetProviderKey(ctx, provider),

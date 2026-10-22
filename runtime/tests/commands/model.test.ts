@@ -9,6 +9,10 @@ import {
   checkModelHistoryCompat,
 } from "./model.js";
 import { modelMenuFallback, readModelMenuSnapshot } from "./model-menu-snapshot.js";
+import {
+  recordOpenRouterZdrEndpoints,
+  resetOpenRouterZdrEndpointsForTesting,
+} from "../llm/registry/openrouter-zdr-endpoints.js";
 import { applyProviderSwitch, switchProviderModel } from "./provider.js";
 import type { EnvSnapshot } from "../config/env.js";
 import { resolveHomeContext, type HomeContext } from "../config/home.js";
@@ -406,6 +410,41 @@ describe("modelCommand", () => {
       }
     ).pendingProviderSwitch;
     expect(pending).toEqual({ provider: "grok", model: "grok-4.7" });
+  });
+
+  it("refuses an OpenRouter model with no zero-retention endpoint while ZDR is on, with the way out", async () => {
+    const environment = { ...TEST_ENVIRONMENT, OPENROUTER_API_KEY: "sk-or-test" } as EnvSnapshot;
+    recordOpenRouterZdrEndpoints({ data: [{ model_id: "x-ai/grok-4.5" }] });
+    try {
+      const refused = stubSession({ provider: "grok", model: "grok-4.6", activeTurn: null, environment });
+      const res = await modelCommand.execute(mkctx(refused, "openrouter:google/gemini-2.5-flash"));
+      expect(res).toEqual({
+        kind: "text",
+        text: "No zero-retention endpoint serves openrouter/google/gemini-2.5-flash, so OpenRouter would refuse it. " +
+          "To use it, set zero_data_retention = false under [providers.openrouter].",
+      });
+      expect((refused as unknown as { pendingProviderSwitch: unknown }).pendingProviderSwitch).toBeNull();
+
+      // A model with an endpoint switches as usual.
+      const allowed = stubSession({ provider: "grok", model: "grok-4.6", activeTurn: null, environment });
+      await modelCommand.execute(mkctx(allowed, "openrouter:x-ai/grok-4.5"));
+      expect((allowed as unknown as { pendingProviderSwitch: unknown }).pendingProviderSwitch)
+        .toEqual({ provider: "openrouter", model: "x-ai/grok-4.5" });
+
+      // With zero data retention turned off nothing is refused.
+      const optedOut = stubSession({
+        provider: "grok",
+        model: "grok-4.6",
+        activeTurn: null,
+        environment,
+        configStore: commandConfigStore(TEST_HOME, { providers: { openrouter: { zero_data_retention: false } } }),
+      });
+      await modelCommand.execute(mkctx(optedOut, "openrouter:google/gemini-2.5-flash"));
+      expect((optedOut as unknown as { pendingProviderSwitch: unknown }).pendingProviderSwitch)
+        .toEqual({ provider: "openrouter", model: "google/gemini-2.5-flash" });
+    } finally {
+      resetOpenRouterZdrEndpointsForTesting();
+    }
   });
 
   it("can switch provider and model from provider-qualified input", async () => {

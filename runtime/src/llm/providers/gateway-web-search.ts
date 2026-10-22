@@ -191,12 +191,19 @@ export async function runOllamaWebFetch(
   return { ...(title === undefined ? {} : { title }), content };
 }
 
-/** OpenRouter's web plugin (Exa) on one chat completion with the session's model and key. */
+/**
+ * OpenRouter's web plugin (Exa) on one chat completion with the session's
+ * model and key. With zero data retention on (the default) the call carries
+ * `provider.zdr` like the session's own requests. OpenRouter's ZDR covers the
+ * model endpoint, not the search engine.
+ */
 export async function runOpenRouterWebSearch(options: CallOptions & {
   readonly baseURL: string;
   readonly model: string;
   readonly allowedDomains?: readonly string[];
   readonly blockedDomains?: readonly string[];
+  /** Route the model call only to zero-data-retention endpoints, as the session does. */
+  readonly zeroDataRetention?: boolean;
 }): Promise<GatewaySearchOutcome> {
   const plugin: Record<string, unknown> = {
     id: "web",
@@ -212,6 +219,7 @@ export async function runOpenRouterWebSearch(options: CallOptions & {
     max_tokens: GATEWAY_SEARCH_MAX_OUTPUT_TOKENS,
     usage: { include: true },
     stream: false,
+    ...(options.zeroDataRetention === true ? { provider: { zdr: true } } : {}),
   }, options);
   if (answer.reason !== undefined) return { kind: "failed", reason: answer.reason, costUsd: undefined };
   const body = record(answer.json);

@@ -96,6 +96,23 @@ describe("WebSearch with the session provider's own search", () => {
     expect(result.admissionUsage?.costUsd).toBe(0.0074);
   });
 
+  it("OpenRouter: the search call asks for zero data retention when the session does", async () => {
+    const reply = () => response({ choices: [{ message: { role: "assistant", content: "x", annotations: [] } }], usage: { cost: 0.007 } });
+    const fetch = vi.fn(async () => reply());
+    vi.stubGlobal("fetch", fetch);
+    await webSearch(session("openrouter", { apiKey: "sk-or-session", model: "z-ai/glm-5.3", zeroDataRetention: true }))
+      .execute({ query: "zero data retention" });
+    await webSearch(session("openrouter", { apiKey: "sk-or-session", model: "z-ai/glm-5.3" }))
+      .execute({ query: "zero data retention" });
+    const bodies = (fetch.mock.calls as unknown as [string, RequestInit][])
+      .filter(([url]) => url === "https://openrouter.ai/api/v1/chat/completions")
+      .map(([, init]) => JSON.parse(String(init.body)));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]).toMatchObject({ provider: { zdr: true }, plugins: [{ id: "web", engine: "exa" }] });
+    // A session that turned it off sends none, like its own requests.
+    expect(bodies[1]).not.toHaveProperty("provider");
+  });
+
   it("Venice: web search with citations on the session model, 0.01 USD plus its listed token price", async () => {
     const fetch = vi.fn(async () => response({
       choices: [{ message: { role: "assistant", content: "x" } }],
