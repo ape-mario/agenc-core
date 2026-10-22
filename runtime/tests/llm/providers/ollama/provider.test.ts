@@ -4,6 +4,11 @@ import { OllamaProvider } from "./adapter.js";
 import { withOllamaHealthSidecar } from "./health.js";
 import { hangingStreamAfterFirstChunk } from "./ollama-test-helpers.js";
 import { isTransientProviderError } from "../../../../src/recovery/api-errors.js";
+import {
+  LLMAuthenticationError,
+  LLMProviderError,
+  LLMServerError,
+} from "../../../../src/llm/errors.js";
 import type { LLMChatOptions, LLMMessage } from "../../../../src/llm/types.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
@@ -605,6 +610,27 @@ describe("providers/ollama entrypoint", () => {
     ).rejects.toThrow(
       "Cannot connect to Ollama at http://localhost:11434. Is the server running?",
     );
+  });
+
+  test.each([
+    [500, "Internal Server Error (ref: 3fedde4c-9bb3-4afd-8441-79aa5cc561d5)", LLMServerError, true],
+    [503, "server busy, please try again.  maximum pending requests exceeded", LLMServerError, true],
+    [401, "unauthorized", LLMAuthenticationError, false],
+    [404, "model \"qwen3:8b\" not found, try pulling it first", LLMProviderError, false],
+  ] as const)("keeps the HTTP %s the ollama SDK reports on status_code", async (status, message, ErrorKind, transient) => {
+    // The SDK's ResponseError carries the status as `status_code`, not `status`.
+    const responseError = Object.assign(new Error(message), { name: "ResponseError", error: message, status_code: status });
+    const provider = new OllamaProvider({ model: "gpt-oss:20b", host: "http://127.0.0.1:11434" });
+    setClient(provider, { chat: vi.fn().mockRejectedValue(responseError) });
+
+    const error = await provider.chat([{ role: "user", content: "hello" }]).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(ErrorKind);
+    expect((error as Error).message).toContain(status === 401 ? "ollama" : message.slice(0, 20));
+    // A 5xx is an outage the turn retries; a missing model or a bad key is not.
+    expect(isTransientProviderError(error)).toBe(transient);
   });
 
   test("maps the refusal the ollama SDK really throws to the same Ollama error", async () => {
