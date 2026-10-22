@@ -6,7 +6,7 @@ import {
   type AbliterationModel,
 } from "./registry/abliteration-models.js";
 import { recordPublishedModelCosts } from "./registry/published-model-costs.js";
-import { recordPublishedModelCatalog } from "./registry/published-model-catalog.js";
+import { recordPublishedModelCatalog, recordPublishedModelDetail } from "./registry/published-model-catalog.js";
 import { openRouterCatalogEntry, openRouterRowFromListing } from "./registry/openrouter-models.js";
 import {
   OLLAMA_CLOUD_ORIGIN,
@@ -703,10 +703,10 @@ export class ModelMetadataResolver {
       this.ollamaCloudTags = tags;
       this.ollamaCloudListed = parseOllamaCloudTags(tags);
     }
-    if (model !== undefined && show !== undefined) {
-      const shown = parseOllamaCloudShow(model.trim(), show);
-      if (shown !== undefined) this.ollamaCloudShown.set(shown.model, shown);
-    }
+    const shown = model !== undefined && show !== undefined
+      ? parseOllamaCloudShow(model.trim(), show)
+      : undefined;
+    if (shown !== undefined) this.ollamaCloudShown.set(shown.model, shown);
     if (this.ollamaCloudListed === undefined && this.ollamaCloudShown.size === 0) return undefined;
     const listed = this.ollamaCloudListed ?? [];
     const rows = [
@@ -718,6 +718,7 @@ export class ModelMetadataResolver {
       rows.map((row, priority) => ollamaCloudCatalogEntry(row, priority, "list")),
       { replace: this.ollamaCloudListed !== undefined },
     );
+    if (shown !== undefined) recordPublishedModelDetail("ollama-cloud", shown.model);
     return Object.freeze(rows);
   }
 

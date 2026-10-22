@@ -3,6 +3,13 @@ import type { OpenAIProviderConfig } from "../openai/types.js";
 import type { LLMChatOptions } from "../../types.js";
 import { OLLAMA_CLOUD_BASE_URL } from "../../registry/ollama-cloud-models.js";
 import { ModelMetadataResolver } from "../../model-metadata.js";
+import { publishedModelDetailRecordedAt } from "../../registry/published-model-catalog.js";
+
+/**
+ * How long a model row this process already read from Ollama is used as it
+ * is before the provider reads it again. Ollama changes rows rarely.
+ */
+const SHOWN_ROW_REUSE_MS = 15 * 60_000;
 
 /** Direct Cloud inference, independent of the local Ollama daemon. */
 export class OllamaCloudProvider extends OpenAIProvider {
@@ -44,10 +51,18 @@ export class OllamaCloudProvider extends OpenAIProvider {
    * a model the bundled snapshot does not know. Best effort.
    */
   override async getExecutionProfile(options?: LLMChatOptions) {
-    try {
-      await this.#metadata.discoverOllamaCloudModels({}, options?.model?.trim() || this.#model);
-    } catch {
-      // The bundled rows answer while Ollama's list cannot be read.
+    const model = options?.model?.trim() || this.#model;
+    // The session's own resolver reads this row when the session starts.
+    // Reading it again here held the first request about 0.45 s after Enter
+    // (a new connection plus /api/tags and /api/show, measured against
+    // ollama.com), so a row read in the last minutes is used as it is.
+    const shownAt = publishedModelDetailRecordedAt("ollama-cloud", model);
+    if (shownAt === undefined || Date.now() - shownAt >= SHOWN_ROW_REUSE_MS) {
+      try {
+        await this.#metadata.discoverOllamaCloudModels({}, model);
+      } catch {
+        // The bundled rows answer while Ollama's list cannot be read.
+      }
     }
     return super.getExecutionProfile(options);
   }
