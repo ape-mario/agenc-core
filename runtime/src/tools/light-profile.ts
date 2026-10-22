@@ -46,7 +46,8 @@ export const LIGHT_TASK_LIMITS_ENV = "AGENC_LIGHT_TASK_LIMITS";
  * Without them DeepSeek Flash wrote larger files with unrequested handling, reran passing checks and
  * wrote long final reports: 83% more output and 156 s more provider time than standard over the race's
  * 22 tasks. The default follows the model: DeepSeek's own API or a gateway serving a DeepSeek model
- * by its id. Other models keep the shorter Light workflow they were measured with.
+ * by its id, and abliteration.ai Large V2 (GLM-5.3). Other models keep the shorter Light workflow
+ * they were measured with.
  */
 export function lightStatesTaskLimits(
   providerName: string | undefined,
@@ -56,7 +57,9 @@ export function lightStatesTaskLimits(
   const value = env[LIGHT_TASK_LIMITS_ENV];
   if (isEnvDefinedFalsy(value)) return false;
   if (isEnvTruthy(value)) return true;
-  return modelFamilyFor(providerName, model) === "deepseek";
+  return modelFamilyFor(providerName, model) === "deepseek" ||
+    (providerName?.trim().toLowerCase() === "abliteration" &&
+      model?.trim().toLowerCase() === "abliterated-model-large-v2");
 }
 
 /** Light sessions on a DeepSeek-family model advertise the batch Edit shape (#3163). */

@@ -1665,6 +1665,21 @@ describe("Light's model-family tuning follows the model through gateways", () =>
     expect(prompt).toBe(await head("openai", "gpt-6-luna"));
   });
 
+  test("abliteration.ai Large V2 states DeepSeek's task limits; the provider's other models do not", async () => {
+    const v2 = await head("abliteration", "abliterated-model-large-v2");
+    expect(v2).toContain(LIGHT_LIMITED_FINISH);
+    expect(v2).not.toContain(LIGHT_FINISH);
+    // The head DeepSeek's own API measured, with Edit and Write as the editors.
+    expect(v2).toBe(await head("deepseek", "deepseek-v4-pro"));
+    expect(v2).not.toContain("Edit and create files with apply_patch");
+    expect(await head("abliteration", "abliterated-model-large-v2", { [LIGHT_TASK_LIMITS_ENV]: "0" })).toContain(LIGHT_FINISH);
+    for (const model of ["abliterated-model", "abliterated-model-large"]) {
+      const other = await head("abliteration", model);
+      expect(other).toContain(LIGHT_FINISH);
+      expect(other).toBe(await head("anthropic", "claude-haiku-5-5"));
+    }
+  });
+
   test.each([
     ["openrouter", "z-ai/glm-5.3"],
     ["ollama-cloud", "gpt-oss:120b"],
