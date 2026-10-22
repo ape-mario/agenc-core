@@ -201,6 +201,40 @@ describe("gateway request shape", () => {
     expect(body.parallel_tool_calls).toBe(true);
   });
 
+  describe("OpenRouter prompt caching for models that cache only on request", () => {
+    const conversation: LLMMessage[] = [
+      { role: "user", content: "read a.txt" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "FileRead", arguments: "{\"path\":\"a.txt\"}" }] },
+      { role: "tool", toolCallId: "c1", toolName: "FileRead", content: "hello" },
+    ];
+    const build = (model: string) => buildChatCompletionsRequest({
+      model, messages: conversation, tools: TOOLS,
+      providerCapabilityHints: chatCompletionsCapabilityHintsForProvider("openrouter", model),
+      options: { systemPrompt: "SYSTEM_HEAD" },
+    });
+
+    test("Claude gets one top-level marker that follows the conversation", () => {
+      const body = build("anthropic/claude-sonnet-5.5");
+      expect(body.cache_control).toEqual({ type: "ephemeral" });
+      expect(JSON.stringify(body.messages)).not.toContain("cache_control");
+    });
+
+    test("Gemini gets one marker, on the system prompt", () => {
+      const body = build("google/gemini-3.8-flash");
+      expect(body.cache_control).toBeUndefined();
+      const messages = body.messages as Array<Record<string, unknown>>;
+      expect(messages[0]).toEqual({ role: "system",
+        content: [{ type: "text", text: "SYSTEM_HEAD", cache_control: { type: "ephemeral" } }] });
+      expect(JSON.stringify(messages.slice(1))).not.toContain("cache_control");
+    });
+
+    test("models that cache on their own get no marker", () => {
+      for (const model of ["qwen/qwen3-coder-next", "z-ai/glm-5.3", "openai/gpt-6-luna", "deepseek/deepseek-v4-flash"]) {
+        expect(JSON.stringify(build(model))).not.toContain("cache_control");
+      }
+    });
+  });
+
   test("reasoning items from another model are not replayed", () => {
     const hints = chatCompletionsCapabilityHintsForProvider("openrouter", "openai/gpt-6-luna");
     const body = buildChatCompletionsRequest({
