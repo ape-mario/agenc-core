@@ -7,6 +7,7 @@ import {
   __disposeIdleReadHelpersForTests,
   bindWorkspaceDirectoryReadCapability,
   bindWorkspaceFileReadCapability,
+  readHelperPoolingEnabled,
 } from "../../src/workspace/file-mutation-transaction.js";
 
 let root = "";
@@ -71,4 +72,13 @@ test.skipIf(process.platform === "win32")("refuses a directory whose identity ch
   await expect(bindWorkspaceDirectoryReadCapability(join(root, "y"), { expectedIdentity: {
     dev: String(admitted.dev), ino: String(admitted.ino), mode: String(admitted.mode) } }))
     .rejects.toMatchObject({ name: "WorkspacePathIdentityChangedError" });
+});
+
+// A parked helper stays in the last directory it bound. Windows keeps a
+// process's working directory open, so a pooled helper would lock that folder
+// against deletion and renames (seen as EBUSY in the Windows transport test).
+test("does not pool read helpers on Windows", () => {
+  expect(readHelperPoolingEnabled("win32")).toBe(false);
+  expect(readHelperPoolingEnabled("linux")).toBe(true);
+  expect(readHelperPoolingEnabled("darwin")).toBe(true);
 });
