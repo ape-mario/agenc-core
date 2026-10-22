@@ -43,7 +43,8 @@ async function fakeServer(status = 200, payload = fixture) {
       return;
     }
     if (status !== 200) {
-      res.writeHead(status, { "content-type": "application/json", "x-ratelimit-reset-requests": String(Math.floor(Date.now() / 1000) + 2) });
+      // Venice's live 429 (2026-10-22): reset headers are epoch milliseconds, no Retry-After.
+      res.writeHead(status, { "content-type": "application/json", "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": String(Date.now() + 2_000), "x-ratelimit-remaining-tokens": "1996448", "x-ratelimit-reset-tokens": String(Date.now() + 2_000) });
       res.end(JSON.stringify({ error: status === 401 ? `Authentication failed: ${key}` : `Rate limit exceeded: ${key}` }));
       return;
     }
@@ -70,13 +71,27 @@ async function fakeServer(status = 200, payload = fixture) {
 }
 
 describe("Venice built-in provider", () => {
-  test("rate-limit reset headers preserve their documented units and standard precedence", async () => {
-    vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+  test("rate-limit reset headers become a short Retry-After for the used-up window", async () => {
+    // Headers of a live Venice 429 captured 2026-10-22: both resets are epoch milliseconds.
+    const nowMs = 1_792_657_891_047;
+    vi.spyOn(Date, "now").mockReturnValue(nowMs);
+    const live = {
+      "x-ratelimit-limit-requests": "100", "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": "1792657951032",
+      "x-ratelimit-limit-tokens": "2000000", "x-ratelimit-remaining-tokens": "1996448", "x-ratelimit-reset-tokens": "1792657951035",
+    };
+    const nowS = Math.floor(nowMs / 1000);
     for (const [headers, expected] of [
-      [{ "x-ratelimit-reset-requests": "1007", "x-ratelimit-reset-tokens": "12" }, "12"],
-      [{ "x-ratelimit-reset-requests": "1007" }, "7"],
-      [{ "x-ratelimit-reset-requests": "1007", "retry-after": "3" }, "3"],
+      [live, "60"],
+      // Only the token window is used up: its reset decides.
+      [{ ...live, "x-ratelimit-remaining-requests": "57", "x-ratelimit-remaining-tokens": "0", "x-ratelimit-reset-tokens": String(nowMs + 12_000) }, "12"],
+      // No window reported as used up (an overloaded model): wait for the later reset.
+      [{ ...live, "x-ratelimit-remaining-requests": "57" }, "60"],
+      // Seconds-precision timestamps and plain delays are read too.
+      [{ "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": String(nowS + 7) }, "7"],
+      [{ "x-ratelimit-remaining-tokens": "0", "x-ratelimit-reset-tokens": "12" }, "12"],
+      [{ ...live, "retry-after": "3" }, "3"],
       [{ "x-ratelimit-reset-requests": "invalid" }, null],
+      [{ "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": String(nowMs - 5_000) }, null],
     ] as const) {
       const fetchImpl = veniceFetch(async () => new Response('{"error":"limited"}', { status: 429, headers }), key);
       expect((await fetchImpl("http://127.0.0.1/api/v1/chat/completions")).headers.get("retry-after")).toBe(expected);
@@ -239,6 +254,10 @@ describe("Venice built-in provider", () => {
     expect(error).toBeInstanceOf(ErrorKind);
     expect(String(error)).not.toContain(key);
     expect(JSON.stringify(error)).not.toContain(key);
-    if (error instanceof LLMRateLimitError) expect(error.retryAfterMs).toBeGreaterThan(0);
+    if (error instanceof LLMRateLimitError) {
+      expect(error.retryAfterMs).toBeGreaterThan(0);
+      // The wait is the window's real reset (about 2 s here), not a timestamp read as a delay.
+      expect(error.retryAfterMs).toBeLessThanOrEqual(3_000);
+    }
   });
 });
