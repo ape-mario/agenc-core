@@ -50,7 +50,8 @@ describe("ZDR badge state", () => {
       anthropic: "retained",
       ollama: "zdr",
       lmstudio: "zdr",
-      "openai-compatible": "zdr",
+      // A server on this computer may be a proxy to a cloud API.
+      "openai-compatible": "unknown",
       openrouter: "zdr",
       // The default Venice model is private.
       venice: "zdr",
@@ -109,10 +110,15 @@ describe("ZDR badge state", () => {
     expect(state("openrouter", "x-ai/grok-4.5", { config: { providers: { openrouter: { base_url: "http://127.0.0.1:9000/v1" } } } })?.state).toBe("unknown");
   });
 
-  it("stays green for a local server on any loopback address and for the provider's own host", () => {
+  it("stays green for Ollama and LM Studio on any loopback address and for the provider's own host", () => {
     for (const url of ["http://127.0.0.1:8000/v1", "http://localhost:1234/v1", "http://[::1]:11434", "http://studio.localhost:1234/v1"]) {
-      expect(state("openai-compatible", "m", { env: { OPENAI_COMPATIBLE_BASE_URL: url } })?.state, url).toBe("zdr");
+      expect(state("openai-compatible", "m", { env: { OPENAI_COMPATIBLE_BASE_URL: url } })).toMatchObject({
+        state: "unknown",
+        reason: expect.stringContaining("may forward them to a cloud API"),
+      });
     }
+    expect(state("ollama", "llama3.3", { env: { OLLAMA_BASE_URL: "http://127.0.0.1:11434" } })?.state).toBe("zdr");
+    expect(state("lmstudio", "m", { env: { LMSTUDIO_BASE_URL: "http://localhost:1234/v1" } })?.state).toBe("zdr");
     expect(state("cerebras", "gpt-oss-120b", { env: { CEREBRAS_BASE_URL: "https://api.cerebras.ai/v1/" } })?.state).toBe("zdr");
   });
 

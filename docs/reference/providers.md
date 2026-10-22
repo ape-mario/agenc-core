@@ -1027,13 +1027,14 @@ Read on 2026-10-22 from each provider's documentation:
 
 | Provider | What happens to API prompts and responses | ZDR | Status line |
 | --- | --- | --- | --- |
-| OpenRouter | Depends on the endpoint | Per request (`provider.zdr`), on by default | Green; red when off or the model has no ZDR endpoint ([zdr](https://openrouter.ai/docs/guides/features/zdr), [routing](https://openrouter.ai/docs/guides/routing/provider-selection)) |
+| OpenRouter | Depends on the endpoint; OpenRouter keeps prompts only if the account turned on prompt logging | Per request (`provider.zdr`), on by default | Green; red when off or the model has no ZDR endpoint ([zdr](https://openrouter.ai/docs/guides/features/zdr), [routing](https://openrouter.ai/docs/guides/routing/provider-selection)) |
 | Ollama Cloud | Not stored or logged | Policy | Green ([faq](https://docs.ollama.com/faq)) |
 | Cerebras | Not retained | Policy | Green ([privacy](https://cerebras.ai/privacy-policy)) |
 | abliteration.ai | Processed in memory, never stored | Policy | Green ([data handling](https://abliteration.ai/data-handling)) |
 | AgenC (managed) | Routed only to ZDR endpoints by the gateway | Built in | Green |
 | Venice AI | Private models keep nothing; anonymized models run on third-party hosts | Per model | Green for private models, red for anonymized ([privacy](https://docs.venice.ai/overview/privacy)) |
-| Ollama, LM Studio, OpenAI-compatible | Stays on this computer | Local | Green on a loopback address, dim `ZDR?` elsewhere |
+| Ollama, LM Studio | Stays on this computer | Local | Green on a loopback address, dim `ZDR?` elsewhere |
+| OpenAI-compatible | Depends on the server, which may be a proxy to a cloud API | Unknown | Dim `ZDR?` |
 | xAI Grok | Kept 30 days for abuse auditing | Team setting in the xAI Console | Red ([security](https://docs.x.ai/developers/faq/security)) |
 | OpenAI | Abuse logs up to 30 days | Approved organization or project; AgenC sends `store: false` | Red ([your data](https://developers.openai.com/api/docs/guides/your-data)) |
 | Anthropic | Up to 30 days, flagged content longer | Organization agreement | Red ([retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention)) |
@@ -1053,11 +1054,12 @@ Read on 2026-10-22 from each provider's documentation:
 
 The status line shows `ZDR` after the usage figures: green when the provider
 and model keep nothing (the request-level control is on, the provider's policy
-keeps nothing, or the server runs on this computer), red when data may be kept
+keeps nothing, or Ollama or LM Studio runs on this computer), red when data may be kept
 (including providers whose ZDR is an account setting AgenC cannot see), and a
 dim `ZDR?` when the requests go to an address whose policy AgenC cannot know:
-a local provider pointed at another machine, or a provider that would
-otherwise be green pointed at a custom base URL. `/status` explains the
+an OpenAI-compatible server (even on this computer, since it may forward to a
+cloud API), a local provider pointed at another machine, or a provider that
+would otherwise be green pointed at a custom base URL. `/status` explains the
 current state in one line. The table lives in
 `runtime/src/llm/registry/provider-retention.ts`.
 

@@ -123,9 +123,14 @@ export function resolveZeroDataRetentionStatus(params: {
   const endpoint = resolveEndpoint(provider, config, params.env ?? {});
   switch (facts.retention) {
     case "local":
-      return endpoint.loopback
-        ? status(provider, "zdr", "Runs on this computer, so nothing leaves it.")
-        : status(provider, "unknown", `Requests go to ${customAddress(endpoint.host)}, whose retention AgenC cannot see.`);
+      if (!endpoint.loopback) {
+        return status(provider, "unknown", `Requests go to ${customAddress(endpoint.host)}, whose retention AgenC cannot see.`);
+      }
+      // A generic OpenAI-compatible server on this computer can be a proxy
+      // (LiteLLM, a login proxy) that forwards to a cloud API.
+      return provider === "openai-compatible"
+        ? status(provider, "unknown", "Requests go to a server on this computer, which may forward them to a cloud API whose retention AgenC cannot see.")
+        : status(provider, "zdr", "Runs on this computer, so nothing leaves it.");
     case "request-zdr": {
       if (!openRouterZeroDataRetentionEnabled(config)) {
         return status(provider, "retained", "Zero data retention is off under [providers.openrouter], so endpoints may keep data.");
@@ -136,7 +141,7 @@ export function resolveZeroDataRetentionStatus(params: {
       if (openRouterModelHasZdrEndpoint(params.model) === false) {
         return status(provider, "retained", `OpenRouter has no zero-retention endpoint for this model and refuses it. ${OPENROUTER_ZDR_OFF_HINT}`);
       }
-      return status(provider, "zdr", "Every request carries provider.zdr, so OpenRouter uses only endpoints that keep nothing.");
+      return status(provider, "zdr", "Every request carries provider.zdr, so OpenRouter uses only endpoints that keep nothing. OpenRouter itself keeps prompts only if your account turned on prompt logging.");
     }
     case "no-retention":
       return !endpoint.builtIn
