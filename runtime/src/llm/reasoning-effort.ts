@@ -9,6 +9,7 @@ import { supportsXaiReasoningEffortParam } from "./structured-output.js";
 import { isOpenAiReasoningFamilyModel } from "./registry/openai-reasoning-models.js";
 import { isAgenCDeepSeekModel, AGENC_DEEPSEEK_REASONING_LEVELS } from "./registry/agenc-deepseek.js";
 import { isNativeDeepSeekModel, DEEPSEEK_REASONING_LEVELS } from "./registry/deepseek-models.js";
+import { isOllamaGptOssModel, OLLAMA_GPT_OSS_REASONING_LEVELS } from "./registry/ollama-gpt-oss.js";
 import { anthropicEffortLevels } from "../utils/model/anthropicThinkingControl.js";
 import { normalizeProviderIdentity } from "../provider-identity.js";
 import { gatewayFamilyDefaultEffort } from "./model-family.js";
@@ -189,6 +190,9 @@ export function resolveReasoningEffort(input: {
   ) {
     reasoningEffortAllowedValues =
       CEREBRAS_QWEN_GEMMA_REASONING_EFFORT_VALUES;
+    acceptsReasoningEffort = true;
+  } else if (slug === "ollama" && isOllamaGptOssModel(model)) {
+    reasoningEffortAllowedValues = new Set(OLLAMA_GPT_OSS_REASONING_LEVELS);
     acceptsReasoningEffort = true;
   } else if (slug === "ollama-cloud" || slug === "groq" || slug === "venice" || slug === "abliteration") {
     const entry = resolveRegisteredModelCatalogEntry({ provider: slug, model });

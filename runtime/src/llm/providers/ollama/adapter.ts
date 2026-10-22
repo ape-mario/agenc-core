@@ -60,6 +60,7 @@ import { repairToolTurnSequence, validateToolTurnSequence } from "../../tool-tur
 import { safeStringify } from "../../_deps/safe-stringify.js";
 import { resolveContextWindowProfile } from "../../_deps/context-window.js";
 import { withOllamaHealthSidecar } from "./health.js";
+import { isOllamaGptOssModel, ollamaGptOssThinkLevel } from "../../registry/ollama-gpt-oss.js";
 import { isRecord } from "../../../utils/record.js";
 import { coerceUsage } from "../../wire/shared.js";
 import { validateAgentInvocationMessageSequence } from "../../../contracts/agent-invocation-envelope.js";
@@ -1187,6 +1188,13 @@ export class OllamaProvider implements LLMProvider {
 
     if (this.config.keepAlive !== undefined)
       params.keep_alive = this.config.keepAlive;
+
+    // gpt-oss reasons at the session's effort; other models keep their own
+    // thinking default (registry/ollama-gpt-oss.ts).
+    const think = isOllamaGptOssModel(String(params.model))
+      ? ollamaGptOssThinkLevel(options?.reasoningEffort)
+      : undefined;
+    if (think !== undefined) params.think = think;
 
     // Native Ollama chat accepts a tools list but no tool_choice. `none`
     // omits the catalog so the provider cannot call tools. `auto` keeps

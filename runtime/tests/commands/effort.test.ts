@@ -129,6 +129,31 @@ describe("/effort Gemini catalog levels", () => {
   });
 });
 
+describe("/effort on a local Ollama model", () => {
+  beforeEach(() => settings.update.mockClear());
+
+  test.each(["low", "medium", "high"])("gpt-oss takes %s, Ollama's own think level", async (level) => {
+    const { context, getAppState } = commandContext("gpt-oss:20b", level, { provider: "ollama" });
+    expect(await effortCommand.execute(context)).toMatchObject({ kind: "text" });
+    expect(settings.update).toHaveBeenCalledWith("userSettings", { reasoning_effort: level });
+    expect(getAppState()).toMatchObject({ effortValue: level });
+  });
+
+  test("gpt-oss has no level above high", async () => {
+    const { context } = commandContext("gpt-oss:120b", "max", { provider: "ollama" });
+    const result = await effortCommand.execute(context);
+    expect(result).toMatchObject({ kind: "error" });
+    if (result.kind === "error") expect(result.message).toContain("Available: low, medium, high");
+    expect(settings.update).not.toHaveBeenCalled();
+  });
+
+  test("a model without levels still says so", async () => {
+    const { context } = commandContext("qwen3:8b", "high", { provider: "ollama" });
+    expect(await effortCommand.execute(context)).toMatchObject({ kind: "error" });
+    expect(settings.update).not.toHaveBeenCalled();
+  });
+});
+
 describe("/effort Grok catalog levels", () => {
   beforeEach(() => {
     settings.update.mockClear();

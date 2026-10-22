@@ -13,6 +13,7 @@ import { supportsGrokServerSideTools } from "./provider-native-search.js";
 import { normalizeProviderIdentity } from "../provider-identity.js";
 import { isOpenAiReasoningFamilyModel } from "./registry/openai-reasoning-models.js";
 import { isRegisteredMetaChatModel } from "./registry/meta-models.js";
+import { isOllamaGptOssModel } from "./registry/ollama-gpt-oss.js";
 
 export interface ProviderModelCapabilities {
   readonly provider: string;
@@ -413,7 +414,8 @@ const PROVIDER_CAPABILITIES: Readonly<Record<string, ProviderCapabilityDefinitio
     acceptsImageHistory: isVisionishOllamaModel,
     acceptsAudioHistory: false,
     acceptsThinkingHistory: false,
-    acceptsReasoningEffort: false,
+    // gpt-oss takes Ollama's `think` level (registry/ollama-gpt-oss.ts).
+    acceptsReasoningEffort: isOllamaGptOssModel,
   },
   openai: {
     supportsToolUse: true,
