@@ -244,9 +244,11 @@ function resolveExplicitPair(
   }
 
   // Venice's and Ollama Cloud's discovered catalogs can serve bare IDs also
-  // owned by native providers (kimi-k3, glm-5.3, muse-spark-open). The
-  // explicit provider/model pair remains the routing authority.
-  if (provider === "venice" || provider === "ollama-cloud") {
+  // owned by native providers (kimi-k3, glm-5.3, muse-spark-open). A local
+  // Ollama runs whatever tag its user pulled, and Ollama's library uses the
+  // same tags as Ollama Cloud (gpt-oss:20b, gemma4:31b). The explicit
+  // provider/model pair remains the routing authority.
+  if (provider === "venice" || provider === "ollama-cloud" || provider === "ollama") {
     return Object.freeze({ provider, model: projectedModel });
   }
 

@@ -231,6 +231,23 @@ describe("provider/model configuration authority", () => {
     ).toThrow(/belongs to provider 'openai'/u);
   });
 
+  test("local Ollama keeps a model whose tag Ollama Cloud also lists", () => {
+    // gpt-oss:20b and gemma4:31b are Ollama library tags and Ollama Cloud rows.
+    for (const model of ["gpt-oss:20b", "gpt-oss:120b", "gemma4:31b"]) {
+      expect(resolveProviderModelLayer(defaultConfig(), {
+        model_provider: "ollama",
+        model,
+      })).toMatchObject({ model_provider: "ollama", model });
+      expect(resolveProviderModelLayer(defaultConfig(), {
+        model: `ollama:${model}`,
+      })).toMatchObject({ model_provider: "ollama", model });
+    }
+    // The same tag without a provider still selects its hosted owner.
+    expect(resolveProviderModelLayer(defaultConfig(), {
+      model: "gpt-oss:20b",
+    })).toMatchObject({ model_provider: "ollama-cloud", model: "gpt-oss:20b" });
+  });
+
   test("an explicit provider accepts its unknown private model", () => {
     expect(
       resolveProviderModelLayer(defaultConfig(), {
