@@ -193,7 +193,7 @@
     "buildImage": "node:26.12.1-bookworm@sha256:dc5ba49acad07ed5c0defe487a0f14726a8882064683460bcb8168e03e2f74f3",
     "runtimeImage": "node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe",
     "debianSnapshot": {
-      "timestamp": "20260701T000000Z",
+      "timestamp": "20261021T000000Z",
       "repositories": [
         {
           "archive": "debian",
@@ -221,7 +221,7 @@
     "runtimePackages": {
       "ripgrep": "13.0.0-4+b2",
       "git": "1:2.39.5-0+deb12u3",
-      "ca-certificates": "20230311+deb12u1",
+      "ca-certificates": "20250419~deb12u2",
       "tini": "0.19.0-1+b3"
     }
   },

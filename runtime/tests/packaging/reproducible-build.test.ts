@@ -2109,7 +2109,7 @@ describe("reproducible install and release contract", () => {
     expect(toolchain.docker.runtimePackages).toEqual({
       ripgrep: "13.0.0-4+b2",
       git: "1:2.39.5-0+deb12u3",
-      "ca-certificates": "20230311+deb12u1",
+      "ca-certificates": "20250419~deb12u2",
       tini: "0.19.0-1+b3",
     });
     expect(dockerfile).toContain(
