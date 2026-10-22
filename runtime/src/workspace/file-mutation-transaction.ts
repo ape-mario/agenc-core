@@ -4190,9 +4190,21 @@ function takeIdleReadHelper(key: ReadHelperPoolKey, anchorPath: string): BoundDi
   return undefined;
 }
 
+/**
+ * Whether released read helpers wait in the idle pool. A parked helper keeps
+ * the working directory of the last directory it bound, and on Windows a
+ * process's working directory cannot be deleted or renamed, so pooling would
+ * lock that folder for up to IDLE_READ_HELPER_MS. Windows helpers exit on
+ * release, as they did before the pool existed.
+ */
+export function readHelperPoolingEnabled(platform: NodeJS.Platform = process.platform): boolean {
+  return platform !== "win32";
+}
+
 async function releaseReadHelper(helper: BoundDirectoryHelper): Promise<void> {
   const key = readHelperPoolKeys.get(helper);
-  if (key === undefined || !helper.reusable || idleReadHelpers.length >= MAX_IDLE_READ_HELPERS) {
+  if (!readHelperPoolingEnabled() || key === undefined || !helper.reusable ||
+      idleReadHelpers.length >= MAX_IDLE_READ_HELPERS) {
     await helper.dispose();
     return;
   }
