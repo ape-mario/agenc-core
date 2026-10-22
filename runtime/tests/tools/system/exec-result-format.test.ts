@@ -26,6 +26,28 @@ function output(overrides: Partial<ExecCommandToolOutput>): ExecCommandToolOutpu
 }
 
 describe("formatUnifiedExecToolContent", () => {
+  test.each([false, true])("a hard timeout retains its exit code and timeout marker (light=%s)", light => {
+    const result = output({ exitCode: 143, exit_code: 143, timedOut: true });
+    const content = formatUnifiedExecToolContent(result, light);
+    expect(content).toContain("exit_code=143 timed_out=true");
+    expect(compactExecExitFooter(content)).toContain("[exit 143 timed_out=true");
+    expect(unifiedExecCodeModeResult(result)).toMatchObject({ exit_code: 143, timed_out: true });
+  });
+
+  test("an elapsed yield window is not a hard timeout", () => {
+    const result = output({ exitCode: null, exit_code: null, process_id: 7, timedOut: true });
+    expect(formatUnifiedExecToolContent(result)).toContain("yielded=true");
+    expect(formatUnifiedExecToolContent(result)).not.toContain("timed_out=true");
+    expect(unifiedExecCodeModeResult(result)).toMatchObject({ yielded: true, session_id: 7 });
+    expect(unifiedExecCodeModeResult(result)).not.toHaveProperty("timed_out");
+  });
+
+  test("a hard timeout without an exit code still reports the timeout", () => {
+    const result = output({ exitCode: null, exit_code: null, timedOut: true });
+    expect(formatUnifiedExecToolContent(result)).toContain("timed_out=true");
+    expect(unifiedExecCodeModeResult(result)).toMatchObject({ timed_out: true });
+  });
+
   test.each([false, true])(
     "removes terminal decorations before framing without changing raw output (light=%s)",
     (light) => {

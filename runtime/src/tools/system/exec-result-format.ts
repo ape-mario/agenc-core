@@ -46,6 +46,7 @@ export function formatUnifiedExecToolContent(
     footerLines.push(`command_outcome=${output.command_outcome} cleanup_complete=true`);
   } else if (output.exitCode !== null) {
     footerLines.push(`exit_code=${output.exitCode}`);
+    if (output.timedOut) footerLines.push("timed_out=true");
   } else if (output.detached === true && output.pid !== undefined) {
     // A detached service that was still running when the yield window
     // closed. AgenC does not track it, so there is no session_id: the pid
@@ -111,6 +112,7 @@ export function unifiedExecCodeModeResult(
     result.cleanup_complete = true;
   } else if (output.exitCode !== null) {
     result.exit_code = output.exitCode;
+    if (output.timedOut) result.timed_out = true;
   } else if (output.detached === true && output.pid !== undefined) {
     result.running = true;
   } else if (output.process_id !== undefined) {
