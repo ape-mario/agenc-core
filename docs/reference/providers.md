@@ -1185,9 +1185,12 @@ value. `anonymized` hides the caller's identity but leaves retention unknown.
 This is model metadata, not an extra request routing preference.
 
 HTTP 401 maps to authentication failure. HTTP 429 maps to rate limiting.
-Venice's `x-ratelimit-reset-requests` is a Unix timestamp;
-`x-ratelimit-reset-tokens` is a delay in seconds. The adapter converts these
-to Core's retry timing and respects a standard `Retry-After` header.
+Venice sends `x-ratelimit-reset-requests` and `x-ratelimit-reset-tokens` as
+Unix timestamps in milliseconds and no `Retry-After` header. The adapter waits
+for the reset of the window that is used up (`x-ratelimit-remaining-* = 0`),
+or for the later reset when neither is, and respects a standard `Retry-After`
+header when Venice sends one. Seconds-precision timestamps and plain delays
+are read too.
 
 Sources: [Chat Completions](https://docs.venice.ai/api-reference/endpoint/chat/completions),
 [models](https://docs.venice.ai/api-reference/endpoint/models/list),
