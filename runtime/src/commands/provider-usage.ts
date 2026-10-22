@@ -566,15 +566,15 @@ function kimiRows(balance: KimiBalance, detail: boolean): Row[] {
   // A negative cash balance is money owed to Kimi.
   const owed = balance.cash !== undefined && balance.cash < 0 ? -balance.cash : undefined;
   if (!detail) {
-    const owing = owed === undefined ? "" : `${SEPARATOR}${money(owed, balance.currency)} owed`;
-    return [{ label: "balance", value: `${money(balance.available, balance.currency)} available${owing}` }];
+    const owing = owed === undefined ? "" : `${SEPARATOR}${money(owed)} owed`;
+    return [{ label: "balance", value: `${money(balance.available)} available${owing}` }];
   }
   return [
-    { label: "available", value: money(balance.available, balance.currency) },
-    ...optionalRow("voucher", balance.voucher === undefined ? undefined : money(balance.voucher, balance.currency)),
+    { label: "available", value: money(balance.available) },
+    ...optionalRow("voucher", balance.voucher === undefined ? undefined : money(balance.voucher)),
     ...optionalRow("cash", balance.cash === undefined
       ? undefined
-      : `${money(balance.cash, balance.currency)}${owed === undefined ? "" : " (owed)"}`),
+      : `${money(balance.cash)}${owed === undefined ? "" : " (owed)"}`),
   ];
 }
 

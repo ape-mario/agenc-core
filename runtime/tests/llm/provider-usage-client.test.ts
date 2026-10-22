@@ -137,7 +137,7 @@ describe("provider usage client", () => {
     });
     expect((await read("kimi")).report).toEqual({
       provider: "kimi",
-      balance: { ok: true, value: { currency: "USD", available: 0, voucher: 0, cash: -0.09476 } },
+      balance: { ok: true, value: { available: 0, voucher: 0, cash: -0.09476 } },
     });
     expect((await read("abliteration")).report).toEqual({
       provider: "abliteration",
@@ -215,11 +215,62 @@ describe("provider usage client", () => {
     expect(deepseek.report).toEqual({ provider: "deepseek", balance: { ok: false, reason: "unexpected response" } });
   });
 
-  it("reads Kimi's mainland platform in yuan", async () => {
-    const { report } = await read("kimi", {
-      "api.moonshot.cn/v1/users/me/balance": { json: { code: 0, status: true, data: { available_balance: 12 } } },
-    }, { baseURL: "https://api.moonshot.cn/v1" });
-    expect(report).toEqual({ provider: "kimi", balance: { ok: true, value: { currency: "CNY", available: 12 } } });
+  it("never sends the key to an endpoint the pinned Ollama Cloud or Kimi adapter refuses", async () => {
+    const refused = [
+      ["ollama-cloud", "https://collector.example/v1"],
+      ["ollama-cloud", "https://ollama.com.collector.example/v1"],
+      ["ollama-cloud", "http://ollama.com/v1"],
+      ["ollama-cloud", "https://ollama.com"],
+      ["kimi", "https://api.moonshot.cn/v1"],
+      ["kimi", "https://collector.example/v1"],
+      ["kimi", "https://api.moonshot.ai/v1//"],
+    ] as const;
+    for (const [provider, baseURL] of refused) {
+      const { report, requests } = await read(provider, LIVE_USAGE_ROUTES, { baseURL, detail: true });
+      expect(requests, `${provider} ${baseURL}`).toEqual([]);
+      const reasons = failureReasons(report);
+      expect(reasons.length).toBeGreaterThan(0);
+      expect(new Set(reasons)).toEqual(new Set(["custom endpoint"]));
+    }
+  });
+
+  it("reads usage only where each provider's chat adapter would send chat", async () => {
+    const { createProvider } = await import("../../src/llm/provider.js");
+    const candidates: Readonly<Record<ProviderUsageSlug, readonly string[]>> = {
+      "ollama-cloud": [
+        "https://ollama.com/v1",
+        "https://ollama.com/v1/",
+        " https://ollama.com/v1// ",
+        "https://collector.example/v1",
+        "http://ollama.com/v1",
+        "https://ollama.com",
+      ],
+      kimi: [
+        "https://api.moonshot.ai/v1",
+        "https://api.moonshot.ai/v1/",
+        "https://api.moonshot.ai/v1//",
+        "https://api.moonshot.cn/v1",
+        "https://collector.example/v1",
+      ],
+      openrouter: ["https://openrouter.ai/api/v1", "http://127.0.0.1:8080/or/api/v1"],
+      deepseek: ["https://api.deepseek.com/v1", "https://gw.example/deepseek/v1"],
+      venice: ["https://api.venice.ai/api/v1", "https://venice-proxy.example/api/v1"],
+      abliteration: ["https://api.abliteration.ai/v1", "https://ablit-proxy.example/v1"],
+    };
+    for (const [provider, baseURLs] of Object.entries(candidates) as Array<[ProviderUsageSlug, readonly string[]]>) {
+      for (const baseURL of baseURLs) {
+        let adapterAccepts = true;
+        try {
+          createProvider(provider, { apiKey: KEY, baseURL });
+        } catch {
+          adapterAccepts = false;
+        }
+        const { requests } = await read(provider, {}, { baseURL });
+        expect(requests.length > 0, `${provider} ${JSON.stringify(baseURL)}`).toBe(adapterAccepts);
+        const origins = [...new Set(requests.map((request) => new URL(request.url).origin))];
+        expect(origins).toEqual(adapterAccepts ? [new URL(baseURL.trim()).origin] : []);
+      }
+    }
   });
 
   it("refuses a base URL that is not http or https before sending the key", async () => {

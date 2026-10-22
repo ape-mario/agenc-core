@@ -3,9 +3,13 @@
  *
  * Each provider here documents an endpoint that answers with the account's
  * balance or usage for the same API key the user already sends it for
- * inference. Every request is a GET to the host of the provider's resolved
- * inference base URL (registry default, config `base_url` or environment
- * override), so a key never travels anywhere its chat requests do not.
+ * inference. Every request is a GET to the origin the provider's chat adapter
+ * would use for the resolved base URL, so a key never travels anywhere its
+ * chat requests could not. OpenRouter, DeepSeek, Venice and abliteration.ai
+ * send chat wherever their base URL points (registry default, config
+ * `base_url` or environment override). The Ollama Cloud and Kimi adapters are
+ * pinned to their own endpoints and refuse any other, so a different
+ * configured endpoint gets no usage request at all.
  *
  * Bodies are read field by field against the documented shapes; anything
  * else in them is ignored. A failure carries only an HTTP status or a short
@@ -25,6 +29,9 @@
  * - abliteration.ai: GET /v1/credits
  *   (https://docs.abliteration.ai/api-reference/credits/get-the-credit-balance-for-the-api-keys-organization)
  */
+
+import { OLLAMA_CLOUD_BASE_URL } from "./registry/ollama-cloud-models.js";
+import { BUILT_IN_PROVIDER_BASE_URLS } from "./registry/provider-info.js";
 
 /** Providers with a documented balance or usage API, in `/usage` order. */
 export const PROVIDER_USAGE_SLUGS = Object.freeze([
@@ -153,8 +160,8 @@ export interface VeniceBalance {
   readonly nextEpochBegins?: string;
 }
 
+/** USD: the Kimi adapter only talks to Moonshot's global platform. */
 export interface KimiBalance {
-  readonly currency: "USD" | "CNY";
   readonly available: number;
   readonly voucher?: number;
   readonly cash?: number;
@@ -377,19 +384,7 @@ function parseVeniceBalance(body: unknown): VeniceBalance | undefined {
   };
 }
 
-/**
- * Kimi's global platform reports US dollars; its mainland China platform
- * (moonshot.cn) reports the same fields in yuan.
- */
-function kimiCurrency(baseURL: string): "USD" | "CNY" {
-  try {
-    return new URL(baseURL).hostname.toLowerCase().endsWith(".cn") ? "CNY" : "USD";
-  } catch {
-    return "USD";
-  }
-}
-
-function parseKimiBalance(body: unknown, baseURL: string): KimiBalance | undefined {
+function parseKimiBalance(body: unknown): KimiBalance | undefined {
   const root = record(body);
   // `code` 0 and `status` true mark success; anything else is not a balance.
   if (root === undefined || root.code !== 0 || root.status === false) return undefined;
@@ -397,7 +392,6 @@ function parseKimiBalance(body: unknown, baseURL: string): KimiBalance | undefin
   const available = finiteNumber(data?.available_balance);
   if (available === undefined) return undefined;
   return {
-    currency: kimiCurrency(baseURL),
     available,
     ...optional("voucher", finiteNumber(data?.voucher_balance)),
     ...optional("cash", finiteNumber(data?.cash_balance)),
@@ -438,6 +432,27 @@ function providerUsageEndpoint(
   base.pathname = `${prefix}${pathname}`;
   if (query !== undefined) base.search = `?${query}`;
   return base.toString();
+}
+
+/**
+ * The base URL the provider's chat adapter would use for `baseURL`, or
+ * undefined when the adapter refuses it. Mirrors the factory, which trims the
+ * configured value, and the pinned adapters: providers/ollama-cloud accepts
+ * only OLLAMA_CLOUD_BASE_URL (any trailing slashes), providers/kimi only
+ * Moonshot's global base URL with at most one trailing slash.
+ */
+function adapterBaseURL(provider: ProviderUsageSlug, baseURL: string): string | undefined {
+  const configured = baseURL.trim() || BUILT_IN_PROVIDER_BASE_URLS[provider];
+  switch (provider) {
+    case "ollama-cloud":
+      return configured.replace(/\/+$/u, "") === OLLAMA_CLOUD_BASE_URL ? OLLAMA_CLOUD_BASE_URL : undefined;
+    case "kimi": {
+      const pinned = BUILT_IN_PROVIDER_BASE_URLS.kimi;
+      return configured === pinned || configured === `${pinned}/` ? pinned : undefined;
+    }
+    default:
+      return configured;
+  }
 }
 
 function failed<T>(reason: string): UsageRead<T> {
@@ -512,9 +527,16 @@ export async function fetchProviderUsage(
   target: ProviderUsageTarget,
   options: ProviderUsageRequestOptions = {},
 ): Promise<ProviderUsageReport> {
-  const { apiKey, baseURL } = target;
-  const get = <T>(path: string, parse: (body: unknown) => T | undefined, fromRoot = false) =>
-    getJson(providerUsageEndpoint(baseURL, path, { fromRoot }), apiKey, options, parse);
+  const { apiKey } = target;
+  const baseURL = adapterBaseURL(target.provider, target.baseURL);
+  const origin = baseURL === undefined ? undefined : httpBase(baseURL)?.origin;
+  const get = <T>(path: string, parse: (body: unknown) => T | undefined, fromRoot = false) => {
+    // An endpoint the chat adapter refuses never receives the key.
+    if (baseURL === undefined) return Promise.resolve(failed<T>("custom endpoint"));
+    const url = providerUsageEndpoint(baseURL, path, { fromRoot });
+    const sameOrigin = url !== undefined && origin !== undefined && new URL(url).origin === origin;
+    return getJson(sameOrigin ? url : undefined, apiKey, options, parse);
+  };
   switch (target.provider) {
     case "ollama-cloud": {
       const [balance, last24h, last7d] = await Promise.all([
@@ -540,7 +562,7 @@ export async function fetchProviderUsage(
     case "kimi":
       return {
         provider: "kimi",
-        balance: await get("/users/me/balance", (body) => parseKimiBalance(body, baseURL)),
+        balance: await get("/users/me/balance", parseKimiBalance),
       };
     case "abliteration":
       return { provider: "abliteration", credits: await get("/credits", parseCreditTotals) };
