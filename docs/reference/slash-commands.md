@@ -25,7 +25,7 @@ Order matches `buildDefaultRegistry`.
 | `/logout` | | Sign out of your AgenC account |
 | `/whoami` | `account` | Show the signed-in AgenC account |
 | `/subscription` | `billing` | Show your AgenC plan and billing URL |
-| `/usage` | | Show hosted model usage for your AgenC plan |
+| `/usage` | | Show AgenC plan usage and the balance or usage of each connected provider; `/usage <provider>` (for example `/usage ollama`) shows one provider in detail. See [`/usage`](#usage) |
 | `/grok-login` | `xai-login` | Sign in with X for Grok subscription access (optional `device` flow). Headless: `agenc grok-login` |
 | `/grok-logout` | `xai-logout` | Sign out of the xAI / Grok OAuth session |
 | `/openai-login` | `chatgpt-login` | Sign in with ChatGPT for OpenAI subscription access |
@@ -117,6 +117,36 @@ the `openai` provider. The `openai-compatible` provider uses
 `OPENAI_COMPATIBLE_API_KEY`, its documented fallback, or a provider-scoped
 saved BYOK credential. See
 [env.md](env.md#provider-credential-isolation).
+
+## `/usage`
+
+`/usage` shows two sections. `AgenC account` is the hosted model usage of the
+signed-in AgenC plan. `Providers` lists every provider with a key set (an
+environment variable or a key saved in `/provider`) whose API reports a balance
+or usage for that same key. All lookups run at once with a 5 second timeout per
+request, and a provider that fails shows one dim line such as
+`Ollama Cloud  usage unavailable (HTTP 401)` without holding up the others.
+
+`/usage <provider>` shows one provider in detail. `/usage ollama` means Ollama
+Cloud, since a local Ollama server has no account.
+
+| Provider | Summary | Detail adds | Endpoint |
+| --- | --- | --- | --- |
+| Ollama Cloud | plan credits left and reset date (or session and weekly limits on legacy plans), purchased credits, last 24 hours, top two models | plan period, last 7 days, web search and fetch, spend per model | `GET /api/balance`, `GET /api/usage` |
+| OpenRouter | account credits left | credits used, this key's daily, weekly, monthly and total spend, key limit, free model requests, key expiry | `GET /api/v1/credits`, `GET /api/v1/key` |
+| DeepSeek | balance per currency | granted and topped-up balance, whether API calls are allowed | `GET /user/balance` |
+| Venice AI | USD balance, plus DIEM and bundled credits when present | DIEM refresh date, API tier and access, key expiry | `GET /api/v1/api_keys/rate_limits` |
+| Kimi (Moonshot) | available balance and money owed | voucher and cash balance | `GET /v1/users/me/balance` |
+| abliteration.ai | credits left | credits used | `GET /v1/credits` |
+
+Each request goes to the provider's own resolved base URL (the registry default,
+`providers.<id>.base_url` in config, or the provider's `*_BASE_URL` override),
+so a key only travels where that provider's chat requests already go. Redirects
+are refused and keys are never printed. Providers whose APIs need an admin or
+management key for billing (OpenAI, Anthropic, xAI, Mistral) or document no
+balance API for API keys (Gemini, Groq, Cerebras, NVIDIA NIM, Meta, Qwen, Z.AI, MiniMax, GitHub
+Copilot, Amazon Bedrock) are not listed. AgenC-managed routes have no key of
+yours to read with; their usage is the AgenC account section.
 
 ## `/swarm`
 

@@ -158,20 +158,48 @@ describe("auth slash commands", () => {
     expect(text).not.toContain("LiteLLM");
   });
 
-  it("shows model allowance usage for free local accounts", async () => {
+  it("shows model allowance usage for free local accounts above the provider section", async () => {
     const agencHome = await makeHome();
     const ctx = localAuthCtx(agencHome);
     await loginCommand.execute(ctx);
 
-    await expect(usageCommand.execute(ctx)).resolves.toEqual({
-      kind: "text",
-      text:
+    const result = await usageCommand.execute(ctx);
+    expect(result.kind).toBe("text");
+    const text = result.kind === "text" ? result.text : "";
+    expect(text.startsWith(
+      "AgenC account\n" +
         "Plan: free\n" +
         "Managed models: not enabled\n" +
         "Hosted model usage requires Pro or higher.\n" +
         "BYOK still works without a subscription.\n" +
-        "Billing: https://id.agenc.ag/subscription",
+        "Billing: https://id.agenc.ag/subscription\n" +
+        "\n" +
+        "Providers\n" +
+        "No provider with a usage API is connected.",
+    )).toBe(true);
+  });
+
+  it("keeps the provider section when the AgenC account is signed out", async () => {
+    const agencHome = await makeHome();
+
+    const result = await usageCommand.execute(localAuthCtx(agencHome));
+    expect(result.kind === "text" ? result.text : "").toMatch(
+      /^AgenC account\nNot logged in\. Run \/login to sign in with Google\.\n\nProviders\n/u,
+    );
+  });
+
+  it("routes one argument to the provider detail and rejects more", async () => {
+    const agencHome = await makeHome();
+
+    await expect(usageCommand.execute({ ...localAuthCtx(agencHome), argsRaw: " mistral " })).resolves.toEqual({
+      kind: "text",
+      text: "Mistral has no balance or usage API that works with an API key.",
     });
+    await expect(usageCommand.execute({ ...localAuthCtx(agencHome), argsRaw: "ollama extra" })).resolves.toEqual({
+      kind: "error",
+      message: "Usage: /usage [provider]",
+    });
+    expect(usageCommand.argumentHint).toBe("[provider]");
   });
 
   it("formats paid model allowance usage", () => {
