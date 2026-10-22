@@ -228,6 +228,41 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+/**
+ * A thinking model's reasoning for a reply that calls tools, kept on that
+ * assistant message so the next request of the same tool loop can send it
+ * back as `thinking`. Ollama's templates for thinking models (gpt-oss among
+ * them) render it there; without it the model starts its reasoning over
+ * after every tool result.
+ */
+function ollamaReplayReasoning(
+  provider: string,
+  model: string,
+  thinking: string,
+  toolCalls: readonly LLMToolCall[],
+): Pick<LLMResponse, "providerReasoningContent" | "providerReasoningProvenance"> {
+  return thinking.length > 0 && toolCalls.length > 0
+    ? { providerReasoningContent: thinking, providerReasoningProvenance: { provider, model } }
+    : {};
+}
+
+/** Thinking that `model` produced on `provider`, else undefined. */
+function replayableOllamaThinking(
+  message: LLMMessage,
+  provider: string,
+  model: string,
+): string | undefined {
+  const source = message.providerReasoningProvenance;
+  const thinking = message.providerReasoningContent;
+  const same = (left: string, right: string): boolean =>
+    left.trim().toLowerCase() === right.trim().toLowerCase();
+  return typeof thinking === "string" && thinking.length > 0 &&
+    typeof source?.provider === "string" && typeof source.model === "string" &&
+    same(source.provider, provider) && same(source.model, model)
+    ? thinking
+    : undefined;
+}
+
 function readNonNegativeNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
     ? value
@@ -709,10 +744,13 @@ export class OllamaProvider implements LLMProvider {
       options?.timeoutMs,
     );
     let content = "";
+    /** The model's thinking, sent back with its tool calls (ollamaReplayReasoning). */
+    let reasoningText = "";
     /** How much of `content` the caller has already been shown. */
     let emittedLength = 0;
     let holdingText = false;
-    let model = String(params.model ?? this.config.model);
+    const requestModel = String(params.model ?? this.config.model);
+    let model = requestModel;
     let toolCalls: LLMToolCall[] = [];
     let promptTokens = 0;
     let completionTokens = 0;
@@ -764,6 +802,7 @@ export class OllamaProvider implements LLMProvider {
               const chunkContent = readString(message.content);
               const thinking = readString(message.thinking);
               if (thinking) {
+                reasoningText += thinking;
                 onChunk({ content: "", done: false, thinkingDelta: { delta: thinking, index: 0 } });
               }
 
@@ -909,6 +948,7 @@ export class OllamaProvider implements LLMProvider {
         content,
         ...(toolCallRecovery ? { toolCallRecovery } : {}),
         toolCalls: completedToolCalls,
+        ...ollamaReplayReasoning(this.name, requestModel, reasoningText, completedToolCalls),
         usage: coerceUsage({
           promptTokens,
           completionTokens,
@@ -1160,9 +1200,17 @@ export class OllamaProvider implements LLMProvider {
         ? [{ role: "system" as const, content: options.systemPrompt.trim() }, ...projection.messages]
         : projection.messages;
 
+    const requestModel = options?.model?.trim() || this.config.model;
+    // Thinking goes back only inside the running tool loop: the assistant
+    // messages after the last user message, as Ollama's gpt-oss template
+    // renders it. Older thinking would only grow the prompt.
+    const lastUserIndex = requestMessages.map((m) => m.role).lastIndexOf("user");
     const params: Record<string, unknown> = {
-      model: options?.model?.trim() || this.config.model,
-      messages: requestMessages.map((m) => this.toOllamaMessage(m)),
+      model: requestModel,
+      messages: requestMessages.map((m, index) => this.toOllamaMessage(
+        m,
+        execution.mode === "native" && index > lastUserIndex ? requestModel : undefined,
+      )),
     };
 
     // Build model options
@@ -1306,7 +1354,12 @@ export class OllamaProvider implements LLMProvider {
     };
   }
 
-  private toOllamaMessage(msg: LLMMessage): Record<string, unknown> {
+  /**
+   * `replayThinkingFor` names the request's model when this message belongs
+   * to the running tool loop; its thinking is sent back only when that same
+   * model produced it on this provider.
+   */
+  private toOllamaMessage(msg: LLMMessage, replayThinkingFor?: string): Record<string, unknown> {
     if (msg.role === "tool") {
       let content: string;
       if (Array.isArray(msg.content)) {
@@ -1326,9 +1379,13 @@ export class OllamaProvider implements LLMProvider {
       };
     }
     if (msg.role === "assistant" && msg.toolCalls?.length) {
+      const thinking = replayThinkingFor === undefined
+        ? undefined
+        : replayableOllamaThinking(msg, this.name, replayThinkingFor);
       return {
         role: "assistant",
         content: msg.content,
+        ...(thinking !== undefined ? { thinking } : {}),
         tool_calls: msg.toolCalls.map((toolCall) => ({
           function: {
             name: toolCall.name,
@@ -1413,6 +1470,12 @@ export class OllamaProvider implements LLMProvider {
           ?? toolCallRecovery.toolName,
       } } : {}),
       toolCalls,
+      ...ollamaReplayReasoning(
+        this.name,
+        options?.model?.trim() || this.config.model,
+        readString(message.thinking),
+        toolCalls,
+      ),
       usage,
       model:
         readString(record.model) ||
