@@ -1333,6 +1333,8 @@ interface GatewayWebSearchBackend {
   readonly baseURL: string;
   readonly model: string;
   readonly rates: TokenRates | undefined;
+  /** OpenRouter: the session's zero data retention, on unless turned off. */
+  readonly zeroDataRetention: boolean;
 }
 
 const GATEWAY_SEARCH_BASE_URLS: Readonly<Record<GatewayWebSearchBackend["provider"], string>> = {
@@ -1370,7 +1372,8 @@ function resolveGatewayWebSearchBackend(opts: ModelFacingToolOptions): GatewayWe
   const rates = price === undefined
     ? undefined
     : { inputUsdPerToken: price.inputUsdPer1K / 1000, outputUsdPerToken: price.outputUsdPer1K / 1000 };
-  return { provider: identity, apiKey, baseURL, model, rates };
+  const zeroDataRetention = identity === "openrouter" && factoryOptions.extra?.zeroDataRetention !== false;
+  return { provider: identity, apiKey, baseURL, model, rates, zeroDataRetention };
 }
 
 /** Native fetch only uses the current session's direct Ollama Cloud key. */
@@ -1415,6 +1418,7 @@ async function runGatewayWebSearch(
       model: backend.model,
       allowedDomains: [...input.filters.allowedDomains],
       blockedDomains: [...input.filters.blockedDomains],
+      zeroDataRetention: backend.zeroDataRetention,
     });
   }
   return await runVeniceWebSearch({

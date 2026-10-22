@@ -987,18 +987,43 @@ its default tier, so a call without Fast sends none.
 ## Zero data retention
 
 Only one built-in provider takes a request-level zero-data-retention control:
-`[providers.openrouter] zero_data_retention = true` adds `provider.zdr = true`
-to every request (OR-ed with the account setting on OpenRouter's side), so
-routing is restricted to endpoints with a zero-data-retention policy and a
-model without one is refused. The desktop shows this as a switch on the
-OpenRouter card. Everywhere else retention is an account, project or team
-setting, so the config field is rejected and the desktop card states the
-provider's policy instead. Verified 2026-09-12 against each provider's
-documentation:
+OpenRouter. With your own OpenRouter key it is on by default. Every request
+carries `provider.zdr = true` (OR-ed with the account setting on OpenRouter's
+side), so routing is restricted to endpoints with a zero-data-retention policy
+and a model without one is refused instead of being served elsewhere. To turn
+it off:
+
+```toml
+[providers.openrouter]
+zero_data_retention = false
+```
+
+The managed AgenC route pins its own zero-data-retention routing and ignores
+this setting.
+
+`/model` and `/providers` read OpenRouter's list of qualifying endpoints
+(`GET /endpoints/zdr` on the OpenRouter base URL, by default
+`https://openrouter.ai/api/v1/endpoints/zdr`; public, no key is sent) and dim
+the OpenRouter models that have none, with the setting that turns it off. A model
+picked anyway, for example with `/model openrouter:<id>`, ends the turn with an
+error that names zero data retention and the setting. It is not retried. When
+the list cannot be read, nothing is dimmed and requests still carry
+`provider.zdr`. On 2026-10-22, 82 of the 298 OpenRouter models in AgenC's
+catalog had no zero-data-retention endpoint, including 15 of the 16 free ones.
+
+OpenRouter does not count in-memory prompt caching as retention, so caching
+keeps working. The WebSearch tool's OpenRouter search (the `web` plugin with the
+Exa engine) also carries `provider.zdr`, but OpenRouter's zero data retention
+covers the model endpoint, not the search engine.
+
+The desktop shows this as a switch on the OpenRouter card. Everywhere else
+retention is an account, project or team setting, so the config field is
+rejected and the desktop card states the provider's policy instead. Verified
+2026-09-12 against each provider's documentation:
 
 | Provider | Default retention | Zero data retention | AgenC |
 | --- | --- | --- | --- |
-| OpenRouter | Depends on the upstream endpoint | Per request (`provider.zdr`) and per account (privacy settings) | `zero_data_retention` switch |
+| OpenRouter | Depends on the upstream endpoint | Per request (`provider.zdr`) and per account (privacy settings) | On by default; `zero_data_retention = false` turns it off |
 | OpenAI | 30 days for abuse monitoring; Responses state 30 days when `store` is true | Per organization or project, on request and approval; `store` is then forced false | Requests already send `store: false`; ZDR itself is granted by OpenAI |
 | Anthropic | Per the commercial retention policy | Organization-level agreement | Account level |
 | xAI Grok | 30 days encrypted, no training | Team-level in the xAI Console (enterprise); every response carries `x-zero-data-retention: true/false` and ZDR disables the stateful Responses, Files, Collections and Batch APIs | Account level |

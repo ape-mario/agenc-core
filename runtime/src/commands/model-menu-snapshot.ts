@@ -19,6 +19,17 @@ import { readBuiltInSessionSelection } from "../session/provider-model-selection
 import { createProviderCommandAccessOverlay } from "./provider-command-access.js";
 import type { SlashCommandContext } from "./types.js";
 import { readVeniceMenuModels } from "./venice-menu-models.js";
+import {
+  OPENROUTER_ZDR_OFF_SETTING,
+  openRouterModelHasZdrEndpoint,
+} from "../llm/providers/openrouter/zero-data-retention.js";
+import {
+  openRouterZeroDataRetentionOn,
+  readOpenRouterZdrModels,
+} from "./openrouter-zdr-models.js";
+
+/** Row detail for an OpenRouter model that zero data retention rules out. */
+const NO_ZERO_DATA_RETENTION_DETAIL = "no zero data retention endpoint";
 
 export type ModelRowStatus =
   | "current"
@@ -35,6 +46,12 @@ type ModelMenuRow = {
   readonly detail: string;
   readonly selectable: boolean;
   readonly groupLabel: string;
+  /**
+   * OpenRouter with zero data retention on: OpenRouter lists no
+   * zero-data-retention endpoint for this model, so it would refuse the
+   * request. Shown, not selectable.
+   */
+  readonly noZeroDataRetention?: true;
 };
 
 export type ModelMenuSnapshot = {
@@ -254,6 +271,11 @@ function readModelMenuSnapshotFromStorage(ctx: SlashCommandContext): ModelMenuSn
   const accessOverlay = createProviderCommandAccessOverlay(ctx);
   const accessFor = (catalogProvider: ProviderSlug, model: string) =>
     accessOverlay.inspect({ provider: catalogProvider, model });
+  // OpenRouter's zero-data-retention list, once a menu has read it. Without
+  // it nothing is marked; the request still asks for zero data retention.
+  const zeroDataRetentionModels = openRouterZeroDataRetentionOn(ctx)
+    ? readOpenRouterZdrModels(ctx)
+    : undefined;
   const isVisibleSelection = (
     catalogProvider: ProviderSlug,
     model: string,
@@ -309,10 +331,19 @@ function readModelMenuSnapshotFromStorage(ctx: SlashCommandContext): ModelMenuSn
         const managedRoute =
           access.route === "subscription" ||
           access.route === "provider-managed";
+        // The managed route pins its own reviewed endpoints.
+        const noZeroDataRetention =
+          row.provider === "openrouter" &&
+          !managedRoute &&
+          zeroDataRetentionModels !== undefined &&
+          !openRouterModelHasZdrEndpoint(zeroDataRetentionModels, row.displayModel);
         return [{
           ...row,
-          selectable: access.effect !== "blocked",
-          detail: rowDetailForRoute(row.status, row.provider, managedRoute),
+          selectable: access.effect !== "blocked" && !noZeroDataRetention,
+          detail: noZeroDataRetention
+            ? NO_ZERO_DATA_RETENTION_DETAIL
+            : rowDetailForRoute(row.status, row.provider, managedRoute),
+          ...(noZeroDataRetention ? { noZeroDataRetention: true as const } : {}),
         }];
       });
     });
@@ -355,6 +386,12 @@ export function modelMenuFallback(snapshot: ModelMenuSnapshot): string {
   for (const row of snapshot.rows) {
     lines.push(
       `  ${row.status === "current" ? "*" : "-"} ${row.provider}:${row.displayModel} (${row.detail})`,
+    );
+  }
+  if (snapshot.rows.some(row => row.noZeroDataRetention === true)) {
+    lines.push(
+      "",
+      `OpenRouter zero data retention is on. To use a model marked "${NO_ZERO_DATA_RETENTION_DETAIL}", set ${OPENROUTER_ZDR_OFF_SETTING}.`,
     );
   }
   lines.push(

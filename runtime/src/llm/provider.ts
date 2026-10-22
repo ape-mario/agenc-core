@@ -151,7 +151,10 @@ export type ProviderRuntimeExtra = Partial<
   readonly gemini?: GeminiRuntimeOptions;
   /** Grok-only opt-in for streaming previous_response_id continuation. */
   readonly incrementalContinuation?: boolean;
-  /** OpenRouter: route only to zero-data-retention endpoints (`provider.zdr`). */
+  /**
+   * OpenRouter: route only to zero-data-retention endpoints (`provider.zdr`).
+   * On unless false; the managed route never sends it.
+   */
   readonly zeroDataRetention?: boolean;
   readonly grokAcp?: {
     readonly binaryPath?: string;
@@ -227,6 +230,8 @@ const PROVIDER_RUNTIME_EXTRA_KEYS = [
   "contextWindowTokens",
   "parallelToolCalls",
   "incrementalContinuation",
+  // A child rebuilt from a session's provider keeps its OpenRouter choice.
+  "zeroDataRetention",
   "visionModel",
   "webSearch",
   "searchMode",

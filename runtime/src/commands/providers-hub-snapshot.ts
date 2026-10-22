@@ -81,6 +81,11 @@ export type ProvidersHubModelRow = {
   readonly tags?: string;
   /** The catalog's name for the model ("Google: Gemma 4 31B"), which search also reads. */
   readonly label?: string;
+  /**
+   * OpenRouter with zero data retention on: no endpoint of this model
+   * qualifies, so the screen shows it as unavailable instead of using it.
+   */
+  readonly noZeroDataRetention?: true;
 };
 
 function plainStatus(row: ProviderMenuRow, keySaved: boolean): string {
@@ -276,23 +281,33 @@ export function filterProvidersHubRows(
   );
 }
 
-/** The selectable models for one provider, as the model menu offers them. */
+/** Tag on an OpenRouter model that zero data retention rules out. */
+const NO_ZERO_DATA_RETENTION_TAG = "no zero retention";
+
+/**
+ * The selectable models for one provider, as the model menu offers them, and
+ * the OpenRouter models that zero data retention rules out, marked.
+ */
 export function readProvidersHubModels(
   ctx: SlashCommandContext,
   provider: ProviderSlug,
 ): readonly ProvidersHubModelRow[] {
   const snapshot = readModelMenuSnapshot(ctx);
   return snapshot.rows
-    .filter((row) => row.provider === provider && row.selectable)
+    .filter((row) => row.provider === provider && (row.selectable || row.noZeroDataRetention === true))
     .map((row) => {
       const label = resolveRegisteredModelCatalogEntry({ provider, model: row.displayModel })?.displayName;
+      const tags = modelCapabilityTags(provider, row.displayModel);
       return {
         model: row.model,
         displayModel: row.displayModel,
         current: row.status === "current",
         isDefault: row.status === "default",
-        tags: modelCapabilityTags(provider, row.displayModel),
+        tags: row.noZeroDataRetention === true
+          ? [NO_ZERO_DATA_RETENTION_TAG, tags].filter(Boolean).join(" · ")
+          : tags,
         ...(label === undefined ? {} : { label }),
+        ...(row.noZeroDataRetention === true ? { noZeroDataRetention: true as const } : {}),
       };
     });
 }

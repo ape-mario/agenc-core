@@ -44,16 +44,24 @@ import {
   readVeniceMenuModels,
   VENICE_MODEL_LIST_UNAVAILABLE_NOTE,
 } from "./venice-menu-models.js";
+import {
+  loadOpenRouterZdrModels,
+  OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE,
+  openRouterZeroDataRetentionOn,
+  readOpenRouterZdrModels,
+} from "./openrouter-zdr-models.js";
+import { OPENROUTER_ZDR_OFF_SETTING } from "../llm/providers/openrouter/zero-data-retention.js";
 
 export type ProvidersHubServices = {
   readonly reload: () => ProvidersHubSnapshot;
   readonly probeLocal: () => Promise<ReadonlySet<ProviderSlug>>;
   readonly modelsFor: (provider: ProviderSlug) => readonly ProvidersHubModelRow[];
   /**
-   * Ask a provider that publishes its own model list (Venice) for it; once it
-   * settles, `modelsFor` returns that list. Null when there is nothing to wait
-   * for: a fixed list, or one read moments ago. `note` says why the bundled
-   * list stays.
+   * Ask a provider that publishes its own model list (Venice) for it, or
+   * OpenRouter for the models that zero data retention allows; once it
+   * settles, `modelsFor` returns the list with what it read. Null when there
+   * is nothing to wait for: a fixed list, or one read moments ago. `note`
+   * says why the bundled list stays or why nothing is marked.
    */
   readonly refreshModels?: (provider: ProviderSlug) => Promise<{ readonly note?: string }> | null;
   readonly connect: (provider: ProviderSlug, apiKey: string) => Promise<ProvidersHubActionResult>;
@@ -94,6 +102,9 @@ const MODEL_MARK_WIDTH = 3;
 
 /** In-use mark, model, note, capabilities. */
 const MODEL_COLUMNS: readonly number[] = [MODEL_MARK_WIDTH, 44, 8, 38];
+
+/** Under OpenRouter's models while zero data retention dims some of them. */
+const NO_ZERO_DATA_RETENTION_HINT = `To use a dimmed model, set ${OPENROUTER_ZDR_OFF_SETTING}.`;
 
 type ConnectChoice = "sign-in" | "paste-key";
 
@@ -265,6 +276,7 @@ function ModelsView({
   const noun = models === 1 ? "model" : "models";
   const matched = shown.filter((entry) => entry.kind === "model").length;
   const searching = query.length > 0;
+  const dimmed = entries.some((entry) => entry.kind === "model" && entry.row.noZeroDataRetention === true);
   return (
     <MenuModal
       title={row.name}
@@ -273,9 +285,11 @@ function ModelsView({
       headerRight={busy ? "working" : loading ? "loading models" : undefined}
       closeHint={searching ? "esc to clear search" : "esc to go back"}
       hint={notice?.text}
-      {...(note === undefined ? {} : {
-        detail: <ThemedText color="warning" wrap="wrap">{note}</ThemedText>,
-      })}
+      {...(note !== undefined
+        ? { detail: <ThemedText color="warning" wrap="wrap">{note}</ThemedText> }
+        : dimmed
+          ? { detail: <ThemedText color="text2" wrap="wrap">{NO_ZERO_DATA_RETENTION_HINT}</ThemedText> }
+          : {})}
       {...(searching || models > SEARCH_LINE_MIN_MODELS ? { lead: <SearchLine query={query} /> } : {})}
       columns={MODEL_COLUMNS}
       headers={["", "model", "", "capabilities"]}
@@ -302,11 +316,18 @@ function ModelsView({
             <ThemedText key="tags" color="inactive"> </ThemedText>,
           ];
         }
+        // A model zero data retention rules out stays listed, dimmed.
+        const unavailable = entry.row.noZeroDataRetention === true;
         return [
           <ThemedText key="mark" color={entry.row.current ? "agenc" : "subtle"}>
             {entry.row.current ? "●" : " "}
           </ThemedText>,
-          <ThemedText key="model" color={active ? "text" : "text2"} bold={active} wrap="truncate-middle">
+          <ThemedText
+            key="model"
+            color={unavailable ? "inactive" : active ? "text" : "text2"}
+            bold={active}
+            wrap="truncate-middle"
+          >
             {entry.row.displayModel}
           </ThemedText>,
           <ThemedText key="note" color="inactive" wrap="truncate-end">
@@ -880,6 +901,10 @@ export function ProvidersHubView({
         return;
       }
       if (entry.kind !== "model") return;
+      if (entry.row.noZeroDataRetention === true) {
+        setNotice({ text: `${entry.row.displayModel} has no zero data retention endpoint`, failed: true });
+        return;
+      }
       run(async () => {
         const result = await services.choose(view.row.provider, entry.row.model);
         if (result.ok) {
@@ -1017,14 +1042,25 @@ function servicesFor(ctx: SlashCommandContext): ProvidersHubServices {
       return new Set(running);
     },
     modelsFor: (provider) => readProvidersHubModels(ctx, provider),
-    refreshModels: (provider) => provider !== "venice" || readVeniceMenuModels(ctx) !== undefined
-      ? null
-      : loadVeniceMenuModels(ctx).then(
-          (result) => result.source === "bundled" && result.reason === "unavailable"
-            ? { note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }
-            : {},
-          () => ({ note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }),
-        ),
+    refreshModels: (provider) => {
+      if (provider === "openrouter") {
+        // Only zero data retention needs OpenRouter's list; its models are bundled.
+        return !openRouterZeroDataRetentionOn(ctx) || readOpenRouterZdrModels(ctx) !== undefined
+          ? null
+          : loadOpenRouterZdrModels(ctx).then(
+              (models) => models === undefined ? { note: OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE } : {},
+              () => ({ note: OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE }),
+            );
+      }
+      return provider !== "venice" || readVeniceMenuModels(ctx) !== undefined
+        ? null
+        : loadVeniceMenuModels(ctx).then(
+            (result) => result.source === "bundled" && result.reason === "unavailable"
+              ? { note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }
+              : {},
+            () => ({ note: VENICE_MODEL_LIST_UNAVAILABLE_NOTE }),
+          );
+    },
     connect: (provider, apiKey) => connectProviderWithKey(ctx, provider, apiKey),
     choose: (provider, model) => chooseProviderModel(ctx, provider, model),
     forget: (provider) => forgetProviderKey(ctx, provider),

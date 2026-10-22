@@ -50,6 +50,7 @@ import {
   type ProviderHttpStreamResponse,
 } from "../../client-session.js";
 import { isFallbackTriggeredError } from "../../../recovery/api-errors.js";
+import { isOpenRouterDataPolicyRoutingRefusal } from "../openrouter/zero-data-retention.js";
 import {
   buildOpenAICompatibilityErrorMessage,
   classifyOpenAIHttpFailure,
@@ -2747,6 +2748,12 @@ export class OpenAIProvider implements LLMProvider {
     // Keep the raw transport error for existing auth/fallback classification.
     if (isInitialProviderHttpRejection(error) && !this.config.managedRequestId) {
       markLLMInitialHttpRejection(error, this.name, error.status, singleWireAttempt);
+      // OpenRouter refused while routing, before choosing an endpoint (a model
+      // with no endpoint that meets zero data retention): nothing ran.
+      if (singleWireAttempt === true && this.name === "openrouter" &&
+          isOpenRouterDataPolicyRoutingRefusal(error.status, error.body)) {
+        markLLMPreGenerationRejection(error, this.name);
+      }
     }
     return error;
   }

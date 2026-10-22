@@ -11,6 +11,7 @@ import type {
 } from "./provider.js";
 import type { ProviderEnvironment } from "./provider-options.js";
 import { resolveXaiCapabilityExtra } from "./xai-capability-config.js";
+import { openRouterZeroDataRetentionEnabled } from "./providers/openrouter/zero-data-retention.js";
 
 export interface ProviderRuntimeRequest {
   readonly requested: ProviderFactoryOptions;
@@ -233,9 +234,9 @@ export function resolveProviderRuntimeRequest(params: {
     params.config.providers?.grok?.incremental_continuation !== false
       ? { incrementalContinuation: true }
       : {}),
-    ...(params.provider === "openrouter" &&
-    params.config.providers?.openrouter?.zero_data_retention === true
-      ? { zeroDataRetention: true }
+    // OpenRouter zero data retention is on unless the config turns it off.
+    ...(params.provider === "openrouter"
+      ? { zeroDataRetention: openRouterZeroDataRetentionEnabled(params.config) }
       : {}),
     // Bedrock reads the configured profile mapping to apply the right
     // request contract to ids that name no model.

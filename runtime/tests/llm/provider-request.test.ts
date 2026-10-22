@@ -17,13 +17,26 @@ describe('provider runtime request', () => {
     })
     expect(openrouter.requested.extra).toMatchObject({ zeroDataRetention: true })
 
+    // On by default: nothing in the config still asks for it.
+    const unset = resolveProviderRuntimeRequest({
+      provider: 'openrouter',
+      model: 'x-ai/grok-4.5',
+      config: {},
+      environment: {},
+    })
+    expect(unset.requested.extra).toMatchObject({ zeroDataRetention: true })
+
     const off = resolveProviderRuntimeRequest({
       provider: 'openrouter',
       model: 'x-ai/grok-4.5',
       config: { providers: { openrouter: { zero_data_retention: false } } },
       environment: {},
     })
-    expect(off.requested.extra?.zeroDataRetention).toBeUndefined()
+    expect(off.requested.extra?.zeroDataRetention).toBe(false)
+    // The explicit choice survives into the provider a session builds.
+    const offProvider = createProvider('openrouter', { ...off.requested, apiKey: 'or-test' })
+    expect(bindingFromProvider({ provider: offProvider, providerName: 'openrouter', model: 'x-ai/grok-4.5' })
+      .factoryOptions.extra?.zeroDataRetention).toBe(false)
 
     const openai = resolveProviderRuntimeRequest({
       provider: 'openai',

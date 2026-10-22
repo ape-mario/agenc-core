@@ -96,6 +96,27 @@ describe("WebSearch with the session provider's own search", () => {
     expect(result.admissionUsage?.costUsd).toBe(0.0074);
   });
 
+  // Zero data retention is on by default for an OpenRouter key (2026-10-22): the search's model call
+  // routes like the session's own requests, and `zero_data_retention = false` leaves it out the same way.
+  it("OpenRouter: the search call carries provider.zdr unless the session turned zero data retention off", async () => {
+    const fetch = vi.fn(async () => response({
+      choices: [{ message: { role: "assistant", content: "x", annotations: [
+        { type: "url_citation", url_citation: { url: "https://openrouter.ai/docs/guides/features/zdr", title: "Zero Data Retention", content: "ZDR" } },
+      ] } }],
+      usage: { prompt_tokens: 900, completion_tokens: 12, cost: 0.0075 },
+    }));
+    vi.stubGlobal("fetch", fetch);
+    await webSearch(session("openrouter", { apiKey: "sk-or-session", model: "deepseek/deepseek-v4.1-flash-1017" }))
+      .execute({ query: "OpenRouter zero data retention" });
+    await webSearch(session("openrouter", { apiKey: "sk-or-session", model: "deepseek/deepseek-v4.1-flash-1017", zeroDataRetention: false }))
+      .execute({ query: "OpenRouter zero data retention" });
+    const bodies = fetch.mock.calls.map(call => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>);
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]).toMatchObject({ plugins: [{ id: "web", engine: "exa" }], provider: { zdr: true } });
+    expect(bodies[1]).toMatchObject({ plugins: [{ id: "web", engine: "exa" }] });
+    expect(bodies[1]).not.toHaveProperty("provider");
+  });
+
   it("Venice: web search with citations on the session model, 0.01 USD plus its listed token price", async () => {
     const fetch = vi.fn(async () => response({
       choices: [{ message: { role: "assistant", content: "x" } }],

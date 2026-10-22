@@ -8184,4 +8184,50 @@ describe("provider outage wait (#2212)", () => {
       restore();
     }
   });
+
+  // OpenRouter, 2026-10-22: a model with no zero-data-retention endpoint, asked for with `provider.zdr` (on by
+  // default), is refused before any generation with HTTP 404. The bare 404 read like a wrong base URL.
+  test("ends the turn on an OpenRouter zero data retention refusal, names the setting, and sends it once", async () => {
+    const model = "google/gemini-2.5-flash-lite";
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ error: {
+      message: "No endpoints found matching your data policy (Zero data retention). Configure: https://openrouter.ai/settings/privacy",
+      code: 404,
+      metadata: { failed_routing_step: "Filter by Data Policy" },
+    } }), { status: 404, headers: { "content-type": "application/json" } }));
+    // Default retries: the refusal itself must not be sent again.
+    const provider = createProvider("openrouter", { apiKey: "synthetic-openrouter", model, extra: { fetchImpl } });
+    const chatStream = vi.spyOn(provider, "chatStream");
+    const { session, events } = mkSession({
+      provider,
+      registry: mkRegistry(),
+      sessionConfiguration: { provider: { slug: "openrouter" }, collaborationMode: { model } },
+      configStoreBase: { provider_outage_wait_ms: 50, provider_outage_retry_ms: 1 },
+    });
+    const ctx = {
+      ...mkCtx(),
+      modelProviderId: "openrouter",
+      modelInfo: { ...mkCtx().modelInfo, slug: model },
+      collaborationMode: { model },
+    };
+
+    await drain(session.runTurn("hello", { ctx }));
+
+    expect(chatStream).toHaveBeenCalledOnce();
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const [, init] = fetchImpl.mock.calls[0]!;
+    expect(JSON.parse(String(init?.body)).provider).toEqual({ zdr: true });
+    expect(
+      events.some(
+        (event) =>
+          event.msg.type === "warning" &&
+          (event.msg.payload as { cause?: string }).cause === "provider_outage_wait",
+      ),
+    ).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({ msg: expect.objectContaining({
+      type: "turn_failed",
+      payload: expect.objectContaining({ message: expect.stringMatching(
+        /^openrouter error: OpenRouter has no zero data retention endpoint for \S+, so it refused the request\. Zero data retention is on by default\. Choose another model, or set zero_data_retention = false under \[providers\.openrouter\] in config\.toml to use this one\.$/u,
+      ) }),
+    }) }));
+  });
 });

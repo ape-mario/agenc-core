@@ -11,7 +11,9 @@
  * - OpenRouter: the `web` plugin with the Exa engine on one chat completion
  *   with the session's model; results arrive as `url_citation` annotations
  *   and the response's `usage.cost` is the charge (Exa auto: 0.007 USD per
- *   request plus the model's tokens).
+ *   request plus the model's tokens). With zero data retention on (the
+ *   default) the call carries `provider.zdr` like the session's own requests.
+ *   OpenRouter's ZDR covers the model endpoint, not the search engine.
  * - Venice: `venice_parameters.enable_web_search: "on"` with citations on one
  *   chat completion with the session's model; results arrive in
  *   `venice_parameters.web_search_citations`. 10 USD per 1,000 searches plus
@@ -197,6 +199,8 @@ export async function runOpenRouterWebSearch(options: CallOptions & {
   readonly model: string;
   readonly allowedDomains?: readonly string[];
   readonly blockedDomains?: readonly string[];
+  /** Route the model call only to zero-data-retention endpoints, as the session does. */
+  readonly zeroDataRetention?: boolean;
 }): Promise<GatewaySearchOutcome> {
   const plugin: Record<string, unknown> = {
     id: "web",
@@ -212,6 +216,7 @@ export async function runOpenRouterWebSearch(options: CallOptions & {
     max_tokens: GATEWAY_SEARCH_MAX_OUTPUT_TOKENS,
     usage: { include: true },
     stream: false,
+    ...(options.zeroDataRetention === true ? { provider: { zdr: true } } : {}),
   }, options);
   if (answer.reason !== undefined) return { kind: "failed", reason: answer.reason, costUsd: undefined };
   const body = record(answer.json);
