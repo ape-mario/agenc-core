@@ -2426,14 +2426,24 @@ export function buildFilteredRegistry(
     }));
   // Light children keep the parent's visible set from spawn time plus what
   // their own search discovered; other children follow the parent's registry.
+  // The tools a Light child started with keep their order (one it selects,
+  // such as exec_command, keeps its place with its full schema); a tool it
+  // loads joins at the end in load order, so the tool definitions it already
+  // sent stay the leading bytes of its later requests.
   const visibleLLMTools = () => {
     if (initialTools !== undefined) {
-      return fallbackAdvertisedTools().flatMap(tool => {
-        const name = tool.function.name;
+      const eligible = new Map(fallbackAdvertisedTools().map(tool => [tool.function.name as string, tool]));
+      const pick = (name: string) => {
+        const tool = eligible.get(name);
+        if (tool === undefined) return [];
         if (discoveredToolNames.has(name)) return [tool];
         const initial = initialTools.get(name);
         return initial === undefined ? [] : [initial];
-      });
+      };
+      return [
+        ...[...initialTools.keys()].flatMap(pick),
+        ...[...discoveredToolNames].filter(name => !initialTools.has(name)).flatMap(pick),
+      ];
     }
     const advertised = base.toLLMTools();
     const visible = advertised.length === 0 ? fallbackAdvertisedTools() : advertised;

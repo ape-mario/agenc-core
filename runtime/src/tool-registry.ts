@@ -1362,29 +1362,37 @@ export function buildToolRegistry(
     return available;
   }
 
-  function visibleSpecs(router?: ToolRouter): readonly ConfiguredToolSpec[] {
-    const specs = (router?.getSpecs() ?? allSpecs()).filter((spec) => spec.unavailable !== true);
+  /**
+   * Whether a tool is in front of the model without a search: a standard
+   * session's undeferred tools, or Light's own set and what its mode or policy
+   * adds. `specs` is the router's whole available catalog.
+   */
+  function shownWithoutSearch(
+    specs: readonly ConfiguredToolSpec[],
+  ): (spec: ConfiguredToolSpec) => boolean {
+    if (options.lightMode !== true) return (spec) => !isDeferredSpec(spec);
     // A restrictive policy may remove discovery itself. Keep its remaining
     // capabilities callable instead of stranding them behind an absent tool.
-    if (options.lightMode === true && !specs.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME)) {
-      return specs;
-    }
-    const lightIdentity = options.lightMode === true ? sessionModelIdentity() : { provider: undefined, model: undefined };
-    return specs.filter(
-      (spec) =>
-        (options.lightMode === true
-          ? (lightEditsWithApplyPatch(lightIdentity.provider, lightIdentity.model)
-            ? LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES : LIGHT_INITIAL_TOOL_NAMES).has(spec.tool.name) ||
-            (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined) ||
-            // The plan-mode reminder ends planning with AskUserQuestion or
-            // ExitPlanMode, so a session in plan mode sees both, as in standard.
-            (PLAN_MODE_TOOLS.has(spec.tool.name) && planModeActive()) ||
-            // A policy that opts out of MCP deferral wants its allowlisted MCP
-            // tools in front of the model with no search step; Light mode is
-            // the small-model profile that most needs that.
-            (deferMcpTools === false && spec.tool.metadata?.source === "mcp" && !isDeferredSpec(spec))
-          : !isDeferredSpec(spec)) || discoveredToolNames.has(spec.tool.name),
-    );
+    if (!specs.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME)) return () => true;
+    const lightIdentity = sessionModelIdentity();
+    const initial = lightEditsWithApplyPatch(lightIdentity.provider, lightIdentity.model)
+      ? LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES : LIGHT_INITIAL_TOOL_NAMES;
+    return (spec) =>
+      initial.has(spec.tool.name) ||
+      (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined) ||
+      // The plan-mode reminder ends planning with AskUserQuestion or
+      // ExitPlanMode, so a session in plan mode sees both, as in standard.
+      (PLAN_MODE_TOOLS.has(spec.tool.name) && planModeActive()) ||
+      // A policy that opts out of MCP deferral wants its allowlisted MCP
+      // tools in front of the model with no search step; Light mode is
+      // the small-model profile that most needs that.
+      (deferMcpTools === false && spec.tool.metadata?.source === "mcp" && !isDeferredSpec(spec));
+  }
+
+  function visibleSpecs(router?: ToolRouter): readonly ConfiguredToolSpec[] {
+    const specs = (router?.getSpecs() ?? allSpecs()).filter((spec) => spec.unavailable !== true);
+    const shown = shownWithoutSearch(specs);
+    return specs.filter((spec) => shown(spec) || discoveredToolNames.has(spec.tool.name));
   }
 
   async function executeConfiguredTool(
@@ -1464,14 +1472,19 @@ export function buildToolRegistry(
   }
 
   /**
-   * The tools every request starts with keep their order; a deferred tool
-   * joins at the end once loaded, in load order. A loaded tool never moves the
-   * tools before it, so the cached prompt prefix up to them stays valid.
+   * The tools every request starts with keep their order; a tool shown only
+   * because it was loaded (by system.searchTools, or by the runtime when a
+   * command yields) joins at the end, in load order. A loaded tool never
+   * moves the tools before it, so the cached prompt prefix up to them stays
+   * valid. Standard sessions and Light sessions alike.
    */
-  function loadOrderedSpecs(visible: readonly ConfiguredToolSpec[]): readonly ConfiguredToolSpec[] {
-    const initial = visible.filter((spec) => !isDeferredSpec(spec));
+  function loadOrderedSpecs(router: ToolRouter): readonly ConfiguredToolSpec[] {
+    const specs = router.getSpecs().filter((spec) => spec.unavailable !== true);
+    const shown = shownWithoutSearch(specs);
+    const visible = specs.filter((spec) => shown(spec) || discoveredToolNames.has(spec.tool.name));
+    const initial = visible.filter(shown);
     if (initial.length === visible.length) return visible;
-    const loaded = new Map(visible.filter((spec) => isDeferredSpec(spec)).map((spec) => [spec.tool.name, spec]));
+    const loaded = new Map(visible.filter((spec) => !shown(spec)).map((spec) => [spec.tool.name, spec]));
     return [...initial, ...[...discoveredToolNames].flatMap((name) => {
       const spec = loaded.get(name);
       return spec === undefined ? [] : [spec];
@@ -1481,7 +1494,9 @@ export function buildToolRegistry(
   let presentationMemo: { router: ToolRouter; discovered: readonly string[];
     provider: string | undefined; planMode: boolean; tools: LLMTool[] } | undefined;
   function buildPresentedTools(router: ToolRouter): LLMTool[] {
-      const visible = standardDeferral ? loadOrderedSpecs(visibleSpecs(router)) : visibleSpecs(router);
+      const visible = standardDeferral || options.lightMode === true
+        ? loadOrderedSpecs(router)
+        : visibleSpecs(router);
       const searchVisible = visible.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME);
       const leanExec = searchVisible && !discoveredToolNames.has("exec_command");
       const leanGrep = searchVisible && !discoveredToolNames.has("Grep");
