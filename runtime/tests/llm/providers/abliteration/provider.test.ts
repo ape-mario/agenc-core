@@ -9,7 +9,7 @@
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createProvider, readProviderIdentity, type ProviderName } from "../../../../src/llm/provider.js";
+import { createProvider, KNOWN_PROVIDER_NAMES, readProviderIdentity, type ProviderName } from "../../../../src/llm/provider.js";
 import { resolveProviderCredentialAuthority } from "../../../../src/llm/provider-options.js";
 import {
   BUILT_IN_PROVIDER_MODEL_CATALOG,
@@ -259,6 +259,51 @@ describe("abliteration.ai built-in provider", () => {
     expect(streamed.usage).toMatchObject({ promptTokens: 12, cachedInputTokens: 8 });
   });
 
+  test("repeats the session's cache key in x-abliteration-session-id, the routing hint the provider reads", async () => {
+    const http = chatFetch(reply(), sse([
+      { choices: [{ index: 0, delta: { content: "ok" } }] },
+      { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
+      { choices: [], usage: { prompt_tokens: 12, completion_tokens: 1, total_tokens: 13 } },
+    ]), reply(), reply(), reply());
+    const header = (index: number) => new Headers(http.chat.mock.calls[index]?.[1]?.headers);
+    const client = createProvider(provider, { apiKey: key, model: V2, extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } });
+    await client.chat([{ role: "user", content: "hi" }], { promptCacheKey: "conv-7d2a9f" });
+    expect(header(0).get("x-abliteration-session-id")).toBe("conv-7d2a9f");
+    expect(http.body(0).prompt_cache_key).toBe("conv-7d2a9f");
+    await client.chatStream!([{ role: "user", content: "hi" }], () => {}, { promptCacheKey: "conv-7d2a9f" });
+    expect(header(1).get("x-abliteration-session-id")).toBe("conv-7d2a9f");
+    expect(header(1).get("authorization")).toBe(`Bearer ${key}`);
+    expect(header(1).get("accept")).toBe("text/event-stream");
+    // A key over the 64-character wire limit is hashed once, for the body and the header alike.
+    await client.chat([{ role: "user", content: "hi" }], { promptCacheKey: `conv-${"x".repeat(80)}` });
+    expect(http.body(2).prompt_cache_key).toMatch(/^[0-9a-f]{64}$/u);
+    expect(header(2).get("x-abliteration-session-id")).toBe(http.body(2).prompt_cache_key);
+    // No key, no header.
+    await client.chat([{ role: "user", content: "hi" }]);
+    expect(header(3).has("x-abliteration-session-id")).toBe(false);
+    expect(http.body(3)).not.toHaveProperty("prompt_cache_key");
+    // A key a header cannot carry stays in the body only.
+    await client.chat([{ role: "user", content: "hi" }], { promptCacheKey: "conv-été" });
+    expect(http.body(4).prompt_cache_key).toBe("conv-été");
+    expect(header(4).has("x-abliteration-session-id")).toBe(false);
+  });
+
+  test("no other provider sends the abliteration session header", async () => {
+    for (const name of KNOWN_PROVIDER_NAMES.filter(name => name !== "abliteration")) {
+      expect(chatCompletionsCapabilityHintsForProvider(name, undefined).promptCacheKeyHeaders).toBeUndefined();
+      expect(chatCompletionsCapabilityHintsForProvider(name, undefined, { managedGateway: true }).promptCacheKeyHeaders).toBeUndefined();
+    }
+    for (const [name, model] of [["venice", "zai-org-glm-5-2"], ["openrouter", "deepseek/deepseek-v4.1-flash-1017"], ["deepseek", "deepseek-flash"]] as const) {
+      expect(chatCompletionsCapabilityHintsForProvider(name, model).promptCacheKeyHeaders).toBeUndefined();
+    }
+    // Venice also sends prompt_cache_key; its requests carry no session header.
+    const http = chatFetch(reply());
+    await createProvider("venice", { apiKey: "venice-fixture", model: "zai-org-glm-5-2", extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } })
+      .chat([{ role: "user", content: "hi" }], { promptCacheKey: "conv-7d2a9f" });
+    expect(http.body(0).prompt_cache_key).toBe("conv-7d2a9f");
+    expect(new Headers(http.chat.mock.calls[0]?.[1]?.headers).has("x-abliteration-session-id")).toBe(false);
+  });
+
   test("reads the reasoning trace as thinking, keeps it out of the answer, and does not replay it", async () => {
     const http = chatFetch(
       // The live API sends `reasoning` (2026-10-22).
@@ -414,12 +459,12 @@ describe("abliteration.ai built-in provider", () => {
   });
 
   test("round-trips a streamed tool call against a local abliteration.ai mock", async () => {
-    const requests: { method: string; path: string; authorization?: string; body: Record<string, any> }[] = [];
+    const requests: { method: string; path: string; authorization?: string; session?: string | string[]; body: Record<string, any> }[] = [];
     const server = createServer(async (req, res) => {
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(Buffer.from(chunk));
       const body = chunks.length === 0 ? {} : JSON.parse(Buffer.concat(chunks).toString());
-      requests.push({ method: req.method!, path: req.url!, authorization: req.headers.authorization, body });
+      requests.push({ method: req.method!, path: req.url!, authorization: req.headers.authorization, session: req.headers["x-abliteration-session-id"], body });
       if (req.url === "/v1/models") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify(fixture));
@@ -478,6 +523,8 @@ describe("abliteration.ai built-in provider", () => {
       "GET /v1/models", "POST /v1/chat/completions", "POST /v1/chat/completions",
     ]);
     expect(requests.every(request => request.authorization === `Bearer ${key}`)).toBe(true);
+    // Both chat requests carry the routing header with the body key; the model list read does not.
+    expect(requests.map(request => request.session)).toEqual([undefined, "conv_fixture", "conv_fixture"]);
     const [, streamed, followUp] = requests;
     expect(streamed!.body).toMatchObject({
       model: V2, stream: true, stream_options: { include_usage: true }, prompt_cache_key: "conv_fixture", reasoning_effort: "high",
