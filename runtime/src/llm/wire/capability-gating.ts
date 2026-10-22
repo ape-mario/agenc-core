@@ -251,6 +251,12 @@ export interface ChatCompletionsCapabilityHints {
    */
   readonly promptCacheKeyScope?: "conversation" | "prefix";
   /**
+   * Request headers that carry the session's prompt-cache key. abliteration.ai
+   * routes by `x-abliteration-session-id`
+   * (docs.abliteration.ai/capabilities/prompt-caching).
+   */
+  readonly promptCacheKeyHeaders?: readonly "x-abliteration-session-id"[];
+  /**
    * If `true`, tool JSON schemas are rewritten to the subset
    * llama.cpp's json-schema-to-grammar compiles. Grammar-constrained
    * servers (LM Studio, llama.cpp server, some custom proxies) build
@@ -584,7 +590,9 @@ export function chatCompletionsCapabilityHintsForProvider(
       reasoningContentFallbackField: "reasoning_content" as const,
       // A stable key per session routes its requests to a server that holds
       // the cached prefix (docs.abliteration.ai/capabilities/prompt-caching).
-      promptCacheKeyFields: ["prompt_cache_key"] as const,
+      // It goes in the session header only, the routing hint the provider
+      // reads first; the body carries no prompt_cache_key.
+      promptCacheKeyHeaders: ["x-abliteration-session-id"] as const,
     } : {}),
     ...(slug === "groq" ? {
       acceptsDirectImageInput: acceptsToolResultImages,

@@ -62,7 +62,10 @@ import {
   type ChatCompletionsMaxTokenField,
   type ChatCompletionsRequestMetadata,
 } from "../../wire/chat-completions.js";
-import { chatCompletionsCapabilityHintsForProvider } from "../../wire/capability-gating.js";
+import {
+  chatCompletionsCapabilityHintsForProvider,
+  type ChatCompletionsCapabilityHints,
+} from "../../wire/capability-gating.js";
 import { sharedPrefixTailEnabled } from "../../wire/shared-prefix-tail.js";
 import { decodeMcpToolNameFromWire } from "../../wire/mcp-tool-naming.js";
 import { parseProviderJson } from "../../wire/parse-json.js";
@@ -419,6 +422,28 @@ function abliterationPolicyFailure(args: {
       `Sending the same input again is blocked again. Change the request or the project's policies.${reference}`,
     args.status ?? 403,
   );
+}
+
+/** Printable ASCII, which every fetch implementation accepts as a header value. */
+const HEADER_SAFE_PROMPT_CACHE_KEY = /^[\x21-\x7e]{1,256}$/u;
+
+/**
+ * The session's prompt-cache key, normalized as for the wire, in each header
+ * the provider reads it from (`promptCacheKeyHeaders`). Without such a header,
+ * without a key, or with a key a header cannot carry, the request headers stay
+ * as they are.
+ */
+function withPromptCacheKeyHeaders(
+  headers: Readonly<Record<string, string>> | undefined,
+  hints: ChatCompletionsCapabilityHints,
+  promptCacheKey: string | undefined,
+): Readonly<Record<string, string>> | undefined {
+  const names = hints.promptCacheKeyHeaders ?? [];
+  const key = promptCacheKey?.trim();
+  if (names.length === 0 || !key) return headers;
+  const value = normalizePromptCacheKey(key);
+  if (!HEADER_SAFE_PROMPT_CACHE_KEY.test(value)) return headers;
+  return { ...headers, ...Object.fromEntries(names.map(name => [name, value])) };
 }
 
 function zaiInsufficientBalanceErrorMessage(): string {
@@ -1147,7 +1172,7 @@ export class OpenAIProvider implements LLMProvider {
         const providerCapabilityHints = this.chatCapabilityHints(model);
         const response = await session.requestJson<Record<string, unknown>>({
           api: "chat_completions",
-          headers,
+          headers: withPromptCacheKeyHeaders(headers, providerCapabilityHints, options?.promptCacheKey),
           path: this.resolvePath("/chat/completions"),
           method: "POST",
           body: request,
@@ -2152,7 +2177,7 @@ export class OpenAIProvider implements LLMProvider {
       try {
         response = await this.requestStream({
           api: "chat_completions",
-          headers,
+          headers: withPromptCacheKeyHeaders(headers, streamCapabilityHints, options?.promptCacheKey),
           path: this.resolvePath("/chat/completions"),
           body: request,
           timeoutMs,

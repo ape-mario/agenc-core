@@ -1261,9 +1261,11 @@ reads either. It is not sent back on later requests.
 
 ### Prompt caching
 
-Caching is automatic. Each request carries the session's `prompt_cache_key`,
-a stable opaque value per session, so related requests reach a server that
-holds the cached prefix. Streamed requests set `stream_options.include_usage`,
+Caching is automatic. Each request carries the session's cache key, a stable
+opaque value per session, in the `x-abliteration-session-id` header, the
+routing hint abliteration.ai reads first, so related requests reach a server
+that holds the cached prefix. The body carries no `prompt_cache_key`. Streamed
+requests set `stream_options.include_usage`,
 and the final chunk reports `usage.prompt_tokens_details.cached_tokens`. Cache
 reads bill at 10% of the input rate, with no cache-write premium. The session
 cost and the status line cache share use these counts. Cache hits are best
