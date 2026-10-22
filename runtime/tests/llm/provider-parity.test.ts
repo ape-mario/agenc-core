@@ -28,6 +28,7 @@ import { GeminiProvider } from "./providers/gemini/index.js";
 import { createGeminiEndpointPlan } from "./providers/gemini/endpoint-plan.js";
 import { GrokProvider } from "./providers/grok/adapter.js";
 import { VeniceProvider } from "./providers/venice/index.js";
+import { AbliterationProvider } from "./providers/abliteration/index.js";
 import { GroqProvider } from "./providers/groq/index.js";
 import { GitHubProvider } from "./providers/github/index.js";
 import { LMStudioProvider } from "./providers/lmstudio/index.js";
@@ -145,6 +146,7 @@ const CHAT_COMPLETIONS_PROVIDERS: ReadonlySet<ProviderName> = new Set([
   "openai-compatible",
   "openrouter",
   "venice",
+  "abliteration",
   "groq",
   "deepseek",
   "meta",
@@ -817,6 +819,26 @@ const PROVIDERS: readonly ProviderParityEntry[] = [
               : fetchImpl(input, init),
           }),
         payload: buildChatCompletionsPayload("zai-org-glm-5-2", parityCase),
+      }),
+  },
+  {
+    provider: "abliteration",
+    model: "abliterated-model-large-v2",
+    apiKey: "abliteration-test",
+    env: { ABLIT_KEY: undefined, ABLITERATION_API_KEY: undefined },
+    createHarness: (parityCase) =>
+      createFetchHarness({
+        factory: (fetchImpl) =>
+          new AbliterationProvider({
+            apiKey: "abliteration-test",
+            model: "abliterated-model-large-v2",
+            tools: parityCase.tools ? [...parityCase.tools] : [],
+            // The model list is not part of the captured chat requests.
+            fetchImpl: (input, init) => String(input).endsWith("/models")
+              ? Promise.resolve(new Response("{}", { status: 503 }))
+              : fetchImpl(input, init),
+          }),
+        payload: buildChatCompletionsPayload("abliterated-model-large-v2", parityCase),
       }),
   },
   {

@@ -17,6 +17,7 @@ vi.mock("../../src/utils/settings/settings.js", () => ({
 import { ModelMetadataResolver } from "../../src/llm/model-metadata.js";
 import { resolveReasoningEffort } from "../../src/llm/reasoning-effort.js";
 import { OLLAMA_CLOUD_MODELS } from "../../src/llm/registry/ollama-cloud-models.js";
+import { ABLITERATION_MODELS } from "../../src/llm/registry/abliteration-models.js";
 import { clearPublishedModelCatalogs } from "../../src/llm/registry/published-model-catalog.js";
 import { resolveSessionReasoningEffort } from "../../src/session/session-reasoning-effort.js";
 import type { ReasoningEffort } from "../../src/session/turn-context.js";
@@ -82,6 +83,23 @@ describe("Ollama Cloud and Venice send the effort the status line shows", () => 
 
   test("every bundled Ollama Cloud model, for every choice", () => {
     for (const { model } of OLLAMA_CLOUD_MODELS) expectAgreement("ollama-cloud", model);
+  });
+
+  test("abliteration.ai sends each model's own mode, for every choice", () => {
+    // Large v2 runs low, high and max; AgenC's default is high (the provider runs max unasked).
+    expect(sent("abliteration", "abliterated-model-large-v2", undefined)).toBe("high");
+    expect(sent("abliteration", "abliterated-model-large-v2", "medium")).toBe("high");
+    expect(sent("abliteration", "abliterated-model-large-v2", "xhigh")).toBe("max");
+    expect(sent("abliteration", "abliterated-model-large-v2", "low")).toBe("low");
+    // Large runs high and max.
+    expect(sent("abliteration", "abliterated-model-large", undefined)).toBe("high");
+    expect(sent("abliteration", "abliterated-model-large", "low")).toBe("high");
+    expect(sent("abliteration", "abliterated-model-large", "xhigh")).toBe("max");
+    // The base model takes every level; unset leaves it at its native depth, and off is sent.
+    expect(sent("abliteration", "abliterated-model", undefined)).toBeUndefined();
+    expect(sent("abliteration", "abliterated-model", "minimal")).toBe("minimal");
+    expect(sent("abliteration", "abliterated-model", "none")).toBe("none");
+    for (const model of ABLITERATION_MODELS) expectAgreement("abliteration", model.model);
   });
 
   test("Venice models from the live list, for every choice", async () => {

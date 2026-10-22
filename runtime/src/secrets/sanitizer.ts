@@ -543,6 +543,12 @@ const SECRET_PATTERNS: ReadonlyArray<{
     replacement: REDACTED_SECRET,
   },
   {
+    // abliteration.ai project keys: `ak_` and 43 URL-safe base64 characters.
+    // The long tail keeps ordinary `ak_` identifiers visible.
+    pattern: /(?<![A-Za-z0-9_-])ak_[A-Za-z0-9_-]{40,}(?=$|[^A-Za-z0-9_-])/g,
+    replacement: REDACTED_SECRET,
+  },
+  {
     pattern: /(?<![A-Za-z0-9_])(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}(?=$|[^A-Za-z0-9_])/g,
     replacement: REDACTED_SECRET,
   },
@@ -754,6 +760,8 @@ function isSensitiveKey(key: string): boolean {
     normalized.endsWith("secretaccesskey") ||
     normalized.endsWith("secretkey") ||
     normalized.endsWith("accesskeyid") ||
+    // abliteration.ai documents its key as ABLIT_KEY, which matches no other rule.
+    normalized === "ablitkey" ||
     normalized === "password" ||
     normalized.endsWith("password") ||
     normalized.endsWith("passwordvalue") ||

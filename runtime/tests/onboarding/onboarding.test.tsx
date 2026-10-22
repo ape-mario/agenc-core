@@ -249,6 +249,14 @@ describe("first-run onboarding wizard", () => {
     );
   });
 
+  test("lists abliteration.ai with the key name that set it up", () => {
+    const row = (env: Record<string, string>) => createInitialFirstRunOnboardingState({ config: defaultConfig(), env })
+      .providerRows.find((entry) => entry.provider === "abliteration");
+    expect(row({})).toEqual({ provider: "abliteration", name: "abliteration.ai", status: "not set", connected: false });
+    expect(row({ ABLITERATION_API_KEY: "ak_fixture" })).toMatchObject({ status: "env ABLITERATION_API_KEY", connected: true });
+    expect(row({ ABLIT_KEY: "ak_fixture", ABLITERATION_API_KEY: "ak_other" })).toMatchObject({ status: "env ABLIT_KEY", connected: true });
+  });
+
   test("uses layered config rather than stale environment selectors for its initial provider", () => {
     const config = {
       ...defaultConfig(),
