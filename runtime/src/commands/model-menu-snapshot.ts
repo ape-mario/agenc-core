@@ -19,6 +19,7 @@ import { readBuiltInSessionSelection } from "../session/provider-model-selection
 import { createProviderCommandAccessOverlay } from "./provider-command-access.js";
 import type { SlashCommandContext } from "./types.js";
 import { readVeniceMenuModels } from "./venice-menu-models.js";
+import { readOllamaMenuModels } from "./ollama-menu-models.js";
 
 export type ModelRowStatus =
   | "current"
@@ -246,11 +247,15 @@ function readModelMenuSnapshotFromStorage(ctx: SlashCommandContext): ModelMenuSn
   const currentModel = sessionSelection.model;
   const configuredModel =
     config !== undefined ? configuredModelForProvider(config, provider) : undefined;
-  // Venice's own list replaces its bundled snapshot once the menu has read it.
+  // Venice's own list replaces its bundled snapshot once the menu has read it,
+  // and so do the models installed on the local Ollama server.
   const veniceModels = readVeniceMenuModels(ctx);
-  const catalog = veniceModels === undefined
-    ? buildProviderModelCatalog(config)
-    : { ...buildProviderModelCatalog(config), venice: veniceModels.map(entry => entry.model) };
+  const ollamaModels = readOllamaMenuModels(ctx);
+  const catalog: Readonly<Record<string, readonly string[]>> = {
+    ...buildProviderModelCatalog(config),
+    ...(veniceModels === undefined ? {} : { venice: veniceModels.map(entry => entry.model) }),
+    ...(ollamaModels === undefined ? {} : { ollama: ollamaModels.map(entry => entry.model) }),
+  };
   const accessOverlay = createProviderCommandAccessOverlay(ctx);
   const accessFor = (catalogProvider: ProviderSlug, model: string) =>
     accessOverlay.inspect({ provider: catalogProvider, model });

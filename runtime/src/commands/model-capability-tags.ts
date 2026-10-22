@@ -8,10 +8,22 @@
 
 import { resolveRegisteredModelCatalogEntry } from "../llm/registry/model-catalog.js";
 import { DEFAULT_MODEL_COSTS, resolveModelCostEntry } from "../session/cost.js";
+import { ollamaMenuModelCapabilities } from "./ollama-menu-models.js";
+
+/** Tags for a model installed on the local Ollama server, from what the server reports. */
+function localOllamaTags(model: string): string {
+  const capabilities = ollamaMenuModelCapabilities(model);
+  if (capabilities === undefined) return "";
+  const tags: string[] = [];
+  if (capabilities.includes("vision")) tags.push("vision");
+  if (capabilities.includes("thinking")) tags.push("thinking");
+  if (!capabilities.includes("tools")) tags.push("no tools");
+  return tags.join(" · ");
+}
 
 export function modelCapabilityTags(provider: string, model: string): string {
   const entry = resolveRegisteredModelCatalogEntry({ provider, model });
-  if (entry === undefined) return "";
+  if (entry === undefined) return provider === "ollama" ? localOllamaTags(model) : "";
   const tags: string[] = [];
   if (entry.inputModalities.includes("image")) tags.push("vision");
   if (entry.supportsThinking === true || entry.supportedReasoningLevels.length > 0) tags.push("thinking");
