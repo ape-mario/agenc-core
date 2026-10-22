@@ -25,6 +25,8 @@ export const PUBLISHED_CATALOG_PROVIDERS: ReadonlySet<string> = new Set([
 ]);
 
 const published = new Map<string, Map<string, RegisteredModelCatalogEntry>>();
+/** provider -> model -> when its per-model detail lookup last answered. */
+const detailed = new Map<string, Map<string, number>>();
 let revision = 0;
 
 function key(model: string): string {
@@ -47,7 +49,27 @@ export function recordPublishedModelCatalog(
     : new Map(published.get(provider) ?? []);
   for (const entry of entries) current.set(key(entry.model), entry);
   published.set(provider, current);
+  // A complete list may come from a lookup that did not carry another
+  // lookup's per-model details, so their marks no longer hold.
+  if (options.replace === true) detailed.delete(provider);
   revision += 1;
+}
+
+/**
+ * Mark that the provider's per-model detail lookup (Ollama Cloud's
+ * `/api/show`) answered for `model` and its row is recorded. Call it after
+ * recordPublishedModelCatalog.
+ */
+export function recordPublishedModelDetail(provider: string, model: string, at: number = Date.now()): void {
+  if (!PUBLISHED_CATALOG_PROVIDERS.has(provider)) return;
+  const rows = detailed.get(provider) ?? new Map<string, number>();
+  rows.set(key(model), at);
+  detailed.set(provider, rows);
+}
+
+/** When the provider's per-model detail for `model` was last recorded in this process. */
+export function publishedModelDetailRecordedAt(provider: string, model: string): number | undefined {
+  return detailed.get(provider)?.get(key(model));
 }
 
 /** The provider's published row for one model, if its live list has one. */
@@ -74,5 +96,6 @@ export function publishedModelCatalogRevision(): number {
 /** Test seam: forget every recorded list. */
 export function clearPublishedModelCatalogs(): void {
   published.clear();
+  detailed.clear();
   revision += 1;
 }

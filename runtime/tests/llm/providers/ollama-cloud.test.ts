@@ -4,6 +4,13 @@ import { resolveProviderCredentialAuthority } from "../../../src/llm/provider-op
 import { resolveProviderCapabilityEntry } from "../../../src/llm/capabilities.js";
 import { resolveRegisteredModelCatalogEntry } from "../../../src/llm/registry/model-catalog.js";
 import { OLLAMA_CLOUD_MODELS } from "../../../src/llm/registry/ollama-cloud-models.js";
+import {
+ clearPublishedModelCatalogs,
+ publishedModelDetailRecordedAt,
+ recordPublishedModelCatalog,
+ recordPublishedModelDetail,
+} from "../../../src/llm/registry/published-model-catalog.js";
+import { ModelMetadataResolver } from "../../../src/llm/model-metadata.js";
 import { chatCompletionsCapabilityHintsForProvider } from "../../../src/llm/wire/capability-gating.js";
 import type { LLMTool, LLMMessage } from "../../../src/llm/types.js";
 
@@ -50,6 +57,50 @@ describe("direct Ollama Cloud provider",()=>{
   // No Ollama Cloud model lists `minimal`: an unlisted level is never sent.
   await provider.chat([{role:"user",content:"hi"}],{reasoningEffort:"minimal"});
   expect(body(fetchImpl,fetchImpl.mock.calls.length-1).reasoning_effort).toBeUndefined();
+ });
+
+ test("uses the row the session already read instead of reading it again before the first request",async()=>{
+  const ollamaRows=async(input:RequestInfo|URL)=>{
+   const url=input instanceof Request?input.url:String(input);
+   if(url.endsWith("/api/tags"))return Response.json({models:[{name:model,model,capabilities:["completion","tools","thinking","vision"]},{name:"glm-5.3",model:"glm-5.3",capabilities:["completion","tools","thinking"]}]});
+   if(url.endsWith("/api/show"))return Response.json({capabilities:["completion","tools","thinking","vision"],model_info:{"deepseek.context_length":1048576},thinking:{values:["low","high","max"],default:"high"}});
+   return reply();
+  };
+  const urls:string[]=[];
+  const fetchImpl=vi.fn<typeof fetch>().mockImplementation(async(input)=>{urls.push(input instanceof Request?input.url:String(input));return ollamaRows(input);});
+  const metadata=()=>urls.filter(url=>url.startsWith("https://ollama.com/api/")).sort();
+  const profile=(provider:unknown,options:object={})=>(provider as {getExecutionProfile:(o:object)=>Promise<unknown>}).getExecutionProfile(options);
+  try{
+   // The session's resolver reads the model's rows when the session starts.
+   await new ModelMetadataResolver({fetchImpl:vi.fn<typeof fetch>().mockImplementation(ollamaRows),env:{OLLAMA_API_KEY:"fixture-key"}}).discoverOllamaCloudModels({},model);
+   expect(publishedModelDetailRecordedAt("ollama-cloud",model)).toBeTypeOf("number");
+   const provider=createProvider("ollama-cloud",{model,apiKey:"fixture-key",extra:{fetchImpl}});
+   await profile(provider);
+   await provider.chat([{role:"user",content:"hi"}]);
+   expect(metadata()).toEqual([]);
+   expect(urls).toEqual(["https://ollama.com/v1/chat/completions"]);
+   // A model this process has not read yet is still read first.
+   await profile(provider,{model:"glm-5.3"});
+   expect(metadata()).toEqual(["https://ollama.com/api/show","https://ollama.com/api/tags"]);
+   // So is a row read long ago.
+   urls.length=0;
+   recordPublishedModelDetail("ollama-cloud",model,Date.now()-16*60_000);
+   await profile(createProvider("ollama-cloud",{model,apiKey:"fixture-key",extra:{fetchImpl}}));
+   expect(metadata()).toEqual(["https://ollama.com/api/show","https://ollama.com/api/tags"]);
+  }finally{clearPublishedModelCatalogs();}
+ });
+
+ test("a complete model list drops the marks of earlier per-model reads",()=>{
+  try{
+   recordPublishedModelDetail("ollama-cloud",model);
+   recordPublishedModelCatalog("ollama-cloud",[],{});
+   expect(publishedModelDetailRecordedAt("ollama-cloud",model)).toBeTypeOf("number");
+   recordPublishedModelCatalog("ollama-cloud",[],{replace:true});
+   expect(publishedModelDetailRecordedAt("ollama-cloud",model)).toBeUndefined();
+   recordPublishedModelDetail("ollama-cloud",model);
+   clearPublishedModelCatalogs();
+   expect(publishedModelDetailRecordedAt("ollama-cloud",model)).toBeUndefined();
+  }finally{clearPublishedModelCatalogs();}
  });
 
  test("preserves streamed tool calls, usage and thinking for continuation",async()=>{
