@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { ZeroDataRetentionStatus } from "../../llm/zero-data-retention.js";
 import type { OffPeakSchedule } from "../../session/off-peak-pricing.js";
 
 /**
@@ -34,4 +35,13 @@ export function useStatusPromptCache(): number | null {
 export const StatusOffPeakContext = createContext<OffPeakSchedule | null>(null);
 export function useStatusOffPeakSchedule(): OffPeakSchedule | null {
   return useContext(StatusOffPeakContext);
+}
+
+/**
+ * Zero data retention of the provider and model a call made now would use,
+ * for the status line's ZDR badge. Null until the session's provider is known.
+ */
+export const StatusZdrContext = createContext<ZeroDataRetentionStatus | null>(null);
+export function useStatusZdr(): ZeroDataRetentionStatus | null {
+  return useContext(StatusZdrContext);
 }

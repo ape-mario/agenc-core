@@ -1,6 +1,6 @@
 import { c as _c } from "react-compiler-runtime";
 import { homedir } from 'node:os';
-import { resolve, sep } from 'node:path';
+import { basename, resolve, sep } from 'node:path';
 import React, { createContext, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { fileURLToPath } from 'url';
 import { useFullscreenMode } from '../context/fullscreenModeContext.js';
@@ -29,16 +29,27 @@ import type { PermissionMode } from '../../permissions/types.js';
 import type { StickyPrompt } from './VirtualMessageList';
 import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
 import { PlanModeBanner } from './v2/primitives.js';
-import { useStatusEffort, useStatusContextUsage, useStatusPromptCache, useStatusOffPeakSchedule } from '../context/statusEffortContext.js';
+import { useStatusEffort, useStatusContextUsage, useStatusPromptCache, useStatusOffPeakSchedule, useStatusZdr } from '../context/statusEffortContext.js';
 import ThemedText from './design-system/ThemedText.js';
 import { useTheme } from './design-system/ThemeProvider.js';
 import { LedgerStatus } from './LedgerStatus.js';
 import { swarmStatusPresentation } from './SwarmStatusIndicator.js';
-import { stringWidth } from '../ink/stringWidth.js';
+import {
+  layoutStatusLine,
+  STATUS_LINE_SEPARATOR,
+  type PlacedStatusLineFact,
+  type StatusLineColor,
+  type StatusLineFact,
+  type StatusLineSpan,
+} from './statusLineLayout.js';
+import type { ZeroDataRetentionStatus } from '../../llm/zero-data-retention.js';
 
 /** Rows of transcript context kept visible above the modal pane's ▔ divider. */
 const MODAL_TRANSCRIPT_PEEK = 2;
-/** The status line under the prompt is one plain row; there is no top bar. */
+/**
+ * The status line under the prompt is one plain row, or two when a narrow
+ * terminal cannot hold every fact on one; there is no top bar.
+ */
 const BOTTOM_CHROME_ROWS = 1;
 const MIN_ROWS_FOR_BOTTOM_CHROME = 5;
 const MIN_ROWS_FOR_SCROLLABLE = 2;
@@ -66,12 +77,13 @@ export function calculateModalViewport(
 
 export function calculateFullscreenLayoutBudget(
   terminalRows: number,
+  statusRows: number = BOTTOM_CHROME_ROWS,
 ): FullscreenLayoutBudget {
   const rows = Number.isFinite(terminalRows)
     ? Math.max(0, Math.trunc(terminalRows))
     : 0;
   const showBottomChrome = rows >= MIN_ROWS_FOR_BOTTOM_CHROME;
-  const chromeRows = showBottomChrome ? BOTTOM_CHROME_ROWS : 0;
+  const chromeRows = showBottomChrome ? statusRows : 0;
   const contentRows = Math.max(1, rows - chromeRows);
 
   return {
@@ -87,14 +99,17 @@ export function calculateFullscreenLayoutBudget(
  * transcript gives these rows up while the list is open, so the prompt and
  * the status line always keep theirs.
  */
-export function calculateSuggestionListRows(terminalRows: number): number {
+export function calculateSuggestionListRows(
+  terminalRows: number,
+  statusRows: number = BOTTOM_CHROME_ROWS,
+): number {
   const rows = Number.isFinite(terminalRows)
     ? Math.max(0, Math.trunc(terminalRows))
     : 0;
-  const budget = calculateFullscreenLayoutBudget(rows);
+  const budget = calculateFullscreenLayoutBudget(rows, statusRows);
   const contentRows = Math.max(
     1,
-    rows - (budget.showBottomChrome ? BOTTOM_CHROME_ROWS : 0),
+    rows - (budget.showBottomChrome ? statusRows : 0),
   );
   return Math.max(0, contentRows - budget.bottomMaxHeight);
 }
@@ -401,7 +416,10 @@ export function FullscreenLayout(t0) {
     rows: terminalRows,
     columns
   } = useTerminalSize();
-  const layoutBudget = calculateFullscreenLayoutBudget(terminalRows);
+  // The status line reports whether it needs a second row; the transcript,
+  // prompt and suggestion list give that row up instead of overlapping it.
+  const [statusRows, setStatusRows] = useState<1 | 2>(1);
+  const layoutBudget = calculateFullscreenLayoutBudget(terminalRows, statusRows);
   const isFullscreen = useFullscreenMode();
   const [stickyPrompt, setStickyPrompt] = useState(null);
   let t4;
@@ -495,7 +513,7 @@ export function FullscreenLayout(t0) {
     }
     // The suggestion list sits under the prompt, between the bottom slot and
     // the status line, outside the slot's clip.
-    const t15 = <PromptSuggestionsList availableRows={calculateSuggestionListRows(terminalRows)} />;
+    const t15 = <PromptSuggestionsList availableRows={calculateSuggestionListRows(terminalRows, statusRows)} />;
     const t16 = <PromptDialogOverlay />;
     const t14Content = <Box flexGrow={1} flexDirection="column" overflow="hidden">{t8}<DesignPlanModeBanner />{t11}{t12}{t13}{t16}</Box>;
     const showFileTreeGutter = shouldShowFileTreeGutter(columns, terminalRows, modal != null) && fileTreeGutter !== undefined && fileTreeGutter !== null && fileTreeGutter !== false;
@@ -525,7 +543,7 @@ export function FullscreenLayout(t0) {
     } else {
       t18 = $[37];
     }
-    return <PromptOverlayProvider>{layoutBudget.showScrollable ? t14 : null}{t17}{t15}{layoutBudget.showBottomChrome ? <StatusLineChrome columns={columns} /> : null}{t18}</PromptOverlayProvider>;
+    return <PromptOverlayProvider>{layoutBudget.showScrollable ? t14 : null}{t17}{t15}{layoutBudget.showBottomChrome ? <StatusLineChrome columns={columns} onRowsChange={setStatusRows} /> : null}{t18}</PromptOverlayProvider>;
   }
   let t8;
   if ($[42] !== bottom || $[43] !== modal || $[44] !== overlay || $[45] !== scrollable) {
@@ -601,10 +619,32 @@ function statusModeLabel(mode: PermissionMode): string {
   return permissionModePlainLabel(mode);
 }
 
-const STATUS_FOLDER_MIN_COLUMNS = 80;
+/**
+ * One word for a mode once the row runs short. "never asks" keeps both words:
+ * it is the mode that matters most to see, and "never" alone says nothing.
+ */
+const SHORT_MODE_LABELS: Partial<Record<PermissionMode, string>> = {
+  default: 'asks',
+  acceptEdits: 'edits',
+  plan: 'plan',
+  dontAsk: 'rules',
+  auto: 'auto',
+};
+
+/**
+ * Floors for the middle-shortened facts. On one row they stop well before a
+ * name gets hard to read, since a second row is still free; once the line
+ * has wrapped, they go lower before the terminal cuts anything.
+ */
+const STATUS_FOLDER_MIN_WIDTH = 10;
+const STATUS_MODEL_MIN_WIDTH = 16;
+const STATUS_FOLDER_LAST_RESORT_WIDTH = 6;
+const STATUS_MODEL_LAST_RESORT_WIDTH = 10;
 
 export type StatusLineSegments = {
-  readonly folder: string | null;
+  readonly folder: string;
+  /** The folder's own name, its short form ("runtime" for "~/agenc-core/runtime"). */
+  readonly folderName?: string;
   readonly model: string;
   readonly effort: string | null;
   readonly mode: string;
@@ -614,12 +654,11 @@ export type StatusLineSegments = {
 };
 
 /**
- * What the status line shows, each fact once: folder, model and mode
- * on the left, spend on the right once there is a figure. Narrow terminals
- * drop the folder.
+ * What the status line shows, each fact once: folder, model and mode on the
+ * left, spend on the right once there is a figure. No fact is dropped for
+ * width; `layoutStatusLine` shortens and wraps instead.
  */
 export function statusLineSegments(
-  columns: number,
   folder: string,
   modelLabel: string,
   mode: PermissionMode,
@@ -628,7 +667,7 @@ export function statusLineSegments(
   lightMode = true,
 ): StatusLineSegments {
   return {
-    folder: columns >= STATUS_FOLDER_MIN_COLUMNS ? folder : null,
+    folder,
     model: modelLabel,
     effort,
     mode: statusModeLabel(mode),
@@ -651,6 +690,8 @@ export type StatusLineUsageItem = {
 };
 
 const OFF_PEAK_NOTE = ' off-peak';
+const OFF_PEAK_SHORT_NOTE = ' op';
+const PRICE_UNKNOWN_SHORT_LABEL = 'no price';
 
 /**
  * The usage facts on the right of the status line, in order: context, the
@@ -690,9 +731,78 @@ export function statusLineUsageItems(
   return items;
 }
 
-/** The visible text of one usage fact. */
-function usageItemText(item: StatusLineUsageItem): string {
-  return item.spans.map(span => span.text).join('');
+/**
+ * The status line's ZDR badge: green when the provider and model keep
+ * nothing, red when data may be kept, a dim "ZDR?" when AgenC cannot tell
+ * (a custom address). It has no shorter form and is never dropped.
+ */
+export function statusLineZdrFact(status: ZeroDataRetentionStatus | null): StatusLineFact | null {
+  if (status === null) return null;
+  const span: StatusLineSpan = status.state === 'zdr'
+    ? { text: 'ZDR', color: 'success' }
+    : status.state === 'retained'
+      ? { text: 'ZDR', color: 'error' }
+      : { text: 'ZDR?', color: 'inactive' };
+  return { key: 'zdr', forms: [[span]] };
+}
+
+/** The usage block with its short forms ("c 82%", "$0.041 op", "no price"), then the ZDR badge. */
+export function statusLineRightFacts(
+  items: readonly StatusLineUsageItem[],
+  zdr: ZeroDataRetentionStatus | null,
+): StatusLineFact[] {
+  const facts: StatusLineFact[] = items.map((item): StatusLineFact => {
+    const short = item.key === 'cache'
+      ? item.spans.map(span => (span.text === 'cache ' ? { ...span, text: 'c ' } : span))
+      : item.key === 'spend'
+        ? item.spans.map(span => (
+          span.text === OFF_PEAK_NOTE
+            ? { ...span, text: OFF_PEAK_SHORT_NOTE }
+            : span.text === PRICE_UNKNOWN_LABEL ? { ...span, text: PRICE_UNKNOWN_SHORT_LABEL } : span
+        ))
+        : null;
+    const changed = short !== null && short.some((span, index) => span.text !== item.spans[index]?.text);
+    return { key: item.key, forms: changed ? [item.spans, short] : [item.spans] };
+  });
+  const badge = statusLineZdrFact(zdr);
+  return badge === null ? facts : [...facts, badge];
+}
+
+/** The facts on the left: folder, model, effort, mode, then session markers. */
+export function statusLineLeftFacts(params: {
+  readonly segments: StatusLineSegments;
+  readonly mode: PermissionMode;
+  readonly swarm: ReturnType<typeof swarmStatusPresentation> | null;
+  readonly shellCount: number;
+  readonly runningAgents: number;
+}): StatusLineFact[] {
+  const { segments } = params;
+  const bypass = params.mode === 'bypassPermissions';
+  const one = (key: string, text: string, color: StatusLineColor, short?: string, bold?: boolean): StatusLineFact => ({
+    key,
+    forms: short === undefined || short === text
+      ? [[{ text, color, ...(bold ? { bold } : {}) }]]
+      : [[{ text, color, ...(bold ? { bold } : {}) }], [{ text: short, color, ...(bold ? { bold } : {}) }]],
+  });
+  const shortMode = SHORT_MODE_LABELS[params.mode];
+  return [
+    {
+      ...one('folder', segments.folder, 'text2', segments.folderName),
+      minWidth: STATUS_FOLDER_MIN_WIDTH,
+      lastResortMinWidth: STATUS_FOLDER_LAST_RESORT_WIDTH,
+    },
+    {
+      ...one('model', segments.model, 'text'),
+      minWidth: STATUS_MODEL_MIN_WIDTH,
+      lastResortMinWidth: STATUS_MODEL_LAST_RESORT_WIDTH,
+    },
+    ...(segments.effort !== null ? [one('effort', segments.effort, 'text', segments.effort.replace(/ effort$/u, ''))] : []),
+    one('mode', segments.mode, bypass ? 'error' : 'text', shortMode, bypass),
+    ...(segments.harness !== null ? [one('harness', segments.harness, 'text', 'std')] : []),
+    ...(params.swarm !== null ? [one('swarm', params.swarm.label, params.swarm.color, undefined, params.swarm.bold)] : []),
+    ...(params.shellCount > 0 ? [one('shells', `${params.shellCount} ${params.shellCount === 1 ? 'shell' : 'shells'}`, 'text')] : []),
+    ...(params.runningAgents > 0 ? [one('agents', `${params.runningAgents} ${params.runningAgents === 1 ? 'agent' : 'agents'}`, 'text')] : []),
+  ];
 }
 
 /** Only the real home directory is represented by ~; preserve the remaining path. */
@@ -710,13 +820,50 @@ function workspaceFolderLabel(columns: number): string {
   return truncateMiddleToWidth(workspacePathLabel(process.cwd()), Math.max(12, Math.floor(columns * 0.24)));
 }
 
+/** The workspace folder's own name; `~` for the home directory itself. */
+export function folderName(cwd: string, home: string = homedir()): string {
+  const label = workspacePathLabel(cwd, home);
+  return label === '~' ? label : basename(resolve(cwd)) || label;
+}
+
 /**
- * The one status line under the prompt. Plain text on the terminal's own
- * background, no border or wash: cwd uses secondary ink, facts
- * use primary ink, and risky state uses the warning tone. Context and spend
- * sit on the right.
+ * Facts the terminal may cut when even the shortest forms are too wide (only
+ * below about 40 columns): the names, then the spend. Everything else, the
+ * ZDR badge above all, keeps its width.
  */
-function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
+const STATUS_LINE_CUTTABLE: ReadonlySet<string> = new Set(['folder', 'model', 'spend']);
+
+/** One block of facts joined by separators, each fact in its own colors. */
+function StatusLineFacts({ facts }: { readonly facts: readonly PlacedStatusLineFact[] }): React.ReactNode {
+  return facts.map((fact, index) => {
+    const cuttable = STATUS_LINE_CUTTABLE.has(fact.key);
+    return (
+      <React.Fragment key={fact.key}>
+        {index > 0 ? <ThemedText color="text2">{STATUS_LINE_SEPARATOR}</ThemedText> : null}
+        <Box flexShrink={cuttable ? 1 : 0} {...(cuttable ? { minWidth: 0 } : {})} overflow="hidden">
+          <Text wrap="truncate-end">
+            {fact.spans.map((span, spanIndex) => (
+              <ThemedText key={spanIndex} color={span.color} bold={span.bold}>{span.text}</ThemedText>
+            ))}
+          </Text>
+        </Box>
+      </React.Fragment>
+    );
+  });
+}
+
+/**
+ * The status line under the prompt. Plain text on the terminal's own
+ * background, no border or wash: cwd uses secondary ink, facts use primary
+ * ink, and risky state uses the error tone. Context, cache, spend and the ZDR
+ * badge sit on the right. Nothing is dropped for width: facts take short
+ * forms, then the usage block moves to a second row (`layoutStatusLine`).
+ */
+function StatusLineChrome({ columns, onRowsChange }: {
+  columns: number;
+  /** Told the row count the line takes, so the layout can give it room. */
+  onRowsChange?: (rows: 1 | 2) => void;
+}): React.ReactNode {
   const model = useAppStateMaybeOutsideOfProvider(state => state.mainLoopModel) ?? 'agenc';
   const mode = useAppStateMaybeOutsideOfProvider(state => state.toolPermissionContext.mode) ?? 'default';
   const swarmMode = useAppStateMaybeOutsideOfProvider(state => state.swarmMode) === true;
@@ -737,85 +884,54 @@ function StatusLineChrome({ columns }: { columns: number }): React.ReactNode {
   const cachePercent = useStatusPromptCache();
   const offPeakSchedule = useStatusOffPeakSchedule();
   const offPeak = useOffPeakNow(offPeakSchedule);
+  const zdr = useStatusZdr();
   // Unset means the default (Light). A session sets it from its runtime options.
   const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) !== false;
   const [themeName] = useTheme();
-  const segments = statusLineSegments(columns, folder, modelDisplayString(model), mode, spend, effort, lightMode);
-  const bypass = mode === 'bypassPermissions';
+  const segments = {
+    ...statusLineSegments(folder, modelDisplayString(model), mode, spend, effort, lightMode),
+    folderName: folderName(process.cwd()),
+  };
   // ANSI magenta on black falls under 4.5:1 in several stock palettes
   // (PuTTY, Ubuntu, the Windows console), so the dark ANSI theme shows the
   // figures in its bright accent instead.
   const valueColor = themeName === 'dark-ansi' ? 'accent' : 'accentSoft';
-  const rightItems = statusLineUsageItems(contextPercent, cachePercent, segments.spend, offPeak, valueColor);
-  const items: Array<{ key: string; label: string; color: 'text' | 'text2' | 'error' | 'accentSoft' | 'accent'; bold?: boolean }> = [
-    ...(segments.folder !== null ? [{ key: 'folder', label: segments.folder, color: 'text2' as const }] : []),
-    { key: 'model', label: segments.model, color: 'text' },
-    ...(segments.effort !== null ? [{ key: 'effort', label: segments.effort, color: 'text' as const }] : []),
-    { key: 'mode', label: segments.mode, color: bypass ? 'error' : 'text', bold: bypass },
-    ...(segments.harness !== null ? [{ key: 'harness', label: segments.harness, color: 'text' as const }] : []),
-    ...(swarmMode ? [{ key: 'swarm', ...swarmStatusPresentation(runningAgents) }] : []),
-    ...(shellCount > 0 ? [{ key: 'shells', label: `${shellCount} ${shellCount === 1 ? 'shell' : 'shells'}`, color: 'text' as const }] : []),
-    ...(runningAgents > 0 ? [{ key: 'agents', label: `${runningAgents} ${runningAgents === 1 ? 'agent' : 'agents'}`, color: 'text' as const }] : []),
-  ];
-  // Reserve the truthful context/cost block first. Drop the cache share
-  // before anything else, then cwd, shorten effort/mode, then drop
-  // swarm/effort/harness and the off-peak note before truncating the model.
-  // Every segment remains in this single row even at a narrow width.
-  const width = () => items.reduce((sum, item) => sum + stringWidth(item.label), Math.max(0, items.length - 1) * 3);
-  const space = (): number => {
-    const rightWidth = stringWidth(rightItems.map(usageItemText).join(' · '));
-    return Math.max(1, columns - 4 - rightWidth - (rightWidth > 0 ? 1 : 0));
-  };
-  const drop = (key: string) => {
-    const index = items.findIndex(item => item.key === key);
-    if (index >= 0) items.splice(index, 1);
-  };
-  if (width() > space()) {
-    const cacheIndex = rightItems.findIndex(item => item.key === 'cache');
-    if (cacheIndex >= 0) rightItems.splice(cacheIndex, 1);
-  }
-  if (width() > space()) drop('folder');
-  if (width() > space()) {
-    for (const item of items) {
-      if (item.key === 'effort') item.label = item.label.replace(/ effort$/, '');
-      if (item.key === 'mode') item.label = item.label.replace(/ mode$/, '');
-    }
-  }
-  for (const key of ['swarm', 'effort', 'harness']) {
-    if (width() > space()) drop(key);
-  }
-  const spendIndex = rightItems.findIndex(item => item.key === 'spend');
-  const spendItem = rightItems[spendIndex];
-  if (spendItem && width() > space()) {
-    rightItems[spendIndex] = { ...spendItem, spans: spendItem.spans.filter(span => span.text !== OFF_PEAK_NOTE) };
-  }
-  const leftWidth = space();
-  const modelItem = items.find(item => item.key === 'model');
-  if (modelItem && width() > leftWidth) {
-    modelItem.label = truncateMiddleToWidth(modelItem.label, Math.max(1, stringWidth(modelItem.label) - (width() - leftWidth)));
+  const layout = layoutStatusLine(
+    columns,
+    statusLineLeftFacts({
+      segments,
+      mode,
+      swarm: swarmMode ? swarmStatusPresentation(runningAgents) : null,
+      shellCount,
+      runningAgents,
+    }),
+    statusLineRightFacts(statusLineUsageItems(contextPercent, cachePercent, segments.spend, offPeak, valueColor), zdr),
+  );
+  useLayoutEffect(() => {
+    onRowsChange?.(layout.rows);
+  }, [layout.rows, onRowsChange]);
+  if (layout.rows === 2) {
+    return (
+      <Box flexDirection="column" paddingX={2} height={2} overflow="hidden" flexShrink={0}>
+        <Box flexDirection="row" height={1} overflow="hidden">
+          <StatusLineFacts facts={layout.left} />
+        </Box>
+        <Box flexDirection="row" height={1} overflow="hidden">
+          <Box flexGrow={1} />
+          <LedgerStatus />
+          <StatusLineFacts facts={layout.right} />
+        </Box>
+      </Box>
+    );
   }
   return (
     <Box flexDirection="row" paddingX={2} height={1} overflow="hidden" flexShrink={0}>
-      <Box flexDirection="row" width={leftWidth} flexShrink={1} minWidth={0} overflow="hidden">
-        {items.map((item, index) => (
-          <React.Fragment key={item.key}>
-            {index > 0 ? <ThemedText color="text2">{' · '}</ThemedText> : null}
-            <ThemedText color={item.color} bold={item.bold} wrap="truncate-end">{item.label}</ThemedText>
-          </React.Fragment>
-        ))}
+      <Box flexDirection="row" flexShrink={1} minWidth={0} overflow="hidden">
+        <StatusLineFacts facts={layout.left} />
       </Box>
       <Box flexGrow={1} />
       <LedgerStatus />
-      {rightItems.map((item, index) => (
-        <React.Fragment key={item.key}>
-          {index > 0 ? <ThemedText color="text2">{' · '}</ThemedText> : null}
-          <Text wrap="truncate-end">
-            {item.spans.map((span, spanIndex) => (
-              <ThemedText key={spanIndex} color={span.color}>{span.text}</ThemedText>
-            ))}
-          </Text>
-        </React.Fragment>
-      ))}
+      <StatusLineFacts facts={layout.right} />
     </Box>
   );
 }

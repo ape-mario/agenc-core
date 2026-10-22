@@ -13,7 +13,9 @@ import {
   StatusEffortContext,
   StatusOffPeakContext,
   StatusPromptCacheContext,
+  StatusZdrContext,
 } from "../context/statusEffortContext.js";
+import type { ZeroDataRetentionStatus } from "../../llm/zero-data-retention.js";
 import { AppStateProvider, getDefaultAppState } from "../state/AppState.js";
 import { Text } from "../ink.js";
 import { createRoot } from "../ink/root.js";
@@ -35,11 +37,13 @@ const MONDAY_PEAK = "2026-10-19T02:00:00Z";
 
 type FooterOptions = {
   readonly columns?: number;
+  readonly rows?: number;
   readonly contextPercent?: number | null;
   readonly cachePercent?: number | null;
   readonly usage?: SessionUsageSnapshot | null;
   readonly offPeak?: OffPeakSchedule | null;
   readonly effort?: string | null;
+  readonly zdr?: ZeroDataRetentionStatus | null;
 };
 
 function footerTree(options: FooterOptions): React.ReactElement {
@@ -50,9 +54,11 @@ function footerTree(options: FooterOptions): React.ReactElement {
           <StatusContextUsageContext value={options.contextPercent === undefined ? 9 : options.contextPercent}>
             <StatusPromptCacheContext value={options.cachePercent === undefined ? 91 : options.cachePercent}>
               <StatusOffPeakContext value={options.offPeak ?? null}>
-                <FullscreenModeProvider enabled>
-                  <FullscreenLayout scrollable={<Text>ready</Text>} bottom={<Text>prompt</Text>} />
-                </FullscreenModeProvider>
+                <StatusZdrContext value={options.zdr ?? null}>
+                  <FullscreenModeProvider enabled>
+                    <FullscreenLayout scrollable={<Text>ready</Text>} bottom={<Text>prompt</Text>} />
+                  </FullscreenModeProvider>
+                </StatusZdrContext>
               </StatusOffPeakContext>
             </StatusPromptCacheContext>
           </StatusContextUsageContext>
@@ -62,12 +68,15 @@ function footerTree(options: FooterOptions): React.ReactElement {
   );
 }
 
-/** The rendered status line: the row that carries the permission mode. */
+/** The rendered status line: its one or two rows under the prompt, joined. */
 async function footer(options: FooterOptions = {}): Promise<string> {
-  const output = await renderToString(footerTree(options), { columns: options.columns ?? 140, rows: 24 });
-  const line = output.split(/\r?\n/u).find((row) => row.includes("asks first"));
-  expect(line, output).toBeDefined();
-  return line!;
+  const output = await renderToString(footerTree(options), { columns: options.columns ?? 140, rows: options.rows ?? 24 });
+  const rows = output.split(/\r?\n/u);
+  const prompt = rows.findIndex((row) => row.includes("prompt"));
+  const status = rows.slice(prompt + 1).filter((row) => row.trim().length > 0);
+  expect(status.length, output).toBeGreaterThan(0);
+  expect(status.length, output).toBeLessThanOrEqual(2);
+  return status.join("\n");
 }
 
 const ANSI16 = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"];
@@ -81,7 +90,8 @@ async function coloredFooter(
     <ThemeProvider initialState={setting}>{footerTree(options)}</ThemeProvider>,
     { columns: options.columns ?? 140, rows: 24, color: true },
   );
-  const row = output.split(/\r?\n/u).find((line) => stripAnsi(line).includes("asks first"));
+  // The status line's last row: the usage block and the ZDR badge.
+  const row = output.split(/\r?\n/u).findLast((line) => stripAnsi(line).trim().length > 0);
   expect(row, output).toBeDefined();
   const cells: { ch: string; fg: string | null }[] = [];
   let fg: string | null = null;
@@ -169,31 +179,36 @@ describe("status line cache share", () => {
     expect(await footer({ contextPercent: null })).toContain("cache 91% · $0.0044");
   });
 
-  test("narrow terminals drop the cache share before anything else", async () => {
-    const left = ["~/project", modelDisplayString(MODEL), "high effort", "asks first"].join(" · ");
+  test("narrow terminals shorten facts one step at a time and never drop the cache share", async () => {
+    const model = modelDisplayString(MODEL);
+    const left = ["~/project", model, "high effort", "asks first"].join(" · ");
     const right = "ctx 9% · cache 91% · $0.0044";
-    // The row is padded by two columns on each side, with a gap before the right block.
-    const fits = 4 + stringWidth(left) + 1 + stringWidth(right);
-    const fitsWithoutCache = fits - stringWidth("cache 91% · ");
-    expect(fitsWithoutCache - 1).toBeGreaterThanOrEqual(80);
+    // The row is padded by two columns on each side, with a two-column gap before the right block.
+    const fits = 4 + stringWidth(left) + 2 + stringWidth(right);
 
     const full = await footer({ columns: fits, effort: "high effort" });
     expect(full).toContain(left);
     expect(full).toContain(right);
+    expect(full.split("\n")).toHaveLength(1);
 
-    // One column short: only the cache share goes.
-    for (const columns of [fits - 1, fitsWithoutCache]) {
-      const narrower = await footer({ columns, effort: "high effort" });
-      expect(narrower, `${columns}`).not.toContain("cache");
-      expect(narrower, `${columns}`).toContain(left);
-      expect(narrower, `${columns}`).toContain("ctx 9% · $0.0044");
-    }
+    // One column short: the effort takes its short form first, nothing goes.
+    const effort = await footer({ columns: fits - 1, effort: "high effort" });
+    expect(effort).toContain(["~/project", model, "high", "asks first"].join(" · "));
+    expect(effort).toContain(right);
 
-    // Narrower still: the folder follows, as before.
-    const narrowest = await footer({ columns: fitsWithoutCache - 1, effort: "high effort" });
-    expect(narrowest).not.toContain("cache");
-    expect(narrowest).not.toContain("~/project");
-    expect(narrowest).toContain("ctx 9% · $0.0044");
+    // Then the mode, then the cache share's name.
+    const mode = await footer({ columns: fits - " effort".length - 1, effort: "high effort" });
+    expect(mode).toContain(["~/project", model, "high", "asks"].join(" · "));
+    expect(mode).toContain(right);
+    const cache = await footer({ columns: fits - " effort".length - " first".length - 1, effort: "high effort" });
+    expect(cache).toContain("ctx 9% · c 91% · $0.0044");
+    expect(cache.split("\n")).toHaveLength(1);
+
+    // Narrower than one row can hold: the usage block moves to a second row.
+    const wrapped = (await footer({ columns: 50, effort: "high effort" })).split("\n");
+    expect(wrapped).toHaveLength(2);
+    expect(wrapped[0]).toMatch(/high( effort)? · asks/u);
+    expect(wrapped[1]).toMatch(/ctx 9% · c(ache)? 91% · \$0\.0044\s*$/u);
   });
 });
 
@@ -279,18 +294,19 @@ describe("status line off-peak mark", () => {
     }
   });
 
-  test("goes on a narrow terminal before the model name is cut", async () => {
+  test("shortens to op on a narrow terminal before the model name is cut", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date(SATURDAY_OFF_PEAK) });
-    const left = [modelDisplayString(MODEL), "asks first"].join(" · ");
-    const fits = 4 + stringWidth(left) + 1 + stringWidth("ctx 9% · $0.0044 off-peak");
-    expect(fits).toBeLessThan(80); // below the width that shows the folder
+    const model = modelDisplayString(MODEL);
+    const left = ["~/project", model, "asks first"].join(" · ");
+    const fits = 4 + stringWidth(left) + 2 + stringWidth("ctx 9% · $0.0044 off-peak");
     const full = await footer({ columns: fits, cachePercent: null, offPeak: DEEPSEEK_HOURS });
     expect(full).toContain(left);
     expect(full).toContain("ctx 9% · $0.0044 off-peak");
-    const narrower = await footer({ columns: fits - 1, cachePercent: null, offPeak: DEEPSEEK_HOURS });
-    expect(narrower).toContain(left);
-    expect(narrower).toContain("ctx 9% · $0.0044");
-    expect(narrower).not.toContain("off-peak");
+    // The mode shortens first, then the note, while the model keeps its name.
+    const narrower = await footer({ columns: fits - " first".length - 1, cachePercent: null, offPeak: DEEPSEEK_HOURS });
+    expect(narrower).toContain(["~/project", model, "asks"].join(" · "));
+    expect(narrower).toContain("ctx 9% · $0.0044 op");
+    expect(narrower.split("\n")).toHaveLength(1);
   });
 
   test("labels compose in the documented order", () => {
@@ -356,5 +372,60 @@ describe("status line usage colors", () => {
     expect(colorOf("ctx", right)).toBe(theme.text2);
     expect(colorOf("85%", right)).toBe(theme.error);
     expect(colorOf("price unknown", right)).toBe(theme.text);
+  });
+});
+
+const ZDR: Record<ZeroDataRetentionStatus["state"], ZeroDataRetentionStatus> = {
+  zdr: { provider: "cerebras", state: "zdr", reason: "Cerebras does not retain inference inputs and outputs." },
+  retained: { provider: "grok", state: "retained", reason: "xAI keeps every API request and response for 30 days." },
+  unknown: { provider: "openai-compatible", state: "unknown", reason: "Requests go to example.com." },
+};
+
+describe("status line ZDR badge", () => {
+  test.each([160, 120, 100, 80, 60, 50, 40])("is on screen with every other fact at %i columns", async (columns) => {
+    const output = await renderToString(footerTree({ columns, effort: "high effort", zdr: ZDR.retained }), { columns, rows: 24 });
+    const rows = output.split(/\r?\n/u);
+    const prompt = rows.findIndex((row) => row.includes("prompt"));
+    const status = rows.slice(prompt + 1).filter((row) => row.trim().length > 0);
+    // The prompt stays above the status line, which is one row or two.
+    expect(prompt, output).toBeGreaterThan(0);
+    expect(status.length, output).toBeGreaterThanOrEqual(1);
+    expect(status.length, output).toBeLessThanOrEqual(2);
+    expect(rows.length, output).toBeLessThanOrEqual(24);
+    const footerText = status.join("\n");
+    for (const fact of ["project", "high", "ask", "ctx 9%", "91%", "$0.0044", "ZDR"]) {
+      expect(footerText, `${columns}: ${fact}`).toContain(fact);
+    }
+    expect(footerText).toMatch(/qwen3/u);
+    for (const row of rows) expect(stringWidth(row), `${columns}: ${row}`).toBeLessThanOrEqual(columns);
+    expect(status.at(-1)!.trimEnd().endsWith("ZDR"), output).toBe(true);
+    expect(status.length).toBe(columns >= 80 ? 1 : 2);
+  });
+
+  test.each(["olive", "dark", "light"] as const)("%s: green when nothing is kept, red when it may be, dim when unknown", async (setting) => {
+    const theme = getTheme(resolveThemeSetting(setting));
+    const green = await coloredFooter(setting, { zdr: ZDR.zdr });
+    expect(green.text.trimEnd().endsWith("ZDR")).toBe(true);
+    expect(green.colorOf("ZDR", green.text.lastIndexOf("ZDR"))).toBe(theme.success);
+    const red = await coloredFooter(setting, { zdr: ZDR.retained });
+    expect(red.colorOf("ZDR", red.text.lastIndexOf("ZDR"))).toBe(theme.error);
+    const unknown = await coloredFooter(setting, { zdr: ZDR.unknown });
+    expect(unknown.text.trimEnd().endsWith("ZDR?")).toBe(true);
+    expect(unknown.colorOf("ZDR?", unknown.text.lastIndexOf("ZDR?"))).toBe(theme.inactive);
+    // The usage block keeps its colors next to the badge.
+    expect(red.colorOf("9%", red.text.indexOf("ctx 9%"))).toBe(theme.accentSoft);
+  });
+
+  test("keeps the badge and the usage colors when the line wraps to two rows", async () => {
+    const theme = getTheme(resolveThemeSetting("olive"));
+    const { text, colorOf } = await coloredFooter("olive", { columns: 50, effort: "high effort", zdr: ZDR.zdr });
+    expect(text.trimStart()).toMatch(/^ctx 9% · c(ache)? 91% · \$0\.0044 · ZDR\s*$/u);
+    expect(colorOf("ZDR", text.lastIndexOf("ZDR"))).toBe(theme.success);
+    expect(colorOf("91%", text.indexOf("91%"))).toBe(theme.accentSoft);
+    expect(colorOf("ctx", text.indexOf("ctx"))).toBe(theme.text2);
+  });
+
+  test("is absent until the session's provider is known", async () => {
+    expect(await footer({ zdr: null })).not.toContain("ZDR");
   });
 });

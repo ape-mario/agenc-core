@@ -4,6 +4,7 @@ import {
   collectStatus,
   formatStatus,
   summarizeGitStatus,
+  zeroDataRetentionStatusLine,
 } from "./status.js";
 import { createStatusDashboardSnapshot } from "./status-menu.js";
 import type { Session } from "../session/session.js";
@@ -202,6 +203,45 @@ describe("statusCommand", () => {
       home: "/home/test",
     });
     expect(res.kind).toBe("text");
+  });
+
+  it("execute explains the status line's ZDR badge right after the provider", async () => {
+    const text = async (provider: string, model: string) => {
+      const res = await statusCommand.execute({
+        session: stubSession({ provider, model }),
+        argsRaw: "",
+        cwd: "/ws",
+        home: "/home/test",
+      });
+      expect(res.kind).toBe("text");
+      return (res as { text: string }).text.split("\n");
+    };
+    const grok = await text("grok", "grok-4.6");
+    const provider = grok.findIndex(line => line.startsWith("Provider"));
+    expect(grok[provider + 1]).toMatch(/^Zero data retention\s+: data may be kept \(red ZDR\)$/u);
+    expect((await text("cerebras", "gpt-oss-120b")).find(line => line.startsWith("Zero data retention")))
+      .toMatch(/: on \(green ZDR\)$/u);
+  });
+
+  it("gives the dashboard the badge's reason as the row detail", () => {
+    const line = zeroDataRetentionStatusLine({
+      provider: "grok",
+      state: "retained",
+      reason: "xAI keeps every API request and response for 30 days. ZDR is a team setting in the xAI Console.",
+    });
+    expect(line).toEqual({
+      key: "Zero data retention",
+      value: "data may be kept (red ZDR)",
+      detail: "xAI keeps every API request and response for 30 days. ZDR is a team setting in the xAI Console.",
+      state: "warn",
+    });
+    const row = createStatusDashboardSnapshot({ lines: [line], git: { state: "clean", branch: "main", changedFiles: 0 } })
+      .rows.find(candidate => candidate.key === "Zero data retention");
+    expect(row).toMatchObject({ section: "privacy", state: "warn", detail: line.detail });
+    expect(zeroDataRetentionStatusLine({ provider: "ollama", state: "zdr", reason: "Runs on this computer, so nothing leaves it." }))
+      .toMatchObject({ value: "on (green ZDR)", state: "ok" });
+    expect(zeroDataRetentionStatusLine({ provider: "openai-compatible", state: "unknown", reason: "r" }))
+      .toMatchObject({ value: "unknown (dim ZDR?)", state: "info" });
   });
 
   it("execute opens a persistent v2 dashboard when TUI app state is wired", async () => {
