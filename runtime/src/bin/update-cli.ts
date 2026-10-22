@@ -687,7 +687,7 @@ export type UpdateDownloadProgressListener = (progress: UpdateDownloadProgress) 
 
 /** A transfer hit one of its limits. Nothing was installed, so a rerun is safe. */
 export class UpdateTransferTimeoutError extends Error {
-  readonly code = "AGENC_UPDATE_TRANSFER_TIMEOUT";
+  readonly code = "UPDATE_TRANSFER_TIMEOUT";
 
   constructor(
     message: string,
