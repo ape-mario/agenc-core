@@ -16,6 +16,7 @@ import {
 import { readBuiltInSessionSelection } from "../session/provider-model-selection.js";
 import type { SlashCommandContext } from "./types.js";
 import { readVeniceMenuModels } from "./venice-menu-models.js";
+import { readOllamaMenuModels } from "./ollama-menu-models.js";
 
 type ProviderRowStatus = "current" | "configured" | "default";
 export type ProviderAuthState = "managed" | "ready" | "missing" | "optional";
@@ -298,7 +299,9 @@ export function readProviderMenuSnapshot(ctx: SlashCommandContext): ProviderMenu
     const auth = providerMenuAuth(access);
     const discoveredModels = provider === "venice"
       ? veniceModels?.map(entry => entry.slug)
-      : undefined;
+      : provider === "ollama"
+        ? readOllamaMenuModels(ctx)?.map(entry => entry.model)
+        : undefined;
     const rawModels = discoveredModels ?? modelCatalog[provider] ?? [];
     const models = managedProjectionActive
       ? access.managed.visibleModels

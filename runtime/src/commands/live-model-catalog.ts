@@ -6,16 +6,18 @@
  * `/effort` offers and what the status line shows from the same registered
  * catalog, so it reads those lists too before it answers: Venice with the
  * session's key (through the menu loader), Ollama Cloud and OpenRouter from
- * their public endpoints. While OpenRouter requests ask for zero data
- * retention, it also reads OpenRouter's list of zero-retention endpoints, so
- * the picker and the status line can tell which models still work. Best
- * effort: the bundled rows answer offline.
+ * their public endpoints, and a local Ollama's installed models from its own
+ * server. While OpenRouter requests ask for zero data retention, it also
+ * reads OpenRouter's list of zero-retention endpoints, so the picker and the
+ * status line can tell which models still work. Best effort: the bundled
+ * rows answer offline.
  *
  * @module
  */
 
 import { readCommandConfig, providerEnvironmentFromCommandContext } from "./config-context.js";
 import { loadVeniceMenuModels } from "./venice-menu-models.js";
+import { loadOllamaMenuModels } from "./ollama-menu-models.js";
 import { ModelMetadataResolver } from "../llm/model-metadata.js";
 import { openRouterZdrEndpointsKnown } from "../llm/registry/openrouter-zdr-endpoints.js";
 import { openRouterZeroDataRetentionEnabled } from "../llm/zero-data-retention.js";
@@ -77,6 +79,12 @@ export async function ensureLiveModelCatalog(
   model: string,
   options: { readonly fetchImpl?: typeof fetch } = {},
 ): Promise<void> {
+  // A local Ollama session: read which models are installed (the server keeps
+  // its own short reuse window), so /model offers them.
+  if (provider === "ollama") {
+    await loadOllamaMenuModels(ctx, options);
+    return;
+  }
   if (provider !== "venice" && provider !== "ollama-cloud" && provider !== "openrouter") return;
   const key = `${provider}\n${provider === "ollama-cloud" ? model : ""}`;
   const at = fresh.get(key);

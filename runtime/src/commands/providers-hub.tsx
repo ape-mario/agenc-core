@@ -53,6 +53,11 @@ import {
   OPENROUTER_ZDR_OFF_HINT,
   openRouterZeroDataRetentionEnabled,
 } from "../llm/zero-data-retention.js";
+import {
+  loadOllamaMenuModels,
+  OLLAMA_MODEL_LIST_UNAVAILABLE_NOTE,
+  readOllamaMenuModels,
+} from "./ollama-menu-models.js";
 
 export type ProvidersHubServices = {
   readonly reload: () => ProvidersHubSnapshot;
@@ -1044,6 +1049,14 @@ function servicesFor(ctx: SlashCommandContext): ProvidersHubServices {
     },
     modelsFor: (provider) => readProvidersHubModels(ctx, provider),
     refreshModels: (provider) => {
+      if (provider === "ollama") {
+        // The models installed on the local Ollama server the session uses.
+        if (readOllamaMenuModels(ctx) !== undefined) return null;
+        return loadOllamaMenuModels(ctx).then(
+          (models) => models === undefined ? { note: OLLAMA_MODEL_LIST_UNAVAILABLE_NOTE } : {},
+          () => ({ note: OLLAMA_MODEL_LIST_UNAVAILABLE_NOTE }),
+        );
+      }
       if (provider === "openrouter") {
         // Models without a zero-retention endpoint are marked once the list is read.
         if (!openRouterZeroDataRetentionEnabled(readCommandConfig(ctx)) || openRouterZdrEndpointsKnown()) return null;
