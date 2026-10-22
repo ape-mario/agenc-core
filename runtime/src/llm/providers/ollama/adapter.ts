@@ -1436,7 +1436,16 @@ export class OllamaProvider implements LLMProvider {
       return mapped;
     }
 
-    const mapped = mapLLMError(this.name, err, timeoutMs ?? this.config.timeoutMs ?? 0);
+    // The ollama SDK puts the HTTP status on `status_code` (its ResponseError);
+    // the shared mapper reads `status`. Without it a 500 or a 503 (server busy,
+    // model failed to load) became a plain provider error that ended the turn
+    // instead of a server error the turn retries, and a 401 from a cloud model
+    // was not an authentication error.
+    const statusCode = typeof e?.status_code === "number" ? e.status_code : undefined;
+    const source = statusCode !== undefined && e?.status === undefined && e?.statusCode === undefined
+      ? Object.assign(new Error(String(e?.message ?? err)), { name: e?.name, status: statusCode, cause: err })
+      : err;
+    const mapped = mapLLMError(this.name, source, timeoutMs ?? this.config.timeoutMs ?? 0);
     return isLLMPreGenerationRejection(err, this.name)
       ? markLLMPreGenerationRejection(mapped, this.name) : mapped;
   }
