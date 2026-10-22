@@ -7,6 +7,12 @@
  */
 
 import { OLLAMA_CLOUD_BASE_URL, OLLAMA_CLOUD_API_KEY_ENV, OLLAMA_CLOUD_DEFAULT_MODEL } from "./ollama-cloud-models.js";
+import {
+  ABLITERATION_API_KEY_ENV_VARS,
+  ABLITERATION_BASE_URL,
+  ABLITERATION_BASE_URL_ENV_VARS,
+  ABLITERATION_DEFAULT_MODEL,
+} from "./abliteration-models.js";
 import { deriveFlatCatalog } from "./model-catalog.js";
 import { normalizeProviderIdentity } from "../../provider-identity.js";
 import { registerProviderFundsDisplayNames } from "../funds.js";
@@ -345,6 +351,14 @@ export const BUILT_IN_PROVIDER_DEFINITIONS = Object.freeze({
     baseURLEnvVars: ["VENICE_BASE_URL"],
     onboarding: onboardingInfo(85, "api-key"),
   }),
+  abliteration: providerDefinition({
+    name: "abliteration.ai",
+    defaultModel: ABLITERATION_DEFAULT_MODEL,
+    baseURL: ABLITERATION_BASE_URL,
+    credentials: apiKeyCredentials(ABLITERATION_API_KEY_ENV_VARS),
+    baseURLEnvVars: ABLITERATION_BASE_URL_ENV_VARS,
+    onboarding: onboardingInfo(86, "api-key"),
+  }),
   groq: providerDefinition({
     name: "Groq",
     defaultModel: "openai/gpt-oss-120b",
@@ -637,6 +651,7 @@ export const BUILT_IN_PROVIDER_MODEL_CATALOG: Readonly<
   ] }),
   // Shared API Llama rows retired 2026-08-16; enterprise IDs remain custom.
   venice: mergeDerivedProviderModels("venice"),
+  abliteration: mergeDerivedProviderModels("abliteration"),
   groq: mergeDerivedProviderModels("groq"),
   deepseek: Object.freeze(["deepseek-flash", "deepseek-v4-pro"]),
   // `/models` also advertises image generation and voice transcription.

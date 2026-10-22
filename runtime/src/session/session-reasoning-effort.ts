@@ -32,10 +32,10 @@ function resolveGeminiSessionReasoningEffort(
 }
 
 /**
- * Ollama Cloud and Venice list, per model, the levels it takes and the one it
- * thinks at when a request names none, and the status line shows the model's
- * default (that one, or DeepSeek's own high for a DeepSeek model,
- * model-family.ts). Send the level the status line shows instead of leaving
+ * Ollama Cloud, Venice and abliteration.ai list, per model, the levels it
+ * takes and the one it thinks at when a request names none, and the status
+ * line shows the model's default (that one, or DeepSeek's own high for a
+ * DeepSeek model, model-family.ts). Send the level the status line shows instead of leaving
  * the field out and trusting the model to apply a default: the chosen level
  * when listed, the same stand-in the status line names for a top tier the
  * model lacks, otherwise the default. Undefined when the model lists no
@@ -58,7 +58,7 @@ function listedGatewayEffort(
 }
 
 function usesListedGatewayEffort(provider: string | undefined): boolean {
-  return provider === "ollama-cloud" || provider === "venice";
+  return provider === "ollama-cloud" || provider === "venice" || provider === "abliteration";
 }
 
 /**
@@ -119,8 +119,9 @@ export function resolveSessionReasoningEffort(
     // Ollama Cloud and Venice models that list `none` (Ollama: thinking value
     // false) think at their own default when the field is omitted, so "off"
     // is sent literally (probed jobs/pv, 2026-10-20: deepseek, glm, kimi,
-    // gemma and nemotron stop thinking only with `none`).
-    if ((selection?.provider === "ollama-cloud" || selection?.provider === "venice") &&
+    // gemma and nemotron stop thinking only with `none`). So does
+    // abliterated-model, which reasons at its native depth without a level.
+    if (usesListedGatewayEffort(selection?.provider) &&
         contract?.levels.includes("none") === true) {
       return "none";
     }

@@ -358,7 +358,7 @@ function requiresStrictChatCompletionsSse(providerName: string): boolean {
  * refusal carries application/json and arrives parsed. Read that text as
  * JSON before looking for the provider code.
  */
-function readZaiErrorBody(body: unknown): unknown {
+function readJsonErrorBody(body: unknown): unknown {
   if (typeof body !== "string" || !body.trimStart().startsWith("{")) {
     return body;
   }
@@ -374,7 +374,51 @@ function isZaiInsufficientBalanceFailure(args: {
   readonly body: unknown;
 }): boolean {
   return isZaiProviderName(args.providerName) &&
-    readNestedProviderCode(readZaiErrorBody(args.body)) === "1113";
+    readNestedProviderCode(readJsonErrorBody(args.body)) === "1113";
+}
+
+/** abliteration.ai's error bodies carry `request_id` beside the code. */
+function readNestedRequestId(value: unknown, depth = 0): string | undefined {
+  if (depth > 5 || value === null || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof record.request_id === "string" && record.request_id.trim().length > 0) {
+    return record.request_id.trim().slice(0, 128);
+  }
+  return readNestedRequestId(record.error, depth + 1);
+}
+
+/**
+ * abliteration.ai refuses a request a project policy blocks with 403
+ * `policy_violation`, and ends a streamed reply it withholds with the same
+ * code in an error frame. The same input is blocked again, so this is neither
+ * a key problem nor worth a retry. 503 `policy_evaluation_unavailable` means a
+ * blocking policy could not be evaluated in time; that one may be retried.
+ * https://docs.abliteration.ai/api/errors
+ */
+function abliterationPolicyFailure(args: {
+  readonly providerName: string;
+  readonly body: unknown;
+  readonly status?: number;
+}): Error | undefined {
+  if (args.providerName !== "abliteration") return undefined;
+  const body = readJsonErrorBody(args.body);
+  const code = readNestedProviderCode(body);
+  if (code !== "policy_violation" && code !== "policy_evaluation_unavailable") return undefined;
+  const requestId = readNestedRequestId(body);
+  const reference = requestId === undefined ? "" : ` Request ID: ${requestId}.`;
+  if (code === "policy_evaluation_unavailable") {
+    return new LLMServerError(
+      args.providerName,
+      503,
+      `abliteration.ai could not evaluate a policy in time and withheld the reply. A retry may succeed.${reference}`,
+    );
+  }
+  return new LLMProviderError(
+    args.providerName,
+    "abliteration.ai blocked this request with a policy (policy_violation). " +
+      `Sending the same input again is blocked again. Change the request or the project's policies.${reference}`,
+    args.status ?? 403,
+  );
 }
 
 function zaiInsufficientBalanceErrorMessage(): string {
@@ -422,7 +466,7 @@ function readZaiPlanRefusal(args: {
   readonly body: unknown;
 }): ZaiPlanRefusal | undefined {
   if (!isZaiProviderName(args.providerName)) return undefined;
-  const body = readZaiErrorBody(args.body);
+  const body = readJsonErrorBody(args.body);
   const code = readNestedProviderCode(body);
   if (code === undefined || !ZAI_PLAN_REFUSAL_CODES.has(code)) return undefined;
   const detail = readNestedProviderMessage(body)
@@ -667,6 +711,8 @@ function mapOpenAIHttpFailureToError(args: {
       zaiInsufficientBalanceErrorMessage(),
     );
   }
+  const policyFailure = abliterationPolicyFailure(args);
+  if (policyFailure !== undefined) return policyFailure;
   const zaiPlanRefusal = readZaiPlanRefusal(args);
   if (zaiPlanRefusal !== undefined) {
     return new LLMFundsError(
@@ -769,6 +815,11 @@ function mapOpenAIStreamError(args: {
     if (retryAfterMs !== undefined) Object.assign(error, { retryAfterMs });
     return error;
   }
+  // A policy that withholds a streamed reply ends it with an error frame.
+  const policyFailure = abliterationPolicyFailure({
+    providerName: args.providerName, body: args.errorBody, ...(status !== undefined ? { status } : {}),
+  });
+  if (policyFailure !== undefined) return policyFailure;
   // HTTP 200 can carry a statusless overload in Responses SSE. Only this
   // structured code, before any output, enters the existing reconnect ladder.
   // The earlier `error` event can carry a directive omitted by response.failed.

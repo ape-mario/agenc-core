@@ -147,7 +147,7 @@ the Grok 4.6 default and capability change.
 they run only through the Grok Build CLI ACP path. See
 [grok-oauth.md](../grok-oauth.md#composer-models-acp).
 
-## Built-in providers (25)
+## Built-in providers (26)
 
 | Slug | Display name | Default model | Default base URL | Ordered credential env aliases | Ordered endpoint env aliases | Onboarding access |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -159,6 +159,7 @@ they run only through the Grok Build CLI ACP path. See
 | `openai-compatible` | OpenAI-compatible | `local-model` | `http://localhost:8000/v1` | `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_API_KEY` | `OPENAI_COMPATIBLE_BASE_URL`, `OPENAI_BASE_URL`, `OPENAI_API_BASE` | `local` |
 | `openrouter` | OpenRouter | `x-ai/grok-4.5` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `OPENROUTER_BASE_URL` | `api-key` |
 | `venice` | Venice AI | `zai-org-glm-5-2` (offline fallback) | `https://api.venice.ai/api/v1` | `VENICE_API_KEY` | `VENICE_BASE_URL` | `api-key` |
+| `abliteration` | abliteration.ai | `abliterated-model-large-v2` | `https://api.abliteration.ai/v1` | `ABLIT_KEY`, `ABLITERATION_API_KEY` | `ABLITERATION_BASE_URL` | `api-key` |
 | `groq` | Groq | `openai/gpt-oss-120b` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` | `GROQ_BASE_URL` | `api-key` |
 | `deepseek` | DeepSeek | `deepseek-flash` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` | `DEEPSEEK_BASE_URL` | `api-key` |
 | `meta` | Meta | `muse-wonder-1.0` | `https://api.meta.ai/v1` | `MODEL_API_KEY` | `META_BASE_URL` | `api-key` |
@@ -1196,3 +1197,117 @@ Sources: [Chat Completions](https://docs.venice.ai/api-reference/endpoint/chat/c
 [privacy](https://docs.venice.ai/overview/privacy),
 [errors](https://docs.venice.ai/api-reference/error-codes), and
 [rate limits](https://docs.venice.ai/api-reference/rate-limiting).
+
+
+## abliteration.ai
+
+Select `abliteration` with `agenc --provider abliteration` or
+`/provider abliteration`. Set `ABLIT_KEY`, the name abliteration.ai documents,
+or `ABLITERATION_API_KEY`, or save a key in the `/providers` screen. When both
+variables are set, `ABLIT_KEY` wins. Keys look like `ak_...`. abliteration.ai
+has its own BYOK credential record and never reads another provider's key.
+`ABLITERATION_BASE_URL` replaces the default endpoint,
+`https://api.abliteration.ai/v1`. `agenc providers` and first-run setup list
+the provider with its key names.
+
+AgenC uses streaming OpenAI-compatible Chat Completions with its own system
+prompt and tools. The Responses and Anthropic Messages surfaces are not used.
+
+| Model | Context | Max output | Input | Reasoning modes in `/effort` | AgenC default | Price per 1M tokens (input, cached input, output) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `abliterated-model-large-v2` (default) | 1,000,000 | 999,990 | text | low, high, max | high | $3.00, $0.30, $5.00 |
+| `abliterated-model` | 262,144 | 262,134 | text, image | off, minimal, low, medium, high, xhigh, max | none sent (native depth) | $1.00, $0.10, $3.00 |
+| `abliterated-model-large` | 1,000,000 | 999,990 | text | high, max | high | $3.00, $0.30, $5.00 |
+
+All three models reason, stream and call tools, including parallel calls.
+AgenC reserves 65,536 output tokens a call, since reasoning and the answer
+share `max_tokens`. The documented maximum stays available to an explicit
+`max_output_tokens` and to max-output recovery.
+
+### Reasoning effort
+
+Chat Completions takes `reasoning_effort` with any of `none`, `minimal`,
+`low`, `medium`, `high`, `xhigh` and `max` on every model, and runs it at one
+of the modes the model has:
+
+| Requested | `abliterated-model` | `abliterated-model-large-v2` | `abliterated-model-large` |
+| --- | --- | --- | --- |
+| `none` | reasoning off | low, trace hidden | reasoning off |
+| `minimal` | minimal | low | high |
+| `low` | low | low | high |
+| `medium` | medium | high | high |
+| `high` | high | high | high |
+| `xhigh` | xhigh | max | max |
+| `max` | max | max | max |
+| nothing sent | native depth | max | high |
+
+`/effort` lists only the modes a model runs, and AgenC sends only those. A
+saved level the model does not list runs at the model's AgenC default; `xhigh`
+and `max` stand in for each other. `/effort off` is offered on
+`abliterated-model` only. Large v2 cannot turn reasoning off.
+
+The provider runs Large v2 at max when a request names no level. AgenC sends
+high instead. Reasoning tokens bill as output at $5 per million, and every
+tool step of an agent turn pays them again. They also delay the first visible
+token. High is the middle of the three modes. Choose max with `/effort max`
+for the hardest tasks.
+
+The reasoning trace is shown as thinking and never as the answer. The live
+API sends it as `reasoning`; the docs name it `reasoning_content`, and AgenC
+reads either. It is not sent back on later requests.
+
+### Prompt caching
+
+Caching is automatic. Each request carries the session's `prompt_cache_key`,
+a stable opaque value per session, so related requests reach a server that
+holds the cached prefix. Streamed requests set `stream_options.include_usage`,
+and the final chunk reports `usage.prompt_tokens_details.cached_tokens`. Cache
+reads bill at 10% of the input rate, with no cache-write premium. The session
+cost and the status line cache share use these counts. Cache hits are best
+effort: in a live session on 2026-10-22, a later Large v2 request read 1,344
+of its 1,452 prompt tokens from cache, while the request right after the
+session's first one missed. The cache belongs to the project and model, so a
+new session can read a prefix an earlier one wrote.
+
+### Images
+
+Only `abliterated-model` takes images: PNG, JPEG, WebP or GIF up to 12 MB.
+The large models answer 400 to image content, so AgenC refuses an image
+before sending it to them. An image a tool returns, such as a screenshot or
+an image file read, reaches `abliterated-model` as a user image after the tool
+results.
+
+### Model list
+
+With a key, AgenC reads `GET /v1/models` before a session's first request and
+reuses the list for ten minutes. It keeps the models that are available to the
+key's project, not locked, ready, produce text and list `tools`. Their limits,
+image input and prices replace the bundled rows. A model the list leaves out
+is refused before the request, with a message that names it. The bundled rows
+answer when the list cannot be read. The list publishes no effort levels, so a
+model only the live list has runs without an effort control.
+
+### Errors
+
+- 401 is an authentication failure. 402, insufficient credits, is a billing
+  error.
+- 429 is rate limiting, and `Retry-After` is honored. The Free tier allows 4
+  concurrent requests and 60 a minute per key.
+- 403 `policy_violation` means a project policy blocked the request, or the
+  same code ended a streamed reply. The turn ends with a message that says so
+  and names the request ID. It is not retried, since the same input is blocked
+  again.
+- 503 `policy_evaluation_unavailable` means a blocking policy could not be
+  evaluated in time. It is retried like other server errors.
+
+Web search, structured outputs, `policy_ids` and `GET /v1/credits` are not
+used.
+
+Sources: [models](https://docs.abliteration.ai/models),
+[pricing](https://docs.abliteration.ai/pricing),
+[thinking and reasoning effort](https://docs.abliteration.ai/capabilities/thinking),
+[prompt caching](https://docs.abliteration.ai/capabilities/prompt-caching),
+[tool calling](https://docs.abliteration.ai/capabilities/tool-calling/openai-chat-completions),
+[images](https://docs.abliteration.ai/capabilities/images),
+[errors](https://docs.abliteration.ai/api/errors), and
+[rate limits](https://docs.abliteration.ai/api/rate-limits).

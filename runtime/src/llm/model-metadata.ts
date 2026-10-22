@@ -1,4 +1,10 @@
 import { parseVeniceModels, veniceCatalogEntry, veniceModelCosts, type VeniceModel } from "./registry/venice-models.js";
+import {
+  abliterationCatalogEntry,
+  abliterationModelCosts,
+  parseAbliterationModels,
+  type AbliterationModel,
+} from "./registry/abliteration-models.js";
 import { recordPublishedModelCosts } from "./registry/published-model-costs.js";
 import { recordPublishedModelCatalog } from "./registry/published-model-catalog.js";
 import { openRouterCatalogEntry, openRouterRowFromListing } from "./registry/openrouter-models.js";
@@ -198,6 +204,8 @@ export const SHARED_PUBLIC_MODEL_CATALOGS = new PublicModelCatalogCache();
 export class ModelMetadataResolver {
   private veniceResponse?: MetadataJson;
   private veniceModels?: readonly VeniceModel[];
+  private abliterationResponse?: MetadataJson;
+  private abliterationModels?: readonly AbliterationModel[];
   private openRouterListing?: MetadataJson;
   private ollamaCloudTags?: MetadataJson;
   private ollamaCloudListed?: readonly OllamaCloudModelRow[];
@@ -209,7 +217,8 @@ export class ModelMetadataResolver {
   private readonly onWarn?: (msg: string) => void;
   private readonly publicCatalogs?: PublicModelCatalogCache;
   private readonly endpointCatalogs?: EndpointMetadataCache;
-  private readonly veniceCatalogs?: EndpointMetadataCache;
+  /** Model lists read with the session's key (Venice, abliteration.ai). */
+  private readonly keyedListCatalogs?: EndpointMetadataCache;
   private endpointRevision = -1;
   private inFlightJson = new Map<
     string,
@@ -229,7 +238,7 @@ export class ModelMetadataResolver {
     this.onWarn = options.onWarn;
     this.publicCatalogs = options.publicCatalogs;
     this.endpointCatalogs = options.endpointCatalogs;
-    this.veniceCatalogs = options.endpointCatalogs ?? (options.fetchImpl ? endpointMetadataForTransport(options.fetchImpl) : undefined);
+    this.keyedListCatalogs = options.endpointCatalogs ?? (options.fetchImpl ? endpointMetadataForTransport(options.fetchImpl) : undefined);
   }
 
   /** Observe authority changes even when an upper-level model cache has a hit. */
@@ -241,6 +250,8 @@ export class ModelMetadataResolver {
       // maps and must not republish data into this generation.
       this.veniceResponse = undefined;
       this.veniceModels = undefined;
+      this.abliterationResponse = undefined;
+      this.abliterationModels = undefined;
       this.openRouterListing = undefined;
       this.ollamaCloudTags = undefined;
       this.ollamaCloudListed = undefined;
@@ -254,13 +265,20 @@ export class ModelMetadataResolver {
 
   private endpointScope(params: LookupParams): EndpointMetadataScope | undefined {
     const provider = normalizeMetadataProviderIdentity(params.provider);
-    if (provider === "venice") return undefined;
+    // These lists use their own scope (readKeyedModelList); observing the
+    // provider here too would rotate it on every lookup.
+    if (provider === "venice" || provider === "abliteration") return undefined;
     return this.endpointCatalogs?.observe(provider, this.endpointConfiguration(params));
   }
 
   private credentialEnvironment(provider: string): Readonly<Record<string, string | undefined>> {
-    if (provider !== "venice" || this.env.VENICE_API_KEY?.trim()) return this.env;
-    return { ...this.env, VENICE_API_KEY: this.readSavedApiKey?.("venice") };
+    if (provider === "venice" && !this.env.VENICE_API_KEY?.trim()) {
+      return { ...this.env, VENICE_API_KEY: this.readSavedApiKey?.("venice") };
+    }
+    if (provider === "abliteration" && resolveProviderApiKeyEnvironment(provider, this.env) === undefined) {
+      return { ...this.env, ABLIT_KEY: this.readSavedApiKey?.("abliteration") };
+    }
+    return this.env;
   }
 
   private endpointConfiguration(params: LookupParams): unknown {
@@ -319,10 +337,15 @@ export class ModelMetadataResolver {
   }
 
   private async resolveMetadata(params: LookupParams): Promise<ResolvedModelMetadata> {
-    if (normalizeMetadataProviderIdentity(params.provider) === "ollama-cloud") {
+    const metadataProvider = normalizeMetadataProviderIdentity(params.provider);
+    if (metadataProvider === "ollama-cloud" || metadataProvider === "abliteration") {
       // Record the live row first: the catalog lookups below then read it.
       try {
-        await this.discoverOllamaCloudModels(params.config, params.model);
+        if (metadataProvider === "ollama-cloud") {
+          await this.discoverOllamaCloudModels(params.config, params.model);
+        } else {
+          await this.discoverAbliterationModels(params.config);
+        }
       } catch {
         // Best effort, as every other live lookup here.
       }
@@ -455,30 +478,45 @@ export class ModelMetadataResolver {
     return Math.max(this.timeoutMs, LIVE_MODEL_LIST_TIMEOUT_MS);
   }
 
-  async discoverVeniceModels(config: AgenCConfig): Promise<readonly VeniceModel[] | undefined> {
-    const params = { provider: "venice", model: "", config };
-    this.cacheRevision(params);
-    const baseUrl = providerBaseUrl(config, "venice", this.env);
-    const headers = authHeaders("venice", config, this.credentialEnvironment("venice"));
-    // No key or transport: use the bundled catalog without a network request.
-    if (!baseUrl || !headers?.Authorization || !this.veniceCatalogs) return undefined;
-    const cache = this.veniceCatalogs;
-    const configuration = { baseUrl, headers };
-    const scope = cache.observe("venice", configuration);
+  /**
+   * A provider's `GET /models` read with the session's key. Resolvers on one
+   * transport share a successful list for ten minutes; an expired one is
+   * served while it refreshes, and a failed or unusable refresh keeps it.
+   * Undefined without a key or transport, without a network request.
+   */
+  private async readKeyedModelList(
+    provider: "venice" | "abliteration",
+    config: AgenCConfig,
+    timeoutMs: number,
+    usable: (json: MetadataJson | undefined) => boolean,
+  ): Promise<MetadataJson | undefined> {
+    this.cacheRevision({ provider, model: "", config });
+    const baseUrl = providerBaseUrl(config, provider, this.env);
+    const headers = authHeaders(provider, config, this.credentialEnvironment(provider));
+    if (!baseUrl || !headers?.Authorization || !this.keyedListCatalogs) return undefined;
+    const cache = this.keyedListCatalogs;
+    const scope = cache.observe(provider, { baseUrl, headers });
     const url = modelsUrlFromBaseUrl(baseUrl);
     const response = await cache.get(scope, {
-      baseUrl, url, method: "GET", headers, timeoutMs: this.veniceListTimeoutMs,
+      baseUrl, url, method: "GET", headers, timeoutMs,
     }, async () => {
-      const result = await this.fetchJsonUncached(url, { headers, timeoutMs: this.veniceListTimeoutMs });
+      const result = await this.fetchJsonUncached(url, { headers, timeoutMs });
       // A broken/empty list must not discard the last successful limits.
-      return parseVeniceModels(result).length > 0 ? result : undefined;
+      return usable(result) ? result : undefined;
     }, { staleWhileRevalidate: true });
     if (!cache.matchesConfiguration(scope, {
-      baseUrl: providerBaseUrl(config, "venice", this.env),
-      headers: authHeaders("venice", config, this.credentialEnvironment("venice")),
+      baseUrl: providerBaseUrl(config, provider, this.env),
+      headers: authHeaders(provider, config, this.credentialEnvironment(provider)),
     })) {
       throw new Error("Provider metadata configuration changed during discovery; retry with the current configuration");
     }
+    return response;
+  }
+
+  async discoverVeniceModels(config: AgenCConfig): Promise<readonly VeniceModel[] | undefined> {
+    const response = await this.readKeyedModelList(
+      "venice", config, this.veniceListTimeoutMs, result => parseVeniceModels(result).length > 0,
+    );
     if (response === undefined) return undefined;
     if (response !== this.veniceResponse) {
       this.veniceResponse = response;
@@ -494,6 +532,30 @@ export class ModelMetadataResolver {
       );
     }
     return this.veniceModels;
+  }
+
+  /**
+   * abliteration.ai's `GET /v1/models` with the session's key: the models the
+   * key's project can use, with their limits, modalities and prices. Its rows
+   * and prices become the published ones (published-model-catalog,
+   * published-model-costs), so a locked model leaves the catalog.
+   */
+  async discoverAbliterationModels(config: AgenCConfig): Promise<readonly AbliterationModel[] | undefined> {
+    const response = await this.readKeyedModelList(
+      "abliteration", config, this.liveModelListTimeoutMs(), result => parseAbliterationModels(result).length > 0,
+    );
+    if (response === undefined) return undefined;
+    if (response !== this.abliterationResponse) {
+      this.abliterationResponse = response;
+      this.abliterationModels = parseAbliterationModels(response);
+      recordPublishedModelCosts("abliteration", abliterationModelCosts(this.abliterationModels));
+      recordPublishedModelCatalog(
+        "abliteration",
+        this.abliterationModels.map((model, priority) => abliterationCatalogEntry(model, priority)),
+        { replace: true },
+      );
+    }
+    return this.abliterationModels;
   }
 
   private async resolveLiveEndpointMetadata(
@@ -861,11 +923,11 @@ export function hasDynamicProviderModelCatalog(
   provider: string,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-  // Venice's IDs come from its /models list and Ollama Cloud's from its
-  // /api/tags list; the bundled snapshots are only the offline fallback, so
-  // an ID missing from them is not a typo.
+  // Venice's and abliteration.ai's IDs come from their /models lists and
+  // Ollama Cloud's from its /api/tags list; the bundled snapshots are only the
+  // offline fallback, so an ID missing from them is not a typo.
   const identity = normalizeMetadataProviderIdentity(provider);
-  if (identity === "venice" || identity === "ollama-cloud") return true;
+  if (identity === "venice" || identity === "ollama-cloud" || identity === "abliteration") return true;
   return shouldPreferDynamicMetadata({ config, provider, model: "" }, env);
 }
 
@@ -876,8 +938,9 @@ function shouldPreferDynamicMetadata(
   const provider = normalizeMetadataProviderIdentity(params.provider);
   // Z.AI's curated catalog is authoritative even when an operator overrides
   // the API base URL. `/models` remains a credential health probe, but its
-  // list does not replace exact context/output limits here.
-  if (provider === "zai" || provider === "zai-coding-plan" || provider === "ollama-cloud") return false;
+  // list does not replace exact context/output limits here. abliteration.ai's
+  // own list reaches its catalog rows through discovery.
+  if (provider === "zai" || provider === "zai-coding-plan" || provider === "ollama-cloud" || provider === "abliteration") return false;
   return provider === "openrouter" || shouldQueryLiveEndpoint(params, env);
 }
 

@@ -140,6 +140,17 @@ describe("providers screen snapshot", () => {
     expect(readLocalByokCredential(home, "venice")?.apiKey).toBe("fake-venice-stored-key");
     expect(JSON.stringify(readProvidersHubSnapshot(ctx))).not.toContain("fake-venice-stored-key");
   });
+  it("lists abliteration.ai with its key names and saves its own BYOK credential", () => {
+    const { home, environment } = tempHome();
+    const ctx = ctxFor({ home, environment });
+    expect(readProvidersHubSnapshot(ctx).rows.find(row => row.provider === "abliteration"))
+      .toMatchObject({ name: "abliteration.ai", connection: "not-set", envLabel: "ABLIT_KEY or ABLITERATION_API_KEY", model: "abliterated-model-large-v2" });
+    saveProviderKey(home, "abliteration", "ak_fake_stored_key");
+    expect(readProvidersHubSnapshot(ctx).rows.find(row => row.provider === "abliteration"))
+      .toMatchObject({ connection: "connected", keySaved: true });
+    expect(readLocalByokCredential(home, "abliteration")?.apiKey).toBe("ak_fake_stored_key");
+    expect(JSON.stringify(readProvidersHubSnapshot(ctx))).not.toContain("ak_fake_stored_key");
+  });
   it("puts the current provider first, then connected ones, with one plain status each", () => {
     const { home, environment } = tempHome();
     saveProviderKey(home, "deepseek", "sk-deepseek");

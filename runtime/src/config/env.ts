@@ -114,6 +114,9 @@ export interface EnvSnapshot {
   readonly OPENROUTER_BASE_URL?: string;
   readonly VENICE_API_KEY?: string;
   readonly VENICE_BASE_URL?: string;
+  readonly ABLIT_KEY?: string;
+  readonly ABLITERATION_API_KEY?: string;
+  readonly ABLITERATION_BASE_URL?: string;
   readonly GROQ_API_KEY?: string;
   readonly GROQ_BASE_URL?: string;
   readonly DEEPSEEK_API_KEY?: string;

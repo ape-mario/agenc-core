@@ -513,6 +513,17 @@ const PROVIDER_CAPABILITIES: Readonly<Record<string, ProviderCapabilityDefinitio
     acceptsImageHistory: isRegisteredMetaChatModel,
     acceptsReasoningEffort: isRegisteredMetaChatModel,
   },
+  abliteration: {
+    // abliteration.ai lists each model's modalities and features with its
+    // live list; the bundled rows answer until that list has been read. Only
+    // abliterated-model takes images.
+    ...HOSTED_CHAT_COMPATIBLE_CAPABILITIES,
+    supportsImageInput: catalogSeesImages("abliteration"),
+    acceptsImageHistory: catalogSeesImages("abliteration"),
+    supportsExtendedThinking: catalogThinks("abliteration"),
+    acceptsThinkingHistory: catalogThinks("abliteration"),
+    acceptsReasoningEffort: catalogTakesEffort("abliteration"),
+  },
   "ollama-cloud": {
     ...HOSTED_CHAT_COMPATIBLE_CAPABILITIES,
     supportsToolUse: model => catalogRow("ollama-cloud", model)?.supportsToolUse !== false,

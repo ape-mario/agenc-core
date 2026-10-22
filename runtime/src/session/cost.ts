@@ -1,4 +1,5 @@
 import { VENICE_MODELS } from "../llm/registry/venice-models.js";
+import { ABLITERATION_MODELS } from "../llm/registry/abliteration-models.js";
 /**
  * Cost sidecar — session cost tracking + formatting.
  *
@@ -1133,6 +1134,10 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
     ...copilotCostAliases("mai-code-1.1-flash", [0.2, 1.2, 0.02, 0.2]),
     ...copilotCostAliases("kimi-k3", [3, 15, 0.3, 3]),
     ...copilotCostAliases("grok-4.6", [2, 6, 0.5, 2], [4, 12, 1, 4], 200_000),
+    // docs.abliteration.ai/pricing, 2026-10-22: cache reads at 10% of input,
+    // no cache-write premium. A key's live list replaces these
+    // (published-model-costs).
+    ...Object.fromEntries(ABLITERATION_MODELS.flatMap(model => model.cost ? [[`abliteration:${model.model}`, model.cost]] : [])),
     // Groq published per-token prices, checked 2026-09-29.
     ...Object.fromEntries(VENICE_MODELS.flatMap(model => model.cost ? [[`venice:${model.model}`, model.cost]] : [])),
     // https://console.groq.com/docs/models

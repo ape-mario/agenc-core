@@ -112,8 +112,10 @@ function isFundsFailureNode(provider: string, item: Record<string, unknown>): bo
   if (status === 402 && (code === "insufficient_credits" || code === "credits_unavailable")) return true;
   // Meta Model API: 402 is a billing failure (balance or payment method).
   // https://dev.meta.ai/docs/error-handling
+  // abliteration.ai: 402 means insufficient credits.
+  // https://docs.abliteration.ai/api/errors
   if ((provider === "deepseek" || provider === "openrouter" || provider === "agenc" ||
-    provider === "meta") && status === 402) return true;
+    provider === "meta" || provider === "abliteration") && status === 402) return true;
   if (provider === "openai" || provider === "codex" || provider === "chatgpt") {
     if (["insufficient_quota", "credit_balance_exhausted", "organization_usage_limit_exceeded",
       "organization_spend_limit_exceeded", "project_spend_limit_exceeded",
