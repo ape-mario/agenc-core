@@ -531,6 +531,11 @@ export function chatCompletionsCapabilityHintsForProvider(
           // `reasoning_details`); `reasoning_content` is its accepted alias.
           reasoningContentField: "reasoning" as const,
           reasoningContentFallbackField: "reasoning_content" as const,
+          // A model whose OpenRouter row lists image input sees images that
+          // tools return (a screenshot, a PNG read with FileRead), relayed as
+          // a user image the way the other routed providers do; a text-only
+          // model gets a note that the image was left out.
+          toolResultImagePolicy: acceptsToolResultImages ? "relay_as_user" as const : "strip" as const,
           ...(gatewayFamily === "deepseek" ? {
             // DeepSeek's own API: reasoning goes back on later requests, the
             // session tail follows the setup reminders, no
