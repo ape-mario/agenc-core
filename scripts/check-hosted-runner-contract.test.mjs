@@ -124,7 +124,16 @@ function fixtureReleaseIndex() {
 const ROLLOUT_FEED =
   "https://gist.githubusercontent.com/hosted-runners-images-bot/79267492faab096d04cdd25ce7014cec/raw/";
 
-function fixtureFetch(toolchain, releases = fixtureReleaseIndex(), rolloutFeeds = {}) {
+const RELEASE_INDEX_PAGE =
+  /^https:\/\/api\.github\.com\/repos\/actions\/runner-images\/releases\?per_page=100&page=(\d+)$/u;
+
+/**
+ * `releases` is the first index page; `laterPages` are pages 2, 3 and so on.
+ * Requested index pages are recorded in `fetch.indexPages`.
+ */
+function fixtureFetch(toolchain, releases = fixtureReleaseIndex(), rolloutFeeds = {}, laterPages = []) {
+  const pages = [releases, ...laterPages];
+  const indexPages = [];
   const bodies = new Map();
   for (const [file, text] of Object.entries(rolloutFeeds)) {
     bodies.set(`${ROLLOUT_FEED}${file}`, text);
@@ -137,12 +146,11 @@ function fixtureFetch(toolchain, releases = fixtureReleaseIndex(), rolloutFeeds 
       bodies.set(profile.inventoryUrl, text);
     }
   }
-  return async (url) => {
-    if (
-      url ===
-      "https://api.github.com/repos/actions/runner-images/releases?per_page=100&page=1"
-    ) {
-      const text = JSON.stringify(releases);
+  const fetchImpl = async (url) => {
+    const page = RELEASE_INDEX_PAGE.exec(url)?.[1];
+    if (page !== undefined) {
+      indexPages.push(Number(page));
+      const text = JSON.stringify(pages[Number(page) - 1] ?? []);
       return new Response(text, {
         status: 200,
         headers: { "Content-Length": String(Buffer.byteLength(text)) },
@@ -155,6 +163,18 @@ function fixtureFetch(toolchain, releases = fixtureReleaseIndex(), rolloutFeeds 
       headers: { "Content-Length": String(Buffer.byteLength(text)) },
     });
   };
+  fetchImpl.indexPages = indexPages;
+  return fetchImpl;
+}
+
+/** Stable releases of images no target uses, to fill an index page. */
+function otherImageReleases(count, from = 0) {
+  return Array.from({ length: count }, (_, index) => ({
+    tag_name: `ubuntu24/20260901.${String(from + index).padStart(3, "0")}`,
+    draft: false,
+    prerelease: false,
+    target_commitish: COMMIT,
+  }));
 }
 
 test("verifies every commit-pinned inventory and its parsed toolchain facts", async () => {
@@ -330,4 +350,77 @@ test("fails closed when the rollout feed is unreadable or names an unknown versi
       /darwin-x64 is missing active official runner image 20260803\.0400\.\*/u,
     );
   }
+});
+
+// GitHub lists runner-images releases newest first, 100 to a page. On
+// 2026-10-22 the stable macos-15 Intel release (2026-08-24) was on page 2.
+test("reads later index pages until every target has a stable release", async () => {
+  const toolchain = fixtureToolchain();
+  const [arm64, intel, windows] = fixtureReleaseIndex();
+  const firstPage = [arm64, windows, ...otherImageReleases(98)];
+  const fetchImpl = fixtureFetch(toolchain, firstPage, {}, [
+    [...otherImageReleases(50, 98), intel, ...otherImageReleases(49, 148)],
+    otherImageReleases(100, 197),
+  ]);
+  const verified = await verifyHostedRunnerInventories({ toolchain, fetchImpl });
+  assert.deepEqual(
+    verified.map(({ target }) => target),
+    ["darwin-arm64", "darwin-x64", "win-x64"],
+  );
+  assert.deepEqual(fetchImpl.indexPages, [1, 2]);
+});
+
+test("stops at the page budget when a target has no stable release", async () => {
+  const toolchain = fixtureToolchain();
+  const [arm64, , windows] = fixtureReleaseIndex();
+  const pages = Array.from({ length: 11 }, (_, index) => otherImageReleases(100, index * 100));
+  const fetchImpl = fixtureFetch(toolchain, [arm64, windows, ...otherImageReleases(98, 5000)], {}, pages);
+  await assert.rejects(
+    verifyHostedRunnerInventories({ toolchain, fetchImpl }),
+    /official runner release index has no stable macos-15\/ release/u,
+  );
+  assert.deepEqual(fetchImpl.indexPages, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+});
+
+test("stops at a short last page", async () => {
+  const toolchain = fixtureToolchain();
+  const [arm64, , windows] = fixtureReleaseIndex();
+  const fetchImpl = fixtureFetch(toolchain, [arm64, windows, ...otherImageReleases(98)], {}, [
+    otherImageReleases(7, 98),
+  ]);
+  await assert.rejects(
+    verifyHostedRunnerInventories({ toolchain, fetchImpl }),
+    /official runner release index has no stable macos-15\/ release/u,
+  );
+  assert.deepEqual(fetchImpl.indexPages, [1, 2]);
+});
+
+test("drops a release that moved to the next page while the pages were read", async () => {
+  const toolchain = fixtureToolchain();
+  const [arm64, intel, windows] = fixtureReleaseIndex();
+  const firstPage = [arm64, windows, ...otherImageReleases(98)];
+  const shifted = { ...firstPage.at(-1) };
+  const fetchImpl = fixtureFetch(toolchain, firstPage, {}, [[shifted, intel]]);
+  const verified = await verifyHostedRunnerInventories({ toolchain, fetchImpl });
+  assert.equal(verified.length, 3);
+});
+
+test("still rejects a release repeated on one page or changed on the next", async () => {
+  const toolchain = fixtureToolchain();
+  const [arm64, intel, windows] = fixtureReleaseIndex();
+  await assert.rejects(
+    verifyHostedRunnerInventories({
+      toolchain,
+      fetchImpl: fixtureFetch(toolchain, [arm64, arm64, intel, windows]),
+    }),
+    /official runner release index duplicated macos-15-arm64\/20260727\.0256/u,
+  );
+  const firstPage = [arm64, windows, ...otherImageReleases(98)];
+  await assert.rejects(
+    verifyHostedRunnerInventories({
+      toolchain,
+      fetchImpl: fixtureFetch(toolchain, firstPage, {}, [[{ ...arm64, prerelease: true }, intel]]),
+    }),
+    /official runner release index duplicated macos-15-arm64\/20260727\.0256/u,
+  );
 });
