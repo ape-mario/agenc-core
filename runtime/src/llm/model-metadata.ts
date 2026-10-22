@@ -42,6 +42,7 @@ import {
   OPENAI_COMPATIBLE_FALLBACK_CONTEXT_WINDOW,
 } from "./openai-compatible-token-limits.js";
 import { OLLAMA_CLOUD_BASE_URL } from "./registry/ollama-cloud-models.js";
+import { ollamaRuntimeContextWindow } from "./providers/ollama/context-window.js";
 import { asRecord } from "../utils/record.js";
 import { fetchProviderRequest } from "./credential-redirect-fetch.js";
 
@@ -606,7 +607,13 @@ export class ModelMetadataResolver {
       ...(headers !== undefined ? { headers } : {}),
       jsonBody: { model: params.model },
     });
-    return metadataFromOllamaShowResponse(response);
+    const shown = metadataFromOllamaShowResponse(response);
+    // A local model runs at the window Core sends it (num_ctx), not at its
+    // trained length: admit against the same number the adapter sends.
+    if (normalizeMetadataProviderIdentity(params.provider) === "ollama" && shown?.contextWindow !== undefined) {
+      return { ...shown, contextWindow: ollamaRuntimeContextWindow(shown.contextWindow) ?? shown.contextWindow };
+    }
+    return shown;
   }
 
   private async fetchEndpointJson(

@@ -564,6 +564,31 @@ describe("providers/ollama entrypoint", () => {
     expect(list).toHaveBeenCalledTimes(1);
   });
 
+  test.each([
+    [131_072, undefined, 32_768],
+    [8_192, undefined, 8_192],
+    [131_072, 65_536, 65_536],
+    [undefined, undefined, undefined],
+  ] as const)("sends num_ctx (trained %s, configured %s) = %s", async (trained, configured, expected) => {
+    // Without num_ctx Ollama runs at its own default (4,096 on most laptops)
+    // while Core plans against a larger window: the oldest messages vanish.
+    const chat = vi.fn().mockResolvedValue({
+      message: { role: "assistant", content: "ok" }, done: true, done_reason: "stop",
+      prompt_eval_count: 10, eval_count: 2,
+    });
+    const show = vi.fn().mockResolvedValue({
+      capabilities: ["completion", "tools"],
+      ...(trained !== undefined ? { model_info: { "gptoss.context_length": trained } } : {}),
+    });
+    const provider = new OllamaProvider({ model: "gpt-oss:20b", ...(configured !== undefined ? { numCtx: configured } : {}) });
+    setClient(provider, { chat, show });
+
+    await provider.chat([{ role: "user", content: "hello" }]);
+
+    const options = (chat.mock.calls[0]?.[0] as { options?: Record<string, unknown> }).options ?? {};
+    expect(options.num_ctx).toBe(expected);
+  });
+
   test("maps refused local connections to a useful Ollama error", async () => {
     const refused = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1"), {
       code: "ECONNREFUSED",

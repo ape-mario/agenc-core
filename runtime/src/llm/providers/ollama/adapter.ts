@@ -8,6 +8,7 @@
  */
 
 import { observeInitialHttpResponse, withInitialHttpRejection } from "../../initial-http-rejection.js";
+import { ollamaRuntimeContextWindow, ollamaTrainedContextLength } from "./context-window.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import type {
@@ -122,6 +123,8 @@ interface OllamaCapabilityProfile {
   readonly mode: "native" | "text";
   /** Only explicit model metadata can remove incompatible tool-result images. */
   readonly toolResultImagePolicy?: "strip";
+  /** The model's trained context length from `/api/show`, when it reports one. */
+  readonly trainedContextLength?: number;
 }
 
 function collectParamDiagnostics(
@@ -606,6 +609,7 @@ export class OllamaProvider implements LLMProvider {
     toolsFingerprint: string;
     mode: "native" | "text";
     toolResultImagePolicy?: "strip";
+    trainedContextLength?: number;
     names: ReturnType<typeof createOllamaToolNameProjection>;
   }>();
 
@@ -1106,11 +1110,13 @@ export class OllamaProvider implements LLMProvider {
         // Missing, malformed, or unknown metadata is not proof tools are unsupported.
         if (!Array.isArray(capabilities) || !capabilities.every((item) => typeof item === "string") ||
           !capabilities.includes("completion")) return { mode: "native" };
+        const trainedContextLength = ollamaTrainedContextLength(metadata);
         return {
           mode: capabilities.includes("tools") &&
             !ollamaTemplateRequiresTextTools(isRecord(metadata) ? metadata.template : undefined)
             ? "native" : "text",
           ...(!capabilities.includes("vision") ? { toolResultImagePolicy: "strip" as const } : {}),
+          ...(trainedContextLength !== undefined ? { trainedContextLength } : {}),
         };
       } catch {
         return { mode: "native" };
@@ -1227,7 +1233,11 @@ export class OllamaProvider implements LLMProvider {
       modelOptions.num_predict = Math.floor(
         (options?.maxOutputTokens ?? this.config.maxTokens)!,
       );
-    if (this.config.numCtx !== undefined) modelOptions.num_ctx = this.config.numCtx;
+    // One num_ctx per model, the same number admission uses: the configured
+    // window, else the default capped at the model's trained length. Without
+    // it Ollama runs at its own small default and drops the oldest messages.
+    const numCtx = this.config.numCtx ?? ollamaRuntimeContextWindow(execution.trainedContextLength);
+    if (numCtx !== undefined) modelOptions.num_ctx = numCtx;
     if (this.config.numGpu !== undefined) modelOptions.num_gpu = this.config.numGpu;
     if (options?.stopSequences !== undefined && options.stopSequences.length > 0) {
       modelOptions.stop = [...options.stopSequences];
