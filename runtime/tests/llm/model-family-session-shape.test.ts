@@ -37,11 +37,12 @@ describe("DeepSeek per-call output default through gateways", () => {
     expect(resolved.maxOutputTokensCappedDefault).toBe(false);
   });
 
-  test("models outside the family keep their route's default", () => {
+  test("other OpenRouter families use the bounded gateway default", () => {
     const glm = new ModelMetadataResolver({ env: {} }).resolveSync({ provider: "ollama-cloud", model: "glm-5.3", config: EMPTY_CONFIG });
     expect(glm.maxOutputTokens).toBe(16_384);
     const luna = new ModelMetadataResolver({ env: {} }).resolveSync({ provider: "openrouter", model: "openai/gpt-6-luna", config: EMPTY_CONFIG });
-    expect(luna.maxOutputTokens).toBe(128_000);
+    expect(luna.maxOutputTokens).toBe(32_000);
+    expect(luna.maxOutputTokensUpperLimit).toBe(128_000);
   });
 });
 

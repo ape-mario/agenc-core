@@ -1,5 +1,5 @@
 /**
- * OpenRouter's refusal when its data policy leaves no endpoint for a model.
+ * OpenRouter's pre-generation refusals when routing leaves no endpoint.
  *
  * With `provider.zdr = true` (AgenC's default) a model that has no
  * zero-data-retention endpoint is refused before anything is generated. The
@@ -26,24 +26,31 @@ function bodyText(body: unknown): string {
   }
 }
 
-export type OpenRouterDataPolicyRefusal = "zero-data-retention" | "other";
+export type OpenRouterRoutingRefusal = "zero-data-retention" | "other" | "unsupported-parameters";
 
-/** Which data policy refused the request, or undefined for any other failure. */
-export function readOpenRouterDataPolicyRefusal(args: {
+/** Which routing constraint refused the request, or undefined for another failure. */
+export function readOpenRouterRoutingRefusal(args: {
   readonly providerName: string;
   readonly status: number;
   readonly message: string;
   readonly body: unknown;
-}): OpenRouterDataPolicyRefusal | undefined {
+}): OpenRouterRoutingRefusal | undefined {
   if (args.providerName !== "openrouter" || args.status !== 404) return undefined;
   const text = `${args.message}\n${bodyText(args.body)}`;
+  if (/no endpoints found that can handle the requested parameters/iu.test(text)) {
+    return "unsupported-parameters";
+  }
   if (!DATA_POLICY_MESSAGE.test(text) && !/"failed_routing_step"\s*:\s*"Filter by Data Policy"/u.test(text)) {
     return undefined;
   }
   return ZERO_RETENTION_POLICY.test(text) ? "zero-data-retention" : "other";
 }
 
-export function openRouterDataPolicyErrorMessage(refusal: OpenRouterDataPolicyRefusal): string {
+export function openRouterRoutingErrorMessage(refusal: OpenRouterRoutingRefusal): string {
+  if (refusal === "unsupported-parameters") {
+    return "OpenRouter has no endpoint that supports the requested parameters under the current routing policy. " +
+      "The request was refused before generation; choose another model with compatible tool and reasoning support.";
+  }
   return refusal === "zero-data-retention"
     ? [
         "OpenRouter has no zero-data-retention endpoint for this model, so it refused the request.",

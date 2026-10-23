@@ -40,7 +40,7 @@ describe("gateway hints follow the model family", () => {
       promptCacheKeyFields: ["prompt_cache_key"], promptCacheKeyScope: "prefix",
       reasoningEffortEnvelope: "openrouter", reportsUsageCost: true,
     });
-    expect(hints.replaysReasoningDetails).toBeUndefined();
+    expect(hints.replaysReasoningDetails).toBe(true);
   });
 
   test("OpenRouter GPT: reasoning_details replayed, the session's prompt_cache_key", () => {
@@ -50,13 +50,14 @@ describe("gateway hints follow the model family", () => {
       promptCacheKeyFields: ["prompt_cache_key"],
     });
     expect(hints.promptCacheKeyScope).toBeUndefined();
-    expect(hints.acceptsParallelToolCalls).toBeUndefined();
+    expect(hints.acceptsParallelToolCalls).toBe(false);
     expect(hints.sharesPromptPrefixAcrossSessions).toBeUndefined();
   });
 
-  test("OpenRouter models of other families only gain the reasoning display", () => {
+  test("OpenRouter models of other families also replay gateway reasoning", () => {
     const hints = chatCompletionsCapabilityHintsForProvider("openrouter", "z-ai/glm-5.3");
-    expect(hints.replaysReasoningContent).toBeUndefined();
+    expect(hints.replaysReasoningContent).toBe(true);
+    expect(hints.replaysReasoningDetails).toBe(true);
     expect(hints.reasoningContentField).toBe("reasoning");
     expect(hints.promptCacheKeyFields).toBeUndefined();
   });
@@ -198,7 +199,7 @@ describe("gateway request shape", () => {
     expect(assistant.reasoning).toBeUndefined();
     expect(body.session_id).toBeUndefined();
     expect(body.prompt_cache_key).toBe("conv-abc");
-    expect(body.parallel_tool_calls).toBe(true);
+    expect(body).not.toHaveProperty("parallel_tool_calls");
   });
 
   describe("OpenRouter prompt caching for models that cache only on request", () => {

@@ -531,6 +531,10 @@ export function chatCompletionsCapabilityHintsForProvider(
           // `reasoning_details`); `reasoning_content` is its accepted alias.
           reasoningContentField: "reasoning" as const,
           reasoningContentFallbackField: "reasoning_content" as const,
+          // Reasoning replay is a gateway contract across all model families.
+          // Prefer the original structured items, with plaintext as a fallback.
+          replaysReasoningContent: true,
+          replaysReasoningDetails: true,
           // A model whose OpenRouter row lists image input sees images that
           // tools return (a screenshot, a PNG read with FileRead), relayed as
           // a user image the way the other routed providers do; a text-only
@@ -542,7 +546,6 @@ export function chatCompletionsCapabilityHintsForProvider(
             // parallel_tool_calls field is sent (the model emits several
             // calls on its own), and sessions share the cached prefix: one
             // prompt_cache_key per model and leading system message.
-            replaysReasoningContent: true,
             acceptsParallelToolCalls: false,
             sharesPromptPrefixAcrossSessions: true,
             promptCacheKeyFields: ["prompt_cache_key"] as const,
@@ -554,16 +557,12 @@ export function chatCompletionsCapabilityHintsForProvider(
             // OpenRouter they arrive in reasoning_details. The cache key is
             // the session's own, as on OpenAI's API, which separates cache
             // reuse by key.
-            replaysReasoningContent: true,
-            replaysReasoningDetails: true,
             promptCacheKeyFields: ["prompt_cache_key"] as const,
           } : {}),
-          // OpenRouter's parameter lists often leave out parallel_tool_calls
-          // although the upstreams take it and default to parallel calls, so
-          // Core sent false to most models (Claude, Gemini, Grok, Qwen) and
-          // they read files one at a time. Leave the field to the upstream
-          // default; GPT models keep the explicit true they get on OpenAI.
-          ...(gatewayFamily !== "openai" ? { acceptsParallelToolCalls: false } : {}),
+          // OpenRouter's routing contract is narrower than the upstream API.
+          // Sending this unadvertised optional control excludes GPT endpoints
+          // under require_parameters. Omission leaves their parallel default.
+          acceptsParallelToolCalls: false,
         }
       : {}),
     ...(slug === "openai" ? { gatesTemperatureOnOpenAiReasoning: true } : {}),
