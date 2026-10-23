@@ -43,6 +43,7 @@ import {
 } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
+import { syncDirectory } from "../utils/durable-atomic-file.js";
 import { collectShellWorkspaceMutationTargets } from "../llm/shell-write-policy.js";
 import { monotonicMs } from "./_deps/utils.js";
 import { DegradedStore } from "./degraded-store.js";
@@ -345,8 +346,7 @@ export class FileHistory {
         await handle.sync();
       } finally { await handle.close(); }
       await rename(tmp, this.statePath);
-      const directory = await open(this.historyDir, "r");
-      try { await directory.sync(); } finally { await directory.close(); }
+      await syncDirectory(this.historyDir);
     } finally { await rm(tmp, { force: true }); }
   }
 

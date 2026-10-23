@@ -178,7 +178,7 @@ function throwDurableAtomicFileErrors(
   }
 }
 
-function syncDirectorySync(path: string): void {
+export function syncDirectorySync(path: string): void {
   let descriptor: number | undefined;
   let primaryError: unknown;
   let hasPrimaryError = false;
@@ -226,16 +226,19 @@ export async function syncDirectory(path: string): Promise<void> {
   throwDurableAtomicFileErrors(hasPrimaryError, primaryError, cleanupErrors);
 }
 
+// Only Windows lacks portable directory fsync. Never hide POSIX failures or
+// Windows I/O and capacity errors. File fsync must not use this exception.
 /** @internal Exported for the cross-platform durability contract test. */
 export function isUnsupportedDirectorySync(
   error: unknown,
   platform: NodeJS.Platform = process.platform,
 ): boolean {
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
-  if (code === "EINVAL" || code === "ENOTSUP") return true;
   return (
     platform === "win32" &&
-    (code === "EACCES" ||
+    (code === "EINVAL" ||
+      code === "ENOTSUP" ||
+      code === "EACCES" ||
       code === "EBADF" ||
       code === "EISDIR" ||
       code === "EPERM")
