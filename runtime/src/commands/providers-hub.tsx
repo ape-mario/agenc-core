@@ -1,3 +1,5 @@
+import { openRouterMenuCatalog } from "./openrouter-menu-models.js";
+import { OPENROUTER_CATALOG_FALLBACK_NOTE } from "../llm/registry/openrouter-live-catalog.js";
 import React from "react";
 import type { ProviderSlug } from "../config/provider-model-authority.js";
 import TextInput from "../tui/components/TextInput.js";
@@ -48,10 +50,8 @@ import {
   ensureOpenRouterZdrEndpoints,
   OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE,
 } from "./live-model-catalog.js";
-import { openRouterZdrEndpointsKnown } from "../llm/registry/openrouter-zdr-endpoints.js";
 import {
   OPENROUTER_ZDR_OFF_HINT,
-  openRouterZeroDataRetentionEnabled,
 } from "../llm/zero-data-retention.js";
 import {
   loadOllamaMenuModels,
@@ -285,7 +285,9 @@ function ModelsView({
   const searching = query.length > 0;
   const highlighted = shown[activeIndex];
   const details = [
-    ...(note === undefined ? [] : [note]),
+    ...(highlighted?.kind === "model" && highlighted.row.catalogDetail ? [highlighted.row.catalogDetail] : []),
+    ...(highlighted?.kind === "model" && highlighted.row.tags?.includes("no tools")
+      ? ["Agent tools will not work with this model."] : []),
     ...(highlighted?.kind === "model" && highlighted.row.zdrUnavailable === true
       ? [OPENROUTER_NO_ZDR_DETAIL]
       : []),
@@ -298,8 +300,11 @@ function ModelsView({
       headerRight={busy ? "working" : loading ? "loading models" : undefined}
       closeHint={searching ? "esc to clear search" : "esc to go back"}
       hint={notice?.text}
-      {...(details.length === 0 ? {} : {
-        detail: <ThemedText color="warning" wrap="wrap">{details.join(" ")}</ThemedText>,
+      {...(details.length === 0 && note === undefined ? {} : {
+        detail: <Box flexDirection="column">
+          {note === undefined ? null : <ThemedText color="subtle" wrap="truncate-end">{note}</ThemedText>}
+          {details.length === 0 ? null : <ThemedText color="subtle" wrap="wrap">{details.join(" ")}</ThemedText>}
+        </Box>,
       })}
       {...(searching || models > SEARCH_LINE_MIN_MODELS ? { lead: <SearchLine query={query} /> } : {})}
       columns={MODEL_COLUMNS}
@@ -914,6 +919,10 @@ export function ProvidersHubView({
       run(async () => {
         const result = await services.choose(view.row.provider, entry.row.model);
         if (result.ok) {
+          if (entry.row.tags?.includes("no tools")) {
+            setNotice({ text: "Model selected. Agent tools will not work with this model.", failed: false });
+            return;
+          }
           onDone();
           return;
         }
@@ -1058,12 +1067,13 @@ function servicesFor(ctx: SlashCommandContext): ProvidersHubServices {
         );
       }
       if (provider === "openrouter") {
-        // Models without a zero-retention endpoint are marked once the list is read.
-        if (!openRouterZeroDataRetentionEnabled(readCommandConfig(ctx)) || openRouterZdrEndpointsKnown()) return null;
-        return ensureOpenRouterZdrEndpoints(ctx).then(
-          (known) => known ? {} : { note: OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE },
-          () => ({ note: OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE }),
-        );
+        return Promise.all([
+          openRouterMenuCatalog(ctx).refresh(),
+          ensureOpenRouterZdrEndpoints(ctx),
+        ]).then(([catalog, zdrKnown]) => ({
+          ...(catalog.source === "bundled" ? { note: OPENROUTER_CATALOG_FALLBACK_NOTE }
+            : !zdrKnown ? { note: OPENROUTER_ZDR_LIST_UNAVAILABLE_NOTE } : {}),
+        }));
       }
       return provider !== "venice" || readVeniceMenuModels(ctx) !== undefined
         ? null

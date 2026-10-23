@@ -1,3 +1,4 @@
+import { openRouterMenuCatalog } from "./openrouter-menu-models.js";
 /**
  * The provider's own model rows for the TUI process.
  *
@@ -85,7 +86,11 @@ export async function ensureLiveModelCatalog(
     await loadOllamaMenuModels(ctx, options);
     return;
   }
-  if (provider !== "venice" && provider !== "ollama-cloud" && provider !== "openrouter") return;
+  if (provider === "openrouter") {
+    await Promise.all([openRouterMenuCatalog(ctx, options).refresh(), ensureOpenRouterZdrEndpoints(ctx, options)]);
+    return;
+  }
+  if (provider !== "venice" && provider !== "ollama-cloud") return;
   const key = `${provider}\n${provider === "ollama-cloud" ? model : ""}`;
   const at = fresh.get(key);
   if (at !== undefined && Date.now() - at < REUSE_MS) return;
@@ -96,12 +101,7 @@ export async function ensureLiveModelCatalog(
       return;
     }
     const resolver = resolverFor(ctx, options.fetchImpl);
-    const found = provider === "ollama-cloud"
-      ? (await resolver.discoverOllamaCloudModels(readCommandConfig(ctx) ?? {}, model)) !== undefined
-      : (await Promise.all([
-          resolver.discoverOpenRouterModels(),
-          ensureOpenRouterZdrEndpoints(ctx, options),
-        ])).every(Boolean);
+    const found = (await resolver.discoverOllamaCloudModels(readCommandConfig(ctx) ?? {}, model)) !== undefined;
     if (found) fresh.set(key, Date.now());
   } catch {
     // The bundled catalog answers while the provider's list cannot be read.

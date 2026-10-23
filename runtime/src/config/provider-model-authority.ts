@@ -1,3 +1,4 @@
+import { publishedModelCatalogEntries } from "../llm/registry/published-model-catalog.js";
 import {
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
@@ -53,6 +54,9 @@ export function buildProviderModelCatalog(
       [...models],
     ]),
   );
+
+  const openrouter = publishedModelCatalogEntries("openrouter");
+  if (openrouter !== undefined) catalog.openrouter = openrouter.map(entry => entry.model);
 
   if (config?.providers) {
     for (const [provider, providerConfig] of Object.entries(config.providers)) {
@@ -393,7 +397,9 @@ export function resolveProviderModelLayer(
       const defaultModel =
         configuredModel ||
         combined.providers?.[provider]?.default_model?.trim() ||
-        BUILT_IN_PROVIDER_DEFAULT_MODELS[provider];
+        (provider === "openrouter" && !catalog[provider]?.includes(BUILT_IN_PROVIDER_DEFAULT_MODELS[provider])
+          ? catalog[provider]?.[0] ?? BUILT_IN_PROVIDER_DEFAULT_MODELS[provider]
+          : BUILT_IN_PROVIDER_DEFAULT_MODELS[provider]);
       selection = resolveExplicitPair(provider, defaultModel, catalog, combined);
     }
   } else if (hasModel) {

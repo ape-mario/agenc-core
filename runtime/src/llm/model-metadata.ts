@@ -7,7 +7,7 @@ import {
 } from "./registry/abliteration-models.js";
 import { recordPublishedModelCosts } from "./registry/published-model-costs.js";
 import { recordPublishedModelCatalog, recordPublishedModelDetail } from "./registry/published-model-catalog.js";
-import { openRouterCatalogEntry, openRouterRowFromListing } from "./registry/openrouter-models.js";
+import { OpenRouterCatalog, openRouterCatalogFor, type OpenRouterCatalogSnapshot } from "./registry/openrouter-live-catalog.js";
 import {
   OPENROUTER_ZDR_ENDPOINTS_URL,
   recordOpenRouterZdrEndpoints,
@@ -64,7 +64,6 @@ const LIVE_MODEL_LIST_TIMEOUT_MS = 5_000;
 const MODELS_DEV_API_URL = "https://models.dev/api.json";
 const LITELLM_MODEL_MAP_URL =
   "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
-const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 
 const LIVE_METADATA_PROVIDERS = new Set([
   "grok",
@@ -102,6 +101,7 @@ export interface ResolvedModelMetadata {
 
 export interface ModelMetadataResolverOptions {
   readonly fetchImpl?: typeof fetch;
+  readonly catalogHome?: string;
   readonly readSavedApiKey?: (provider: string) => string | undefined;
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly timeoutMs?: number;
@@ -211,7 +211,8 @@ export class ModelMetadataResolver {
   private veniceModels?: readonly VeniceModel[];
   private abliterationResponse?: MetadataJson;
   private abliterationModels?: readonly AbliterationModel[];
-  private openRouterListing?: MetadataJson;
+  private openRouterCatalog?: OpenRouterCatalog;
+  private readonly catalogHome?: string;
   private ollamaCloudTags?: MetadataJson;
   private ollamaCloudListed?: readonly OllamaCloudModelRow[];
   private readonly ollamaCloudShown = new Map<string, OllamaCloudModelRow>();
@@ -236,6 +237,7 @@ export class ModelMetadataResolver {
 
   constructor(options: ModelMetadataResolverOptions = {}) {
     this.fetchImpl = options.fetchImpl;
+    this.catalogHome = options.catalogHome ?? options.env?.AGENC_HOME;
     this.readSavedApiKey = options.readSavedApiKey;
     this.env = options.env ?? process.env;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_METADATA_TIMEOUT_MS;
@@ -257,7 +259,7 @@ export class ModelMetadataResolver {
       this.veniceModels = undefined;
       this.abliterationResponse = undefined;
       this.abliterationModels = undefined;
-      this.openRouterListing = undefined;
+      this.openRouterCatalog = undefined;
       this.ollamaCloudTags = undefined;
       this.ollamaCloudListed = undefined;
       this.ollamaCloudShown.clear();
@@ -277,6 +279,9 @@ export class ModelMetadataResolver {
   }
 
   private credentialEnvironment(provider: string): Readonly<Record<string, string | undefined>> {
+    if (provider === "openrouter" && !this.env.OPENROUTER_API_KEY?.trim()) {
+      return { ...this.env, OPENROUTER_API_KEY: this.readSavedApiKey?.("openrouter") };
+    }
     if (provider === "venice" && !this.env.VENICE_API_KEY?.trim()) {
       return { ...this.env, VENICE_API_KEY: this.readSavedApiKey?.("venice") };
     }
@@ -297,6 +302,7 @@ export class ModelMetadataResolver {
   }
 
   resolveSync(params: LookupParams): ResolvedModelMetadata {
+    if (normalizeMetadataProviderIdentity(params.provider) === "openrouter") this.openRouterCatalogForSession().read();
     const explicit = readExplicitConfigMetadata(params);
     const veniceModel = normalizeMetadataProviderIdentity(params.provider) === "venice"
       ? this.veniceModels?.find(entry => entry.model === params.model) : undefined;
@@ -646,16 +652,27 @@ export class ModelMetadataResolver {
     params: LookupParams,
   ): Promise<ModelMetadataValues | undefined> {
     if (normalizeMetadataProviderIdentity(params.provider) !== "openrouter") return undefined;
-    const response = await this.fetchJson(OPENROUTER_MODELS_URL);
-    this.recordOpenRouterListing(response);
-    return metadataFromOpenAiModelsResponse(response, params.model);
+    await this.discoverOpenRouterModels();
+    return inferBuiltInMetadata(params.provider, params.model);
   }
 
-  /** Read OpenRouter's public list and record its rows (see below). */
+  private openRouterCatalogForSession(): OpenRouterCatalog {
+    const apiKey = resolveProviderApiKeyEnvironment("openrouter", this.credentialEnvironment("openrouter"))?.value;
+    if (this.openRouterCatalog === undefined) {
+      const options = { home: this.catalogHome, apiKey, fetchImpl: this.fetchImpl, timeoutMs: this.liveModelListTimeoutMs() };
+      this.openRouterCatalog = this.fetchImpl === undefined ? openRouterCatalogFor(options) : new OpenRouterCatalog(options);
+    }
+    return this.openRouterCatalog;
+  }
+
+  /** Read cached rows without waiting for the network. */
+  readOpenRouterCatalog(): OpenRouterCatalogSnapshot {
+    return this.openRouterCatalogForSession().read();
+  }
+
+  /** The shared catalog handles TTL, disk persistence and published capability/price rows. */
   async discoverOpenRouterModels(): Promise<boolean> {
-    const response = await this.fetchJson(OPENROUTER_MODELS_URL, { timeoutMs: this.liveModelListTimeoutMs() });
-    this.recordOpenRouterListing(response);
-    return response !== undefined;
+    return (await this.openRouterCatalogForSession().refresh()).source !== "bundled";
   }
 
   /**
@@ -666,30 +683,6 @@ export class ModelMetadataResolver {
   async discoverOpenRouterZdrEndpoints(): Promise<boolean> {
     const response = await this.fetchJson(OPENROUTER_ZDR_ENDPOINTS_URL, { timeoutMs: this.liveModelListTimeoutMs() });
     return recordOpenRouterZdrEndpoints(response);
-  }
-
-  /**
-   * OpenRouter's public list carries each model's input modalities,
-   * parameters (tools, reasoning) and effort levels. Record them so a model
-   * the bundled snapshot does not know, or knows from an older list, gets
-   * its current capabilities.
-   */
-  private recordOpenRouterListing(response: MetadataJson | undefined): void {
-    if (response === undefined || response === this.openRouterListing) return;
-    const data = asRecord(response)?.data;
-    if (!Array.isArray(data)) return;
-    this.openRouterListing = response;
-    const today = new Date().toISOString().slice(0, 10);
-    const rows = data.flatMap((value) => {
-      const row = openRouterRowFromListing(value, today);
-      return row === undefined ? [] : [row];
-    });
-    if (rows.length === 0) return;
-    recordPublishedModelCatalog(
-      "openrouter",
-      rows.map((row, index) => openRouterCatalogEntry(row, index)),
-      { replace: true },
-    );
   }
 
   /**

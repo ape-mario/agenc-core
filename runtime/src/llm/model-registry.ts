@@ -165,7 +165,7 @@ function resolveCostEntry(params: {
   );
   return {
     entry: match === null || match.entry.costEstimated ? conservativeModelCost(params.registry) : match.entry,
-    known: match !== null && match.entry.costEstimated !== true,
+    known: match !== null && match.entry.costEstimated !== true && match.entry.catalogEstimate !== true,
     ...(match ? { matchedKey: match.key } : {}),
   };
 }

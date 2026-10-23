@@ -1,4 +1,7 @@
 import { OpenAIProvider } from "../../src/llm/providers/openai/adapter.js";
+import { OpenRouterCatalog } from "../../src/llm/registry/openrouter-live-catalog.js";
+import { clearPublishedModelCatalog } from "../../src/llm/registry/published-model-catalog.js";
+import { recordPublishedModelCosts } from "../../src/llm/registry/published-model-costs.js";
 import { withOneShotFastMode } from "../../src/one-shot-fast-mode.js";
 import { tokenAccountingService } from "../../src/llm/token-accounting.js";
 import { describe, expect, test, vi } from "vitest";
@@ -40,6 +43,34 @@ function response(overrides: Partial<LLMResponse> = {}): LLMResponse {
     ...overrides,
   };
 }
+
+test("budget admission and settlement use a live-only OpenRouter model's catalog rates", async () => {
+  const model = "fixture/live-budget";
+  const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ data: [{
+    id: model, context_length: 100000, supported_parameters: ["tools"],
+    pricing: { prompt: "0.000002", completion: "0.000005" },
+  }] })));
+  try {
+    await new OpenRouterCatalog({ fetchImpl }).refresh();
+    const state = harness({ maxCostUsd: 1 });
+    const provider = { name: "openrouter", getExecutionProfile: async () => ({
+      usageReporting: "authoritative" as const, supportsMaxOutputTokens: true,
+    }) } as unknown as LLMProvider;
+    await runAdmittedModelCall({ session: state.session, provider,
+      messages: [{ role: "user", content: "hello" }], options: { model, maxOutputTokens: 200 },
+      stepId: "model:live-catalog", model, providerName: "openrouter", invoke: async () => response({ model }),
+    });
+    const admission = state.acquire.mock.calls[0]![0];
+    expect(admission.costEstimated).toBe(true);
+    expect(admission.maxCostUsd).toBeCloseTo(admission.maxInputTokens * 0.000002 + admission.maxOutputTokens * 0.000005, 10);
+    expect(state.reconcile).toHaveBeenCalledWith("reservation-1", expect.objectContaining({
+      costUsd: expect.closeTo(0.00045, 12), costEstimated: true,
+    }));
+  } finally {
+    clearPublishedModelCatalog("openrouter");
+    recordPublishedModelCosts("openrouter", new Map());
+  }
+});
 
 function harness(options: {
   readonly maxCostUsd?: number;

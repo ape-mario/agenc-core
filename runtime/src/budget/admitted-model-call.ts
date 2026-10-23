@@ -885,7 +885,7 @@ export async function runAdmittedModelCall(
         maxInputTokens,
         maxOutputTokens: admittedMaxOutputTokens,
         maxCostUsd: maximumCost,
-        ...(reservedRates.costEstimated ? { costEstimated: true } : {}),
+        ...(reservedRates.costEstimated || reservedRates.catalogEstimate ? { costEstimated: true } : {}),
         ...(denialReason !== undefined ? { denialReason } : {}),
       },
       params.signal,

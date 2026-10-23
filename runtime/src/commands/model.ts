@@ -1,3 +1,5 @@
+import { openRouterSelectionNotice } from "../llm/model-catalog-selection.js";
+import { openRouterMenuCatalog } from "./openrouter-menu-models.js";
 /**
  * `/model <model-name>` — switch the model for subsequent turns.
  *
@@ -346,6 +348,10 @@ function updateModelChrome(ctx: SlashCommandContext, model: string): void {
 // Custom endpoints intentionally accept private model IDs. Keep that support,
 // but distinguish an unlisted spelling from a verified catalog selection.
 function unverifiedModelNotice(provider: ProviderSlug, model: string): string {
+  if (provider === "openrouter") {
+    const note = openRouterSelectionNotice(model);
+    return note === undefined ? "" : `${note}\n`;
+  }
   const known = BUILT_IN_PROVIDER_MODEL_CATALOG[provider].some(
     entry => providerLocalModelIdFromCatalog(provider, entry) === model,
   ) || listRegisteredModelCatalogEntries(provider).some(entry => entry.model === model);
@@ -379,6 +385,8 @@ export const modelCommand: SlashCommand = {
   immediate: true,
   execute: (ctx: SlashCommandContext): Promise<SlashCommandResult> =>
     safeExecute(async () => {
+      const catalog = openRouterMenuCatalog(ctx);
+      catalog.read();
       const target = ctx.argsRaw.trim();
       if (target.length === 0) {
         if (
@@ -387,7 +395,9 @@ export const modelCommand: SlashCommand = {
         ) {
           return { kind: "skip" };
         }
-        return { kind: "text", text: modelMenuFallback(readModelMenuSnapshot(ctx)) };
+        const snapshot = readModelMenuSnapshot(ctx);
+        if (snapshot.provider === "openrouter") void catalog.refresh();
+        return { kind: "text", text: modelMenuFallback(snapshot) };
       }
       const selection = resolveCommandSelection(ctx, { model: target });
       if (!selection.ok) {

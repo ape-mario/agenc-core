@@ -63,6 +63,7 @@ export interface RegisteredModelCatalogEntry {
    * chosen. Rows that leave it out fall back to the provider's own rule.
    */
   readonly supportsThinking?: boolean;
+  readonly isFree?: boolean;
   /** The provider has announced this model's retirement (YYYY-MM-DD). */
   readonly retiresOn?: string;
   readonly supportsParallelToolCalls: boolean;

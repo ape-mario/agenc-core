@@ -99,3 +99,10 @@ export function clearPublishedModelCatalogs(): void {
   detailed.clear();
   revision += 1;
 }
+
+/** Forget one provider when its live catalog is unavailable. */
+export function clearPublishedModelCatalog(provider: string): void {
+  published.delete(provider);
+  detailed.delete(provider);
+  revision += 1;
+}

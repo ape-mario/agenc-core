@@ -1,4 +1,6 @@
-import { assertModelCatalogSelection } from "../llm/model-catalog-selection.js";
+import { openRouterCatalogFor } from "../llm/registry/openrouter-live-catalog.js";
+import { defaultModelForProvider } from "../config/resolve-model.js";
+import { assertModelCatalogSelection, openRouterSelectionNotice } from "../llm/model-catalog-selection.js";
 import { resolve as resolvePath } from "node:path";
 
 import { ModelMetadataResolver, type ModelMetadataResolverOptions } from "../llm/model-metadata.js";
@@ -138,10 +140,15 @@ export function resolveCanonicalStartupSelection(params: {
       "canonical startup config must contain a provider/model pair",
     );
   }
+  if (provider === "openrouter" && params.env.AGENC_HOME) {
+    openRouterCatalogFor({ home: params.env.AGENC_HOME, apiKey: params.env.OPENROUTER_API_KEY?.trim() }).read();
+  }
   // Saved models may outlive a curated catalog entry or arrive before Core
   // learns about them. Preserve main's startup behavior for those selections.
   if (params.explicitModel !== undefined) {
     assertModelCatalogSelection(config, provider, canonicalModel, params.env);
+    const note = provider === "openrouter" ? openRouterSelectionNotice(canonicalModel) : undefined;
+    if (note !== undefined) console.warn(note);
   }
   if (!isModelAllowed(provider, canonicalModel, config)) {
     throw new ModelNotAllowedError(canonicalModel);
@@ -171,6 +178,15 @@ export async function resolveDiscoveredStartupDefault(
   modelSelectionSource: "explicit" | "provider_default" | undefined,
   metadata: ModelMetadataResolverOptions,
 ): Promise<StartupSelection> {
+  if (startup.provider === "openrouter" && modelSelectionSource === "provider_default" &&
+      !startup.config.providers?.openrouter?.default_model) {
+    const resolver = new ModelMetadataResolver(metadata);
+    resolver.readOpenRouterCatalog();
+    void resolver.discoverOpenRouterModels();
+    const model = defaultModelForProvider("openrouter");
+    if (model !== startup.model) return { ...startup, model, config: { ...startup.config, model } };
+    return startup;
+  }
   if (startup.provider !== "venice" || startup.config.providers?.venice?.default_model) return startup;
   if (modelSelectionSource !== "provider_default") return startup;
   const models = await new ModelMetadataResolver(metadata).discoverVeniceModels(startup.config);

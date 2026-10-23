@@ -35,7 +35,7 @@ test('offline regeneration preserves the complete snapshot and both authority pr
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
-test('the expiry filter uses the generation day and keeps each row its retirement date', async () => {
+test('generation retains every advertised model and its retirement date', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'catalog-expiry-'))
   try {
     const listing = (id: string, expirationDate?: string) => ({
@@ -48,7 +48,8 @@ test('the expiry filter uses the generation day and keeps each row its retiremen
     await writeFile(snapshot, JSON.stringify({ data: [
       listing('vendor/retired-in-october', '2026-10-01'),
       listing('vendor/retiring-later', '2026-11-30'),
-      listing('vendor/current'),
+      { ...listing('vendor/current'), supported_parameters: [] },
+      { id: '~vendor/alias', architecture: { output_modalities: ['image'] } },
     ] }))
     const child = spawnSync(process.execPath, ['scripts/generate-openrouter-catalog.mjs', snapshot, directory], {
       encoding: 'utf8', timeout: 30000, env: { ...process.env, AGENC_CATALOG_DATE: '2026-10-20' },
@@ -56,8 +57,8 @@ test('the expiry filter uses the generation day and keeps each row its retiremen
     expect(child.status, child.stderr).toBe(0)
     const rows = JSON.parse(await readFile(join(directory, 'openrouter-models.data.json'), 'utf8')) as
       Array<{ model: string; expires?: string }>
-    // A cut-off date fixed in the script kept models that retired after it was written.
-    expect(rows.map(row => row.model)).toEqual(['vendor/retiring-later', 'vendor/current'])
-    expect(rows[0]?.expires).toBe('2026-11-30')
+    // The provider's listing owns membership, including non-tool and media rows.
+    expect(rows.map(row => row.model)).toEqual(['vendor/retired-in-october', 'vendor/retiring-later', 'vendor/current', '~vendor/alias'])
+    expect(rows[1]?.expires).toBe('2026-11-30')
   } finally { await rm(directory, { recursive: true, force: true }) }
 })

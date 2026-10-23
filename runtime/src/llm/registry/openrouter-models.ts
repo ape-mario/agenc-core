@@ -1,6 +1,6 @@
 /** Generated from https://openrouter.ai/api/v1/models, verified 2026-10-20.
- * Text-output models advertising function tools; batch, routing aliases and
- * media-only models are excluded. Missing output limits and efforts stay unknown.
+ * The bundled snapshot is the offline fallback. Live discovery and future
+ * regeneration retain every advertised model, including models without tools.
  * Regenerate: node runtime/scripts/generate-openrouter-catalog.mjs [snapshot.json]
  */
 import { readFileSync } from 'node:fs';
@@ -8,13 +8,14 @@ import { OPENROUTER_MODEL_IDS } from './openrouter-model-ids.js';
 import { frozenLazyArray } from './catalog-array.js';
 import type { ReasoningEffort } from '../../session/turn-context.js';
 import type { RegisteredModelCatalogEntry } from './model-catalog.js';
+import { openRouterModelIsFree } from './openrouter-live-pricing.js';
 import { asRecord } from '../../utils/record.js';
 export interface OpenRouterCatalogRow {
-  readonly model: string; readonly label: string; readonly context: number;
+  readonly model: string; readonly label: string; readonly context?: number;
   readonly output?: number; readonly modalities: readonly ('text' | 'image' | 'audio')[];
   readonly parameters: readonly string[]; readonly efforts: readonly ReasoningEffort[];
   readonly defaultEffort?: ReasoningEffort; readonly pricing: Readonly<Record<string, string | undefined>>;
-  readonly priceOverrides?: readonly { readonly min_prompt_tokens?: number; readonly utc_start?: number; readonly utc_end?: number; readonly prompt: string; readonly completion: string; readonly input_cache_read?: string; readonly input_cache_write?: string }[];
+  readonly priceOverrides?: readonly { readonly min_prompt_tokens?: number; readonly utc_start?: number; readonly utc_end?: number; readonly utc_days?: readonly string[]; readonly prompt: string; readonly completion: string; readonly input_cache_read?: string; readonly input_cache_write?: string }[];
   /** OpenRouter's announced retirement date (`expiration_date`), YYYY-MM-DD. */
   readonly expires?: string;
 }
@@ -42,25 +43,17 @@ export const OPENROUTER_MODELS: readonly OpenRouterCatalogRow[] = frozenLazyArra
 
 const EFFORTS: ReadonlySet<string> = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 
-/**
- * One row of OpenRouter's public `GET /models` as a catalog row, with the
- * generator's filter (scripts/generate-openrouter-catalog.mjs): a model that
- * takes function tools and outputs text only, not a batch or `~` alias, and
- * not past its announced expiration date. Undefined for any other row.
- */
-export function openRouterRowFromListing(value: unknown, today: string): OpenRouterCatalogRow | undefined {
+/** Every well-formed model in the provider listing, including models without tools. */
+export function openRouterRowFromListing(value: unknown, _today?: string): OpenRouterCatalogRow | undefined {
   const row = asRecord(value);
   const architecture = asRecord(row?.architecture);
   const id = row?.id;
   const parameters = Array.isArray(row?.supported_parameters)
     ? row.supported_parameters.filter((item): item is string => typeof item === 'string') : [];
-  const outputs = Array.isArray(architecture?.output_modalities) ? architecture.output_modalities : [];
   const expires = typeof row?.expiration_date === 'string' ? row.expiration_date.slice(0, 10) : undefined;
-  if (typeof id !== 'string' || id.length === 0 || !parameters.includes('tools') || outputs.length !== 1 ||
-      outputs[0] !== 'text' || id.endsWith(':batch') || id.startsWith('~') ||
-      (expires !== undefined && expires < today)) return undefined;
-  const context = typeof row?.context_length === 'number' && row.context_length > 0 ? row.context_length : undefined;
-  if (context === undefined) return undefined;
+  if (typeof id !== 'string' || id.trim().length === 0 || /[\s\x00-\x1f\x7f]/u.test(id)) return undefined;
+  const context = typeof row?.context_length === 'number' && Number.isFinite(row.context_length) && row.context_length > 0
+    ? row.context_length : undefined;
   const top = asRecord(row?.top_provider);
   const output = typeof top?.max_completion_tokens === 'number' && top.max_completion_tokens > 0 ? top.max_completion_tokens : undefined;
   const inputs = Array.isArray(architecture?.input_modalities) ? architecture.input_modalities : [];
@@ -82,7 +75,11 @@ export function openRouterRowFromListing(value: unknown, today: string): OpenRou
     efforts: Object.freeze(efforts),
     ...(defaultEffort === undefined ? {} : { defaultEffort }),
     pricing,
-    ...(Array.isArray(overrides) ? { priceOverrides: overrides as OpenRouterCatalogRow['priceOverrides'] } : {}),
+    ...(Array.isArray(overrides) ? { priceOverrides: overrides.flatMap(value => {
+      const override = asRecord(value);
+      if (typeof override?.prompt !== 'string' || typeof override.completion !== 'string') return [];
+      return [override as unknown as NonNullable<OpenRouterCatalogRow['priceOverrides']>[number]];
+    }) } : {}),
     ...(expires === undefined ? {} : { expires }),
   });
 }
@@ -93,13 +90,13 @@ export function openRouterCatalogEntry(entry: OpenRouterCatalogRow, index: numbe
     provider: 'openrouter',
     model: entry.model,
     displayName: entry.label,
-    contextWindow: entry.context,
-    maxContextWindow: entry.context,
+    ...(entry.context === undefined ? {} : { contextWindow: entry.context, maxContextWindow: entry.context }),
     ...(entry.output !== undefined ? { maxOutputTokens: entry.output } : {}),
     inputModalities: entry.modalities,
-    supportsToolUse: true,
+    supportsToolUse: entry.parameters.includes('tools'),
+    isFree: openRouterModelIsFree(entry),
     // OpenRouter lists `reasoning` / `include_reasoning` for models that think.
-    supportsThinking: entry.parameters.includes('reasoning') || entry.parameters.includes('include_reasoning'),
+    supportsThinking: entry.parameters.some(parameter => ['reasoning', 'include_reasoning', 'reasoning_effort'].includes(parameter)),
     ...(entry.expires === undefined ? {} : { retiresOn: entry.expires }),
     supportsParallelToolCalls: entry.parameters.includes('parallel_tool_calls'),
     supportsStructuredOutput: entry.parameters.includes('structured_outputs'),
