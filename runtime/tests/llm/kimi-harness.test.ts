@@ -93,12 +93,26 @@ test.each([false, true])("Moonshot cache writes are reported without double coun
   const messages: LLMMessage[] = [{ role: "user", content: "Go" }];
   const result = await (stream ? provider.chatStream(messages, () => undefined) : provider.chat(messages));
   expect(result.usage).toMatchObject({ promptTokens: 100, cachedInputTokens: 60, cacheCreationInputTokens: 30, cacheWritesUnreported: false });
-  expect(resolveModelCostEntry({ provider: "kimi", model }, DEFAULT_MODEL_COSTS)).toBeNull();
-  const cost = computeUsdCostWithResolution({ model: "kimi-k3", provider: "kimi",
+  expect(resolveModelCostEntry({ provider: "kimi", model }, DEFAULT_MODEL_COSTS)).not.toBeNull();
+  const cost = computeUsdCostWithResolution({ model, provider: "kimi",
     inputTokens: result.usage.promptTokens, outputTokens: result.usage.completionTokens,
     cachedInputTokens: result.usage.cachedInputTokens!, cacheCreationInputTokens: result.usage.cacheCreationInputTokens!,
     reasoningOutputTokens: 0, webSearchRequests: 0, totalTokens: result.usage.totalTokens, turns: 1,
   }, DEFAULT_MODEL_COSTS);
   expect(cost.known).toBe(true);
-  expect(cost.costUsd).toBeCloseTo(0.000213, 9);
+  expect(cost.costUsd).toBeCloseTo(0.000142, 9);
+});
+
+test.each([
+  ["kimi-k3.1-pro", 0.000142],
+  ["kimi-k3.1-pro-highspeed", 0.000272],
+  ["kimi-k3", 0.000213],
+])("native pricing includes cached input and default cache writes once: %s", (model, expected) => {
+  const result = computeUsdCostWithResolution({
+    model, provider: "kimi", inputTokens: 100, outputTokens: 5,
+    cachedInputTokens: 60, cacheCreationInputTokens: 30,
+    reasoningOutputTokens: 0, webSearchRequests: 0, totalTokens: 105, turns: 1,
+  }, DEFAULT_MODEL_COSTS);
+  expect(result.known).toBe(true);
+  expect(result.costUsd).toBeCloseTo(expected, 9);
 });

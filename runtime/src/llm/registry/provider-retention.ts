@@ -172,9 +172,18 @@ export const PROVIDER_RETENTION: Readonly<Record<Exclude<BuiltInProviderSlug, "a
     ],
   }),
   kimi: facts({
+    // Rechecked 2026-10-23: the privacy policy's section 6 retains input while
+    // an account is active. Enterprise ZDR is a server-side policy requested
+    // from Moonshot, not an API parameter or a guarantee AgenC can verify.
+    // https://platform.kimi.ai/docs/agreement/userprivacy
+    // https://platform.kimi.ai/docs/guide/zero-data-retention
     retention: "account-level",
     summary: "Moonshot keeps input while the account is active. ZDR is for enterprise customers on request.",
-    docs: ["https://platform.kimi.ai/docs/guide/zero-data-retention"],
+    docs: [
+      "https://platform.kimi.ai/docs/guide/zero-data-retention",
+      "https://platform.kimi.ai/docs/agreement/userprivacy",
+      "https://platform.kimi.ai/docs/agreement/modeluse",
+    ],
   }),
   mistral: facts({
     retention: "account-level",

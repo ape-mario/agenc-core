@@ -1,6 +1,9 @@
 # Native Kimi CLI sweep
 
-This suite drives the built `runtime/bin/agenc` in Light mode. It does not
+This suite drives the built `runtime/bin/agenc` in Light mode with structured
+JSON output. This activates the CLI's existing exact-output contract and
+leaves task acceptance to the independent grader, avoiding a conflicting
+prose completion checklist. It does not
 implement an alternative agent loop. Its six fixtures cover file read-back,
 a multi-file rename with tests, a failing-test debugging task, six sequential
 pipeline stages, an attached image, and a tokenizer-calibrated 96k to 101k
@@ -32,14 +35,21 @@ turn a refused request into a solve. If token estimation is also refused,
 this mode records an unmeasured long-prompt probe explicitly. Normal funded
 runs require successful calibration.
 
-The owner ledger starts at $0.191416725 spent and has a $20 cumulative cap.
+The owner ledger starts at $0.191416725 spent and has a $24 cumulative cap
+and a $1 remaining-balance floor. The owner requested at least $20 of native
+testing. Existing ledgers keep their original limits unless explicitly
+reconciled against renewed owner authorization.
 It records cash plus vouchers, including debt hidden by available balance.
 Deposits never erase previously recorded spend. Each completion checks the
-balance and reserves a conservative admission envelope of $30 per million
-request bytes plus $100 per million allowed output tokens, with a separate
-image allowance. These are bounds used by the experiment, not model prices.
-K3.1 pricing remains unpublished, so neither this envelope nor observed zero
-spend proves its actual inference price. Requests have a 4,096 output cap.
+balance and reserves a conservative admission envelope of $12 per million
+request bytes plus $40 per million allowed output tokens, with a separate
+image allowance. Large requests use the provider tokenizer, adding tool
+definition bytes, framing and a token margin. These are admission bounds,
+not model prices. Actual usage is priced from the official native table
+read on 2026-10-23, including K3.1. When balance settlement lags, admission
+uses the higher of observed spend and priced usage with a 10% margin.
+Reports distinguish priced usage from balance deductions. Requests have
+a 4,096 output cap.
 Outstanding reservations prevent another request after uncertain transport
 or capture failures. Do not reset the ledger to resume a budget-limited run.
 
@@ -47,6 +57,14 @@ Evidence includes per-request usage and timing, balance changes, tool calls,
 and reasoning hashes. Headers and keys are never recorded. The artifact
 grader also requires observable tool behavior. A matching output file alone
 does not prove read-back, debugging, test execution, or reasoning replay.
+Completion warnings are failures even if the artifact is correct.
+
+After completing the base matrix, `--seed N` generates shuffled archives
+with 24 fresh retrieval values for long-context stress runs. Use
+`--target-tokens N` to calibrate longer prompts; the runner requires room
+for another 32,768 tokens within the discovered model's context window.
+Use unique repeat numbers and the same ledger. The seed, target, tokenizer
+estimates and actual request usage are recorded for reproducibility.
 
 Local checks, with an isolated home:
 

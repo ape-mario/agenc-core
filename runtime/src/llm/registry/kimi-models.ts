@@ -3,7 +3,7 @@
  * advertise the K3 context, modalities, thinking-only mode and effort enum.
  * Output defaults and wire controls follow the K3 family contract:
  * https://platform.kimi.ai/docs/api/models-overview
- * K3.1 prices are not published there yet; do not borrow another model's rate.
+ * Published native prices live in session/cost.ts, independently of gateway rates.
  */
 interface KimiChatModelSpec {
   readonly model: string;
