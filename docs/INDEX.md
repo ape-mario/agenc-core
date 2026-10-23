@@ -3,7 +3,7 @@
 Canonical map of docs under `docs/`. Product overview and install entry:
 [`../README.md`](../README.md).
 
-Version in tree: **runtime / launcher 0.19.16**; embedding SDK
+Version in tree: **runtime / launcher 0.19.17**; embedding SDK
 **0.3.0**. Default provider **grok**; fresh-config session and direct-provider
 default **grok-4.6**. OpenRouter's default remains
 **`x-ai/grok-4.5`** (see [providers.md](reference/providers.md)).
@@ -99,6 +99,7 @@ history; the linked pages below are current product truth.
 
 | Doc | Summary |
 | --- | --- |
+| [releases/0.19.17.md](releases/0.19.17.md) | AgenC 0.19.17: Kimi K3.1 Pro and Highspeed, faster daemon startup, stable macOS Node paths, transport recovery and Abliterated Large Flash |
 | [releases/0.19.16.md](releases/0.19.16.md) | AgenC 0.19.16: live OpenRouter models, reasoning replay and compatible routing |
 | [releases/0.19.15.md](releases/0.19.15.md) | AgenC 0.19.15: Windows headless prompts, account model retirement, and message punctuation. |
 | [releases/0.19.14.md](releases/0.19.14.md) | AgenC 0.19.14: Windows PATH on install, OpenRouter zero data retention by default, and provider balances in /usage |
@@ -150,7 +151,7 @@ Tracked in the repo (safe for GitHub clones):
 
 | Path | Summary |
 | --- | --- |
-| [`../README.md`](../README.md) | Product README (0.19.16) |
+| [`../README.md`](../README.md) | Product README (0.19.17) |
 | [`../packages/agenc-sdk/README.md`](../packages/agenc-sdk/README.md) | SDK package readme |
 | [`../runtime/eval/README.md`](../runtime/eval/README.md) | Agent-eval harness notes |
 | [`../runtime/src/tui/README.md`](../runtime/src/tui/README.md) | TUI architecture (Ink fork, themes) |
