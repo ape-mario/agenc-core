@@ -6,7 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   checkOriginFileChanged,
@@ -131,8 +131,15 @@ describe("FileHistory (I-28)", () => {
     const other = new FileHistory({ projectDir: project, sessionId: "other" });
     await other.trackEdit(file, "other-edit");
     other.stop();
-    const resumed = new FileHistory({ projectDir: project, sessionId: "first" });
+    const diagnostics: string[] = [];
+    const resumed = new FileHistory({
+      projectDir: project,
+      sessionId: "first",
+      onDiagnostic: ({ cause }) => { diagnostics.push(cause); },
+    });
     await resumed.loadFromDisk();
+    await resumed.flush();
+    expect(diagnostics).toEqual([]);
     expect((await resumed.previewRewind("before-edit"))?.filesChanged).toEqual([file]);
     await resumed.rewindToMessage("before-edit");
     expect(readFileSync(file, "utf8")).toBe("original\n");
@@ -144,6 +151,49 @@ describe("FileHistory (I-28)", () => {
     expect(readFileSync(file, "utf8")).toBe("changed\n");
     resumed.stop();
   });
+
+  test.each(["root", "sibling-prefix", "other-session", "traversal", "relative"])(
+    "rejects a persisted %s backup path without loading the index",
+    async (kind) => {
+      const file = join(project, "durable.txt");
+      writeFileSync(file, "original\n");
+      const first = new FileHistory({ projectDir: project, sessionId: "first" });
+      await first.trackEdit(file, "edit");
+      await first.flush();
+      first.stop();
+      const other = new FileHistory({ projectDir: project, sessionId: "other" });
+      other.stop();
+      const invalidPaths: Record<string, string> = {
+        root: first.historyDir,
+        "sibling-prefix": join(`${first.historyDir}-other`, "v1"),
+        "other-session": join(other.historyDir, "v1"),
+        traversal: `${first.historyDir}${sep}..${sep}outside`,
+        relative: "v1",
+      };
+      const indexPath = join(first.historyDir, "snapshots.json");
+      const index = JSON.parse(readFileSync(indexPath, "utf8"));
+      const backup = index.snapshots[0].trackedFileBackups[file];
+      expect(backup.backupFileName).toBeTypeOf("string");
+      backup.backupFileName = invalidPaths[kind];
+      writeFileSync(indexPath, JSON.stringify(index));
+      const diagnostics: string[] = [];
+      const resumed = new FileHistory({
+        projectDir: project,
+        sessionId: "first",
+        onDiagnostic: ({ cause }) => { diagnostics.push(cause); },
+      });
+      try {
+        await resumed.loadFromDisk();
+        await resumed.flush();
+        expect(diagnostics).toEqual(["file_history_load_failed"]);
+        expect(resumed.getState().snapshots).toEqual([]);
+        expect(resumed.getState().trackedFiles.size).toBe(0);
+        expect(readFileSync(file, "utf8")).toBe("original\n");
+      } finally {
+        resumed.stop();
+      }
+    },
+  );
 
   test("trackEdit creates v1 backup of tracked file", async () => {
     const file = join(project, "src.txt");
