@@ -839,6 +839,21 @@ function applyModelFamilyOutputContract(
   metadata: ModelMetadataValues,
 ): ModelMetadataValues {
   const provider = normalizeMetadataProviderIdentity(params.provider);
+  if (provider === "openrouter" &&
+      gatewayModelFamily(provider, params.model) !== "deepseek" &&
+      metadata.maxOutputTokensExplicit !== true) {
+    // The listing's maximum belongs to its top endpoint. ZDR or other routing
+    // preferences can select a smaller endpoint. Do not reserve that maximum
+    // for every ordinary turn; retain it for explicit settings and recovery.
+    const routeUpper = metadata.maxOutputTokensUpperLimit ??
+      metadata.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS_UPPER_LIMIT;
+    return {
+      ...metadata,
+      maxOutputTokens: Math.min(DEFAULT_MAX_OUTPUT_TOKENS, metadata.maxOutputTokens ?? routeUpper, routeUpper),
+      maxOutputTokensUpperLimit: routeUpper,
+      maxOutputTokensCappedDefault: true,
+    };
+  }
   if (gatewayModelFamily(provider, params.model) !== "deepseek" ||
       metadata.maxOutputTokensExplicit === true) {
     return metadata;

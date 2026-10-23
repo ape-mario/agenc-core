@@ -34,7 +34,7 @@ export function openRouterExtraBody(
     "zeroDataRetention" | "extraBody" | "managedRequestId"
   >,
 ): Readonly<Record<string, unknown>> | undefined {
-  if (config.zeroDataRetention !== true || config.managedRequestId === true) {
+  if (config.managedRequestId === true) {
     return config.extraBody;
   }
   const existingProvider = config.extraBody?.provider;
@@ -42,8 +42,12 @@ export function openRouterExtraBody(
     existingProvider !== null &&
     typeof existingProvider === "object" &&
     !Array.isArray(existingProvider)
-      ? { ...(existingProvider as Record<string, unknown>), zdr: true }
-      : { zdr: true };
+      ? { ...(existingProvider as Record<string, unknown>) }
+      : {};
+  // Best-effort routing may silently ignore tools when the eligible endpoints
+  // do not support them. Require the wire contract, including on ZDR routes.
+  provider.require_parameters = true;
+  if (config.zeroDataRetention === true) provider.zdr = true;
   return { ...(config.extraBody ?? {}), provider };
 }
 

@@ -65,7 +65,7 @@ describe("OpenRouterProvider", () => {
     expect(requestBody.stream).toBe(false);
   });
 
-  test("routes only to zero-data-retention endpoints when configured, and sends no routing block otherwise", async () => {
+  test("requires supported parameters and retains zero-data-retention routing when configured", async () => {
     const reply = () =>
       new Response(
         JSON.stringify({
@@ -94,11 +94,11 @@ describe("OpenRouterProvider", () => {
     const bodies = fetchImpl.mock.calls.map(([, init]) =>
       JSON.parse(String(init?.body)) as Record<string, unknown>,
     );
-    expect(bodies[0]?.provider).toEqual({ zdr: true });
-    expect(bodies[1]).not.toHaveProperty("provider");
+    expect(bodies[0]?.provider).toEqual({ require_parameters: true, zdr: true });
+    expect(bodies[1]?.provider).toEqual({ require_parameters: true });
     // An existing routing block keeps its other preferences.
-    expect(bodies[2]?.provider).toEqual({ data_collection: "deny", zdr: true });
-    expect(openRouterExtraBody({})).toBeUndefined();
+    expect(bodies[2]?.provider).toEqual({ data_collection: "deny", require_parameters: true, zdr: true });
+    expect(openRouterExtraBody({})).toEqual({ provider: { require_parameters: true } });
   });
 
   test("explains a model OpenRouter refuses under zero data retention instead of passing the raw 404", async () => {

@@ -36,6 +36,35 @@ Native `x_search`, for example, is still sent only on the internal compatible
 Grok request. The original reasoning model sees and invokes the AgenC client
 tool, while AgenC owns the backend-specific request.
 
+## OpenRouter routing and reasoning
+
+Direct OpenRouter requests set `provider.require_parameters = true` alongside
+the existing ZDR policy. The router must find an endpoint that accepts the
+request's parameters, including tools. An incompatible route is a
+pre-generation refusal; AgenC does not retry it with tools or ZDR removed.
+The managed gateway keeps its own routing contract.
+
+All routed model families replay same-provider, same-model reasoning.
+Structured `reasoning_details` take precedence over plaintext `reasoning`
+or its `reasoning_content` alias. Neither hidden reasoning nor tool-shaped
+answer text becomes an executable call or a final answer automatically.
+
+Ordinary OpenRouter turns reserve at most 32,000 output tokens, bounded by
+the catalog and context window. DeepSeek keeps its existing family default.
+Explicit output settings and output-limit recovery retain the catalog ceiling.
+This avoids reserving a top endpoint's entire output allowance when ZDR selects
+a smaller endpoint. It does not make the catalog context window an exact limit
+for every endpoint. The optional `parallel_tool_calls` field is omitted because
+OpenRouter does not advertise it for these routes; endpoints retain their own
+parallel-call defaults.
+
+For small direct OpenRouter context windows, admission and wire fitting use
+the same safety buffer: 5% of the window, up to the usual 1,024 tokens. This
+leaves space for a useful reply on 4K models without removing prompt padding.
+
+See the OpenRouter contracts for [provider routing](https://openrouter.ai/docs/guides/routing/provider-selection)
+and [reasoning replay](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+
 ## Object-root tools (Grok / DeepSeek)
 
 Strict OpenAI-compatible providers (x.ai / Grok, DeepSeek) require each tool

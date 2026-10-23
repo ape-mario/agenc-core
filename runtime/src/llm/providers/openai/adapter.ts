@@ -115,8 +115,8 @@ import {
 import { getSelectedProviderEnvironment } from "../../../utils/model/providers.js";
 import { isEnvDefinedFalsy } from "../../../utils/envBoolean.js";
 import {
-  openRouterDataPolicyErrorMessage,
-  readOpenRouterDataPolicyRefusal,
+  openRouterRoutingErrorMessage,
+  readOpenRouterRoutingRefusal,
 } from "../openrouter/data-policy.js";
 const OPENAI_RESPONSES_INVALID_FUNCTION_CALL_MESSAGE =
   "OpenAI Responses stream emitted invalid function_call";
@@ -724,11 +724,11 @@ function mapOpenAIHttpFailureToError(args: {
       args.status,
     );
   }
-  const dataPolicyRefusal = readOpenRouterDataPolicyRefusal(args);
-  if (dataPolicyRefusal !== undefined) {
+  const routingRefusal = readOpenRouterRoutingRefusal(args);
+  if (routingRefusal !== undefined) {
     return new LLMProviderError(
       args.providerName,
-      openRouterDataPolicyErrorMessage(dataPolicyRefusal),
+      openRouterRoutingErrorMessage(routingRefusal),
       args.status,
     );
   }
@@ -1370,7 +1370,7 @@ export class OpenAIProvider implements LLMProvider {
         !(this.name === "meta" && metaModelUsesResponsesApi(model))
         ? {
             contextSafetyBufferTokens:
-              CHAT_COMPLETIONS_CONTEXT_SAFETY_BUFFER_TOKENS,
+              this.contextSafetyBufferTokens(this.resolveContextWindowTokens(options)),
           }
         : {}),
       ...(this.config.contextWindowTokens !== undefined
@@ -1497,6 +1497,16 @@ export class OpenAIProvider implements LLMProvider {
     });
   }
 
+  private contextSafetyBufferTokens(contextWindowTokens: number | undefined): number {
+    // Small routed models cannot spend a fixed 1024 tokens on padding as well
+    // as admission's minimum reply reservation. Keep the existing buffer for
+    // normal windows and scale it to 5% for small OpenRouter contexts.
+    return this.name === "openrouter" && this.config.managedRequestId !== true &&
+        contextWindowTokens !== undefined
+      ? Math.min(CHAT_COMPLETIONS_CONTEXT_SAFETY_BUFFER_TOKENS, Math.max(1, Math.floor(contextWindowTokens * 0.05)))
+      : CHAT_COMPLETIONS_CONTEXT_SAFETY_BUFFER_TOKENS;
+  }
+
   private fitRequestWithinContextWindow(
     request: Record<string, unknown>,
     metadata: ChatCompletionsRequestMetadata,
@@ -1508,10 +1518,11 @@ export class OpenAIProvider implements LLMProvider {
     }
     const maxTokenField = metadata.maxTokenField;
     if (maxTokenField === undefined) return metadata;
+    const safetyBufferTokens = this.contextSafetyBufferTokens(contextWindowTokens);
     const availableOutputTokens = Math.floor(
       contextWindowTokens -
         metadata.estimatedPromptTokens -
-        CHAT_COMPLETIONS_CONTEXT_SAFETY_BUFFER_TOKENS,
+        safetyBufferTokens,
     );
     if (metadata.maxTokens <= availableOutputTokens) {
       // Nothing left for this method to shrink. That is not the same as no
@@ -1545,7 +1556,7 @@ export class OpenAIProvider implements LLMProvider {
     const requestedTokens = metadata.estimatedPromptTokens + metadata.maxTokens;
     throw new LLMContextWindowExceededError(
       this.name,
-      `estimated prompt (${metadata.estimatedPromptTokens}) plus reserved output (${metadata.maxTokens}) exceeds context window (${contextWindowTokens}) after ${CHAT_COMPLETIONS_CONTEXT_SAFETY_BUFFER_TOKENS} token safety buffer`,
+      `estimated prompt (${metadata.estimatedPromptTokens}) plus reserved output (${metadata.maxTokens}) exceeds context window (${contextWindowTokens}) after ${safetyBufferTokens} token safety buffer`,
       {
         effectiveTokens: requestedTokens,
         maxTokens: contextWindowTokens,
@@ -1586,7 +1597,7 @@ export class OpenAIProvider implements LLMProvider {
       message:
         `${this.name} reduced the output reservation to ${availableOutputTokens} of the requested ${requested} tokens (${percent}%): ` +
         `the estimated prompt (${metadata.estimatedPromptTokens}) leaves that much of the ${contextWindowTokens} token context window ` +
-        `after the ${CHAT_COMPLETIONS_CONTEXT_SAFETY_BUFFER_TOKENS} token safety buffer; the prompt is approaching the context window`,
+        `after the ${this.contextSafetyBufferTokens(contextWindowTokens)} token safety buffer; the prompt is approaching the context window`,
     });
   }
 
@@ -2784,9 +2795,9 @@ export class OpenAIProvider implements LLMProvider {
     if (isInitialProviderHttpRejection(error) && !this.config.managedRequestId) {
       markLLMInitialHttpRejection(error, this.name, error.status, singleWireAttempt);
       // OpenRouter refused while routing, before it chose an endpoint (no
-      // endpoint meets the data policy): nothing ran, so admission can
+      // endpoint meets the data or parameter policy): nothing ran, so admission can
       // release the reservation at zero instead of holding it as unknown.
-      if (singleWireAttempt === true && readOpenRouterDataPolicyRefusal({
+      if (singleWireAttempt === true && readOpenRouterRoutingRefusal({
         providerName: this.name,
         status: error.status,
         message: error.message,
