@@ -1,3 +1,4 @@
+import "../helpers/cron-os-home.js";
 // End-to-end tests for scripts/install/install.sh (TODO task 1).
 //
 // The installer must speak the exact runtime-manager install contract
@@ -52,6 +53,25 @@ const WINDOWS_NODE_BIN_REL = "node_modules/.agenc-node/node.exe";
 const NODE_LIBRARY_REL = "node_modules/.agenc-node/lib";
 const NODE_ABI = process.versions.modules;
 
+// These fixtures advertise Linux/x64 independently of the host. Only their
+// -e identity probes emulate that target; file-based helpers retain the real OS
+// for filesystem locking and extraction.
+function fixtureNodeProbeLines(platform = "linux"): string[] {
+  return [
+    'if [ "${1:-}" = "-e" ]; then',
+    '  shift; fixture_script="$1"; shift',
+    `  exec ${JSON.stringify(process.execPath)} -e "Object.defineProperty(process, 'platform', { value: '${platform}' }); Object.defineProperty(process, 'arch', { value: 'x64' }); $fixture_script" "$@"`,
+    "fi",
+  ];
+}
+function fixtureNodeDirectory(home: string, platform = "linux"): string {
+  const directory = join(home, "fixture-node");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  writeFileSync(join(directory, "node"), ["#!/bin/sh", ...fixtureNodeProbeLines(platform),
+    `exec ${JSON.stringify(process.execPath)} "$@"`, ""].join("\n"), { mode: 0o755 });
+  return directory;
+}
+
 function sha256(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
@@ -81,7 +101,7 @@ function removePersistentWrapperLocks(root: string): void {
 // node script so the generated wrapper can actually be executed.
 function makeSyntheticArtifact(
   dir: string,
-  options: { omitPrivateNode?: boolean; omitPrivateNodeLibrary?: boolean } = {},
+  options: { omitPrivateNode?: boolean; omitPrivateNodeLibrary?: boolean; platform?: string } = {},
 ): { tarball: string; sha: string } {
   const tree = join(dir, "tree");
   const binDir = join(tree, "node_modules", "@tetsuo-ai", "runtime", "bin");
@@ -110,6 +130,7 @@ function makeSyntheticArtifact(
     "  printf 'private-node-path-ok\\n'",
     "  exit 0",
     "fi",
+    ...fixtureNodeProbeLines(options.platform),
     `exec ${JSON.stringify(process.execPath)} "$@"`,
     "",
   ].join("\n");
@@ -122,6 +143,7 @@ function makeSyntheticArtifact(
   writeFileSync(join(privateNodeRoot, "LICENSE"), "synthetic Node license\n");
   writeFileSync(join(privateNodeRoot, "identity.json"), JSON.stringify({
     schemaVersion: 1,
+    executable: "bin/node", executableSha256: sha256(Buffer.from(nodeShim)), executableBytes: Buffer.byteLength(nodeShim),
     nodeVersion: process.versions.node,
     nodeMajor: Number(process.versions.node.split(".")[0]),
     nodeModuleAbi: process.versions.modules,
@@ -138,7 +160,7 @@ function makeSyntheticArtifact(
     }
   }
   const tarball = join(dir, `agenc-runtime-${VERSION}-test.tar.gz`);
-  const res = spawnSync("tar", ["-czf", tarball, "-C", tree, "node_modules"]);
+  const res = spawnSync("tar", [...(process.platform === "darwin" ? ["--no-xattrs"] : []), "-czf", tarball, "-C", tree, "node_modules"], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
   expect(res.status).toBe(0);
   return { tarball, sha: sha256(readFileSync(tarball)) };
 }
@@ -998,6 +1020,24 @@ function expectFailedInstallCleanup(home: string): void {
   }
 }
 
+// Installer lock registries use the OS account home, deliberately ignoring HOME.
+// Substitute that syscall in the disposable program, never in shipped code.
+function isolatedOsHomePrelude(): string {
+  const home = process.env.AGENC_TEST_HERMETIC_HOME;
+  if (!home) throw new Error("installer tests require a hermetic home");
+  return `const fixtureOs = require("node:os");
+const originalFixtureUserInfo = fixtureOs.userInfo;
+fixtureOs.userInfo = () => ({ ...originalFixtureUserInfo(), homedir: ${JSON.stringify(home)} });
+require("node:module").syncBuiltinESMExports();`;
+}
+function isolatedInstaller(path: string, home: string): string {
+  const source = readFileSync(path, "utf8");
+  const marker = "// BEGIN GENERATED AGENC RUNTIME INSTALLER PROGRAM";
+  const target = join(home, "isolated-install.sh");
+  writeFileSync(target, source.replace(marker, marker + "\n" + isolatedOsHomePrelude()));
+  return target;
+}
+
 type RunResult = { status: number; stdout: string; stderr: string };
 
 function runInstaller(opts: {
@@ -1019,7 +1059,7 @@ function runInstaller(opts: {
     HOME: opts.home,
     AGENC_HOME: opts.agencHome ?? join(opts.home, ".agenc"),
     TMPDIR: join(opts.home, "tmp"),
-    PATH: [...(opts.pathPrepend ?? []), process.env.PATH ?? ""].join(":"),
+    PATH: [...(opts.pathPrepend ?? []), fixtureNodeDirectory(opts.home, opts.envOverrides?.AGENC_INSTALL_PLATFORM), process.env.PATH ?? ""].join(":"),
     // Deterministic platform selection regardless of the host machine.
     AGENC_INSTALL_PLATFORM: "linux",
     AGENC_INSTALL_ARCH: "x64",
@@ -1033,7 +1073,7 @@ function runInstaller(opts: {
   const res = spawnSync(
     "sh",
     [
-      opts.installerPath ?? INSTALL_SH,
+      isolatedInstaller(opts.installerPath ?? INSTALL_SH, opts.home),
       ...(opts.repoDerived
         ? []
         : ["--manifest-url", opts.manifestUrl ?? pathToFileURL(opts.manifest!).href]),
@@ -1059,7 +1099,7 @@ function runInstallerAsync(opts: {
     HOME: opts.home,
     AGENC_HOME: join(opts.home, ".agenc"),
     TMPDIR: join(opts.home, "tmp"),
-    PATH: process.env.PATH ?? "",
+    PATH: [fixtureNodeDirectory(opts.home), process.env.PATH ?? ""].join(":"),
     AGENC_INSTALL_PLATFORM: "linux",
     AGENC_INSTALL_ARCH: "x64",
     AGENC_INSTALL_LIBC_FAMILY: "glibc",
@@ -1072,7 +1112,7 @@ function runInstallerAsync(opts: {
     const child = spawn(
       "sh",
       [
-        INSTALL_SH,
+        isolatedInstaller(INSTALL_SH, opts.home),
         "--manifest-url",
         pathToFileURL(opts.manifest).href,
         "--prefix",
@@ -1214,6 +1254,24 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
       wrapper: join(home, ".local", "bin", "agenc"),
     };
   }
+
+  test.skipIf(process.platform !== "darwin")("macOS installer writes a stable Node wrapper and launchd keeps its wrapper entrypoint", () => {
+    const home = join(work, "home");
+    const artifact = makeSyntheticArtifact(work, { platform: "darwin" });
+    const manifest = writeManifest(work, artifact, { platform: "darwin", minimumMacosVersion: "13.5" });
+    const stubs = join(work, "stubs");
+    mkdirSync(stubs);
+    writeFileSync(join(stubs, "launchctl"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    const result = runInstaller({ home, manifest, pathPrepend: [stubs], envOverrides: { AGENC_INSTALL_PLATFORM: "darwin" } });
+    expect(result.status, result.stderr).toBe(0);
+    const wrapper = join(home, ".local/bin/agenc");
+    const stable = join(home, ".agenc/bin/agenc-node");
+    expect(parseGeneratedWrapper(wrapper)?.nodeBin).toBe(stable);
+    expect(lstatSync(stable).isFile()).toBe(true);
+    expect(lstatSync(stable).isSymbolicLink()).toBe(false);
+    expect(readFileSync(stable)).toEqual(readFileSync(join(work, "tree", NODE_BIN_REL)));
+    expect(readFileSync(join(home, "Library/LaunchAgents/dev.agenc.daemon.plist"), "utf8")).toContain(`<string>${wrapper}</string>`);
+  });
 
   test("resolve_system_tool accepts the platform's stock tools, including hardlinked ones", () => {
     // Regression: the resolver required nlink === 1, but macOS ships
