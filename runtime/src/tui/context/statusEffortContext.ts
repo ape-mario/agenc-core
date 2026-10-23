@@ -37,6 +37,12 @@ export function useStatusOffPeakSchedule(): OffPeakSchedule | null {
   return useContext(StatusOffPeakContext);
 }
 
+/** Manual web search, read from the same config and session environment as the picker. */
+export const StatusWebSearchContext = createContext(false);
+export function useStatusWebSearch(): boolean {
+  return useContext(StatusWebSearchContext);
+}
+
 /**
  * Zero data retention of the provider and model a call made now would use,
  * for the status line's ZDR badge. Null until the session's provider is known.

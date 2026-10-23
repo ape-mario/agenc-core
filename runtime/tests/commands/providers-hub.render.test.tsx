@@ -141,7 +141,7 @@ describe("providers screen", () => {
       message: "Key active for this session only; it was not saved. Linux Secret Service is unavailable. Set DEEPSEEK_API_KEY before launching AgenC." } as never);
     const screen = await mount(<ProvidersHubView initial={snapshot} initialProvider="deepseek" services={services} onDone={() => {}} />);
     try {
-      await screen.press("\x1b[B", "\x1b[B", "\r", "test-placeholder", "\r");
+      await screen.press("\x1b[B", "\x1b[B", "\x1b[B", "\r", "test-placeholder", "\r");
       expect(screen.screen()).toContain("session only");
       expect(screen.screen()).toContain("secret service is unavailable");
       expect(screen.screen()).toContain("deepseek_api_key");
@@ -154,7 +154,7 @@ describe("providers screen", () => {
     services.connect.mockRejectedValue(new Error("test-placeholder"));
     const screen = await mount(<ProvidersHubView initial={snapshot} initialProvider="deepseek" services={services} onDone={() => {}} />);
     try {
-      await screen.press("\x1b[B", "\x1b[B", "\r", "test-placeholder", "\r");
+      await screen.press("\x1b[B", "\x1b[B", "\x1b[B", "\r", "test-placeholder", "\r");
       expect(screen.screen()).toContain("could not complete this action");
       expect(screen.screen()).not.toContain("test-placeholder");
     } finally { screen.unmount(); }
@@ -257,8 +257,8 @@ describe("providers screen", () => {
     );
     try {
       screen.screen();
-      // deepseek-flash, deepseek-pro, Replace API key, Remove saved key
-      await screen.press("\u001b[B", "\u001b[B", "\u001b[B", "\r");
+      // deepseek-flash, deepseek-pro, Web search, Replace API key, Remove saved key
+      await screen.press("\u001b[B", "\u001b[B", "\u001b[B", "\u001b[B", "\r");
       expect(services.forget).toHaveBeenCalledWith("deepseek");
       expect(screen.screen()).toContain("saved key removed.");
     } finally {
@@ -385,8 +385,8 @@ describe("account sign-in on the providers screen", () => {
       />,
     );
     try {
-      // grok-4.6, Sign out, Use the API key instead
-      await screen.press("\u001b[B", "\u001b[B", "\r");
+      // grok-4.6, Web search, Sign out, Use the API key instead
+      await screen.press("\u001b[B", "\u001b[B", "\u001b[B", "\r");
       await sleep(60);
       expect(services.setAuth).toHaveBeenCalledWith("grok", "api-key");
       expect(screen.screen()).toContain("saved. new sessions use the api key.");
@@ -394,4 +394,26 @@ describe("account sign-in on the providers screen", () => {
       screen.unmount();
     }
   });
+});
+
+
+it("/model has a pinned Web search row that toggles Auto and On", async () => {
+  let mode: "auto" | "on" = "auto";
+  const setWebSearchMode = vi.fn(async (next: "auto" | "on") => {
+    mode = next;
+    return { ok: true as const, message: "Saved." };
+  });
+  const screen = await mount(<ProvidersHubView initial={snapshot} initialProvider="deepseek"
+    services={fakeServices({ webSearchMode: () => mode, setWebSearchMode, deepSeekSearchState: () => "off" })} onDone={() => {}} />);
+  try {
+    expect(screen.screen()).toMatch(/web search\s+auto/);
+    // Preferences precede the existing key actions.
+    await screen.press("\x1b[A", "\x1b[A", "\x1b[A", "\r");
+    expect(setWebSearchMode).toHaveBeenLastCalledWith("on");
+    expect(screen.screen()).toMatch(/web search\s+on/);
+    expect(screen.screen()).toContain("deepseek search: off.");
+    await screen.press("\r");
+    expect(setWebSearchMode).toHaveBeenLastCalledWith("auto");
+    expect(screen.screen()).toMatch(/web search\s+auto/);
+  } finally { screen.unmount(); }
 });

@@ -1,3 +1,5 @@
+import { resolveDeepSeekWebSearchSetting, type DeepSeekWebSearchSetting } from "../llm/providers/deepseek/web-search.js";
+import { resolveWebSearchMode, type WebSearchMode } from "../tools/web-search-mode.js";
 import { openRouterMenuCatalog } from "./openrouter-menu-models.js";
 import { OPENROUTER_CATALOG_FALLBACK_NOTE } from "../llm/registry/openrouter-live-catalog.js";
 import React from "react";
@@ -18,6 +20,7 @@ import { nextMenuIndex, previousMenuIndex } from "./menu-navigation.js";
 import { searchModels } from "./model-search.js";
 import {
   chooseProviderAuth,
+  chooseWebSearchMode,
   chooseProviderModel,
   connectProviderWithKey,
   forgetProviderKey,
@@ -61,6 +64,9 @@ import {
 
 export type ProvidersHubServices = {
   readonly reload: () => ProvidersHubSnapshot;
+  readonly webSearchMode?: () => WebSearchMode;
+  readonly deepSeekSearchState?: () => DeepSeekWebSearchSetting;
+  readonly setWebSearchMode?: (mode: WebSearchMode) => Promise<ProvidersHubActionResult>;
   readonly probeLocal: () => Promise<ReadonlySet<ProviderSlug>>;
   readonly modelsFor: (provider: ProviderSlug) => readonly ProvidersHubModelRow[];
   /**
@@ -89,7 +95,8 @@ type ModelEntry =
   | { readonly kind: "use-account" }
   | { readonly kind: "use-key" }
   | { readonly kind: "replace-key" }
-  | { readonly kind: "remove-key" };
+  | { readonly kind: "remove-key" }
+  | { readonly kind: "web-search" };
 
 /** Takes the place of the models when none matches the search. */
 type NoMatch = { readonly kind: "no-match" };
@@ -194,6 +201,7 @@ function modelEntries(
   }
   return [
     ...models.map((model): ModelEntry => ({ kind: "model", row: model })),
+    { kind: "web-search" },
     ...accountEntries,
     ...(row.access === "api-key" ? [{ kind: "replace-key" } as const] : []),
     ...(row.keySaved ? [{ kind: "remove-key" } as const] : []),
@@ -214,6 +222,8 @@ function entryLabel(entry: Exclude<ModelEntry, { kind: "model" }>, row: Provider
       return "Replace API key";
     case "remove-key":
       return "Remove saved key";
+    case "web-search":
+      return "Web search";
   }
 }
 
@@ -264,6 +274,8 @@ function ModelsView({
   notice,
   loading = false,
   note,
+  webSearchMode,
+  deepSeekSearchState,
 }: {
   readonly row: ProvidersHubRow;
   /** Every entry, before the search. */
@@ -276,6 +288,8 @@ function ModelsView({
   readonly notice: Notice;
   /** The provider's own model list is being read. */
   readonly loading?: boolean;
+  readonly webSearchMode: WebSearchMode;
+  readonly deepSeekSearchState?: DeepSeekWebSearchSetting;
   /** Why the bundled model list is shown. */
   readonly note?: string;
 }): React.ReactNode {
@@ -285,6 +299,9 @@ function ModelsView({
   const searching = query.length > 0;
   const highlighted = shown[activeIndex];
   const details = [
+    ...(highlighted?.kind === "web-search" && row.provider === "deepseek" && deepSeekSearchState !== undefined
+      ? [`DeepSeek Search: ${deepSeekSearchState === "on" ? "On" : deepSeekSearchState === "off" ? "Off" : "Auto"}.`] : []),
+    ...(highlighted?.kind === "web-search" ? ["Auto loads search when needed. On gives the model WebSearch and web_fetch from the first request."] : []),
     ...(highlighted?.kind === "model" && highlighted.row.catalogDetail ? [highlighted.row.catalogDetail] : []),
     ...(highlighted?.kind === "model" && highlighted.row.tags?.includes("no tools")
       ? ["Agent tools will not work with this model."] : []),
@@ -328,7 +345,7 @@ function ModelsView({
             <ThemedText key="label" color={active ? "text" : "subtle"} bold={active}>
               {entryLabel(entry, row)}
             </ThemedText>,
-            <ThemedText key="note" color="inactive"> </ThemedText>,
+            <ThemedText key="note" color="inactive">{entry.kind === "web-search" ? webSearchMode === "on" ? "On" : "Auto" : " "}</ThemedText>,
             <ThemedText key="tags" color="inactive"> </ThemedText>,
           ];
         }
@@ -523,6 +540,7 @@ export function ProvidersHubView({
   readonly onDone: () => void;
 }): React.ReactNode {
   const [snapshot, setSnapshot] = React.useState(initial);
+  const [webSearchMode, setWebSearchMode] = React.useState<WebSearchMode>(() => services.webSearchMode?.() ?? "auto");
   const [probed, setProbed] = React.useState<ReadonlySet<ProviderSlug> | null>(null);
   const [filter, setFilter] = React.useState("");
   const [listIndex, setListIndex] = React.useState(0);
@@ -859,6 +877,16 @@ export function ProvidersHubView({
       }
       const entry = onScreen[modelIndexRef.current];
       if (entry === undefined || entry.kind === "no-match") return;
+      if (entry.kind === "web-search") {
+        run(async () => {
+          const result = await services.setWebSearchMode?.(webSearchMode === "on" ? "auto" : "on");
+          if (result !== undefined) {
+            setWebSearchMode(services.webSearchMode?.() ?? "auto");
+            setNotice({ text: result.message, failed: !result.ok });
+          }
+        });
+        return;
+      }
       if (entry.kind === "replace-key") {
         setKeyValue("");
         setNotice(null);
@@ -993,6 +1021,8 @@ export function ProvidersHubView({
         busy={busy}
         notice={notice}
         loading={load?.loading === true}
+        webSearchMode={webSearchMode}
+        {...(services.deepSeekSearchState === undefined ? {} : { deepSeekSearchState: services.deepSeekSearchState() })}
         {...(load?.note === undefined ? {} : { note: load.note })}
       />
     );
@@ -1048,6 +1078,14 @@ export function ProvidersHubView({
 function servicesFor(ctx: SlashCommandContext): ProvidersHubServices {
   return {
     reload: () => readProvidersHubSnapshot(ctx),
+    webSearchMode: () => resolveWebSearchMode(providerEnvironmentFromCommandContext(ctx), readCommandConfig(ctx)?.web_search),
+    setWebSearchMode: (mode) => chooseWebSearchMode(ctx, mode),
+    deepSeekSearchState: () => {
+      const env = providerEnvironmentFromCommandContext(ctx);
+      const config = readCommandConfig(ctx);
+      return resolveDeepSeekWebSearchSetting(env.AGENC_DEEPSEEK_WEB_SEARCH,
+        resolveWebSearchMode(env, config?.web_search) === "on" ? true : config?.providers?.deepseek?.web_search);
+    },
     probeLocal: async () => {
       const { detectRunningLocalProviders } = await import("../onboarding/Onboarding.js");
       const running = await detectRunningLocalProviders({

@@ -697,6 +697,7 @@ const ROOT_FIELD_VALIDATORS = {
   stream_degenerate_guard: fieldValidator("stream_degenerate_guard", optionalBoolean),
   light_mode: fieldValidator("light_mode", optionalBoolean),
   defer_rare_tools: fieldValidator("defer_rare_tools", optionalBoolean),
+  web_search: enumValidator("web_search", ["auto", "on"]),
   lean_system_prompt: fieldValidator("lean_system_prompt", optionalBoolean),
   stream_watchdog_timeout_ms: fieldValidator("stream_watchdog_timeout_ms", optionalNonNegativeInteger),
   stream_quiet_warning_ms: fieldValidator("stream_quiet_warning_ms", optionalNonNegativeInteger),

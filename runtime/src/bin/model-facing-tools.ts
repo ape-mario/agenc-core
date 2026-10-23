@@ -262,6 +262,7 @@ export interface ModelFacingToolOptions {
    * environment wins.
    */
   readonly deepseekWebSearch?: boolean;
+  readonly webSearchEnabled?: () => boolean;
   /**
    * Session provider slug retained for embedding compatibility. Tool
    * availability must not be gated by the provider that performs reasoning.
@@ -1303,7 +1304,7 @@ function resolveDeepSeekWebSearchBackend(
 ): DeepSeekWebSearchBackend | undefined {
   const setting = resolveDeepSeekWebSearchSetting(
     opts.env?.[DEEPSEEK_WEB_SEARCH_ENV],
-    opts.deepseekWebSearch,
+    opts.webSearchEnabled?.() === true ? true : opts.deepseekWebSearch,
   );
   if (setting === "off") return undefined;
   const provider = currentSessionProvider(opts);

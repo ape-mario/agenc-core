@@ -1,0 +1,94 @@
+{
+  "usage": {
+    "runId": "conv-mvle8lo5",
+    "sequence": 76,
+    "costUsd": 0.002435476,
+    "heldCostUsd": 0,
+    "inputTokens": 42799,
+    "outputTokens": 1559,
+    "totalTokens": 44358,
+    "modelCalls": 9,
+    "hasUnknownCost": false,
+    "models": [
+      {
+        "model": "gpt-6-luna",
+        "provider": "openai",
+        "costUsd": 0.002435476,
+        "heldCostUsd": 0,
+        "inputTokens": 42799,
+        "outputTokens": 1559,
+        "totalTokens": 44358,
+        "modelCalls": 9,
+        "hasUnknownCost": false
+      }
+    ],
+    "agents": []
+  },
+  "tools": {
+    "WebSearch": 6,
+    "web_fetch": 4
+  },
+  "firstTool": "WebSearch",
+  "calls": [
+    {
+      "callId": "call_4MxsJHo5EOYYkQYfNdyRQxAh",
+      "toolName": "WebSearch",
+      "args": "{\"query\":\"site:gov.cn State Council announced this week China March 2025\",\"allowed_domains\":[\"gov.cn\",\"xinhua.net\"],\"blocked_domains\":[],\"max_results\":10}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_aTpOeTBXAUADhkZsTeC234VJ",
+      "toolName": "WebSearch",
+      "args": "{\"query\":\"China State Council announces this week\",\"allowed_domains\":[\"english.www.gov.cn\",\"www.gov.cn\",\"english.news.cn\",\"xinhua.net\"],\"blocked_domains\":[],\"max_results\":10}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_WLcWGvpO4ObHdc05PlG3Xuyl",
+      "toolName": "WebSearch",
+      "args": "{\"query\":\"site:english.www.gov.cn/news/ \\\"State Council\\\" September 2026\",\"allowed_domains\":[\"english.www.gov.cn\"],\"blocked_domains\":[],\"max_results\":10}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_wlXVWSeAu0joWGgGSLWJODXz",
+      "toolName": "WebSearch",
+      "args": "{\"query\":\"site:english.www.gov.cn/news/202610/ \\\"State Council\\\" October 19 20 21 22 23 2026 China announced\",\"allowed_domains\":[\"english.www.gov.cn\"],\"blocked_domains\":[],\"max_results\":10}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_cRAXomRafWcHuN2jU8zK6U1n",
+      "toolName": "WebSearch",
+      "args": "{\"query\":\"China State Council October 19 2026 October 23 2026 announcements Xinhua\",\"allowed_domains\":[\"english.news.cn\",\"xinhuanet.com\"],\"blocked_domains\":[],\"max_results\":10}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_AlpldtEAyQ1O41lrubhNtfvN",
+      "toolName": "WebSearch",
+      "args": "{\"query\":\"site:english.www.gov.cn/news/202610/23 State Council October 23 2026\",\"allowed_domains\":[\"english.www.gov.cn\"],\"blocked_domains\":[],\"max_results\":10}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_ZA9kORCIwFLBuyxDIjlvPAWx",
+      "toolName": "web_fetch",
+      "args": "{\"url\":\"https://english.www.gov.cn/News/index.html\",\"prompt\":\"Find State Council announcements published this week (October 19-25, 2026), list titles, publication dates, and substantive announcement points with exact links.\",\"timeout_ms\":20000,\"max_chars\":10000}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_dGQ5eqgcVCVy91e3MVzCc1Pf",
+      "toolName": "web_fetch",
+      "args": "{\"url\":\"https://english.www.gov.cn/news/202610/23/content_WS6adb6170c6d00ca5f9a0ded2.html\",\"prompt\":\"Summarize the State Council executive meeting announcement: exact decisions, policy actions, date; extract key details.\",\"timeout_ms\":20000,\"max_chars\":6000}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_Mhx6JYnGo0M213DWCVl8d7aH",
+      "toolName": "web_fetch",
+      "args": "{\"url\":\"https://english.www.gov.cn/news/202610/22/content_WS6ada15ffc6d00ca5f9a0de8d.html\",\"prompt\":\"Summarize the revised outbound investment administrative measures: issuing authority, main changes, effective date.\",\"timeout_ms\":20000,\"max_chars\":6000}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_uxF1AcF0FTkiIrzN3sR3RoE9",
+      "toolName": "web_fetch",
+      "args": "{\"url\":\"https://english.www.gov.cn/news/202610/22/content_WS6ad9d6c2c6d00ca5f9a0de74.html\",\"prompt\":\"Summarize the five-year plan to strengthen industrial foundation and upgrade manufacturing: goals and measures, issuing authority, dates.\",\"timeout_ms\":20000,\"max_chars\":6000}",
+      "recoveryCategory": "idempotent"
+    }
+  ]
+}

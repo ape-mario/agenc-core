@@ -1,0 +1,1592 @@
+[
+  {
+    "light": true,
+    "mode": "auto",
+    "body": {
+      "model": "deepseek-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "Reply OK."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "tool2__system_x2esearchTools",
+            "description": "Find unlisted tools by name or keyword (tools, not files or code). Listed tools are ready. select loads a tool's schema by exact name.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "select": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exec_command",
+            "description": "Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens): system.searchTools select:exec_command loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "cmd": {
+                  "type": "string"
+                },
+                "workdir": {
+                  "type": "string",
+                  "description": "Default: workspace root."
+                },
+                "timeoutMs": {
+                  "type": "number",
+                  "description": "Hard timeout, ms."
+                }
+              },
+              "required": [
+                "cmd"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "FileRead",
+            "description": "Read text/images/PDFs/notebooks; authorizes edits. Prefer 1-based offset/limit line windows: default 2000 lines, cap 25000 tokens. Line numbers are sparse and display-only. Successful edits need no reread. PDF pages and dense line numbers: system.searchTools select:FileRead.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string"
+                },
+                "offset": {
+                  "type": "number"
+                },
+                "limit": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "file_path"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "apply_patch",
+            "description": "Use the apply_patch tool to edit files.\n\nInput must obey this patch format:\n\n*** Begin Patch\n[one or more file hunks]\n*** End Patch\n\nSupported hunks:\n- *** Add File: path followed by one or more + lines\n- *** Delete File: path\n- *** Update File: path, optionally followed by *** Move to: path, then one or more @@ chunks\n\nPatch paths should be workspace-relative unless an absolute path is necessary and inside the allowed workspace roots.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "The full apply_patch payload."
+                }
+              },
+              "required": [
+                "input"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "thinking": {
+        "type": "disabled"
+      },
+      "max_tokens": 1,
+      "stream": false
+    }
+  },
+  {
+    "light": true,
+    "mode": "search-only",
+    "body": {
+      "model": "deepseek-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant.\n\nUse WebSearch to find web information and web_fetch to read pages, instead of curl or wget through the shell."
+        },
+        {
+          "role": "user",
+          "content": "Reply OK."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "tool2__system_x2esearchTools",
+            "description": "Find unlisted tools by name or keyword (tools, not files or code). Listed tools are ready. select loads a tool's schema by exact name.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "select": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exec_command",
+            "description": "Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens): system.searchTools select:exec_command loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "cmd": {
+                  "type": "string"
+                },
+                "workdir": {
+                  "type": "string",
+                  "description": "Default: workspace root."
+                },
+                "timeoutMs": {
+                  "type": "number",
+                  "description": "Hard timeout, ms."
+                }
+              },
+              "required": [
+                "cmd"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "FileRead",
+            "description": "Read text/images/PDFs/notebooks; authorizes edits. Prefer 1-based offset/limit line windows: default 2000 lines, cap 25000 tokens. Line numbers are sparse and display-only. Successful edits need no reread. PDF pages and dense line numbers: system.searchTools select:FileRead.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string"
+                },
+                "offset": {
+                  "type": "number"
+                },
+                "limit": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "file_path"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "apply_patch",
+            "description": "Use the apply_patch tool to edit files.\n\nInput must obey this patch format:\n\n*** Begin Patch\n[one or more file hunks]\n*** End Patch\n\nSupported hunks:\n- *** Add File: path followed by one or more + lines\n- *** Delete File: path\n- *** Update File: path, optionally followed by *** Move to: path, then one or more @@ chunks\n\nPatch paths should be workspace-relative unless an absolute path is necessary and inside the allowed workspace roots.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "The full apply_patch payload."
+                }
+              },
+              "required": [
+                "input"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "WebSearch",
+            "description": "Search the web for current information and return result titles, URLs, and snippets.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "allowed_domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "blocked_domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "max_results": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "thinking": {
+        "type": "disabled"
+      },
+      "max_tokens": 1,
+      "stream": false
+    }
+  },
+  {
+    "light": true,
+    "mode": "on",
+    "body": {
+      "model": "deepseek-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant.\n\nUse WebSearch to find web information and web_fetch to read pages, instead of curl or wget through the shell."
+        },
+        {
+          "role": "user",
+          "content": "Reply OK."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "tool2__system_x2esearchTools",
+            "description": "Find unlisted tools by name or keyword (tools, not files or code). Listed tools are ready. select loads a tool's schema by exact name.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "select": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exec_command",
+            "description": "Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens): system.searchTools select:exec_command loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "cmd": {
+                  "type": "string"
+                },
+                "workdir": {
+                  "type": "string",
+                  "description": "Default: workspace root."
+                },
+                "timeoutMs": {
+                  "type": "number",
+                  "description": "Hard timeout, ms."
+                }
+              },
+              "required": [
+                "cmd"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "FileRead",
+            "description": "Read text/images/PDFs/notebooks; authorizes edits. Prefer 1-based offset/limit line windows: default 2000 lines, cap 25000 tokens. Line numbers are sparse and display-only. Successful edits need no reread. PDF pages and dense line numbers: system.searchTools select:FileRead.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string"
+                },
+                "offset": {
+                  "type": "number"
+                },
+                "limit": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "file_path"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "apply_patch",
+            "description": "Use the apply_patch tool to edit files.\n\nInput must obey this patch format:\n\n*** Begin Patch\n[one or more file hunks]\n*** End Patch\n\nSupported hunks:\n- *** Add File: path followed by one or more + lines\n- *** Delete File: path\n- *** Update File: path, optionally followed by *** Move to: path, then one or more @@ chunks\n\nPatch paths should be workspace-relative unless an absolute path is necessary and inside the allowed workspace roots.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "The full apply_patch payload."
+                }
+              },
+              "required": [
+                "input"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "web_fetch",
+            "description": "Fetch an HTTPS URL and return readable text content plus status and final URL. When `prompt` is provided, large pages are distilled: the prompt runs against the fetched content and the response carries the extraction plus a short raw preview (the full text is saved to disk for follow-up reads).",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "timeout_ms": {
+                  "type": "number"
+                },
+                "max_chars": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "WebSearch",
+            "description": "Search the web for current information and return result titles, URLs, and snippets.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "allowed_domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "blocked_domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "max_results": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "thinking": {
+        "type": "disabled"
+      },
+      "max_tokens": 1,
+      "stream": false
+    }
+  },
+  {
+    "light": false,
+    "mode": "auto",
+    "body": {
+      "model": "deepseek-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "Reply OK."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "tool2__system_x2esearchTools",
+            "description": "Find and load tools that are not in your function list. select (or select:<tool_name> in query) loads a tool's schema by its exact name; query and the filters search the catalog by name, family, source, keyword or profile.\n\nTo hand a self-contained task to a helper agent, load spawn_agent with select:spawn_agent; it loads wait_agent, send_message, assign_task, close_agent, list_agents with it.\nDeferred tools you can load with select: TodoWrite (a plan for long work), Orient (rank files for a question in a large repository), web_fetch (fetch a web page), WebSearch (search the web), report_agent_job_result (CSV job worker result), AskUserQuestion (multiple-choice question to the user), EnterPlanMode (plan a large change first), ExitPlanMode (present a plan for approval), LSP (definitions and references), NotebookRead (read Jupyter notebooks), request_ledger_transfer (Ledger transfer), ledger_wallet_cli_status (Ledger CLI status), install_ledger_wallet_cli (install the Ledger CLI), VerifyPlanExecution (check progress against a plan), SendUserMessage (progress note to the user).",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Search terms; may include select:<tool_name>."
+                },
+                "select": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ],
+                  "description": "Exact tool name or names to load."
+                },
+                "family": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "profile": {
+                  "type": "string"
+                },
+                "includeHidden": {
+                  "type": "boolean"
+                },
+                "advertisedOnly": {
+                  "type": "boolean"
+                },
+                "maxResults": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 200
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exec_command",
+            "description": "Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. Batch bounded independent reads. Yielded session_id exposes write_stdin; kill_process stops it. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens): system.searchTools select:exec_command loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "cmd": {
+                  "type": "string"
+                },
+                "workdir": {
+                  "type": "string",
+                  "description": "Default: workspace root."
+                },
+                "timeoutMs": {
+                  "type": "number",
+                  "description": "Hard timeout, ms."
+                }
+              },
+              "required": [
+                "cmd"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "FileRead",
+            "description": "Read text, images, PDFs or Jupyter notebooks. Default: the first 2000 lines, numbered from 1 (cat -n); for a large file pass offset (1-based) and limit and read only what you need. A read over 25000 tokens fails. PDFs over 10 pages need pages (at most 20 per read). Directories fail: list them with the shell. A whole-file read authorizes edits; Edit and Write fail if their change did not land, so do not re-read to check one.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "offset": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[1-9]\\d*$"
+                    }
+                  ],
+                  "description": "Line to start from, 1-based."
+                },
+                "limit": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[1-9]\\d*$"
+                    }
+                  ],
+                  "description": "Number of lines to read."
+                },
+                "pages": {
+                  "type": "string",
+                  "description": "PDF page range, e.g. '1-5'."
+                }
+              },
+              "required": [
+                "file_path"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Edit",
+            "description": "FileRead first. Replace shortest unique exact old_string with new_string, preserving indentation, omitting unchanged context/display numbers. replace_all replaces every match (default false). Prefer existing files; create only as needed. Emojis only on request.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "old_string": {
+                  "type": "string"
+                },
+                "new_string": {
+                  "type": "string"
+                },
+                "replace_all": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "file_path",
+                "old_string",
+                "new_string"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "MultiEdit",
+            "description": "Several exact replacements in one file, applied in order, each to the result of the one before. Read the file first (FileRead, or exec_command output that printed it whole). Each old_string must be unique when its edit applies unless replace_all is set. The file is written only if every edit succeeds.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "edits": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Replacements, applied in order.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "old_string": {
+                        "type": "string",
+                        "description": "Exact text to replace; unique in the file at that point unless replace_all is true."
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "The replacement text."
+                      },
+                      "replace_all": {
+                        "type": "boolean",
+                        "description": "Replace every occurrence for this edit (default false)."
+                      }
+                    },
+                    "required": [
+                      "old_string",
+                      "new_string"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "file_path",
+                "edits"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Write",
+            "description": "Create/replace complete files; existing files require FileRead first. Use Edit for partial changes. Documentation/emojis only on request.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "file_path",
+                "content"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Glob",
+            "description": "Find file paths by glob, newest modification first. Skip gitignored/build/vendor files unless includeIgnored=true.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "pattern": {
+                  "type": "string",
+                  "description": "Glob, e.g. src/**/*.ts."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Directory; default workspace root."
+                },
+                "includeIgnored": {
+                  "type": "boolean",
+                  "description": "Include ignored files; default false."
+                }
+              },
+              "required": [
+                "pattern"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Grep",
+            "description": "Search with packaged ripgrep, not shell grep/rg; escape literal braces. output_mode: files_with_matches (default paths), content (lines), count. Context/line numbers apply to content. multiline matches across lines with dot-all. Skip ignored/build/vendor files unless includeIgnored=true. Missing ripgrep: agenc doctor, reinstall same version; no fallback. Other fields (-n, -A, -B, -C, type, head_limit, offset, multiline, includeIgnored) are accepted; system.searchTools select:Grep loads their schema.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "pattern": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 65536,
+                  "description": "Regex."
+                },
+                "path": {
+                  "type": "string",
+                  "maxLength": 16384,
+                  "description": "File/directory; default cwd."
+                },
+                "glob": {
+                  "type": "string",
+                  "maxLength": 65536,
+                  "description": "rg --glob filter."
+                },
+                "output_mode": {
+                  "type": "string",
+                  "enum": [
+                    "content",
+                    "files_with_matches",
+                    "count"
+                  ],
+                  "description": "Default: files_with_matches."
+                },
+                "-i": {
+                  "type": "boolean",
+                  "description": "Ignore case."
+                }
+              },
+              "required": [
+                "pattern"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Skill",
+            "description": "Run a skill listed in the system reminders within this conversation; when one matches the request, call it before responding. Skill names only: MCP tools are called through their own function after system.searchTools loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "skill": {
+                  "type": "string",
+                  "description": "A listed skill name."
+                },
+                "args": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "skill"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "thinking": {
+        "type": "disabled"
+      },
+      "max_tokens": 1,
+      "stream": false
+    }
+  },
+  {
+    "light": false,
+    "mode": "search-only",
+    "body": {
+      "model": "deepseek-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant.\n\nUse WebSearch to find web information and web_fetch to read pages, instead of curl or wget through the shell."
+        },
+        {
+          "role": "user",
+          "content": "Reply OK."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "tool2__system_x2esearchTools",
+            "description": "Find and load tools that are not in your function list. select (or select:<tool_name> in query) loads a tool's schema by its exact name; query and the filters search the catalog by name, family, source, keyword or profile.\n\nTo hand a self-contained task to a helper agent, load spawn_agent with select:spawn_agent; it loads wait_agent, send_message, assign_task, close_agent, list_agents with it.\nDeferred tools you can load with select: web_fetch (fetch a web page), TodoWrite (a plan for long work), Orient (rank files for a question in a large repository), report_agent_job_result (CSV job worker result), AskUserQuestion (multiple-choice question to the user), EnterPlanMode (plan a large change first), ExitPlanMode (present a plan for approval), LSP (definitions and references), NotebookRead (read Jupyter notebooks), request_ledger_transfer (Ledger transfer), ledger_wallet_cli_status (Ledger CLI status), install_ledger_wallet_cli (install the Ledger CLI), VerifyPlanExecution (check progress against a plan), SendUserMessage (progress note to the user).",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Search terms; may include select:<tool_name>."
+                },
+                "select": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ],
+                  "description": "Exact tool name or names to load."
+                },
+                "family": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "profile": {
+                  "type": "string"
+                },
+                "includeHidden": {
+                  "type": "boolean"
+                },
+                "advertisedOnly": {
+                  "type": "boolean"
+                },
+                "maxResults": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 200
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exec_command",
+            "description": "Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. Batch bounded independent reads. Yielded session_id exposes write_stdin; kill_process stops it. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens): system.searchTools select:exec_command loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "cmd": {
+                  "type": "string"
+                },
+                "workdir": {
+                  "type": "string",
+                  "description": "Default: workspace root."
+                },
+                "timeoutMs": {
+                  "type": "number",
+                  "description": "Hard timeout, ms."
+                }
+              },
+              "required": [
+                "cmd"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "FileRead",
+            "description": "Read text, images, PDFs or Jupyter notebooks. Default: the first 2000 lines, numbered from 1 (cat -n); for a large file pass offset (1-based) and limit and read only what you need. A read over 25000 tokens fails. PDFs over 10 pages need pages (at most 20 per read). Directories fail: list them with the shell. A whole-file read authorizes edits; Edit and Write fail if their change did not land, so do not re-read to check one.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "offset": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[1-9]\\d*$"
+                    }
+                  ],
+                  "description": "Line to start from, 1-based."
+                },
+                "limit": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[1-9]\\d*$"
+                    }
+                  ],
+                  "description": "Number of lines to read."
+                },
+                "pages": {
+                  "type": "string",
+                  "description": "PDF page range, e.g. '1-5'."
+                }
+              },
+              "required": [
+                "file_path"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Edit",
+            "description": "FileRead first. Replace shortest unique exact old_string with new_string, preserving indentation, omitting unchanged context/display numbers. replace_all replaces every match (default false). Prefer existing files; create only as needed. Emojis only on request.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "old_string": {
+                  "type": "string"
+                },
+                "new_string": {
+                  "type": "string"
+                },
+                "replace_all": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "file_path",
+                "old_string",
+                "new_string"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "MultiEdit",
+            "description": "Several exact replacements in one file, applied in order, each to the result of the one before. Read the file first (FileRead, or exec_command output that printed it whole). Each old_string must be unique when its edit applies unless replace_all is set. The file is written only if every edit succeeds.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "edits": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Replacements, applied in order.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "old_string": {
+                        "type": "string",
+                        "description": "Exact text to replace; unique in the file at that point unless replace_all is true."
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "The replacement text."
+                      },
+                      "replace_all": {
+                        "type": "boolean",
+                        "description": "Replace every occurrence for this edit (default false)."
+                      }
+                    },
+                    "required": [
+                      "old_string",
+                      "new_string"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "file_path",
+                "edits"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Write",
+            "description": "Create/replace complete files; existing files require FileRead first. Use Edit for partial changes. Documentation/emojis only on request.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "file_path",
+                "content"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Glob",
+            "description": "Find file paths by glob, newest modification first. Skip gitignored/build/vendor files unless includeIgnored=true.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "pattern": {
+                  "type": "string",
+                  "description": "Glob, e.g. src/**/*.ts."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Directory; default workspace root."
+                },
+                "includeIgnored": {
+                  "type": "boolean",
+                  "description": "Include ignored files; default false."
+                }
+              },
+              "required": [
+                "pattern"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Grep",
+            "description": "Search with packaged ripgrep, not shell grep/rg; escape literal braces. output_mode: files_with_matches (default paths), content (lines), count. Context/line numbers apply to content. multiline matches across lines with dot-all. Skip ignored/build/vendor files unless includeIgnored=true. Missing ripgrep: agenc doctor, reinstall same version; no fallback. Other fields (-n, -A, -B, -C, type, head_limit, offset, multiline, includeIgnored) are accepted; system.searchTools select:Grep loads their schema.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "pattern": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 65536,
+                  "description": "Regex."
+                },
+                "path": {
+                  "type": "string",
+                  "maxLength": 16384,
+                  "description": "File/directory; default cwd."
+                },
+                "glob": {
+                  "type": "string",
+                  "maxLength": 65536,
+                  "description": "rg --glob filter."
+                },
+                "output_mode": {
+                  "type": "string",
+                  "enum": [
+                    "content",
+                    "files_with_matches",
+                    "count"
+                  ],
+                  "description": "Default: files_with_matches."
+                },
+                "-i": {
+                  "type": "boolean",
+                  "description": "Ignore case."
+                }
+              },
+              "required": [
+                "pattern"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Skill",
+            "description": "Run a skill listed in the system reminders within this conversation; when one matches the request, call it before responding. Skill names only: MCP tools are called through their own function after system.searchTools loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "skill": {
+                  "type": "string",
+                  "description": "A listed skill name."
+                },
+                "args": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "skill"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "WebSearch",
+            "description": "Search the web for current information and return result titles, URLs, and snippets.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "allowed_domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "blocked_domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "max_results": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "thinking": {
+        "type": "disabled"
+      },
+      "max_tokens": 1,
+      "stream": false
+    }
+  },
+  {
+    "light": false,
+    "mode": "on",
+    "body": {
+      "model": "deepseek-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant.\n\nUse WebSearch to find web information and web_fetch to read pages, instead of curl or wget through the shell."
+        },
+        {
+          "role": "user",
+          "content": "Reply OK."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "tool2__system_x2esearchTools",
+            "description": "Find and load tools that are not in your function list. select (or select:<tool_name> in query) loads a tool's schema by its exact name; query and the filters search the catalog by name, family, source, keyword or profile.\n\nTo hand a self-contained task to a helper agent, load spawn_agent with select:spawn_agent; it loads wait_agent, send_message, assign_task, close_agent, list_agents with it.\nDeferred tools you can load with select: TodoWrite (a plan for long work), Orient (rank files for a question in a large repository), report_agent_job_result (CSV job worker result), AskUserQuestion (multiple-choice question to the user), EnterPlanMode (plan a large change first), ExitPlanMode (present a plan for approval), LSP (definitions and references), NotebookRead (read Jupyter notebooks), request_ledger_transfer (Ledger transfer), ledger_wallet_cli_status (Ledger CLI status), install_ledger_wallet_cli (install the Ledger CLI), VerifyPlanExecution (check progress against a plan), SendUserMessage (progress note to the user).",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Search terms; may include select:<tool_name>."
+                },
+                "select": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ],
+                  "description": "Exact tool name or names to load."
+                },
+                "family": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "profile": {
+                  "type": "string"
+                },
+                "includeHidden": {
+                  "type": "boolean"
+                },
+                "advertisedOnly": {
+                  "type": "boolean"
+                },
+                "maxResults": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 200
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "exec_command",
+            "description": "Workspace inspection/tests/builds; use a listed editing tool for source changes, delete/rename use rm/mv. Call tools directly, not printed placeholders/commentary. Batch bounded independent reads. Yielded session_id exposes write_stdin; kill_process stops it. No trailing &: leftovers stop on return, yielded processes at session end. Lasting services need detach. Advanced fields (yield_time_ms, tty, login, shell, detach, max_output_tokens): system.searchTools select:exec_command loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "cmd": {
+                  "type": "string"
+                },
+                "workdir": {
+                  "type": "string",
+                  "description": "Default: workspace root."
+                },
+                "timeoutMs": {
+                  "type": "number",
+                  "description": "Hard timeout, ms."
+                }
+              },
+              "required": [
+                "cmd"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "FileRead",
+            "description": "Read text, images, PDFs or Jupyter notebooks. Default: the first 2000 lines, numbered from 1 (cat -n); for a large file pass offset (1-based) and limit and read only what you need. A read over 25000 tokens fails. PDFs over 10 pages need pages (at most 20 per read). Directories fail: list them with the shell. A whole-file read authorizes edits; Edit and Write fail if their change did not land, so do not re-read to check one.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "offset": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[1-9]\\d*$"
+                    }
+                  ],
+                  "description": "Line to start from, 1-based."
+                },
+                "limit": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[1-9]\\d*$"
+                    }
+                  ],
+                  "description": "Number of lines to read."
+                },
+                "pages": {
+                  "type": "string",
+                  "description": "PDF page range, e.g. '1-5'."
+                }
+              },
+              "required": [
+                "file_path"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Edit",
+            "description": "FileRead first. Replace shortest unique exact old_string with new_string, preserving indentation, omitting unchanged context/display numbers. replace_all replaces every match (default false). Prefer existing files; create only as needed. Emojis only on request.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "old_string": {
+                  "type": "string"
+                },
+                "new_string": {
+                  "type": "string"
+                },
+                "replace_all": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "file_path",
+                "old_string",
+                "new_string"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "MultiEdit",
+            "description": "Several exact replacements in one file, applied in order, each to the result of the one before. Read the file first (FileRead, or exec_command output that printed it whole). Each old_string must be unique when its edit applies unless replace_all is set. The file is written only if every edit succeeds.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "edits": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Replacements, applied in order.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "old_string": {
+                        "type": "string",
+                        "description": "Exact text to replace; unique in the file at that point unless replace_all is true."
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "The replacement text."
+                      },
+                      "replace_all": {
+                        "type": "boolean",
+                        "description": "Replace every occurrence for this edit (default false)."
+                      }
+                    },
+                    "required": [
+                      "old_string",
+                      "new_string"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "file_path",
+                "edits"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Write",
+            "description": "Create/replace complete files; existing files require FileRead first. Use Edit for partial changes. Documentation/emojis only on request.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "Workspace/absolute path; not an agent-tree ID."
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "file_path",
+                "content"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Glob",
+            "description": "Find file paths by glob, newest modification first. Skip gitignored/build/vendor files unless includeIgnored=true.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "pattern": {
+                  "type": "string",
+                  "description": "Glob, e.g. src/**/*.ts."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Directory; default workspace root."
+                },
+                "includeIgnored": {
+                  "type": "boolean",
+                  "description": "Include ignored files; default false."
+                }
+              },
+              "required": [
+                "pattern"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Grep",
+            "description": "Search with packaged ripgrep, not shell grep/rg; escape literal braces. output_mode: files_with_matches (default paths), content (lines), count. Context/line numbers apply to content. multiline matches across lines with dot-all. Skip ignored/build/vendor files unless includeIgnored=true. Missing ripgrep: agenc doctor, reinstall same version; no fallback. Other fields (-n, -A, -B, -C, type, head_limit, offset, multiline, includeIgnored) are accepted; system.searchTools select:Grep loads their schema.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "pattern": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 65536,
+                  "description": "Regex."
+                },
+                "path": {
+                  "type": "string",
+                  "maxLength": 16384,
+                  "description": "File/directory; default cwd."
+                },
+                "glob": {
+                  "type": "string",
+                  "maxLength": 65536,
+                  "description": "rg --glob filter."
+                },
+                "output_mode": {
+                  "type": "string",
+                  "enum": [
+                    "content",
+                    "files_with_matches",
+                    "count"
+                  ],
+                  "description": "Default: files_with_matches."
+                },
+                "-i": {
+                  "type": "boolean",
+                  "description": "Ignore case."
+                }
+              },
+              "required": [
+                "pattern"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "Skill",
+            "description": "Run a skill listed in the system reminders within this conversation; when one matches the request, call it before responding. Skill names only: MCP tools are called through their own function after system.searchTools loads them.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "skill": {
+                  "type": "string",
+                  "description": "A listed skill name."
+                },
+                "args": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "skill"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "web_fetch",
+            "description": "Fetch an HTTPS URL and return readable text content plus status and final URL. When `prompt` is provided, large pages are distilled: the prompt runs against the fetched content and the response carries the extraction plus a short raw preview (the full text is saved to disk for follow-up reads).",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "timeout_ms": {
+                  "type": "number"
+                },
+                "max_chars": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "WebSearch",
+            "description": "Search the web for current information and return result titles, URLs, and snippets.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "allowed_domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "blocked_domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "max_results": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "thinking": {
+        "type": "disabled"
+      },
+      "max_tokens": 1,
+      "stream": false
+    }
+  }
+]

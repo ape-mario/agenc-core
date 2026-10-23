@@ -1,3 +1,6 @@
+import { applyCanonicalConfigPatchSync } from "../config/update-sync.js";
+import { asRecord } from "../utils/record.js";
+import { resolveWebSearchMode, type WebSearchMode } from "../tools/web-search-mode.js";
 /**
  * What the `/providers` screen does: check and save a pasted key, switch to a
  * provider and model and keep them as the default, and remove a saved key.
@@ -193,4 +196,30 @@ export function signOutOfAccount(
 ): ProvidersHubActionResult {
   const result = signOutOfProvider(requireCommandConfigStore(ctx).homeContext, provider);
   return result.ok ? { ok: true, message: result.message } : { ok: false, message: result.message };
+}
+
+/** Save first, then acknowledge the live daemon before updating client chrome. */
+export async function chooseWebSearchMode(
+  ctx: SlashCommandContext,
+  mode: WebSearchMode,
+): Promise<ProvidersHubActionResult> {
+  const store = requireCommandConfigStore(ctx);
+  applyCanonicalConfigPatchSync(store.homeContext.configTomlPath, { web_search: mode }, "user");
+  try {
+    const apply = asRecord(ctx.session)?.applyDaemonConfig;
+    if (typeof apply === "function") {
+      const receipt = asRecord(await apply.call(ctx.session, { reload: true }));
+      if (receipt?.applied !== true && receipt?.sessionId !== "pending") {
+        throw new Error(typeof receipt?.summary === "string" ? receipt.summary : "Daemon did not apply the configuration.");
+      }
+    }
+    await store.reload();
+  } catch {
+    return { ok: false, message: "Web search preference saved. Live update was not confirmed. Run /config reload to retry." };
+  }
+  const effective = resolveWebSearchMode(providerEnvironmentFromCommandContext(ctx), store.current().web_search);
+  const label = effective === "on" ? "On" : "Auto";
+  return { ok: true, message: effective === mode
+    ? `Web search: ${label}. Saved for future sessions.`
+    : `Preference saved. Web search remains ${label} because an override is active.` };
 }

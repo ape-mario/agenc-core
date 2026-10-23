@@ -1,3 +1,5 @@
+import { resolveWebSearchMode } from "../../src/tools/web-search-mode.js";
+import { snapshotProviderEnvironment } from "../../src/llm/provider-environment.js";
 import { describe, expect, test } from "vitest";
 import { validateAgenCConfigBlocks, type AgenCConfig } from "../../src/config/schema.js";
 import { rareToolDeferralEnabled } from "../../src/tools/rare-tool-deferral.js";
@@ -28,4 +30,18 @@ describe("payload switch config keys", () => {
     expect(leanSystemPromptEnabled({}, "deepseek")).toBe(false);
     expect(leanSystemPromptEnabled({}, "openai")).toBe(true);
   });
+});
+
+
+test("web search defaults to Auto; session environment overrides config", () => {
+  for (const mode of ["auto", "on"] as const) {
+    expect(() => validateAgenCConfigBlocks({ web_search: mode })).not.toThrow();
+    expect(resolveWebSearchMode({}, mode)).toBe(mode);
+    expect(resolveWebSearchMode(snapshotProviderEnvironment({ AGENC_WEB_SEARCH: mode }), mode === "on" ? "auto" : "on")).toBe(mode);
+  }
+  expect(resolveWebSearchMode({})).toBe("auto");
+  expect(resolveWebSearchMode({ AGENC_WEB_SEARCH: "invalid" }, "on")).toBe("on");
+  for (const value of [true, false, "off", "invalid"]) {
+    expect(() => validateAgenCConfigBlocks({ web_search: value } as unknown as AgenCConfig)).toThrow(/web_search/);
+  }
 });

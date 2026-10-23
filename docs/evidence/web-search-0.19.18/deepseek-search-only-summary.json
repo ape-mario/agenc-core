@@ -1,0 +1,69 @@
+{
+  "usage": {
+    "runId": "conv-mvldwstr",
+    "sequence": 40,
+    "costUsd": 0.01254234,
+    "heldCostUsd": 0,
+    "inputTokens": 45299,
+    "outputTokens": 1806,
+    "totalTokens": 47105,
+    "modelCalls": 4,
+    "hasUnknownCost": false,
+    "models": [
+      {
+        "model": "deepseek-flash",
+        "provider": "deepseek",
+        "costUsd": 0.00804234,
+        "heldCostUsd": 0,
+        "inputTokens": 45299,
+        "outputTokens": 1806,
+        "totalTokens": 47105,
+        "modelCalls": 4,
+        "hasUnknownCost": false
+      }
+    ],
+    "agents": []
+  },
+  "tools": {
+    "WebSearch": 6
+  },
+  "firstTool": "WebSearch",
+  "calls": [
+    {
+      "callId": "call_00_T6wP4nKuQniggebAr7uw2152",
+      "toolName": "WebSearch",
+      "args": "{\"query\":\"China State Council announcement this week\",\"allowed_domains\":[\"gov.cn\",\"xinhua.net\",\"english.www.gov.cn\",\"news.cn\"],\"max_results\":10}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_01_OL0e0Jvga2S9pUu5rxm67438",
+      "toolName": "WebSearch",
+      "args": "{\"query\":\"\u56fd\u52a1\u9662 \u5e38\u52a1\u4f1a\u8bae \u90e8\u7f72 2026\u5e74\",\"allowed_domains\":[\"gov.cn\",\"xinhua.net\",\"news.cn\"],\"max_results\":10}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_00_wMaY8T3gZShmvjRr0QXT7053",
+      "toolName": "WebSearch",
+      "args": "{\"allowed_domains\":[\"english.www.gov.cn\",\"www.gov.cn\"],\"max_results\":10,\"query\":\"State Council circular guidelines issued October 2026 english.www.gov.cn policy\"}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_01_vIwG2VFulaelkQBkUhHW7572",
+      "toolName": "WebSearch",
+      "args": "{\"allowed_domains\":[\"news.cn\",\"xinhua.net\"],\"max_results\":10,\"query\":\"\u56fd\u52a1\u9662 \u5370\u53d1 \u610f\u89c1 \u901a\u77e5 2026\u5e7410\u6708\"}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_00_vO5utQ4xKF54PyMyJzrc1267",
+      "toolName": "WebSearch",
+      "args": "{\"allowed_domains\":[\"www.gov.cn\",\"english.www.gov.cn\"],\"max_results\":8,\"query\":\"\u4e2d\u5171\u4e2d\u592e\u529e\u516c\u5385 \u56fd\u52a1\u9662\u529e\u516c\u5385 \u5173\u4e8e\u63a8\u52a8\u79d1\u6280\u521b\u65b0\u548c\u4ea7\u4e1a\u521b\u65b0\u6df1\u5ea6\u878d\u5408\u7684\u610f\u89c1 content_ 202610\"}",
+      "recoveryCategory": "idempotent"
+    },
+    {
+      "callId": "call_01_4tLqPpwH55rcdN58ueWm2191",
+      "toolName": "WebSearch",
+      "args": "{\"allowed_domains\":[\"www.gov.cn\",\"english.www.gov.cn\"],\"max_results\":8,\"query\":\"\u79d1\u6280\u5174\u5546 \u610f\u89c1 \u5546\u52a1\u90e8 2026\u5e7410\u6708 \u56fd\u52a1\u9662 \u653f\u7b56\"}",
+      "recoveryCategory": "idempotent"
+    }
+  ]
+}

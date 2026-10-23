@@ -11,6 +11,7 @@ import { createModelFacingTools } from "./model-facing-tools.js";
 import { sparseLineNumbersEnabled } from "../tools/system/_deps/line-numbers.js";
 import type { CsvAgentJobsRepositoryProvider } from "../app-server/csv-agent-jobs-authority.js";
 import type { ProviderEnvironment } from "../llm/provider-options.js";
+import { resolveWebSearchMode, type WebSearchMode } from "../tools/web-search-mode.js";
 import { rareToolDeferralEnabled } from "../tools/rare-tool-deferral.js";
 
 export interface BootstrapToolRegistryOptions {
@@ -32,6 +33,7 @@ export interface BootstrapToolRegistryOptions {
   >;
   /** config.toml `defer_rare_tools`; the session environment overrides it. */
   readonly configuredDeferRareTools?: boolean;
+  readonly configuredWebSearch?: WebSearchMode;
   /**
    * config.toml `[providers.deepseek] web_search`; the session's
    * `AGENC_DEEPSEEK_WEB_SEARCH` overrides it.
@@ -42,7 +44,13 @@ export interface BootstrapToolRegistryOptions {
 export function buildBootstrapToolRegistry(
   options: BootstrapToolRegistryOptions,
 ): ToolRegistry {
+  const webSearchEnabled = (): boolean => {
+    const store = options.getSession()?.services?.configStore;
+    return resolveWebSearchMode(options.environment ?? {},
+      store === undefined ? options.configuredWebSearch : store.current().web_search) === "on";
+  };
   const modelFacingTools = createModelFacingTools({
+    webSearchEnabled,
     workspaceRoot: options.workspaceRoot,
     ...(options.agencHome !== undefined
       ? { agencHome: options.agencHome }
@@ -89,6 +97,7 @@ export function buildBootstrapToolRegistry(
       : {}),
     getSession: options.getSession,
     requireAdmission: true,
+    webSearchEnabled,
     // Read from the session's captured environment, so a client sets it per
     // session. An explicit toolRegistryOptions value below still wins.
     deferRareTools: rareToolDeferralEnabled(options.environment ?? {}, {

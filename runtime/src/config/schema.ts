@@ -1004,6 +1004,8 @@ export interface AgenCConfig {
    * Light. The session's AGENC_DEFER_RARE_TOOLS overrides it.
    */
   readonly defer_rare_tools?: boolean;
+  /** Manual web tools and guidance. AGENC_WEB_SEARCH overrides this setting. */
+  readonly web_search?: "auto" | "on";
   /**
    * Use the lean static head of the system prompt. Unset: on for OpenAI and
    * Grok. The session's AGENC_LEAN_SYSTEM_PROMPT overrides it.
@@ -1164,6 +1166,7 @@ export const KNOWN_CONFIG_KEYS: readonly string[] = Object.freeze([
   "stream_degenerate_guard",
   "light_mode",
   "defer_rare_tools",
+  "web_search",
   "lean_system_prompt",
   "stream_watchdog_timeout_ms",
   "stream_quiet_warning_ms",

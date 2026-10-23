@@ -240,6 +240,7 @@ export const HERMETIC_AGENC_STATE_ENV_VARS = Object.freeze([
   'AGENC_DEEPSEEK_REASONING_ONLY_REPLAY',
   // DeepSeek Search API behind WebSearch (a test that needs it sets it explicitly)
   'AGENC_DEEPSEEK_WEB_SEARCH',
+  'AGENC_WEB_SEARCH',
   // session request-layout switch (a test that needs it sets it explicitly)
   'AGENC_SHARED_PREFIX_TAIL',
   // MCP process injection, mutation, OAuth, and sizing overrides

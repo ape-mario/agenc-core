@@ -1,0 +1,39 @@
+
+> @tetsuo-ai/runtime@0.19.18 test:host-functional
+> node scripts/run-hermetic-vitest.mjs run tests/tools/rare-tool-deferral.test.ts tests/config/payload-switches-config.test.ts tests/config/strict-schema-validation.test.ts tests/prompts/system-prompt.test.ts tests/bin/model-facing-tools.test.ts tests/commands/providers-hub.render.test.tsx tests/commands/providers-hub-model-search.render.test.tsx tests/commands/providers-hub.test.ts tests/commands/web-search-mode.test.ts tests/tui/components/statusLineLayout.test.ts tests/tui/components/FullscreenLayout.usage-indicators.test.tsx tests/llm/provider-environment.test.ts tests/llm/providers/deepseek/web-search.test.ts tests/session/light-fixed-prefix.test.ts
+
+
+ RUN  v4.1.10 /Users/tetsuoarena/claude-agenc/wt-websearch/runtime
+
+ ✓ tests/config/strict-schema-validation.test.ts (78 tests) 26ms
+ ✓ tests/llm/providers/deepseek/web-search.test.ts (18 tests) 35ms
+ ✓ tests/config/payload-switches-config.test.ts (4 tests) 9ms
+ ✓ tests/llm/provider-environment.test.ts (6 tests) 7ms
+ ✓ tests/commands/web-search-mode.test.ts (3 tests) 85ms
+ ✓ tests/commands/providers-hub.test.ts (21 tests) 215ms
+ ✓ tests/tui/components/statusLineLayout.test.ts (15 tests) 16ms
+ ✓ tests/prompts/system-prompt.test.ts (117 tests) 96ms
+[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0; ✓ tests/tools/rare-tool-deferral.test.ts (19 tests) 39ms
+[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0; ✓ tests/tui/components/FullscreenLayout.usage-indicators.test.tsx (41 tests) 1362ms
+     ✓ updates when an hour boundary passes while nothing else renders  1125ms
+[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0; ✓ tests/session/light-fixed-prefix.test.ts (4 tests) 171ms
+[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;stderr | tests/bin/model-facing-tools.test.ts > model-facing tools > WebSearch falls back when Grok native web_search returns no source URLs
+[context] Warning: model "test-model" not in context window table; using conservative 128k default. Add it to src/utils/model/openaiContextWindows.ts for accurate compaction.
+
+[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;stderr | tests/bin/model-facing-tools.test.ts > WebFetch prompt extraction (task 4) > runs the prompt against fetched content instead of echoing it
+[context] Warning: model "test-model" not in context window table; using conservative 128k default. Add it to src/utils/model/openaiContextWindows.ts for accurate compaction.
+
+ ✓ tests/bin/model-facing-tools.test.ts (122 tests) 1519ms
+[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0; ✓ tests/commands/providers-hub.render.test.tsx (12 tests) 2726ms
+     ✓ asks for a key on a provider that is not set, then shows its models  439ms
+[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0; ✓ tests/commands/providers-hub-model-search.render.test.tsx (13 tests) 4515ms
+     ✓ keeps search usable during refresh, shows all 468 models and explains a no-tools choice  447ms
+     ✓ lists the exact name first, then names that start with the query, then looser matches  1032ms
+     ✓ edits the search with backspace and says when nothing matches  414ms
+     ✓ clears the search on the first esc and goes back to the providers on the second  572ms
+     ✓ uses the highlighted match  327ms
+
+ Test Files  14 passed (14)
+      Tests  473 passed (473)
+   Start at  19:59:26
+   Duration  8.21s (transform 25.11s, setup 9.73s, import 27.20s, tests 10.82s, environment 1ms)

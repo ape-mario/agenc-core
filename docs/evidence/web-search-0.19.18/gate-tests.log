@@ -1,0 +1,574 @@
+
+> agenc-core@0.19.18 test:required-gates
+> node --test scripts/check-hosted-runner-contract.test.mjs scripts/run-fast-checks.test.mjs scripts/run-required-gates.test.mjs scripts/local-gate-github-app.test.mjs scripts/local-gate-context-seed.test.mjs scripts/local-gatekeeper.test.mjs scripts/local-gate-ruleset.test.mjs runtime/scripts/check-daemon-errors.test.mjs runtime/scripts/check-tui-runtime-startup.test.mjs
+
+agenc daemon protocol-error gate (14 scenarios)
+  state: private HOME/AGENC_HOME + owned daemon
+  ensuring private daemon is ready ... ok
+
+  → 01-invalid-jsonrpc-version … PASS (2ms)
+  → 02-missing-method … PASS (1ms)
+  → 03-missing-id … PASS (1ms)
+  → 04-unknown-method-after-initialize … PASS (1ms)
+  → 05-not-initialized … PASS (0ms)
+  → 06-already-initialized … PASS (0ms)
+  → 07-unsupported-protocol-version … PASS (0ms)
+  → 08-bad-auth-cookie-same-uid … PASS (1ms)
+  → 09-invalid-params-agent-create … PASS (1ms)
+  → 10-agent-stop-unknown … PASS (0ms)
+  → 11-message-stream-without-session … PASS (1ms)
+  → 12-session-attach-unknown-session … PASS (0ms)
+  → 13-malformed-json … PASS (1ms)
+  → 14-daemon-still-alive-after-malformed … PASS (0ms)
+
+✓ 14/14 passed
+agenc daemon protocol-error gate (14 scenarios)
+  state: private HOME/AGENC_HOME + owned daemon
+  ensuring private daemon is ready ... ok
+
+  → 01-invalid-jsonrpc-version … PASS (2ms)
+  → 02-missing-method … PASS (0ms)
+  → 03-missing-id … PASS (0ms)
+  → 04-unknown-method-after-initialize … FAIL (1ms)
+      ✗ expected error for id=2, got: {"jsonrpc":"2.0","id":2,"result":{"unexpected":true}}
+  → 05-not-initialized … PASS (0ms)
+  → 06-already-initialized … PASS (0ms)
+  → 07-unsupported-protocol-version … PASS (0ms)
+  → 08-bad-auth-cookie-same-uid … PASS (0ms)
+  → 09-invalid-params-agent-create … PASS (0ms)
+  → 10-agent-stop-unknown … PASS (0ms)
+  → 11-message-stream-without-session … PASS (1ms)
+  → 12-session-attach-unknown-session … PASS (0ms)
+  → 13-malformed-json … PASS (0ms)
+  → 14-daemon-still-alive-after-malformed … PASS (0ms)
+
+✗ 1/14 failed (13 passed)
+    - 04-unknown-method-after-initialize: expected error for id=2, got: {"jsonrpc":"2.0","id":2,"result":{"unexpected":true}}
+✔ daemon error gate isolates and cleans successful and failed runs (422.758583ms)
+✖ import proof succeeds only after the expected export returns (100.250209ms)
+✖ top-level process.exit(0) cannot falsely green the import probe (49.080041ms)
+✖ candidate code cannot forge a fixed IPC proof frame (49.775167ms)
+✖ missing bootTUI fails even when the module imports cleanly (48.131208ms)
+✖ candidate global monkeypatches cannot erase export requirements (126.183459ms)
+✖ candidate iterator poisoning cannot skip export requirements (102.838375ms)
+✔ cold warmup leaves headroom for private daemon startup (0.270416ms)
+✔ startup PTYs replace poisoned operator roots with private gate state (0.226375ms)
+✔ mock provider configuration must be injected explicitly (0.113959ms)
+✔ mock provider configuration uses only the canonical model authority (0.100541ms)
+✔ private gate state publishes one canonical root through path aliases (80.646125ms)
+✔ private gate trust is canonical and deterministic without copied operator state (67.561541ms)
+✔ private gate default config is the minimal versioned config (7.227125ms)
+✔ startup smoke seeds its default config before starting the daemon (0.224125ms)
+✔ private gate teardown removes only an owned root and proves it absent (4.365584ms)
+✔ private gate root removal bounds Windows handle retries only (0.193458ms)
+✔ private gate project fixtures are deterministic and can expose real diffs (561.198917ms)
+✔ teardown serializes with an in-flight daemon start (113.747084ms)
+✔ a restart accepts the pid file an exited foreground daemon leaves (272.602583ms)
+✔ a stop still fails when daemon.pid names a process the gate does not own (2187.538833ms)
+✔ pid-file poisoning never signals an unowned process (2.606833ms)
+✔ a symlinked private daemon home cannot redirect cleanup (29.578709ms)
+✔ a deleted private root still terminates every retained daemon child (2.475458ms)
+✔ catchable terminal signals clean state and retained daemons before exit (96.495083ms)
+✔ a clean PTY exit before first paint is a failure (2.018834ms)
+[3/4] early-exit 80x24: FAILED
+        exited before first paint (code 0, signal 0)
+        PTY never rendered the AgenC interactive screen invariant
+[3/4] one-byte-hang 80x24: FAILED
+        PTY never rendered the AgenC interactive screen invariant
+x
+✔ one byte followed by a hang is not a functional TUI startup (22.065416ms)
+[3/4] post-reply-exit-race 80x24: FAILED
+        exited before the post-reply observation (code 0, signal 0)
+[?2004h                                                                                                                                AgenC interactive screen
+✔ a spontaneous clean exit at the post-reply boundary cannot race green (9.649084ms)
+[3/4] healthy 80x24: clean startup
+✔ a painted PTY that stays alive until requested termination passes (42.838583ms)
+[3/4] termination-race 80x24: FAILED
+        PTY failed during SIGTERM grace (code 1, signal 0)
+[?2004h                                                                                                                                AgenC interactive screen
+[3/4] termination-race 80x24: FAILED
+        PTY failed during SIGTERM grace (code 0, signal 11)
+[?2004h                                                                                                                                AgenC interactive screen
+✔ a PTY crash during the requested termination grace is a failure (83.519666ms)
+[3/4] unkillable-warmup 80x24: FAILED
+        PTY survived the SIGTERM grace period
+        PTY survived the SIGKILL grace period
+[?2004h                                                                                                                                AgenC interactive screen
+✔ an ignored warmup cannot hide a PTY that survives SIGKILL (28.771125ms)
+[3/4] sigkill-only-warmup 80x24: FAILED
+        PTY survived the SIGTERM grace period
+[?2004h                                                                                                                                AgenC interactive screen
+✔ an ignored warmup cannot hide a PTY that requires SIGKILL (17.78275ms)
+✔ verifies every commit-pinned inventory and its parsed toolchain facts (30.99825ms)
+✔ rejects an inventory URL that is not pinned to an exact commit (0.269333ms)
+✔ rejects inventory byte-count drift before parsing (3.687542ms)
+✔ rejects inventory digest drift (1.947833ms)
+✔ rejects parsed toolchain facts that drift from the reviewed profile (1.043667ms)
+✔ rejects a newer official rollout image missing from reviewed profiles (0.709542ms)
+✔ parses only the two rollout feed shapes GitHub publishes (0.209959ms)
+✔ does not require a newer prerelease that GitHub's rollout feed does not deploy (0.499375ms)
+✔ requires a newer prerelease while GitHub's rollout feed deploys it (0.266ms)
+✔ fails closed when the rollout feed is unreadable or names an unknown version (3.635167ms)
+✔ reads later index pages until every target has a stable release (1.134041ms)
+✔ stops at the page budget when a target has no stable release (2.436042ms)
+✔ stops at a short last page (2.29125ms)
+✔ drops a release that moved to the next page while the pages were read (1.45875ms)
+✔ still rejects a release repeated on one page or changed on the next (0.66475ms)
+✔ next policy context is the canonical one-epoch v1 to v2 transition (0.966667ms)
+✔ seed body is immutable, main-bound, evidence-complete, and failure-only (4.481625ms)
+✔ exact seed verifier rejects every identity and outcome mutation (1.904917ms)
+✔ strict inventory paginates beyond 1000 suites and inspects each suite (87.706708ms)
+✔ strict inventory rejects a pagination total that changes mid-read (0.938167ms)
+✔ App-scoped inventory rejects a foreign suite even if GitHub ignores its filter (0.561291ms)
+✔ App preflight binds numeric identity and scopes seed write versus recovery read (55.175166ms)
+✔ wrong App identity fails before token mint or Check Run mutation (47.502125ms)
+✔ credentialed seeder rereads main around key use, creates only failure, and proves exact one (10.872959ms)
+✔ seed refuses a nonzero precondition without POST or PATCH (7.527209ms)
+✔ seed revalidates the five-minute handoff immediately before its sole Check Run POST (8.161167ms)
+✔ seed rejects duplicate postcondition and moved main after publication (16.443292ms)
+✔ recovery verifies one existing exact failure without check mutation (7.772834ms)
+✔ recovery rejects a seed outside the conservative source-eligibility window (6.752875ms)
+✔ handoff pruning is owner-, type-, name-, mode-, and entry-count bounded (408.816375ms)
+✔ trusted path validation rejects writable or symlinked ancestors and final files (1.980833ms)
+✔ unapproved policy drift stops coordinator and credential child before any authority use (15.905292ms)
+✔ live deployment parser requires loaded byte-bound units and exact aggregate placement (0.421625ms)
+✔ CLI cannot accept a SHA, context, or conclusion and child receives only random handoff ID (0.324709ms)
+✔ static parent is aggregate-capped and credential-free (0.210458ms)
+✔ GitHub App JWT is RS256-signed with the bounded GitHub claims (55.132959ms)
+✔ installation token request is repository- and permission-scoped (51.731792ms)
+✔ installation token readback rejects extra permissions or repository scope (84.042ms)
+✔ installation identity is verified before a token can be minted (12.372ms)
+✔ pull request identity is remote, open, same-repository, and main-bound (0.419125ms)
+✔ main identity is bound to the canonical remote main ref (0.253875ms)
+✔ main receipt refuses any non-canonical ref (0.132083ms)
+✔ receipt summary is canonical, exact-SHA-bound, and mutation-sensitive (1.471083ms)
+✔ publisher creates one completed App-owned check for the exact receipt (1.244083ms)
+✔ publisher scopes duplicate detection to the configured App (0.733625ms)
+✔ publisher refuses duplicate checks from its own App (0.6155ms)
+✔ release verifier rejects stale, duplicate, wrong-App, and non-success checks (1.031416ms)
+✔ verifier rejects malformed canonical receipts and persisted field drift (0.396083ms)
+✔ ruleset payload binds main to the exact App-owned local check (1.492459ms)
+✔ ruleset readback verifier rejects source, bypass, target, and strictness drift (0.567041ms)
+✔ ruleset renderer requires an explicit safe App ID and enforcement state (0.310416ms)
+✔ disabled bootstrap payload creates the required context before App binding (0.358083ms)
+✔ cutover inventory covers all listed rulesets and legacy protection (0.265ms)
+✔ cutover inventory rejects stale hosted and every unexpected required check (0.348041ms)
+✔ policy rotation requires the immediately previous active context epoch (0.421667ms)
+✔ effective main verifier proves the App-bound rule is the only required check (0.3275ms)
+✔ candidate index rejects symlinks, gitlinks, and tracked scratch collisions (2.554792ms)
+✔ candidate Git parsing stays confined before and after source sealing (1.50875ms)
+✖ sealed source verification grants one exact safe.directory to a confined worker (73.222375ms)
+✔ dependency acquisition accepts only SHA-512-pinned npm registry artifacts (1.108583ms)
+✔ native rebuild is source-only, offline, and bound to reviewed local headers and tools (0.626125ms)
+✔ candidate and Docker accounts cannot inherit supplementary groups (1.413167ms)
+✔ transient-unit inventory includes nested gates but excludes dispatchers (0.662417ms)
+✔ loaded systemd policy rejects stale fragments and every extra drop-in (0.44675ms)
+✔ rootless Docker recovery accepts only an exact bounded container inventory (0.401375ms)
+✔ Docker data root must be an independent hardened ext4/xfs device mount (1.147458ms)
+✔ Docker persistent inventory requires four exact object classes and bounded counts (0.692875ms)
+✔ Docker network inventory is exact, full-length, and local (9.549667ms)
+✔ Docker daemon policy rejects swarm and managed plugins (0.139833ms)
+✖ Docker cgroup canary is located inside the dedicated user slice with exact limits (4.3005ms)
+✔ Docker cgroup canary inspect is exact and immutable (0.24325ms)
+✔ dedicated rootless Docker socket rejects group or world access (0.124167ms)
+✔ job filesystem inventory binds the exact tmpfs source and mount point (0.598375ms)
+✖ stale bounded job roots are unmounted before their mount points are removed (50.970209ms)
+✔ stale mounted job tmpfs is validated and unmounted from its 0711 root (17.23125ms)
+✔ mounted job tmpfs rejects a root whose ownership or exact 0711 mode drifted (0.203417ms)
+✔ candidate stdout is a pipe and cannot truncate earlier trusted log evidence (38.597875ms)
+✔ credential-free worker hands off success before the App-only publisher runs (182.018625ms)
+✔ a second dispatch accepts and retains the first bounded gate log (241.60175ms)
+✔ expired ready handoffs are pruned without rerunning local gates (51.5485ms)
+✔ an authoritative local gate failure is the only worker failure published (43.962291ms)
+✔ infrastructure failure creates no handoff and cannot reach the App (130.2355ms)
+✔ candidate transient units are cleaned before the candidate workspace (43.882291ms)
+✔ moved PR head aborts before a ready handoff exists (57.474208ms)
+✔ publisher rereads the PR after worker teardown and refuses a moved head (44.404459ms)
+✔ publisher refuses a stale or guessed job ID before reading the App key (107.452083ms)
+✔ merged-main gets a distinct exact-main worker handoff and App check (63.171875ms)
+✔ systemd deployment mounts the App key only in a random transient publisher (1.007458ms)
+﹣ systemd accepts every hardened static unit without ignored directives (11.941625ms) # systemd-analyze is unavailable
+✔ documentation paths skip code checks (1.226625ms)
+✔ runtime prompt Markdown selects only its bounded contract test (1.911083ms)
+✔ runtime prompt mapping fails when its contract is missing (2.985ms)
+✔ other runtime Markdown does not enter Vitest related mode (0.303792ms)
+✔ runtime source and tests select separate Vitest modes (0.241459ms)
+✔ runtime Vitest plans check ripgrep before typecheck and test discovery (0.35675ms)
+✔ deleted runtime source selects its subsystem tests (0.17625ms)
+✔ deleted root source selects matching root tests (0.078125ms)
+✔ deleted runtime source command runs the subsystem target (0.093584ms)
+✔ unmapped deleted source fails instead of passing on typecheck alone (0.112291ms)
+✔ unmapped deleted runtime scripts also fail closed (0.070209ms)
+✔ deleted hermetic Vitest runner selects its discovery contract (0.05375ms)
+✔ deleted slash add-dir scenario selects CLI and command contracts (0.044375ms)
+✔ runtime JSON configuration uses policy tests, not Vitest related mode (0.071125ms)
+✔ NUL-delimited names preserve newlines, tabs, and leading dashes (0.078666ms)
+✔ invalid UTF-8 Git names fail instead of being changed silently (0.051334ms)
+✔ change collection includes untracked files (0.113959ms)
+✔ launcher-only changes do not run runtime Vitest (0.206584ms)
+✔ SDK-only changes select SDK typecheck (0.097709ms)
+✔ workflow and policy changes select policy tests (0.092333ms)
+✔ option-like base refs fail before change selection (76.008375ms)
+✔ child command failures retain their exit status (58.542833ms)
+✔ ci-required-gates documents the skip set and fail-closed deletion (1.285625ms)
+✔ native C and C# sources typecheck only (0.152375ms)
+✔ deleted native C does not use the JS/TS fail-closed mapping (0.096417ms)
+✔ required-gate inventory outside the policy selector typechecks only (0.067417ms)
+✔ runtime lock and toolchain files do not select policy tests (0.061208ms)
+✖ required gate inventory is complete, ordered, and bounded (1.966833ms)
+✔ Docker cleanup waits through late daemon-side container materialization (1.092667ms)
+✔ Docker preflight cannot green from a single empty inventory (0.284041ms)
+✔ required-gates CLI exposes only the reviewed inventory and contract (181.549459ms)
+✖ required gate rejects a mismatched expected SHA before any gate starts (34.474792ms)
+✔ ending source validation rejects a commit that moved after the gate (0.188333ms)
+✔ required gate contract is deterministic and mutation-sensitive (1.551417ms)
+✔ artifact freeze rejects nested and root symlinks (36.884625ms)
+✔ gate environment strips credentials and isolates writable state (136.836916ms)
+✔ systemd hardening profiles preserve the exact transient-unit policies (6.671625ms)
+✔ systemd hardening baseline is frozen, propagated, and override-allowlisted (1.034125ms)
+✔ transient systemd workers bind to the dispatcher and expose Docker only to the stable gate (0.346542ms)
+✔ bounded job filesystems are exact dispatcher-bound tmpfs mounts (0.097291ms)
+✔ aggregate cgroup records enforce exact local-gate limits and parent capacity (0.364041ms)
+✔ rootless Docker daemon must remain beneath the capped delegated user slice (0.241084ms)
+✔ systemd result classification publishes only authoritative command outcomes (0.124167ms)
+✖ required-gates state ignores hostile ambient temp roots (0.155417ms)
+✖ gate temp root preserves Unix socket headroom for nested contract suites (0.095625ms)
+✔ importing the runner does not swallow process termination signals (33.395792ms)
+✔ a timed-out gate terminates its descendant process tree (3040.213333ms)
+✖ a timed-out gate receives a bounded graceful cleanup phase (1109.970583ms)
+required-gates: running first
+✖ a successful gate drains background descendants before returning (1261.776167ms)
+✔ a failed gate stops the required sequence immediately (0.357708ms)
+﹣ owned detached daemons are stopped before private state is removed (0.078792ms) # Linux /proc ownership assertion
+﹣ daemon cleanup refuses a receipt for a process without exact ownership (0.055958ms) # Linux /proc ownership assertion
+ℹ tests 173
+ℹ suites 0
+ℹ pass 155
+ℹ fail 15
+ℹ cancelled 0
+ℹ skipped 3
+ℹ todo 0
+ℹ duration_ms 5953.5375
+
+✖ failing tests:
+
+test at runtime/scripts/check-tui-runtime-startup.test.mjs:52:1
+✖ import proof succeeds only after the expected export returns (100.250209ms)
+  AssertionError [ERR_ASSERTION]: Error: import probe exited with code 1
+      at runImportProbe (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:404:13)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async probeFixture (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.test.mjs:46:12)
+      at async TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.test.mjs:53:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+  false !== true
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.test.mjs:54:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at runtime/scripts/check-tui-runtime-startup.test.mjs:57:1
+✖ top-level process.exit(0) cannot falsely green the import probe (49.080041ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /without a verified completion proof/u. Input:
+
+  'import probe exited with code 1'
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.test.mjs:62:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import probe exited with code 1',
+    expected: /without a verified completion proof/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at runtime/scripts/check-tui-runtime-startup.test.mjs:65:1
+✖ candidate code cannot forge a fixed IPC proof frame (49.775167ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /signature verification failed/u. Input:
+
+  'import probe exited with code 1'
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.test.mjs:76:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import probe exited with code 1',
+    expected: /signature verification failed/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at runtime/scripts/check-tui-runtime-startup.test.mjs:79:1
+✖ missing bootTUI fails even when the module imports cleanly (48.131208ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /bootTUI/u. Input:
+
+  'import probe exited with code 1\n' +
+    'startup smoke crashed (FileSystemRead: /var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-tui-import-proof-Jrs1Di/main.mjs): Error [ERR_ACCESS_DENIED]: Access to this API has been restricted\n' +
+    '    at lstatSync (node:fs:2136:11)\n' +
+    '    at regularFileSha256 (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:119:20)\n' +
+    '    at importProbeChild (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:220:20)\n' +
+    '    at file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:786:13\n' +
+    '    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n' +
+    '    at async node:internal/modules/esm/loader:650:26\n' +
+    '    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n'
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.test.mjs:82:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import probe exited with code 1\nstartup smoke crashed (FileSystemRead: /var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-tui-import-proof-Jrs1Di/main.mjs): Error [ERR_ACCESS_DENIED]: Access to this API has been restricted\n    at lstatSync (node:fs:2136:11)\n    at regularFileSha256 (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:119:20)\n    at importProbeChild (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:220:20)\n    at file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:786:13\n    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n',
+    expected: /bootTUI/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at runtime/scripts/check-tui-runtime-startup.test.mjs:85:1
+✖ candidate global monkeypatches cannot erase export requirements (126.183459ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /bootTUI/u. Input:
+
+  'import probe exited with code 1\n' +
+    'startup smoke crashed (FileSystemRead: /var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-tui-import-proof-x0tDI3/main.mjs): Error [ERR_ACCESS_DENIED]: Access to this API has been restricted\n' +
+    '    at lstatSync (node:fs:2136:11)\n' +
+    '    at regularFileSha256 (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:119:20)\n' +
+    '    at importProbeChild (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:220:20)\n' +
+    '    at file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:786:13\n' +
+    '    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n' +
+    '    at async node:internal/modules/esm/loader:650:26\n' +
+    '    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n'
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.test.mjs:92:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import probe exited with code 1\nstartup smoke crashed (FileSystemRead: /var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-tui-import-proof-x0tDI3/main.mjs): Error [ERR_ACCESS_DENIED]: Access to this API has been restricted\n    at lstatSync (node:fs:2136:11)\n    at regularFileSha256 (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:119:20)\n    at importProbeChild (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:220:20)\n    at file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:786:13\n    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n',
+    expected: /bootTUI/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at runtime/scripts/check-tui-runtime-startup.test.mjs:95:1
+✖ candidate iterator poisoning cannot skip export requirements (102.838375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /bootTUI/u. Input:
+
+  'import probe exited with code 1\n' +
+    'startup smoke crashed (FileSystemRead: /var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-tui-import-proof-P9I290/main.mjs): Error [ERR_ACCESS_DENIED]: Access to this API has been restricted\n' +
+    '    at lstatSync (node:fs:2136:11)\n' +
+    '    at regularFileSha256 (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:119:20)\n' +
+    '    at importProbeChild (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:220:20)\n' +
+    '    at file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:786:13\n' +
+    '    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n' +
+    '    at async node:internal/modules/esm/loader:650:26\n' +
+    '    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n'
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.test.mjs:102:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import probe exited with code 1\nstartup smoke crashed (FileSystemRead: /var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-tui-import-proof-P9I290/main.mjs): Error [ERR_ACCESS_DENIED]: Access to this API has been restricted\n    at lstatSync (node:fs:2136:11)\n    at regularFileSha256 (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:119:20)\n    at importProbeChild (file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:220:20)\n    at file:///Users/tetsuoarena/claude-agenc/wt-websearch/runtime/scripts/check-tui-runtime-startup.mjs:786:13\n    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n',
+    expected: /bootTUI/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/local-gatekeeper.test.mjs:241:1
+✖ sealed source verification grants one exact safe.directory to a confined worker (73.222375ms)
+  GatekeeperFailure: sealed candidate workspace must use its canonical path
+      at verifyFinalCandidateSourceInWorker (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/local-gatekeeper.mjs:694:11)
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/local-gatekeeper.test.mjs:258:28)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'SOURCE_INVALID'
+  }
+
+test at scripts/local-gatekeeper.test.mjs:585:1
+✖ Docker cgroup canary is located inside the dedicated user slice with exact limits (4.3005ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + '/private/var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-cgroup-test-AL4bGV/user.slice/user-993.slice/user@993.service/app.slice/docker.service/docker-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.scope'
+  - '/var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-cgroup-test-AL4bGV/user.slice/user-993.slice/user@993.service/app.slice/docker.service/docker-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.scope'
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/local-gatekeeper.test.mjs:600:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/private/var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-cgroup-test-AL4bGV/user.slice/user-993.slice/user@993.service/app.slice/docker.service/docker-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.scope',
+    expected: '/var/folders/gd/mvb492r97z1bw8c0nzrwhj_m0000gp/T/agenc-cgroup-test-AL4bGV/user.slice/user-993.slice/user@993.service/app.slice/docker.service/docker-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.scope',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/local-gatekeeper.test.mjs:703:1
+✖ stale bounded job roots are unmounted before their mount points are removed (50.970209ms)
+  Error: ENOENT: no such file or directory, open '/proc/self/mountinfo'
+      at readFileSync (node:fs:621:20)
+      at readJobMountRecord (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/local-gatekeeper.mjs:2084:30)
+      at cleanupStaleJobRoots (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/local-gatekeeper.mjs:2206:21)
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/local-gatekeeper.test.mjs:711:11)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/proc/self/mountinfo'
+  }
+
+test at scripts/local-gatekeeper.test.mjs:1237:1
+﹣ systemd accepts every hardened static unit without ignored directives (11.941625ms) # systemd-analyze is unavailable
+  AssertionError [ERR_ASSERTION]: systemd rejected agenc-local-gate-context-seed@.service: undefinedundefined
+
+  null !== 0
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/local-gatekeeper.test.mjs:1267:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/run-required-gates.test.mjs:134:1
+✖ required gate inventory is complete, ordered, and bounded (1.966833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'v26.8.1'
+  - 'v26.12.1'
+         ^
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/run-required-gates.test.mjs:135:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'v26.8.1',
+    expected: 'v26.12.1',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/run-required-gates.test.mjs:283:1
+✖ required gate rejects a mismatched expected SHA before any gate starts (34.474792ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /does not match expected SHA/. Input:
+
+  'required-gates: required gates need Linux, observed darwin\n'
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/run-required-gates.test.mjs:293:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'required-gates: required gates need Linux, observed darwin\n',
+    expected: /does not match expected SHA/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/run-required-gates.test.mjs:885:1
+✖ required-gates state ignores hostile ambient temp roots (0.155417ms)
+  Error: required-gates run base must be one real directory
+      at createRequiredGatesRoot (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/run-required-gates.mjs:243:11)
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/run-required-gates.test.mjs:897:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/run-required-gates.test.mjs:910:1
+✖ gate temp root preserves Unix socket headroom for nested contract suites (0.095625ms)
+  Error: required-gates run base must be one real directory
+      at createRequiredGatesRoot (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/run-required-gates.mjs:243:11)
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/run-required-gates.test.mjs:912:16)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/run-required-gates.test.mjs:1007:1
+✖ a timed-out gate receives a bounded graceful cleanup phase (1109.970583ms)
+  AssertionError [ERR_ASSERTION]: SIGTERM cleanup did not run
+
+  false !== true
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/run-required-gates.test.mjs:1030:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/run-required-gates.test.mjs:1033:1
+✖ a successful gate drains background descendants before returning (1261.776167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (file:///Users/tetsuoarena/claude-agenc/wt-websearch/scripts/run-required-gates.test.mjs:1063:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
