@@ -78,8 +78,8 @@ Documentation map: [`docs/INDEX.md`](docs/INDEX.md). Architecture:
 - **Durable scheduled prompts** — require Linux directory descriptors and a
   local OS-account home for protected locks. Stop older scheduler/gateway
   processes before upgrading; see [storage and platform requirements](docs/durable-cron-storage.md).
-- **Guided onboarding** — `agenc onboard` includes AgenC account sign-in,
-  X / xAI sign-in for Grok, provider API keys, and local providers without
+- **Guided onboarding**: `agenc onboard` includes X / xAI sign-in for Grok,
+  provider API keys, and local providers without
   requiring slash commands; follow-on acts: `identity`, `channel`, `autonomy`,
   `recap` (personas, channels, budget/heartbeat/webhooks).
 - **Remote control** — pair iOS or Android with `agenc remote on|off|status`;
@@ -290,7 +290,7 @@ AGENC_AUTH_BACKEND=remote agenc login
 agenc remote on
 ```
 
-Managed OpenRouter models: [`docs/managed-openrouter.md`](docs/managed-openrouter.md).
+OpenRouter setup: [`docs/managed-openrouter.md`](docs/managed-openrouter.md).
 VPS deploy: [`docs/deploy/vps.md`](docs/deploy/vps.md).
 
 ## Configuration
