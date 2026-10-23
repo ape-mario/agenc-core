@@ -199,6 +199,7 @@ import type { StartedMcpSseServer } from "../mcp/server/start.js";
 
 import {
   recoverDaemonStateOnStartup,
+  materializeRecoveredRunSnapshot,
   StartupResumeSourceBudget,
   type DaemonStartupRecoveryReport,
   type RecoveredAgentRun,
@@ -927,13 +928,28 @@ async function runAgenCDaemonForegroundLocked(
         run,
       })),
       concurrency: STARTUP_RUNTIME_RESTORE_CONCURRENCY,
-      task: ({ run }, context): Promise<"published" | "unavailable"> =>
-        restoreAndPublishRecoveredRun(
+      task: ({ run }, context): Promise<"published" | "unavailable"> => {
+        let hydratedRun: RecoveredAgentRun;
+        try {
+          hydratedRun = snapshotPolicies.hydrateStartupRun(startupRecovery, run);
+        } catch (error) {
+          try {
+            run.resumeSource?.close();
+          } catch (cleanupError) {
+            throw new AggregateError(
+              [error, cleanupError],
+              "startup snapshot hydration and resume-source cleanup failed",
+              { cause: error },
+            );
+          }
+          throw error;
+        }
+        return restoreAndPublishRecoveredRun(
           sessionManager,
           agentManager,
           runner,
           startupRecovery,
-          run,
+          hydratedRun,
           context,
           {
             recordReplayToolResult: (result) =>
@@ -944,7 +960,8 @@ async function runAgenCDaemonForegroundLocked(
               );
             },
           },
-        ),
+        );
+      },
       onSettled: (settled) => {
         writeAgenCDaemonStartupDebug(
           host,
@@ -1131,7 +1148,7 @@ async function runAgenCDaemonForegroundLocked(
       agentManager.handleRunnerTerminated(agentId, snapshot),
     );
     try {
-      snapshotPolicies.hydrateStartupRecovery(startupRecovery);
+      snapshotPolicies.registerStartupRecovery(startupRecovery);
       snapshotPolicies.startPeriodic();
     } catch (error) {
       snapshotPolicies.close();
@@ -2286,29 +2303,37 @@ export function recoverAgenCDaemonStartupState(
 
   try {
     for (const pathSet of paths) {
-      const driver = openStateDatabasePaths(pathSet);
+      const phase = <T>(name: string, work: () => T): T => {
+        const started = performance.now();
+        try {
+          return work();
+        } finally {
+          log(`daemon startup ${name} ${Math.round(performance.now() - started)}ms in ${pathSet.projectDir}`);
+        }
+      };
+      const driver = phase("database open", () => openStateDatabasePaths(pathSet));
       try {
         const walPath = `${pathSet.stateDbPath}-wal`;
         log(
           `daemon opened state DB ${pathSet.stateDbPath} (${describeFileSizeMb(pathSet.stateDbPath)}, wal ${describeFileSizeMb(walPath)})`,
         );
-        const prunedRuns = pruneTerminalAgentRuns(
+        const prunedRuns = phase("terminal retention", () => pruneTerminalAgentRuns(
           driver,
           config.agent?.retention,
-        );
+        ));
         // Per-session hard cap first, so the table-wide agent-grouped sweep
         // below only measures the rows that survive it.
-        const prunedPerSession = pruneSessionSnapshotsPerSession(
+        const prunedPerSession = phase("session snapshot retention", () => pruneSessionSnapshotsPerSession(
           driver,
           config.agent?.retention,
-        );
-        const prunedTable = pruneSessionStateSnapshots(
+        ));
+        const prunedTable = phase("snapshot table retention", () => pruneSessionStateSnapshots(
           driver,
           config.agent?.retention,
-        );
-        // Before the socket opens is the one moment a full VACUUM cannot stall a
-        // client; a database created without auto-vacuum is converted here once.
-        const reclaimed = driver.reclaimFreePages({ allowFullVacuum: true });
+        ));
+        // A full VACUUM rewrites the entire database. Startup is an admission
+        // path, so only bounded incremental reclamation belongs here.
+        const reclaimed = phase("space reclaim", () => driver.reclaimFreePages());
         if (reclaimed.mode !== "none") {
           log(describeStateReclaim(reclaimed, pathSet.stateDbPath));
         }
@@ -2323,12 +2348,13 @@ export function recoverAgenCDaemonStartupState(
               `${new Set([...prunedRuns.prunedSessionIds, ...prunedPerSession.prunedSessionIds, ...prunedTable.prunedSessionIds]).size} session(s) in ${pathSet.projectDir}`,
           );
         }
-        const report = recoverDaemonStateOnStartup(driver, {
+        const report = phase("journal and snapshot recovery", () => recoverDaemonStateOnStartup(driver, {
           now: () => recoveredAt,
           retainRuntimeResumeSources: true,
+          deferSnapshots: true,
           startupResumeSourceBudget,
           ...(canonicalProjectionEpoch !== undefined ? { canonicalProjectionEpoch } : {}),
-        });
+        }));
         recoveredRuns.push(...report.recoveredRuns);
         recoveredToolCalls.push(...report.recoveredToolCalls);
         warnings.push(...report.warnings);
@@ -2581,34 +2607,45 @@ export class AgenCDaemonSnapshotPolicyRegistry {
     }
   }
 
-  hydrateStartupRecovery(report: DaemonStartupRecoveryReport): void {
-    const reconciledSessionIds = new Set(
-      report.recoveredToolCalls.map((call) => call.sessionId),
-    );
+  registerStartupRecovery(report: DaemonStartupRecoveryReport): void {
     for (const run of report.recoveredRuns) {
       if (run.currentSessionId === undefined) continue;
-      const policy = this.#policyForProjectDir(run.projectDir);
-      this.#rememberSession(run.currentSessionId, policy.driver.stateDbPath);
+      this.#rememberSession(run.currentSessionId, join(run.projectDir, STATE_DATABASE_FILENAME));
       this.#liveSessions.add(run.currentSessionId);
-      policy.policy.trackSession(run.currentSessionId, run.id);
-      if (run.latestSnapshot !== undefined) {
-        policy.policy.hydrateSession({
-          sessionId: run.currentSessionId,
-          snapshotAt: run.latestSnapshot.snapshotAt,
-          conversation: run.latestSnapshot.conversation,
-          toolState: run.latestSnapshot.toolState,
-          mcpConnectionState: run.latestSnapshot.mcpConnectionState,
-        });
-        // Startup recovery reconciled this session's stale tool calls
-        // (replayed, poisoned or cancelled) into the hydrated state: write
-        // that outcome now, before the daemon advertises readiness, instead
-        // of leaving it to the first periodic tick. A session recovery left
-        // untouched keeps its rows exactly as startup pruning left them.
-        if (reconciledSessionIds.has(run.currentSessionId)) {
-          policy.policy.flushSession(run.currentSessionId);
-        }
+    }
+  }
+
+  hydrateStartupRun(
+    report: DaemonStartupRecoveryReport,
+    recovered: RecoveredAgentRun,
+  ): RecoveredAgentRun {
+    if (recovered.currentSessionId === undefined) return recovered;
+    const policy = this.#policyForProjectDir(recovered.projectDir);
+    const warnings: DaemonStartupRecoveryReport["warnings"][number][] = [];
+    const run = materializeRecoveredRunSnapshot(
+      policy.driver, recovered, report.recoveredToolCalls, warnings,
+    );
+    for (const warning of warnings) this.#log(warning.message);
+    const sessionId = recovered.currentSessionId;
+    policy.policy.trackSession(sessionId, run.id);
+    if (run.latestSnapshot !== undefined) {
+      policy.policy.hydrateSession({
+        sessionId,
+        snapshotAt: run.latestSnapshot.snapshotAt,
+        conversation: run.latestSnapshot.conversation,
+        toolState: run.latestSnapshot.toolState,
+        mcpConnectionState: run.latestSnapshot.mcpConnectionState,
+      });
+      // Startup recovery reconciled this session's stale tool calls
+      // (replayed, poisoned or cancelled) into the hydrated state: write
+      // that outcome before this session can replay tools or be published.
+      // The durable in-flight rows survive a crash before this write and
+      // are reconciled again by the next startup.
+      if (report.recoveredToolCalls.some(call => call.sessionId === sessionId && call.projectDir === run.projectDir)) {
+        policy.policy.flushSession(sessionId);
       }
     }
+    return run;
   }
 
   startPeriodic(): void {
@@ -3635,9 +3672,8 @@ function recoverySnapshotMetadata(
     projectDir: snapshot.projectDir,
     sessionId: snapshot.sessionId,
     snapshotAt: snapshot.snapshotAt,
-    conversation: snapshot.conversation as JsonValue,
-    toolState: snapshot.toolState as JsonValue,
-    mcpConnectionState: snapshot.mcpConnectionState as JsonValue,
+    // Summary metadata is copied into listings and the daemon shutdown file.
+    // Keep payloads in SQLite and the runtime, not in every summary copy.
     recoveredToolCalls: snapshot.recoveredToolCalls.map(
       recoveryToolCallMetadata,
     ),

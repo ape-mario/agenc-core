@@ -85,6 +85,8 @@ export interface RecoveredAgentRun {
   readonly lastSnapshotAt?: string;
   readonly metadata?: JsonObject;
   readonly latestSnapshot?: RecoveredSessionStateSnapshot;
+  /** The daemon loads the payload behind its per-session restore gate. */
+  readonly snapshotDeferred?: true;
   /** Exact pinned canonical authority retained only for daemon restoration. */
   readonly resumeSource?: StartupRunResumeSource;
 }
@@ -167,6 +169,7 @@ export function recoverDaemonStateOnStartup(
     readonly canonicalProjectionEpoch?: string;
     readonly retainRuntimeResumeSources?: boolean;
     readonly startupResumeSourceBudget?: StartupResumeSourceBudget;
+    readonly deferSnapshots?: boolean;
     /** Test-only race seam after cwd fd open and before pathname reproof. */
     readonly afterStartupResumeCwdOpenForTestingOnly?: (cwd: string) => void;
   } = {},
@@ -293,6 +296,7 @@ export function recoverDaemonStateOnStartup(
         warnings,
         excludedRunIds,
         retainedResumeSources,
+        options.deferSnapshots === true,
       );
       return {
         recoveredAt,
@@ -416,6 +420,7 @@ function loadRecoverableAgentRuns(
   warnings: DaemonStartupRecoveryWarning[],
   excludedRunIds: ReadonlySet<string>,
   resumeSources: ReadonlyMap<string, StartupRunResumeSource>,
+  deferSnapshots: boolean,
 ): RecoveredAgentRun[] {
   const runs = driver
     .prepareState<string[], AgentRunRow>(
@@ -444,6 +449,7 @@ function loadRecoverableAgentRuns(
         recoveredToolCalls,
         warnings,
         resumeSources.get(row.id),
+        deferSnapshots,
       ),
     );
 }
@@ -454,13 +460,14 @@ function toRecoveredAgentRun(
   recoveredToolCalls: readonly RecoveredInFlightToolCall[],
   warnings: DaemonStartupRecoveryWarning[],
   resumeSource: StartupRunResumeSource | undefined,
+  deferSnapshots: boolean,
 ): RecoveredAgentRun {
   const currentSessionId = nullableString(row.current_session_id);
   const createdByClient = nullableString(row.created_by_client);
   const lastSnapshotAt = nullableString(row.last_snapshot_at);
   const metadata = parseJsonObject(row.metadata_json);
   const latestSnapshot =
-    currentSessionId === undefined
+    currentSessionId === undefined || deferSnapshots
       ? undefined
       : loadLatestSnapshot(
           driver,
@@ -481,8 +488,31 @@ function toRecoveredAgentRun(
     ...(lastSnapshotAt !== undefined ? { lastSnapshotAt } : {}),
     ...(metadata !== undefined ? { metadata } : {}),
     ...(latestSnapshot !== undefined ? { latestSnapshot } : {}),
+    ...(deferSnapshots && currentSessionId !== undefined ? { snapshotDeferred: true as const } : {}),
     ...(resumeSource !== undefined ? { resumeSource } : {}),
   };
+}
+
+/**
+ * Canonical projection, cancellations and tool classification have already
+ * committed. Load only this session's latest snapshot, applying the same
+ * durable tool outcomes again. A crash before hydration leaves those rows for
+ * the next startup; no runtime or replay may be published before this step.
+ */
+export function materializeRecoveredRunSnapshot(
+  driver: StateSqliteDriver,
+  run: RecoveredAgentRun,
+  recoveredToolCalls: readonly RecoveredInFlightToolCall[],
+  warnings: DaemonStartupRecoveryWarning[],
+): RecoveredAgentRun {
+  if (run.snapshotDeferred !== true) return run;
+  const { snapshotDeferred: _, ...rest } = run;
+  const snapshot = run.currentSessionId === undefined
+    ? undefined
+    : loadLatestSnapshot(
+        driver, run.id, run.currentSessionId, recoveredToolCalls, warnings,
+      );
+  return { ...rest, ...(snapshot !== undefined ? { latestSnapshot: snapshot } : {}) };
 }
 
 function loadLatestSnapshot(

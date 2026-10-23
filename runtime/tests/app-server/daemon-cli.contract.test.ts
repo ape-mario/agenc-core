@@ -6514,6 +6514,11 @@ snapshot_max_bytes = 64
       "run-other",
       "run-restart",
     ]);
+    for (const agent of agentList.agents) {
+      expect(agent.metadata).not.toHaveProperty("recovery.snapshot.conversation");
+      expect(agent.metadata).not.toHaveProperty("recovery.snapshot.toolState");
+      expect(agent.metadata).not.toHaveProperty("recovery.snapshot.mcpConnectionState");
+    }
     const recoveredSessions = await client.request("session.list", {});
     expect(recoveredSessions.sessions.find(session => session.sessionId === "session-other")?.metadata?.lightMode).toBe(true);
     expect(recoveredSessions.sessions.find(session => session.sessionId === "session-restart")?.metadata?.lightMode).toBe(false);
@@ -6539,15 +6544,6 @@ snapshot_max_bytes = 64
           toolRecoveryMode: "category_policy",
           snapshot: {
             sessionId: "session-restart",
-            toolState: {
-              pending: [],
-              completed: {
-                "tool-restart": {
-                  status: "poisoned",
-                  recoveryAction: "poison",
-                },
-              },
-            },
             recoveredToolCalls: [
               {
                 toolCallId: "tool-restart",
@@ -8273,16 +8269,6 @@ snapshot_max_bytes = 64
           metadata: {
             recovery: {
               snapshot: {
-                toolState: {
-                  pending: [],
-                  completed: {
-                    "tool-poison": {
-                      status: "poisoned",
-                      recoveryCategory: "side-effecting",
-                      recoveryAction: "poison",
-                    },
-                  },
-                },
                 recoveredToolCalls: [
                   {
                     toolCallId: "tool-poison",
@@ -8311,16 +8297,6 @@ snapshot_max_bytes = 64
           metadata: {
             recovery: {
               snapshot: {
-                toolState: {
-                  pending: [],
-                  completed: {
-                    "tool-cancel": {
-                      status: "recovery_cancelled",
-                      recoveryCategory: "interactive",
-                      recoveryAction: "cancel",
-                    },
-                  },
-                },
                 recoveredToolCalls: [
                   {
                     toolCallId: "tool-cancel",
