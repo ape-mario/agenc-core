@@ -126,12 +126,21 @@ reasoning after thinking-off recovery. It increases replay input, is included in
 admission, and can change model strategy or reach a task budget sooner.
 See [Direct DeepSeek](../providers/deepseek-direct.md) for the experiment.
 
+`AGENC_WEB_SEARCH` accepts `auto` or `on` and overrides the saved top-level
+`web_search` setting controlled by the Web search row in `/model` and
+`/providers`. Auto preserves deferred discovery. On exposes WebSearch and
+web_fetch from the first request, adds one prompt instruction, and enables
+DeepSeek Search for DeepSeek sessions, including proxy routes. An explicit
+`AGENC_DEEPSEEK_WEB_SEARCH` value still takes priority. In measured DeepSeek
+requests, On adds about 279 input tokens per request in Light and 263 in
+standard mode; other providers can tokenize the tools differently.
+
 `AGENC_DEEPSEEK_WEB_SEARCH` (boolean-like) chooses whether the WebSearch tool
 of a `deepseek` session searches through DeepSeek's Search API. `1` turns it on
 for any DeepSeek base URL, ahead of a configured search endpoint; `0` turns it
-off. Unset leaves `[providers.deepseek] web_search` in charge, and when that is
-unset too it is on only for DeepSeek's own API host with no search endpoint
-configured. Each successful search costs $0.00075 ($0.75 per 1,000). See
+off. When unset, manual Web search On enables it; otherwise
+`[providers.deepseek] web_search` is in charge. With both settings unset, it
+is on only for DeepSeek's own API host with no search endpoint configured. Each successful search costs $0.00075 ($0.75 per 1,000). See
 [Direct DeepSeek](../providers/deepseek-direct.md#web-search).
 
 `AGENC_OPENAI_REASONING_REPLAY` (boolean-like, on by default) controls whether
