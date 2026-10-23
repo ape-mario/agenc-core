@@ -1,4 +1,5 @@
 import "../bootstrap/node-env.js";
+import { readLocalByokCredential } from "../auth/native-credentials.js";
 import { resolveCliCwdForStartup } from "./cli-cwd.js";
 import { requireProjectTrustForTui } from "./project-trust-preflight.js";
 import { cliStartupErrorMessage } from "./cli-process-main.js";
@@ -1616,6 +1617,10 @@ export async function oneShotCLI(
     const startup = resolveCanonicalStartupSelection({
       config,
       env: sessionEnv,
+      metadata: {
+        catalogHome: configStore.homeContext.path,
+        readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
+      },
       ...(startupCliFlags.model !== undefined ? { explicitModel: startupCliFlags.model } : {}),
       ...(profileName !== undefined ? { profileName } : {}),
     });

@@ -237,7 +237,7 @@ export class ModelMetadataResolver {
 
   constructor(options: ModelMetadataResolverOptions = {}) {
     this.fetchImpl = options.fetchImpl;
-    this.catalogHome = options.catalogHome ?? options.env?.AGENC_HOME;
+    this.catalogHome = options.catalogHome;
     this.readSavedApiKey = options.readSavedApiKey;
     this.env = options.env ?? process.env;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_METADATA_TIMEOUT_MS;
@@ -672,7 +672,10 @@ export class ModelMetadataResolver {
 
   /** The shared catalog handles TTL, disk persistence and published capability/price rows. */
   async discoverOpenRouterModels(): Promise<boolean> {
-    return (await this.openRouterCatalogForSession().refresh()).source !== "bundled";
+    const catalog = this.openRouterCatalogForSession();
+    // Like fetchJson(), a resolver without an injected transport stays local.
+    const snapshot = this.fetchImpl === undefined ? catalog.read() : await catalog.refresh();
+    return snapshot.source !== "bundled";
   }
 
   /**

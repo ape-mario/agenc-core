@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 
 import { defaultConfig, mergeConfigs } from "../../src/config/schema.js";
 import {
@@ -6,6 +6,10 @@ import {
   type SessionSelection,
 } from "../../src/session/provider-model-selection.js";
 import { ModelNotAllowedError } from "../../src/utils/model/modelAllowlist.js";
+import { clearPublishedModelCatalogs, recordPublishedModelCatalog } from "../../src/llm/registry/published-model-catalog.js";
+import { openRouterCatalogEntry } from "../../src/llm/registry/openrouter-models.js";
+
+afterEach(() => clearPublishedModelCatalogs());
 
 const CURRENT: SessionSelection = Object.freeze({
   provider: "grok",
@@ -88,6 +92,34 @@ describe("session provider/model policy boundary", () => {
 
 describe("model catalog admission", () => {
   const current = { provider: "deepseek", model: "deepseek-flash" };
+
+  test.each([
+    { model_provider: "openrouter", model: "private-openrouter-model" },
+    { providers: { openrouter: { default_model: "private-openrouter-model" } } },
+  ])("preserves a configured private OpenRouter selection: %o", config => {
+    for (const live of [false, true]) {
+      if (live) recordPublishedModelCatalog("openrouter", [openRouterCatalogEntry({
+        model: "public/model", label: "Public model", modalities: ["text"],
+        parameters: ["tools"], efforts: [], pricing: {},
+      })], { replace: true });
+      for (const layer of [
+        { model_provider: "openrouter" },
+        { model_provider: "openrouter", model: "private-openrouter-model" },
+      ]) {
+        expect(resolveProviderModelSelection(config, current, layer, {}))
+          .toMatchObject({ provider: "openrouter", model: "private-openrouter-model" });
+        expect(() => resolveProviderModelSelection({ ...config, availableModels: [] }, current, layer, {}))
+          .toThrow(ModelNotAllowedError);
+      }
+    }
+  });
+
+  test("still validates a newly typed OpenRouter model when a private model is saved", () => {
+    const config = { model_provider: "openrouter", model: "private-openrouter-model" };
+    expect(() => resolveProviderModelSelection(config, current, {
+      model_provider: "openrouter", model: "another-private-model",
+    }, {})).toThrow("Invalid OpenRouter model id");
+  });
 
   test.each(["xyz", "deepseek-flsh", "deepseek:deepseek-flsh"])(
     "rejects fixed-catalog input %s with a closest-name hint", (model) => {

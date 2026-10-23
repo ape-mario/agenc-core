@@ -86,6 +86,11 @@ export class OpenRouterCatalog {
   }
 
   refresh(): Promise<OpenRouterCatalogSnapshot> {
+    // Match other background network features: tests must inject a transport.
+    // The hermetic runner sets NODE_ENV for workers and child processes.
+    if (this.#options.fetchImpl === undefined && process.env.NODE_ENV === "test") {
+      return Promise.resolve(this.read());
+    }
     if (this.#pending !== undefined) return this.#pending;
     if (this.#snapshot.source !== "bundled" && this.#now() - this.#at < OPENROUTER_CATALOG_TTL_MS) {
       return Promise.resolve(this.read());

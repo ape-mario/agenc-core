@@ -44,7 +44,7 @@ function resolverFor(
     // Public endpoints answer without a key.
   }
   return new ModelMetadataResolver({
-    fetchImpl: fetchImpl ?? globalThis.fetch.bind(globalThis),
+    fetchImpl: fetchImpl ?? (process.env.NODE_ENV === "test" ? undefined : globalThis.fetch.bind(globalThis)),
     env,
     timeoutMs: DISCOVERY_TIMEOUT_MS,
   });

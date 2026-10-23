@@ -1,4 +1,5 @@
 import "../bootstrap/node-env.js";
+import { readLocalByokCredential } from "../auth/native-credentials.js";
 import { readCompactionProgressEvent } from "../services/compact/progress.js";
 import type { CompactionProgressEvent } from "../services/compact/types.js";
 import type { OneShotContinueSession } from "./route.js";
@@ -3619,6 +3620,10 @@ export async function bootTUIEntry(
       const startup = resolveCanonicalStartupSelection({
         config,
         env: sessionEnv,
+        metadata: {
+          catalogHome: configStore.homeContext.path,
+          readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
+        },
         ...(startupCliFlags.model !== undefined ? { explicitModel: startupCliFlags.model } : {}),
         ...(profileName !== undefined ? { profileName } : {}),
       });

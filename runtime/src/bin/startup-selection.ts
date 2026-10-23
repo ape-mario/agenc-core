@@ -1,4 +1,3 @@
-import { openRouterCatalogFor } from "../llm/registry/openrouter-live-catalog.js";
 import { defaultModelForProvider } from "../config/resolve-model.js";
 import { assertModelCatalogSelection, openRouterSelectionNotice } from "../llm/model-catalog-selection.js";
 import { resolve as resolvePath } from "node:path";
@@ -115,6 +114,8 @@ export function resolveCanonicalStartupSelection(params: {
   readonly config: AgenCConfig;
   /** The same scoped provider environment used to create this session. */
   readonly env: Readonly<Record<string, string | undefined>>;
+  /** Catalog dependencies captured at ingress, never rediscovered from env. */
+  readonly metadata?: Omit<ModelMetadataResolverOptions, "env">;
   /** A model typed at CLI ingress. Omit for saved, profile, or restored selections. */
   readonly explicitModel?: string;
   readonly profileName?: string;
@@ -140,8 +141,8 @@ export function resolveCanonicalStartupSelection(params: {
       "canonical startup config must contain a provider/model pair",
     );
   }
-  if (provider === "openrouter" && params.env.AGENC_HOME) {
-    openRouterCatalogFor({ home: params.env.AGENC_HOME, apiKey: params.env.OPENROUTER_API_KEY?.trim() }).read();
+  if (provider === "openrouter" && params.metadata !== undefined) {
+    new ModelMetadataResolver({ ...params.metadata, env: params.env }).readOpenRouterCatalog();
   }
   // Saved models may outlive a curated catalog entry or arrive before Core
   // learns about them. Preserve main's startup behavior for those selections.

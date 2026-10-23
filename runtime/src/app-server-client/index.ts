@@ -5,6 +5,7 @@
  * daemon request setup and the minimal TUI session shell outside `bin/agenc.ts`.
  */
 
+import { readLocalByokCredential } from "../auth/native-credentials.js";
 import { sessionDurableMemoryDirectories } from "../services/extractMemories/memory-paths.js";
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
@@ -802,6 +803,10 @@ async function createBoundAgenCDaemonOnlyTuiContext(
   const startup = resolveCanonicalStartupSelection({
     config: effectiveConfig,
     env: providerEnvironment,
+    metadata: {
+      catalogHome: configStore.homeContext.path,
+      readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
+    },
     ...(options.explicitModel !== undefined
       ? { explicitModel: options.explicitModel }
       : {}),

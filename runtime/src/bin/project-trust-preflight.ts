@@ -2,6 +2,7 @@
 import { homedir } from "node:os";
 import { parse as parsePath } from "node:path";
 
+import { readLocalByokCredential } from "../auth/native-credentials.js";
 import { ConfigStore } from "../config/store.js";
 import {
   resolveAgencHome,
@@ -165,6 +166,10 @@ export async function runProjectTrustPreflightForTui(
   const startup = resolveCanonicalStartupSelection({
     config,
     env,
+    metadata: {
+      catalogHome: configStore.homeContext.path,
+      readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
+    },
     ...(startupCliFlags.model !== undefined ? { explicitModel: startupCliFlags.model } : {}),
     ...(profileName !== undefined ? { profileName } : {}),
   });

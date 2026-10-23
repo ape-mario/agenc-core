@@ -6,6 +6,7 @@ import {
   type ProviderSlug,
 } from "../config/provider-model-authority.js";
 import { defaultConfig, type AgenCConfig } from "../config/schema.js";
+import { configuredModelForProvider } from "../config/resolve-model.js";
 import { resolveBuiltInProviderSlug } from "../llm/registry/provider-info.js";
 import type { Session } from "./session.js";
 import { asRecord } from "../utils/record.js";
@@ -64,7 +65,11 @@ export function resolveProviderModelSelection(
   if (model === undefined) {
     throw new Error("model selection values must be non-empty");
   }
-  if (options.validateCatalog !== false) {
+  // A saved OpenRouter selection may name a private route or outlive the
+  // public catalog. Validate newly typed IDs while preserving that saved pair.
+  const savedOpenRouterModel = provider === "openrouter" &&
+    configuredModelForProvider(config ?? {}, provider) === model;
+  if (options.validateCatalog !== false && !savedOpenRouterModel) {
     assertModelCatalogSelection(config ?? {}, provider, model, env);
   }
   if (!isModelAllowed(provider, model, config ?? {})) {
