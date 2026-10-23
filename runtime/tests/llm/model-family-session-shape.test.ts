@@ -24,6 +24,7 @@ describe("DeepSeek per-call output default through gateways", () => {
     ["openrouter", "deepseek/deepseek-v4-pro-0813", 393_216],
     ["ollama-cloud", "deepseek-v4-pro:0813", 393_216],
     ["ollama-cloud", "deepseek-v4.1-flash", 393_216],
+    ["abliteration", "abliterated-model-large-flash", 262_144],
   ] as const)("%s %s reserves 64k a call; the route limit stays the ceiling", (provider, model, ceiling) => {
     const resolved = new ModelMetadataResolver({ env: {} }).resolveSync({ provider, model, config: EMPTY_CONFIG });
     expect(resolved).toMatchObject({ maxOutputTokens: 64_000, maxOutputTokensUpperLimit: ceiling, maxOutputTokensCappedDefault: true });
@@ -51,6 +52,7 @@ describe("DeepSeek default effort shown for gateways", () => {
     ["ollama-cloud", "deepseek-v4-pro:0813"],
     ["ollama-cloud", "deepseek-v4.1-flash"],
     ["openrouter", "deepseek/deepseek-v4-pro-0813"],
+    ["abliteration", "abliterated-model-large-flash"],
   ])("%s %s defaults to high like DeepSeek's own API", (provider, model) => {
     const registry = new ModelRegistry({ config: defaultConfig() });
     expect(modelRegistryEntryToModelInfo(registry.resolveSync({ provider, model })).defaultReasoningLevel).toBe("high");

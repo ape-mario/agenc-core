@@ -71,6 +71,7 @@ test.each([
   ["openrouter", "deepseek/deepseek-v4.1-flash-1017"],
   ["ollama-cloud", "deepseek-v4.1-flash:1017"],
   ["venice", "deepseek-v4-1-flash-1017"],
+  ["abliteration", "abliterated-model-large-flash"],
 ])("a DeepSeek model through %s gets the batch Edit DeepSeek's own API gets", (provider, model) => {
   const session = gatewayOwner(provider, model);
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, getSession: () => session });
@@ -90,6 +91,9 @@ test.each([
   ["openrouter", "z-ai/glm-5.3"],
   ["ollama-cloud", "gpt-oss:120b"],
   ["venice", "zai-org-glm-5-2"],
+  ["abliteration", "abliterated-model-large-v2"],
+  ["abliteration", "abliterated-model-large"],
+  ["abliteration", "abliterated-model"],
 ])("other gateway models keep the canonical Light editors: %s %s", (provider, model) => {
   const session = gatewayOwner(provider, model);
   const registry = buildToolRegistry({ workspaceRoot: "/tmp", lightMode: true, getSession: () => session });

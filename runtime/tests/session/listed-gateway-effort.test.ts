@@ -86,6 +86,10 @@ describe("Ollama Cloud and Venice send the effort the status line shows", () => 
   });
 
   test("abliteration.ai sends each model's own mode, for every choice", () => {
+    expect(sent("abliteration", "abliterated-model-large-flash", undefined)).toBe("high");
+    expect(sent("abliteration", "abliterated-model-large-flash", "none")).toBe("none");
+    expect(sent("abliteration", "abliterated-model-large-flash", "low")).toBe("low");
+    expect(sent("abliteration", "abliterated-model-large-flash", "max")).toBe("max");
     // Large v2 runs low, high and max; AgenC's default is high (the provider runs max unasked).
     expect(sent("abliteration", "abliterated-model-large-v2", undefined)).toBe("high");
     expect(sent("abliteration", "abliterated-model-large-v2", "medium")).toBe("high");

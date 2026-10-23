@@ -1270,11 +1270,22 @@ prompt and tools. The Responses and Anthropic Messages surfaces are not used.
 | `abliterated-model-large-v2` (default) | 1,000,000 | 999,990 | text | low, high, max | high | $3.00, $0.30, $5.00 |
 | `abliterated-model` | 262,144 | 262,134 | text, image | off, minimal, low, medium, high, xhigh, max | none sent (native depth) | $1.00, $0.10, $3.00 |
 | `abliterated-model-large` | 1,000,000 | 999,990 | text | high, max | high | $3.00, $0.30, $5.00 |
+| `abliterated-model-large-flash` | 1,048,576 | 262,144 | text, image | off, low, high, max | high | $1.00, $0.10, $2.00 |
 
-All three models reason, stream and call tools, including parallel calls.
-AgenC reserves 65,536 output tokens a call, since reasoning and the answer
+All four models reason, stream and call tools, including parallel calls.
+AgenC reserves 65,536 output tokens a call for the existing models and 64,000
+for Large Flash through its DeepSeek family behavior. Reasoning and the answer
 share `max_tokens`. The documented maximum stays available to an explicit
 `max_output_tokens` and to max-output recovery.
+
+Large Flash is based on DeepSeek-V4.1-Flash-1017. In Light, it uses DeepSeek's
+batch Edit and task limits. Requests keep abliteration's session cache header
+and `prompt_cache_key`. Both `/model` and `/providers` list the model.
+
+The ZDR badge uses abliteration's existing provider policy for all four models.
+The provider states that it retains no prompt, completion or image content and
+does not use that content for training. Operational and billing metadata are
+retained. See [data handling](https://abliteration.ai/data-handling).
 
 ### Reasoning effort
 
@@ -1282,21 +1293,22 @@ Chat Completions takes `reasoning_effort` with any of `none`, `minimal`,
 `low`, `medium`, `high`, `xhigh` and `max` on every model, and runs it at one
 of the modes the model has:
 
-| Requested | `abliterated-model` | `abliterated-model-large-v2` | `abliterated-model-large` |
-| --- | --- | --- | --- |
-| `none` | reasoning off | low, trace hidden | reasoning off |
-| `minimal` | minimal | low | high |
-| `low` | low | low | high |
-| `medium` | medium | high | high |
-| `high` | high | high | high |
-| `xhigh` | xhigh | max | max |
-| `max` | max | max | max |
-| nothing sent | native depth | max | high |
+| Requested | `abliterated-model` | `abliterated-model-large-v2` | `abliterated-model-large` | `abliterated-model-large-flash` |
+| --- | --- | --- | --- | --- |
+| `none` | reasoning off | low, trace hidden | reasoning off | reasoning off |
+| `minimal` | minimal | low | high | low |
+| `low` | low | low | high | low |
+| `medium` | medium | high | high | high |
+| `high` | high | high | high | high |
+| `xhigh` | xhigh | max | max | high |
+| `max` | max | max | max | max |
+| nothing sent | native depth | max | high | high |
 
 `/effort` lists only the modes a model runs, and AgenC sends only those. A
 saved level the model does not list runs at the model's AgenC default; `xhigh`
 and `max` stand in for each other. `/effort off` is offered on
-`abliterated-model` only. Large v2 cannot turn reasoning off.
+`abliterated-model` and `abliterated-model-large-flash`. Large v2 cannot turn
+reasoning off.
 
 The provider runs Large v2 at max when a request names no level. AgenC sends
 high instead. Reasoning tokens bill as output at $5 per million, and every
@@ -1325,11 +1337,10 @@ new session can read a prefix an earlier one wrote.
 
 ### Images
 
-Only `abliterated-model` takes images: PNG, JPEG, WebP or GIF up to 12 MB.
-The large models answer 400 to image content, so AgenC refuses an image
+`abliterated-model` and `abliterated-model-large-flash` take images.
+Large and Large v2 answer 400 to image content, so AgenC refuses an image
 before sending it to them. An image a tool returns, such as a screenshot or
-an image file read, reaches `abliterated-model` as a user image after the tool
-results.
+an image file read, reaches a vision model as a user image after the tool results.
 
 ### Model list
 

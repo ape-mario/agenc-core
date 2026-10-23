@@ -210,6 +210,42 @@
       "parent": null
     },
     {
+      "id": "abliterated-model-large-flash",
+      "display_name": "Abliterated Large Flash",
+      "name": "Abliterated Large Flash",
+      "context_length": 1048576,
+      "max_output_length": 262144,
+      "input_modalities": [
+        "text",
+        "image"
+      ],
+      "output_modalities": [
+        "text"
+      ],
+      "supported_features": [
+        "tools",
+        "json_mode",
+        "structured_outputs",
+        "logprobs",
+        "web_search",
+        "reasoning"
+      ],
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000002",
+        "image": "0",
+        "request": "0",
+        "input_cache_read": "0.0000001"
+      },
+      "access": {
+        "required_checks": [],
+        "available": true,
+        "locked": false,
+        "missing_requirements": []
+      },
+      "is_ready": true
+    },
+    {
       "id": "fixture-locked-model",
       "object": "model",
       "owned_by": "abliteration.ai",

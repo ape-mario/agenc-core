@@ -12,6 +12,8 @@ describe("model family behind a provider/model pair", () => {
     ["ollama-cloud", "deepseek-v4-pro:0813", "deepseek"],
     ["venice", "deepseek-v4-1-flash-1017", "deepseek"],
     ["venice", "deepseek-v4-pro-0813", "deepseek"],
+    ["abliteration", "abliterated-model-large-flash", "deepseek"],
+    ["abliteration", " ABLITERATED-MODEL-LARGE-FLASH ", "deepseek"],
     // GPT-6 Luna and other hosted GPT reasoning models.
     ["openrouter", "openai/gpt-6-luna", "openai"],
     ["openrouter", "~openai/gpt-luna-latest", undefined],
@@ -35,6 +37,13 @@ describe("model family behind a provider/model pair", () => {
     ["venice", "openai-gpt-oss-120b"],
     ["venice", "openai-gpt-4o-2024-11-20"],
     ["venice", "zai-org-glm-5-2"],
+    ["abliteration", "abliterated-model"],
+    ["abliteration", "abliterated-model-large"],
+    ["abliteration", "abliterated-model-large-v2"],
+    ["abliteration", "abliterated-model-large-flash-next"],
+    ["abliteration", "abliterated-model-large-flash:free"],
+    ["abliteration", "deepseek-v4.1-flash"],
+    ["openai-compatible", "abliterated-model-large-flash"],
     // Not gateways: the managed route and custom endpoints keep their own contracts.
     ["agenc", "deepseek/deepseek-v4.1-flash"],
     ["openai-compatible", "deepseek-v4-flash"],
