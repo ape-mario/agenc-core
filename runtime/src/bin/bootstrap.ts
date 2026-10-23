@@ -1204,7 +1204,10 @@ async function bootstrapLocalRuntimeSessionScoped(
   const localByokAuthBackend = new LocalAuthBackend({ agencHome, env });
   startup = await resolveDiscoveredStartupDefault(startup, configStore.modelSelectionSource(), {
     catalogHome: configStore.homeContext.path,
-    fetchImpl,
+    // A default bound global fetch is not an injected test transport. Keep
+    // OpenRouter background discovery local unless a fixture opts into it.
+    fetchImpl: startup.provider === "openrouter" && process.env.NODE_ENV === "test"
+      ? options.fetchImpl : fetchImpl,
     env: providerEnvironment,
     readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
   });
@@ -1525,7 +1528,8 @@ async function bootstrapLocalRuntimeSessionScoped(
     fallbackProvider: profileProvider,
     metadata: {
       catalogHome: configStore.homeContext.path,
-      fetchImpl,
+      fetchImpl: profileProvider === "openrouter" && process.env.NODE_ENV === "test"
+        ? options.fetchImpl : fetchImpl,
       env,
       readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
       // Sessions on the real network share one download of each public model
