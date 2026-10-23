@@ -83,6 +83,14 @@ afterEach(() => {
 });
 
 describe("durable checkpoint reader", () => {
+  it("preserves and validates the completion gate sample allowance", () => {
+    const base = legacyCheckpoint("a".repeat(64));
+    const checkpoint = {...base, checkpointVersion: 4, toolResultIntegrityVersion: 1, prefixHashVersion: 3,
+      resumableState: {...base.resumableState, completionGateRound: 1, completionGateSampleStart: 4}};
+    expect(readTurnCheckpoint(checkpoint)).toMatchObject({checkpoint: {resumableState: {completionGateSampleStart: 4}}});
+    expect(() => readTurnCheckpoint({...checkpoint, resumableState: {...checkpoint.resumableState, completionGateSampleStart: -1}})).toThrow();
+  });
+
   it("layers strict checkpoint validation over the additive recovery envelope", () => {
     const checkpoint = {
       ...legacyCheckpoint("a".repeat(64)),

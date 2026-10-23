@@ -1,5 +1,5 @@
 /**
- * Phase 4b — Completion gate for non-interactive sessions.
+ * Phase 4b: Completion gate for non-interactive sessions.
  *
  * An interactive session can end a turn on a premature "done": the human
  * reads the reply and steers. A non-interactive session (`agenc -p`, a
@@ -15,7 +15,8 @@
  *     item must have an associated successful tool result since the last
  *     change (token overlap with the tool name, arguments, or content;
  *     sentence punctuation is not a token). The first answer must also cite a
- *     command that succeeded since then, so reads alone never settle it. An
+ *     command that succeeded since then, apart from the narrow literal-file
+ *     write/read contract. An
  *     answer that falls short gets a durable user message and the loop
  *     re-enters (`transition: completion_gate`). The first message quotes the
  *     task and asks for an acceptance checklist backed by executed checks; a
@@ -50,7 +51,9 @@
  * The injected message is durable on purpose: it is persisted with the
  * next iteration checkpoint like a stop-hook message, so a resumed turn
  * sees it in its history and `completionGateRound` (checkpointed) keeps the
- * loop bounded across a crash.
+ * loop bounded across a crash. A separate persisted sample ordinal bounds
+ * tool and recovery continuations to six samples, each with an 8,192-token
+ * output cap. Exhausting that allowance stops an ongoing tool loop.
  *
  * @module
  */
@@ -64,13 +67,16 @@ import type {
   CompletedToolResultRecord,
   TurnState,
 } from "../session/turn-state.js";
+import { verifiedLiteralFile } from "./completion-gate-literal.js";
 import { isPlanMode } from "../session/plan-mode.js";
 import { inDeadlineReserve } from "../session/run-deadline.js";
 import { isSubagentSessionSource } from "../session/run-turn-queued-commands.js";
 import { hasFileMutationMetadata } from "../tools/result-metadata.js";
 
 export const DEFAULT_COMPLETION_GATE_ROUNDS = 3;
-export const COMPLETION_GATE_ROUNDS_HARD_CAP = 10;
+export const COMPLETION_GATE_ROUNDS_HARD_CAP = 3;
+export const COMPLETION_GATE_MAX_SAMPLES = 6;
+export const COMPLETION_GATE_MAX_OUTPUT_TOKENS = 8_192;
 export const COMPLETION_GATE_TASK_TEXT_MAX_CHARS = 6_000;
 export const COMPLETION_GATE_MAX_UNMET_ITEMS = 20;
 const UNMET_ITEM_MAX_CHARS = 200;
@@ -105,6 +111,7 @@ export type CompletionGateReason =
   | "unavailable_checks"
   | "rounds_exhausted"
   | "no_tool_use"
+  | "literal_file_verified"
   | "answer_only"
   | "deadline_reserve";
 
@@ -639,7 +646,7 @@ export function buildCompletionGateMessage(input: {
   readonly unlinkedItems?: readonly string[];
 }): string {
   const open = `<completion_gate round="${input.round}" of="${input.maxRounds}">`;
-  const close = "</completion_gate>";
+  const close = "Keep the answer concise: at most five grouped evidence lines. Reuse current evidence; do not expand the task.\n</completion_gate>";
   if (input.reason === "no_verification") {
     return [
       open,
@@ -650,7 +657,7 @@ export function buildCompletionGateMessage(input: {
   if (input.reason === "no_checklist") {
     return [
       open,
-      "Your previous answer did not provide a valid acceptance checklist. Re-run the relevant checks, then include at least one nonempty `- [x]` item outside code fences, with the check and its observed result. Use only `- [x]`, `- [ ]`, or `- [-] reason` for checklist items. Leave unmet requirements unchecked and mark genuinely unverifiable requirements `- [-]`; neither is verified. Do not invent successful evidence to satisfy the format.",
+      "Your previous answer did not provide a valid acceptance checklist. Reuse checks that passed after the last change; run a check only if evidence is missing. Include at least one nonempty `- [x]` item outside code fences, with the check and its observed result. Use only `- [x]`, `- [ ]`, or `- [-] reason` for checklist items. Leave unmet requirements unchecked and mark genuinely unverifiable requirements `- [-]`; neither is verified. Do not invent successful evidence to satisfy the format.",
       close,
     ].join("\n");
   }
@@ -674,13 +681,10 @@ export function buildCompletionGateMessage(input: {
   }
   return [
     open,
-    "Your last message reads as a final answer. It is not accepted yet. This session is non-interactive: nobody will answer a question or run a check for you, and the result is judged by inspecting the workspace after you stop, not by reading your summary.",
-    "",
-    "Do this now, with tools:",
-    "1. Write an acceptance checklist from the task quoted below: every file, path, name, format, command, test, exit code, edge case and behaviour it states or clearly implies.",
-    "2. For each item, name the concrete check that proves it in this environment: the tests, builds or commands the task names; the delivered program run on the stated inputs and on edge cases; the produced files inspected. A check that ran after your last change counts and need not be re-run; run every check you have not observed passing since then, and read its actual output.",
-    "3. If any item is unmet or broken, keep working on it now, then re-check the whole list, because a fix can break something that passed before.",
-    "4. Then answer again with the checklist as markdown checkboxes, one line of evidence per item (the command you ran and what it showed), followed by a short summary. Use `- [x]` for verified items, `- [ ]` for items still unmet, and `- [-] reason` for items that cannot be verified here.",
+    "Review whether the requested result is supported by the tool results already recorded. Keep the review proportional to the task.",
+    "Reuse successful checks after the last relevant change. Do not repeat reads, tests or builds just to produce a checklist. If evidence is missing or a requirement failed, run only the relevant check and fix that requirement.",
+    "Group related requirements into at most five short evidence lines. Do not split paths, names, formats and trivial properties into separate items, invent extra edge cases, or re-check unrelated work. For a small file task, one read-back check is enough.",
+    "Answer briefly using - [x] for supported requirements, - [ ] for unmet requirements, and - [-] with an observed reason for checks unavailable here. Name the executed command or inspected file on each line. Do not claim success from an intention or a failed check.",
     "",
     "<task_instruction>",
     neutralizeEnvelopeTags(input.taskText),
@@ -879,6 +883,9 @@ export async function completionGate(
   ) {
     return settle("skipped", "answer_only", 0);
   }
+  if (round === 0 && verifiedLiteralFile(plan.taskText, text, state.completedToolResults, ctx.cwd)) {
+    return settle("verified", "literal_file_verified", 0);
+  }
   const toolCallsSinceInjection =
     round === 0
       ? 0
@@ -966,6 +973,7 @@ export async function completionGate(
   }
   const injectItems =
     reason === "unavailable_unproven" ? unavailableItems : unmetItems;
+  state.completionGateSampleStart ??= state.modelSampleOrdinal;
   state.completionGateRound += 1;
   state.completionGateToolLedgerMark = state.completedToolResults.length;
   state.completionGateLastRequest = request;

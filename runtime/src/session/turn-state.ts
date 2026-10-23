@@ -438,6 +438,8 @@ export interface TurnState {
   completionGate: CompletionGatePlan | undefined;
   /** Verification prompts injected this turn. Checkpointed; bounds the loop. */
   completionGateRound: number;
+  /** Sample ordinal at the first verification request, persisted across resume. */
+  completionGateSampleStart: number | undefined;
   /** `completedToolResults.length` when the last gate prompt was injected. */
   completionGateToolLedgerMark: number;
   /**
@@ -615,6 +617,7 @@ export function buildInitialTurnState(
     // Phase 4b
     completionGate: undefined,
     completionGateRound: 0,
+    completionGateSampleStart: undefined,
     completionGateToolLedgerMark: 0,
     completionGateLastRequest: undefined,
     completionGateSettled: false,
@@ -682,6 +685,7 @@ export function toCheckpointSlice(state: TurnState): TurnCheckpointSlice {
     stopHookBlockingCount: number;
     planToolRequiredRetryCount?: number;
     completionGateRound?: number;
+    completionGateSampleStart?: number;
     pendingAdmissionFallback?: PendingAdmissionFallback;
     modelSampleOrdinal?: number;
     modelSampleResumePrompt?: ModelSampleResumePrompt;
@@ -704,6 +708,9 @@ export function toCheckpointSlice(state: TurnState): TurnCheckpointSlice {
   };
   if (state.completionGateRound > 0) {
     slice.completionGateRound = state.completionGateRound;
+  }
+  if (state.completionGateSampleStart !== undefined) {
+    slice.completionGateSampleStart = state.completionGateSampleStart;
   }
   if (state.reasoningCapPolicy !== undefined) {
     slice.reasoningCapPolicy = readReasoningCapPolicy(state.reasoningCapPolicy);
@@ -836,6 +843,10 @@ export function restoreFromCheckpoint(
     slice.completionGateRound >= 0
   ) {
     state.completionGateRound = slice.completionGateRound;
+  }
+  if (slice.completionGateSampleStart !== undefined &&
+      Number.isSafeInteger(slice.completionGateSampleStart) && slice.completionGateSampleStart >= 0) {
+    state.completionGateSampleStart = slice.completionGateSampleStart;
   }
   if (
     slice.pendingAdmissionFallback !== undefined &&
