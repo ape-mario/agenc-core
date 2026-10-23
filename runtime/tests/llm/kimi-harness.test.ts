@@ -189,3 +189,25 @@ test("stop limits count UTF-8 bytes and reject invalid requests before HTTP", as
   await expect(provider.chatStream(messages, () => undefined, { stopSequences: Array(6).fill("END") })).rejects.toThrow("five stop sequences");
   expect(fetchImpl).toHaveBeenCalledTimes(1);
 });
+
+test.each(KIMI_CHAT_MODELS)("separates tool work from final schema generation: %s", async model => {
+  const fetchImpl = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ model, choices: [{ finish_reason: "tool_calls", message: {
+      role: "assistant", content: "", reasoning_content: "Read the file first.",
+      tool_calls: [{ id: "read_0", type: "function", function: { name: "FileRead", arguments: '{"path":"x"}' } }],
+    } }] }))
+    .mockResolvedValueOnce(Response.json({ model, choices: [{ finish_reason: "stop", message: { content: '{"ok":true}' } }] }));
+  const provider = new KimiProvider({ model, apiKey: "test-key", fetchImpl, tools: [tool] });
+  const messages: LLMMessage[] = [{ role: "user", content: "Read x then return JSON." }];
+  const first = await provider.chat(messages);
+  messages.push({ role: "assistant", content: first.content, toolCalls: first.toolCalls,
+    providerReasoningContent: first.providerReasoningContent, providerReasoningProvenance: first.providerReasoningProvenance });
+  messages.push({ role: "tool", toolCallId: first.toolCalls![0].id, toolName: "FileRead", content: "test" });
+  const result = await provider.chat(messages, { tools: [], structuredOutput: { schema: { type: "json_schema", name: "answer",
+    schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"], additionalProperties: false },
+  } } });
+  expect(bodyAt(fetchImpl, 0)).not.toHaveProperty("response_format");
+  expect(bodyAt(fetchImpl, 1)).not.toHaveProperty("tools");
+  expect(bodyAt(fetchImpl, 1)).toHaveProperty("response_format");
+  expect(result.structuredOutput?.parsed).toEqual({ ok: true });
+});

@@ -1,5 +1,5 @@
 import unittest
-from suite import stress_target
+from suite import stress_target, stress_case
 
 
 class StressBudgetTest(unittest.TestCase):
@@ -15,6 +15,11 @@ class StressBudgetTest(unittest.TestCase):
     def test_delayed_billing_cannot_fund_another_large_request(self):
         self.assertLess(stress_target(self.ledger(1, 20, 24), 1048576), 96000)
         self.assertLess(stress_target(self.ledger(1, 1, 1.2), 1048576), 96000)
+
+    def test_remaining_target_uses_shorter_tasks_without_relaxing_wire_limits(self):
+        self.assertEqual(stress_case(self.ledger(20, 20, 5), 1048576, 150), ('replay', {}))
+        self.assertEqual(stress_case(self.ledger(1, 1, 24), 1048576, 100),
+                         ('long-context', {'seed': 100, 'target_tokens': 500000}))
 
 
 if __name__ == '__main__':
