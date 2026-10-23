@@ -770,6 +770,8 @@ export interface LLMChatOptions {
    * conversation state is implied.
    */
   readonly promptCacheKey?: string;
+  /** Native Kimi K3 implicit cache TTL. Hits renew the original entry's TTL. */
+  readonly promptCacheTtl?: "5m" | "1h";
   /**
    * Stable prompt-cache scope of the local user (the same for every session
    * of one AgenC home). Wires whose provider keys the cache by scope rather

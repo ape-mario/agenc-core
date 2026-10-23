@@ -665,13 +665,30 @@ const COST_TIER_ZAI_GLM_53_FLASH: Readonly<ModelCostEntry> = Object.freeze({
   cachedInputIncludedInInputTokens: true,
 });
 
-// Official Moonshot global API prices retrieved 2026-09-05.
-// https://platform.kimi.ai/docs/pricing/chat-k3
-// https://platform.kimi.ai/docs/pricing/chat-k27-code
-// https://platform.kimi.ai/docs/pricing/chat-k26
+// Official Moonshot global API prices rechecked 2026-10-23, including the
+// newly published K3.1 rows: https://platform.kimi.ai/docs/pricing/chat
+const COST_TIER_KIMI_K31_PRO: Readonly<ModelCostEntry> = Object.freeze({
+  inputUsdPer1K: 0.002,
+  outputUsdPer1K: 0.01,
+  cachedInputUsdPer1K: 0.0002,
+  cachedInputIncludedInInputTokens: true,
+  cacheCreationUsdPer1K: 0.002,
+  cacheCreation1hUsdPer1K: 0.004,
+  cacheCreationIncludedInInputTokens: true,
+});
+const COST_TIER_KIMI_K31_PRO_HIGHSPEED: Readonly<ModelCostEntry> = Object.freeze({
+  inputUsdPer1K: 0.004,
+  outputUsdPer1K: 0.02,
+  cachedInputUsdPer1K: 0.0002,
+  cachedInputIncludedInInputTokens: true,
+  cacheCreationUsdPer1K: 0.004,
+  cacheCreation1hUsdPer1K: 0.008,
+  cacheCreationIncludedInInputTokens: true,
+});
 const COST_TIER_KIMI_K3: Readonly<ModelCostEntry> = Object.freeze({
   // Automatic 5m cache writes are included in prompt_tokens, at the input rate.
   cacheCreationUsdPer1K: 0.003,
+  cacheCreation1hUsdPer1K: 0.006,
   cacheCreationIncludedInInputTokens: true,
   inputUsdPer1K: 0.003,
   outputUsdPer1K: 0.015,
@@ -1224,6 +1241,8 @@ export const DEFAULT_MODEL_COSTS: Readonly<Record<string, ModelCostEntry>> =
       cachedInputUsdPer1K: 0.00025, cachedInputIncludedInInputTokens: true,
     },
     "kimi:kimi-k3": COST_TIER_KIMI_K3,
+    "kimi:kimi-k3.1-pro": COST_TIER_KIMI_K31_PRO,
+    "kimi:kimi-k3.1-pro-highspeed": COST_TIER_KIMI_K31_PRO_HIGHSPEED,
     "kimi:kimi-k2.7-code": COST_TIER_KIMI_K27_CODE,
     "kimi:kimi-k2.7-code-highspeed": COST_TIER_KIMI_K27_CODE_HIGHSPEED,
     "kimi:kimi-k2.6": COST_TIER_KIMI_K26,

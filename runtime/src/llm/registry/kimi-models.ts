@@ -3,7 +3,7 @@
  * advertise the K3 context, modalities, thinking-only mode and effort enum.
  * Output defaults and wire controls follow the K3 family contract:
  * https://platform.kimi.ai/docs/api/models-overview
- * K3.1 prices are not published there yet; do not borrow another model's rate.
+ * Published native prices live in session/cost.ts, independently of gateway rates.
  */
 interface KimiChatModelSpec {
   readonly model: string;
@@ -12,6 +12,11 @@ interface KimiChatModelSpec {
   readonly maxOutputTokens?: number;
   readonly maxOutputTokensUpperLimit?: number;
   readonly supportsReasoningEffort: boolean;
+  // Live combined-contract probe on 2026-10-23: K3/K3.1 and K2.7 Highspeed
+  // skip the tool, K2.6 fences the JSON, and K2.7 Code completes both steps.
+  // Keep schema-only support separate from schema-plus-tools support.
+  // https://platform.kimi.ai/docs/guide/response_format
+  // Reproducer: runtime/eval/kimi-native/contracts.mjs
   readonly supportsStructuredOutputWithTools: boolean;
   readonly priority: number;
 }

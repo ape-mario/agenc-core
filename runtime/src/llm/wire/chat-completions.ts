@@ -69,6 +69,7 @@ import { applyQwenKimiImageInputContract } from "./qwen-contract.js";
 import {
   applyKimiImageInputContract,
   assertKimiRequestPayloadSize,
+  kimiCacheWriteUsage,
 } from "./kimi-contract.js";
 import {
   LLMContextWindowExceededError,
@@ -714,6 +715,12 @@ export function buildChatCompletionsRequest(
   }
 
   const requestedToolChoice = input.options?.toolChoice;
+  if (input.providerCapabilityHints?.acceptsImplicitCacheTtl && input.options?.promptCacheTtl) {
+    if (!["5m", "1h"].includes(input.options.promptCacheTtl)) {
+      throw new RangeError("Kimi prompt cache TTL must be 5m or 1h");
+    }
+    body.prompt_cache_options = { mode: "implicit", ttl: input.options.promptCacheTtl };
+  }
   const disablesThinkingForForcedToolChoice =
     input.providerCapabilityHints?.disablesThinkingForForcedToolChoice === true &&
     requestedToolChoice !== undefined &&
@@ -1063,8 +1070,9 @@ export function parseChatCompletionsResponse(
   response: Record<string, unknown>,
   request: ChatCompletionsRequestOptions,
   reconstruction?: {
-    readonly discardedReasoningContent: boolean;
-    readonly conflictingReasoningModel: boolean;
+    readonly discardedReasoningContent?: boolean;
+    readonly conflictingReasoningModel?: boolean;
+    readonly responseHeaders?: Headers;
   },
 ): LLMResponse {
   let historyIds: ReadonlySet<string> | undefined;
@@ -1276,12 +1284,9 @@ export function parseChatCompletionsResponse(
   const isKimiResponse =
     request.providerCapabilityHints?.reasoningContentProvenance?.provider ===
       "kimi";
-  const cacheCreationInputTokens = isKimiResponse &&
-    typeof promptDetails.cache_write_tokens === "number" &&
-    Number.isFinite(promptDetails.cache_write_tokens) &&
-    promptDetails.cache_write_tokens >= 0
-    ? promptDetails.cache_write_tokens
-    : undefined;
+  const cacheWrites = isKimiResponse
+    ? kimiCacheWriteUsage(promptDetails.cache_write_tokens, reconstruction?.responseHeaders)
+    : {};
   // Diagnostics rebuild and serialize the request. The short loop consumes
   // them at its terminal boundary; keep an immutable message-list snapshot.
   const metricsRequest = oneShotFastModeActive()
@@ -1343,8 +1348,8 @@ export function parseChatCompletionsResponse(
       reasoningOutputTokens: completionDetails.reasoning_tokens,
       // Moonshot reports writes separately inside total prompt tokens. Older
       // responses and other Chat endpoints may still omit this breakdown.
-      cacheCreationInputTokens,
-      cacheWritesUnreported: cacheCreationInputTokens === undefined,
+      ...cacheWrites,
+      cacheWritesUnreported: cacheWrites.cacheCreationInputTokens === undefined,
       // Only providers documented to take service_tier report the tier that
       // served the request; Fast mode bills at its own rates.
       ...(request.providerCapabilityHints?.acceptsServiceTier === true

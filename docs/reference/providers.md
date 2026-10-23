@@ -496,20 +496,17 @@ curated global catalog is:
 | Model | Context | Default / maximum output | Cached input / input / output per 1M tokens | Reasoning effort (default) |
 | --- | ---: | ---: | ---: | --- |
 | `kimi-k3` | 1,048,576 | 131,072 / 1,048,576 | $0.30 / $3.00 / $15.00 | `low`, `high`, `max` (`max`) |
-| `kimi-k3.1-pro` | 1,048,576 | 131,072 harness default / 1,048,576 context ceiling | not yet published | `low`, `high`, `max` (`max`) |
-| `kimi-k3.1-pro-highspeed` | 1,048,576 | 131,072 harness default / 1,048,576 context ceiling | not yet published | `low`, `high`, `max` (`max`) |
+| `kimi-k3.1-pro` | 1,048,576 | 131,072 harness default / 1,048,576 context ceiling | $0.20 / $2.00 / $10.00 | `low`, `high`, `max` (`max`) |
+| `kimi-k3.1-pro-highspeed` | 1,048,576 | 131,072 harness default / 1,048,576 context ceiling | $0.20 / $4.00 / $20.00 | `low`, `high`, `max` (`max`) |
 | `kimi-k2.7-code` | 262,144 | 32,768 harness default / not published | $0.19 / $0.95 / $4.00 | provider-controlled |
 | `kimi-k2.7-code-highspeed` | 262,144 | 32,768 harness default / not published | $0.38 / $1.90 / $8.00 | provider-controlled |
 | `kimi-k2.6` | 262,144 | 32,768 harness default / not published | $0.16 / $0.95 / $4.00 | provider-controlled |
 
-The authenticated global `/v1/models` catalog returned both K3.1 Pro IDs on
-2026-10-23 with image/video input, thinking-only reasoning, dynamic tools,
-and the context and effort values above. Their public model guide and prices
-are not yet published. They use the K3 family wire contract and output budget;
-AgenC leaves their cost unknown. K3 remains the default because it has a
-published price and established behavior. OpenRouter's live catalog lists
-`moonshotai/kimi-k3`, `moonshotai/kimi-k2.7-code`, and
-`~moonshotai/kimi-latest` (currently targeting K3), but no K3.1 route.
+The authenticated global `/v1/models` catalog returned these six IDs on
+2026-10-23. The official pricing table now lists both K3.1 variants, and AgenC
+accounts for their input, output, cache hits and write tiers. K3 remains the
+native default. OpenRouter has a separate catalog and endpoint policy; its
+prices and ZDR eligibility are not inferred from the native Moonshot catalog.
 
 All six models receive the normal AgenC function-tool catalog and vision
 history. Requests above Moonshot's 128-tool limit fail locally rather than
@@ -533,16 +530,32 @@ fail closed on malformed JSON, missing/conflicting terminal reasons, or a
 partial tool call not finalized with `finish_reason=tool_calls`.
 
 
-Moonshot automatically caches repeated prefixes with a 5 minute TTL; no
-explicit cache-control field is needed. AgenC keeps the stable system head
-before session-specific context on native Kimi and OpenRouter Kimi. It reads
-`prompt_tokens_details.cached_tokens` and Moonshot's `cache_write_tokens`,
-including streaming usage. Both are subsets of total prompt tokens. An HTTP 429 with Moonshot's
-`exceeded_current_quota_error` and insufficient-balance evidence stops as a
-billing refusal; ordinary throttling remains retryable. K3's
-5 minute writes cost $3/M and are accounted for without double counting;
-the documented optional 1 hour tier costs $6/M and is not selected by AgenC.
-See [context caching](https://platform.kimi.ai/docs/guide/context-caching).
+Moonshot automatically caches repeated prefixes with a five-minute TTL. AgenC
+keeps the stable system head before session-specific context and sends a stable
+session `prompt_cache_key` on native Kimi. K3-family clients can select the
+one-hour tier with `AGENC_KIMI_CACHE_TTL=1h`; `5m` is also accepted. Programmatic
+callers can override this with `LLMChatOptions.promptCacheTtl`. K2 omits the
+unsupported TTL control. No explicit cache objects or IDs are created.
+
+Hits renew the original TTL without a new write charge. The first write locks
+that TTL until expiration, even if a later request asks for a different one.
+AgenC reads cached and written token subsets from usage, including streams, and
+uses Moonshot's numeric write-tier headers to account for the actual TTL.
+Five-minute writes cost the ordinary input rate; one-hour writes cost twice
+that rate. Writes are not double-counted. See
+[context caching](https://platform.kimi.ai/docs/guide/context-caching) and
+[pricing](https://platform.kimi.ai/docs/pricing/chat).
+
+An HTTP 429 with Moonshot's `exceeded_current_quota_error` and insufficient-balance
+evidence stops as a billing refusal; ordinary throttling remains retryable.
+Stop sequences are validated locally: at most five strings, each at most 32
+UTF-8 bytes, as specified by the [Chat API](https://platform.kimi.ai/docs/api/chat).
+
+Native Kimi retains the red retention badge. Moonshot's default policy retains
+input while the account is active. Enterprise ZDR requires server-side approval;
+no request flag enables it. OpenRouter uses its own endpoint eligibility and
+`provider.zdr=true`. See the [privacy policy](https://platform.kimi.ai/docs/agreement/userprivacy)
+and [ZDR policy](https://platform.kimi.ai/docs/guide/zero-data-retention).
 
 Multiple tool calls in a response are accepted and paired with their results;
 the optional `parallel_tool_calls` control stays omitted for routing
@@ -556,13 +569,15 @@ public HTTP image URLs and SVG are rejected before network dispatch. Supported
 formats are JPG, PNG, WebP, GIF, BMP, HEIC, and HEIF, and the final request is
 bounded to 100 MB. JSON Schema response format follows the family contract. Combining it with tools is enabled only for `kimi-k2.7-code`, whose
 complete tool-call/result/final-JSON loop has been verified; the others
-remain fail-closed until their combined loop is verified. Kimi supplies no
+reject the combined request after live probes skipped tools or returned fenced
+JSON. For those models, complete tool work first, then request the final schema
+with `tools: []`. This split sequence passed for all six models. Kimi supplies no
 native image-generation route, so `ImagineImage` continues to use a separately
 authorized media backend. Sources: [model overview](https://platform.kimi.ai/docs/api/models-overview.md),
 [thinking models](https://platform.kimi.ai/docs/guide/use-thinking-models.md),
 [vision models](https://platform.kimi.ai/docs/guide/use-kimi-vision-model.md),
 [Chat Completions](https://platform.kimi.ai/docs/api/chat.md), and
-[pricing](https://platform.kimi.ai/docs/pricing/chat-k3.md).
+[pricing](https://platform.kimi.ai/docs/pricing/chat).
 
 ## Local context windows
 

@@ -2,6 +2,7 @@
 import hashlib
 import json
 import pathlib
+import random
 import struct
 import subprocess
 import zlib
@@ -38,20 +39,27 @@ def image_fixture():
             + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
 
 
-def long_prompt(records=6500):
+def long_prompt(records=6500, seed=0):
     needles = {17: 'orchid', records//2: 'cobalt', records-19: 'harbor'}
-    lines = [f'Record {i:05d}: item={needles.get(i, "ordinary")}; status=archived; count={i % 97}.\n' for i in range(records)]
+    order = list(range(records))
+    if seed:
+        rng = random.Random(seed)
+        needles = {i: hashlib.sha256(f'{seed}:{i}'.encode()).hexdigest()[:12]
+                   for i in sorted(rng.sample(order, min(24, records)))}
+        rng.shuffle(order)
+    lines = [f'Record {i:05d}: item={needles.get(i, "ordinary")}; status=archived; count={i % 97}.\n' for i in order]
     prompt = ('Find the item values for records '+', '.join(map(str, needles))+
-              ' in the supplied archive. Use a tool to write answer.json as a JSON array of these three values '
+              ' in the supplied archive. Use a tool to write answer.json as a JSON array of the requested values '
               'in that order, then read it back. Do not create or consult an archive file.\n<archive>\n'+
               ''.join(lines)+'</archive>\nReturn a brief confirmation.')
     return prompt, list(needles.values())
 
 
-def prepare(root, task, records=6500):
+def prepare(root, task, records=6500, seed=0):
     root = pathlib.Path(root)
     root.mkdir(parents=True, exist_ok=True)
     protected = []
+    expected = None
     if task == 'file':
         prompt = 'Use a tool to create hello.txt containing exactly hi. Then read it back with a tool and reply with only its content.'
     elif task == 'multi-file':
@@ -101,10 +109,11 @@ console.log(n < steps.length ? 'NEXT: '+JSON.stringify(steps[n]) : 'All six stag
         prompt = ('Inspect the attached image visually. Write answer.json with integer counts under keys red_squares, '
                   'blue_circles, green_triangles. Then read it back. Do not inspect image bytes or run image analysis code.')
     elif task == 'long-context':
-        prompt, _ = long_prompt(records)
+        prompt, expected = long_prompt(records, seed)
     else:
         raise ValueError(task)
     return {'prompt': prompt, 'image': str(root/'shapes.png') if task == 'vision' else None,
+            'expected': expected,
             'protected': {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in protected}}
 
 
@@ -118,7 +127,7 @@ def grade(root, task, spec, env):
             return (root/'hello.txt').read_bytes() == b'hi', 'exact bytes'
         if task in ('vision', 'long-context'):
             expected = ({'red_squares': 3, 'blue_circles': 2, 'green_triangles': 1} if task == 'vision'
-                        else ['orchid', 'cobalt', 'harbor'])
+                        else spec.get('expected') or ['orchid', 'cobalt', 'harbor'])
             return json.loads((root/'answer.json').read_text()) == expected, 'independent JSON oracle'
         if task == 'replay':
             assert json.loads((root/'progress.json').read_text()) == ['normalize','unique','sort','lengths','total','report']

@@ -14,6 +14,7 @@ import {
   builtInProviderIds,
 } from "./registry/provider-info.js";
 import type { VeniceModel } from "./registry/venice-models.js";
+import { KIMI_CHAT_MODELS } from "./registry/kimi-models.js";
 
 afterEach(() => resetOpenRouterZdrEndpointsForTesting());
 
@@ -42,6 +43,29 @@ describe("OpenRouter zero data retention default", () => {
 });
 
 describe("ZDR badge state", () => {
+  it("does not infer enterprise ZDR from any native Kimi model's capabilities", () => {
+    for (const model of KIMI_CHAT_MODELS) {
+      expect(state("kimi", model)).toMatchObject({
+        state: "retained",
+        reason: expect.stringContaining("enterprise customers on request"),
+      });
+    }
+  });
+
+  it("uses OpenRouter endpoint eligibility and the request policy for Moonshot models", () => {
+    recordOpenRouterZdrEndpoints({ data: [{ model_id: "moonshotai/kimi-k3" }] });
+    expect(state("openrouter", "moonshotai/kimi-k3")?.state).toBe("zdr");
+    expect(state("openrouter", "moonshotai/kimi-k3")?.reason).toContain("provider.zdr");
+    expect(state("openrouter", "moonshotai/kimi-k3", {
+      config: { providers: { openrouter: { zero_data_retention: false } } },
+    })?.state).toBe("retained");
+    expect(state("openrouter", "moonshotai/unlisted-model")?.state).toBe("retained");
+    expect(state("openrouter", "moonshotai/kimi-k3", {
+      config: { providers: { openrouter: { base_url: "https://proxy.example.com/v1" } } },
+    })?.state).toBe("unknown");
+    expect(state("kimi", "kimi-k3")?.state).toBe("retained");
+  });
+
   it("does not advertise a retention guarantee for the retired account provider", () => {
     expect(resolveZeroDataRetentionStatus({ provider: "agenc", model: "agenc" })).toBeUndefined();
   });

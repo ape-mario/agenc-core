@@ -113,6 +113,7 @@ export interface ChatCompletionsCapabilityHints {
    * the newest message was not reused by the next request).
    */
   readonly promptCacheControl?: "top_level" | "system_prompt";
+  readonly acceptsImplicitCacheTtl?: boolean;
   /** Explain encoded function aliases when instructions use canonical names. */
   readonly includeToolNameAliases?: boolean;
   /**
@@ -715,6 +716,10 @@ export function chatCompletionsCapabilityHintsForProvider(
       ? {
           // Moonshot caches stable prefixes automatically with a 5m TTL.
           sharesPromptPrefixAcrossSessions: true,
+          // Session routing hint, not a cache object or server conversation.
+          // https://platform.kimi.ai/docs/api/chat
+          promptCacheKeyFields: ["prompt_cache_key"] as const,
+          acceptsImplicitCacheTtl: isKimiK3,
           acceptsDirectImageInput: true,
           acceptsParallelToolCalls: false,
           maxToolDefinitions: 128,

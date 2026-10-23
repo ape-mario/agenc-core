@@ -684,6 +684,8 @@ describe("KimiProvider", () => {
 
   test.each([
     "kimi-k3",
+    "kimi-k3.1-pro",
+    "kimi-k3.1-pro-highspeed",
     "kimi-k2.7-code-highspeed",
     "kimi-k2.6",
   ])("blocks unverified structured-output tool loops for %s", async (model) => {

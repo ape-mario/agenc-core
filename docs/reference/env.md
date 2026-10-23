@@ -96,6 +96,15 @@ route has no endpoint environment override and never borrows
 `OPENAI_API_KEY`; custom or regional compatible endpoints belong under the
 separate `openai-compatible` provider.
 
+`AGENC_KIMI_CACHE_TTL` selects `5m` or `1h` implicit cache writes for native
+Kimi K3-family requests. Unset uses the provider default of five minutes.
+The value is captured with the client session environment; any value other
+than `5m` or `1h` is rejected. A programmatic request TTL takes priority, and
+K2 requests omit the TTL control. The first write fixes the TTL, and hits renew that
+original TTL. Usage accounting follows the actual response write tier, so a
+later `5m` request can still report one-hour writes. One-hour writes cost
+twice the ordinary input rate. See [Kimi provider reference](providers.md).
+
 Amazon Bedrock uses the required access/secret pair for direct SigV4 signing;
 the session token is optional. Only the Bedrock variables in the table are
 consumed by this provider.

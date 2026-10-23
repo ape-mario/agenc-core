@@ -4,11 +4,43 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
-from fixtures import TASKS, prepare, grade
-from run import calibrate, ProviderError
+from fixtures import TASKS, prepare, grade, long_prompt
+from run import calibrate, ProviderError, cli_command, completion_warning, read_back_observed
 
 
 class FixturesTest(unittest.TestCase):
+    def test_read_back_requires_the_artifact_and_accepts_native_command_tools(self):
+        def calls(name, arguments, output='AGENC_DATA\nhi\n[exit 0]\nAGENC_DATA'):
+            return [{'tools':[{'id':'read1', 'name':name, 'arguments':arguments}]},
+                    {'messages':[{'role':'tool', 'toolCallId':'read1', 'toolOutput':output}]}]
+        self.assertTrue(read_back_observed(calls('FileRead', '{"file_path":"hello.txt"}'), 'hello.txt'))
+        self.assertFalse(read_back_observed(calls('FileRead', '{"file_path":"unrelated.txt"}'), 'hello.txt'))
+        self.assertTrue(read_back_observed(calls('exec_command', '{"cmd":"cat answer.json"}'), 'answer.json'))
+        self.assertFalse(read_back_observed(calls('exec_command', '{"cmd":"cat unrelated.txt"}'), 'answer.json'))
+        self.assertFalse(read_back_observed(calls('FileRead', '{"file_path":"hello.txt"}', 'File not found'), 'hello.txt'))
+        self.assertFalse(read_back_observed(calls('exec_command', '{"cmd":"cat hello.txt"}', 'AGENC_DATA\nno such file\n[exit 1]\nAGENC_DATA'), 'hello.txt'))
+
+    def test_shuffled_context_has_reproducible_independent_answers(self):
+        prompt, answer = long_prompt(100, 7)
+        self.assertEqual((prompt, answer), long_prompt(100, 7))
+        self.assertEqual(len(answer), 24)
+        self.assertNotEqual(answer, long_prompt(100, 8)[1])
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            spec = prepare(root, 'long-context', 100, 7)
+            import json
+            (root/'answer.json').write_text(json.dumps(answer))
+            self.assertTrue(grade(root, 'long-context', spec, os.environ)[0])
+            (root/'answer.json').write_text(json.dumps(long_prompt(100, 8)[1]))
+            self.assertFalse(grade(root, 'long-context', spec, os.environ)[0])
+
+    def test_exact_reply_tasks_do_not_conflict_with_the_prose_completion_gate(self):
+        cmd = cli_command('kimi-k3')
+        self.assertEqual(cmd[cmd.index('--output-format')+1], 'json')
+        self.assertTrue(completion_warning('hi\ncompletion gate exhausted after 3 rounds; the final answer was not verified'))
+        self.assertTrue(completion_warning('completion gate settled as partial after 2 rounds'))
+        self.assertFalse(completion_warning('{"result":"hi"}'))
+
     def test_token_calibration_and_funds_refusal_are_distinct(self):
         with patch('run.api', side_effect=[{'data': {'total_tokens': 130000}}, {'data': {'total_tokens': 98000}}]):
             records, estimates = calibrate('any-model', False)
