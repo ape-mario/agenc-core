@@ -1,3 +1,4 @@
+import { notifyApprovalResolverReady } from "./approval-resolver-ready.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ApprovalCtx } from "../tools/orchestrator.js";
@@ -302,6 +303,7 @@ export function usePermissionRequests(
         });
       },
     };
+    notifyApprovalResolverReady(session.services);
     session.appStateBridge = createSessionAppStateBridge(
       setModel,
       setExpandedView,

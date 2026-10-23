@@ -1,3 +1,4 @@
+import { waitForApprovalResolver } from "./approval-resolver-ready.js";
 /**
  * Daemon-backed session adapter for the AgenC TUI.
  *
@@ -3057,10 +3058,11 @@ async function maybeBridgeDaemonApproval(
   if (!isJsonObject(payload) || typeof payload.callId !== "string") return;
   if (pendingApprovals.settleEvent(event.type, payload, event.turnId)) return;
   if (event.type !== "request_permissions") return;
-  const resolver = session.services.approvalResolver;
-  if (resolver === undefined) return;
   const controller = pendingApprovals.begin(payload, event.turnId);
   if (controller === undefined) return;
+  const resolver = session.services.approvalResolver ??
+    await waitForApprovalResolver(session.services, controller.signal);
+  if (resolver === undefined || controller.signal.aborted) return;
   const toolName =
     typeof payload.toolName === "string" ? payload.toolName : "tool";
   const decision = await resolver
