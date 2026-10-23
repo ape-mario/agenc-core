@@ -4829,9 +4829,9 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
     );
   });
 
-  test("managed wire retries reuse the sampling UUID while tool rounds and new turns receive distinct UUIDs", async () => {
+  test("direct wire retries reuse sampling snapshots without sending account request headers", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const model = "openrouter/openai/gpt-5";
+    const model = "openai/gpt-5";
     const fetchImpl = vi.fn<typeof fetch>(async () => {
       const attempt = fetchImpl.mock.calls.length;
       if (attempt === 1) {
@@ -4852,9 +4852,9 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
     });
     const provider = createProvider("openrouter", {
       apiKey: "synthetic-session",
-      baseURL: "https://id.agenc.ag/v1/auth/openrouter/v1",
+      baseURL: "https://openrouter.ai/api/v1",
       model,
-      extra: { managedGateway: true, maxRetries: 0, maxTokens: 100, fetchImpl },
+      extra: { maxRetries: 0, maxTokens: 100, fetchImpl },
     });
     // Adapter retries are disabled: each failed fetch must re-enter through
     // runSamplingRequest's outer reconnect loop using its saved snapshot.
@@ -4874,7 +4874,9 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
     await drain(session.runTurn("Another request", { ctx: { ...ctx, subId: "turn-next" } }));
 
     expect(chatStream).toHaveBeenCalledTimes(5);
-    const ids = fetchImpl.mock.calls.map(([, init]) => new Headers(init?.headers).get("Idempotency-Key"));
+    const wireIds = fetchImpl.mock.calls.map(([, init]) => new Headers(init?.headers).get("Idempotency-Key"));
+    expect(wireIds).toEqual(Array(5).fill(null));
+    const ids = chatStream.mock.calls.map(([, , options]) => options?.managedRequestId);
     for (const id of ids) expect(id).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u);
     expect(ids.slice(0, 3)).toEqual(Array(3).fill(ids[0]));
     expect(new Set([ids[0], ids[3], ids[4]]).size).toBe(3);
@@ -4882,7 +4884,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
     expect(bodies.slice(0, 3)).toEqual(Array(3).fill(bodies[0]));
     const continuation = JSON.parse(bodies[3]!).messages;
     const toolCallId = continuation.find((message: { role: string }) => message.role === "assistant").tool_calls[0].id;
-    expect(toolCallId).toMatch(/^call_[a-f0-9]{32}$/u);
+    expect(toolCallId).toBe("synthetic-read");
     expect(continuation).toContainEqual(expect.objectContaining({ role: "tool", tool_call_id: toolCallId }));
     for (const body of bodies) {
       expect(body).not.toContain("managedRequestId");

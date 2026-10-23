@@ -37,7 +37,6 @@ const EXPECTED_CLASSES = {
   minimax: "retains",
   github: "account-level",
   "amazon-bedrock": "account-level",
-  agenc: "no-retention",
 } as const;
 
 describe("provider retention classification", () => {

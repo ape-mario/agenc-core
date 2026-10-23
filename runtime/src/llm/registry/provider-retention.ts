@@ -58,7 +58,7 @@ function facts(entry: ProviderRetentionFacts): ProviderRetentionFacts {
 
 const LOCAL_SUMMARY = "Runs on this computer. Nothing leaves it unless the server address points elsewhere.";
 
-export const PROVIDER_RETENTION: Readonly<Record<BuiltInProviderSlug, ProviderRetentionFacts>> = Object.freeze({
+export const PROVIDER_RETENTION: Readonly<Record<Exclude<BuiltInProviderSlug, "agenc">, ProviderRetentionFacts>> = Object.freeze({
   grok: facts({
     retention: "account-level",
     summary: "xAI keeps every API request and response for 30 days. ZDR is a team setting in the xAI Console.",
@@ -209,9 +209,4 @@ export const PROVIDER_RETENTION: Readonly<Record<BuiltInProviderSlug, ProviderRe
       "https://docs.aws.amazon.com/bedrock/latest/userguide/abuse-detection.html",
     ],
   }),
-  agenc: facts({
-    retention: "no-retention",
-    summary: "The AgenC gateway routes only to endpoints that keep nothing.",
-    docs: ["https://github.com/tetsuo-ai/agenc-core/blob/main/docs/reference/providers.md#zero-data-retention"],
-  }),
-} satisfies Record<BuiltInProviderSlug, ProviderRetentionFacts>);
+} satisfies Record<Exclude<BuiltInProviderSlug, "agenc">, ProviderRetentionFacts>);

@@ -9666,7 +9666,7 @@ describe("AgenC delegate background-agent runner", () => {
     ).rejects.toThrow(/internal-only/);
   });
 
-  it("passes the daemon AuthBackend into delegate bootstrap", async () => {
+  it("passes account identity into delegate bootstrap without model vending", async () => {
     const authBackend = makeAuthBackend("local", "managed-key");
     const { runner, bootstrap } = makeTopLevelRunner({
       conversationId: "parent-session",
@@ -9688,15 +9688,13 @@ describe("AgenC delegate background-agent runner", () => {
     expect(bootstrapOptions?.authBackend).not.toBe(authBackend);
     await expect(
       bootstrapOptions?.authBackend?.vendKey("grok", "daemon-session"),
-    ).resolves.toMatchObject({
-      provider: "grok",
-      sessionId: "daemon-session",
-      apiKey: "managed-key",
-    });
-    expect(authBackend.vendKey).toHaveBeenCalledWith("grok", "daemon-session");
+    ).rejects.toThrow("AgenC accounts no longer provide models");
+    expect(await bootstrapOptions?.authBackend?.whoami()).toMatchObject({ authenticated: true, provider: "local" });
+    expect(authBackend.whoami).toHaveBeenCalled();
+    expect(authBackend.vendKey).not.toHaveBeenCalled();
   });
 
-  it("updateRuntimeConfig resets active daemon runtime provider-key cache after auth reload", async () => {
+  it("updateRuntimeConfig replaces account identity while model vending stays retired", async () => {
     const initialAuthBackend = makeAuthBackend("local", "managed-key-before");
     const reloadedAuthBackend = makeAuthBackend("remote", "managed-key-after");
     const { runner, bootstrap } = makeTopLevelRunner({
@@ -9718,13 +9716,17 @@ describe("AgenC delegate background-agent runner", () => {
     expect(firstRuntimeAuthBackend.kind).toBe("local");
     await expect(
       firstRuntimeAuthBackend.vendKey("grok", "daemon-session"),
-    ).resolves.toMatchObject({ apiKey: "managed-key-before" });
+    ).rejects.toThrow("AgenC accounts no longer provide models");
 
+    expect(await firstRuntimeAuthBackend.whoami()).toMatchObject({ provider: "local" });
     runner.updateRuntimeConfig({ authBackend: reloadedAuthBackend });
+    expect(await firstRuntimeAuthBackend.whoami()).toMatchObject({ provider: "remote" });
+    expect(initialAuthBackend.vendKey).not.toHaveBeenCalled();
+    expect(reloadedAuthBackend.vendKey).not.toHaveBeenCalled();
 
     await expect(
       firstRuntimeAuthBackend.vendKey("grok", "daemon-session"),
-    ).resolves.toMatchObject({ apiKey: "managed-key-after" });
+    ).rejects.toThrow("AgenC accounts no longer provide models");
 
     await runner.stopAgent("parent-session");
 
@@ -9738,7 +9740,7 @@ describe("AgenC delegate background-agent runner", () => {
     expect(secondRuntimeAuthBackend?.kind).toBe("remote");
     await expect(
       secondRuntimeAuthBackend?.vendKey("grok", "daemon-session"),
-    ).resolves.toMatchObject({ apiKey: "managed-key-after" });
+    ).rejects.toThrow("AgenC accounts no longer provide models");
   });
 
   it("[managed-thread] returns conversationId as agentId with no delegate fork", async () => {

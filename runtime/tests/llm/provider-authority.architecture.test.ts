@@ -298,12 +298,8 @@ describe("provider authority architecture", () => {
 
     const providerFactory = readFileSync(`${SRC}/llm/provider.ts`, "utf8");
     expect(providerFactory).not.toMatch(/apiKeyEnvironmentLabelFor/u);
-    expect(providerFactory.match(/\bapiKeyEnvLabel\s*:/gu)).toEqual([
-      "apiKeyEnvLabel:",
-    ]);
-    expect(providerFactory).toMatch(
-      /apiKeyEnvLabel:\s*"AgenC subscription"/u,
-    );
+    expect(providerFactory).not.toMatch(/\bapiKeyEnvLabel\s*:/u);
+    expect(providerFactory).not.toContain("AgenC subscription");
   });
 
   test("provider metadata does not invent transport policy or websocket support", () => {

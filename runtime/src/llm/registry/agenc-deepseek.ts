@@ -1,10 +1,15 @@
-/** Historical model identities retained for saved-session metadata. */
+/** Historical model identities and metadata, never model-service authority. */
 export const AGENC_DEEPSEEK_MODEL = "deepseek/deepseek-v4-flash-0731";
 export const AGENC_DEEPSEEK_V41_MODEL = "deepseek/deepseek-v4.1-flash";
-/** Dated generation id that can occur in historical session usage. */
+/** OpenRouter's dated generation id for V4.1 Flash. A managed response can report it. */
 export const AGENC_DEEPSEEK_V41_GENERATION = "deepseek/deepseek-v4.1-flash-20260910";
+export const AGENC_DEEPSEEK_MODELS = [
+  { model: AGENC_DEEPSEEK_MODEL, label: "DeepSeek V4 Flash 0731", vision: false },
+  { model: AGENC_DEEPSEEK_V41_MODEL, label: "DeepSeek V4.1 Flash", vision: true },
+] as const;
+
 export function isAgenCDeepSeekModel(model: string | undefined): boolean {
-  return model === AGENC_DEEPSEEK_MODEL || model === AGENC_DEEPSEEK_V41_MODEL;
+  return AGENC_DEEPSEEK_MODELS.some(entry => entry.model === model);
 }
 
 // Native levels published for this exact model. Medium is a legacy alias
