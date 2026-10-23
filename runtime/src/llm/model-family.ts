@@ -18,7 +18,7 @@
 
 import { normalizeProviderMetadataIdentity } from "../provider-identity.js";
 
-export type ModelFamily = "deepseek" | "openai";
+export type ModelFamily = "deepseek" | "openai" | "kimi";
 
 /** Gateways with model ids whose underlying family is known. */
 export const MODEL_FAMILY_GATEWAYS: ReadonlySet<string> = new Set([
@@ -59,6 +59,7 @@ export function gatewayModelFamily(
     if (slash <= 0) return undefined;
     const author = id.slice(0, slash);
     const name = id.slice(slash + 1);
+    if (author === "moonshotai" && /^kimi-(?:k[23](?:$|[-.:])|latest$)/u.test(name)) return "kimi";
     if (author === "deepseek") return "deepseek";
     if (author === "openai" && OPENAI_HOSTED_GPT.test(name) && !name.startsWith("gpt-oss")) return "openai";
     return undefined;
@@ -75,6 +76,7 @@ export function gatewayModelFamily(
   }
   // Ollama Cloud: `deepseek-v4.1-flash:1017`, `deepseek-v4-pro:0813`. Its only
   // OpenAI models are open-weight gpt-oss builds.
+  if (/^kimi-k[23](?:$|[-.:])/u.test(id)) return "kimi";
   return DEEPSEEK.test(id) ? "deepseek" : undefined;
 }
 
@@ -112,5 +114,6 @@ export function modelFamilyFor(
   const slug = normalizeProviderMetadataIdentity(provider);
   if (slug === "deepseek") return "deepseek";
   if (slug === "openai") return "openai";
+  if (slug === "kimi") return "kimi";
   return gatewayModelFamily(slug, model);
 }

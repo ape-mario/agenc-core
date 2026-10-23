@@ -1276,6 +1276,12 @@ export function parseChatCompletionsResponse(
   const isKimiResponse =
     request.providerCapabilityHints?.reasoningContentProvenance?.provider ===
       "kimi";
+  const cacheCreationInputTokens = isKimiResponse &&
+    typeof promptDetails.cache_write_tokens === "number" &&
+    Number.isFinite(promptDetails.cache_write_tokens) &&
+    promptDetails.cache_write_tokens >= 0
+    ? promptDetails.cache_write_tokens
+    : undefined;
   // Diagnostics rebuild and serialize the request. The short loop consumes
   // them at its terminal boundary; keep an immutable message-list snapshot.
   const metricsRequest = oneShotFastModeActive()
@@ -1335,13 +1341,10 @@ export function parseChatCompletionsResponse(
         promptDetails.cached_tokens ??
         (isKimiResponse ? usageRecord.cached_tokens : undefined),
       reasoningOutputTokens: completionDetails.reasoning_tokens,
-      // Unlike Responses' input_tokens_details.cache_write_tokens, Chat
-      // Completions has no field for prompt-cache writes: a real cache write
-      // is folded into prompt_tokens with no way to tell it apart from
-      // ordinary input. Flag it so budget reconciliation
-      // (admitted-model-call.ts) does not under-price it as ordinary input on
-      // models that bill cache writes above the input rate.
-      cacheWritesUnreported: true,
+      // Moonshot reports writes separately inside total prompt tokens. Older
+      // responses and other Chat endpoints may still omit this breakdown.
+      cacheCreationInputTokens,
+      cacheWritesUnreported: cacheCreationInputTokens === undefined,
       // Only providers documented to take service_tier report the tier that
       // served the request; Fast mode bills at its own rates.
       ...(request.providerCapabilityHints?.acceptsServiceTier === true

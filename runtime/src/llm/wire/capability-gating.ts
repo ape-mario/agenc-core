@@ -1,3 +1,4 @@
+import { isKimiK3Model } from "../registry/kimi-models.js";
 import { resolveNvidiaCurrentModel } from "../registry/nvidia-current-models.js";
 /**
  * Per-provider capability gating for chat-completions wire fields.
@@ -446,7 +447,7 @@ export function chatCompletionsCapabilityHintsForProvider(
   const isMinimax = slug === "minimax";
   const isMinimaxM3 =
     isMinimax && /(?:^|[/:])minimax-m3(?:$|[-_.:])/i.test(model ?? "");
-  const isKimiK3 = isKimi && normalizedModel === "kimi-k3";
+  const isKimiK3 = isKimi && isKimiK3Model(model);
   const isKimiK27 =
     isKimi && /^kimi-k2\.7-code(?:-highspeed)?$/u.test(normalizedModel);
   const isKimiK26 = isKimi && normalizedModel === "kimi-k2.6";
@@ -552,6 +553,7 @@ export function chatCompletionsCapabilityHintsForProvider(
             promptCacheKeyScope: "prefix" as const,
             ...deepSeekDefaultEffort,
           } : {}),
+          ...(gatewayFamily === "kimi" ? { sharesPromptPrefixAcrossSessions: true } : {}),
           ...(gatewayFamily === "openai" ? {
             // OpenAI's own API replays the encrypted reasoning items; through
             // OpenRouter they arrive in reasoning_details. The cache key is
@@ -711,6 +713,8 @@ export function chatCompletionsCapabilityHintsForProvider(
     ...(supportsZaiToolStreaming ? { streamsToolCalls: true } : {}),
     ...(isKnownKimiModel
       ? {
+          // Moonshot caches stable prefixes automatically with a 5m TTL.
+          sharesPromptPrefixAcrossSessions: true,
           acceptsDirectImageInput: true,
           acceptsParallelToolCalls: false,
           maxToolDefinitions: 128,

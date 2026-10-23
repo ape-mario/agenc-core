@@ -670,6 +670,9 @@ const COST_TIER_ZAI_GLM_53_FLASH: Readonly<ModelCostEntry> = Object.freeze({
 // https://platform.kimi.ai/docs/pricing/chat-k27-code
 // https://platform.kimi.ai/docs/pricing/chat-k26
 const COST_TIER_KIMI_K3: Readonly<ModelCostEntry> = Object.freeze({
+  // Automatic 5m cache writes are included in prompt_tokens, at the input rate.
+  cacheCreationUsdPer1K: 0.003,
+  cacheCreationIncludedInInputTokens: true,
   inputUsdPer1K: 0.003,
   outputUsdPer1K: 0.015,
   cachedInputUsdPer1K: 0.0003,

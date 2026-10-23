@@ -14,6 +14,11 @@ describe("model family behind a provider/model pair", () => {
     ["venice", "deepseek-v4-pro-0813", "deepseek"],
     ["abliteration", "abliterated-model-large-flash", "deepseek"],
     ["abliteration", " ABLITERATED-MODEL-LARGE-FLASH ", "deepseek"],
+    ["openrouter", "moonshotai/kimi-k3", "kimi"],
+    ["openrouter", "moonshotai/kimi-k3:batch", "kimi"],
+    ["openrouter", "moonshotai/kimi-k2.7-code:nitro", "kimi"],
+    ["openrouter", "~moonshotai/kimi-latest", "kimi"],
+    ["ollama-cloud", "kimi-k3", "kimi"],
     // GPT-6 Luna and other hosted GPT reasoning models.
     ["openrouter", "openai/gpt-6-luna", "openai"],
     ["openrouter", "~openai/gpt-luna-latest", undefined],
@@ -33,7 +38,7 @@ describe("model family behind a provider/model pair", () => {
     ["openrouter", "x-ai/grok-4.7"],
     ["openrouter", "deepseek-v4.1-flash"],
     ["ollama-cloud", "gpt-oss:120b"],
-    ["ollama-cloud", "kimi-k3"],
+    ["openrouter", "other/kimi-k3"],
     ["venice", "openai-gpt-oss-120b"],
     ["venice", "openai-gpt-4o-2024-11-20"],
     ["venice", "zai-org-glm-5-2"],
@@ -56,6 +61,7 @@ describe("model family behind a provider/model pair", () => {
   test("native providers are their own family whatever the model id", () => {
     expect(modelFamilyFor("deepseek", "deepseek-flash")).toBe("deepseek");
     expect(modelFamilyFor("deepseek", undefined)).toBe("deepseek");
+    expect(modelFamilyFor("kimi", "kimi-k3.1-pro")).toBe("kimi");
     expect(modelFamilyFor("openai", "gpt-6-luna")).toBe("openai");
     expect(modelFamilyFor("OpenAI", undefined)).toBe("openai");
     expect(gatewayModelFamily("deepseek", "deepseek-flash")).toBeUndefined();

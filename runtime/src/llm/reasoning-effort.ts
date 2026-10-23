@@ -1,3 +1,4 @@
+import { isKimiK3Model } from "./registry/kimi-models.js";
 /** Provider-scoped effort contract shared by session validation and wire gating.
  * Registered models retain their catalog levels and defaults, except that a
  * DeepSeek model through a gateway defaults to DeepSeek's own high
@@ -127,7 +128,7 @@ export function resolveReasoningEffort(input: {
   const isManagedDeepSeek = input.managedGateway === true && slug === "openrouter" && isAgenCDeepSeekModel(model);
   const isNativeDeepSeek = slug === "deepseek" && isNativeDeepSeekModel(model);
   const isZai = slug === "zai" || slug === "zai-coding-plan";
-  const isKimiK3 = slug === "kimi" && model?.trim().toLowerCase() === "kimi-k3";
+  const isKimiK3 = slug === "kimi" && isKimiK3Model(model);
   // Preserve the existing transport compatibility gates. OpenAI and Grok
   // family matching permits forwarding, but does not verify a session enum.
   let acceptsReasoningEffort = false;
