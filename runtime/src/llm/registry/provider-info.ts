@@ -143,15 +143,13 @@ export type BuiltInProviderOnboardingAccess =
   | "api-key"
   | "environment"
   | "local"
-  | "managed";
+  | "retired";
 
 export interface BuiltInProviderOnboardingInfo {
   /** Stable provider-picker rank. Lower values appear first. */
   readonly order: number;
   /** Mutually exclusive first-run credential/readiness path. */
   readonly access: BuiltInProviderOnboardingAccess;
-  /** A signed-in AgenC subscription may supply this provider's key. */
-  readonly supportsManagedKeyAccess: boolean;
 }
 
 export interface ProviderCredentialFieldDefinition {
@@ -241,12 +239,10 @@ const AMAZON_BEDROCK_REGIONAL_ENDPOINT = Object.freeze({
 function onboardingInfo(
   order: number,
   access: BuiltInProviderOnboardingAccess,
-  supportsManagedKeyAccess = false,
 ): BuiltInProviderOnboardingInfo {
   return Object.freeze({
     order,
     access,
-    supportsManagedKeyAccess,
   });
 }
 
@@ -341,7 +337,7 @@ export const BUILT_IN_PROVIDER_DEFINITIONS = Object.freeze({
     baseURL: "https://openrouter.ai/api/v1",
     credentials: apiKeyCredentials(["OPENROUTER_API_KEY"]),
     baseURLEnvVars: ["OPENROUTER_BASE_URL"],
-    onboarding: onboardingInfo(70, "api-key", true),
+    onboarding: onboardingInfo(70, "api-key"),
   }),
   venice: providerDefinition({
     name: "Venice AI",
@@ -530,7 +526,7 @@ export const BUILT_IN_PROVIDER_DEFINITIONS = Object.freeze({
     baseURL: "https://id.agenc.ag/v1",
     credentials: noCredentials(),
     baseURLEnvVars: ["AGENC_BASE_URL"],
-    onboarding: onboardingInfo(160, "managed"),
+    onboarding: onboardingInfo(160, "retired"),
   }),
 } as const);
 
@@ -680,7 +676,7 @@ export const BUILT_IN_PROVIDER_MODEL_CATALOG: Readonly<
     "amazon.nova-lite-v1:0",
     "amazon.nova-micro-v1:0",
   ] }),
-  agenc: Object.freeze(["agenc"]),
+  agenc: Object.freeze([]),
 });
 
 /**
@@ -722,12 +718,11 @@ export interface BuiltInProviderInfo {
   readonly credentials: ProviderCredentialDefinition;
   readonly baseURLEnvVars: readonly string[];
   readonly supportsApiKeylessAuth: boolean;
-  readonly requiresManagedAuth: boolean;
   readonly onboarding: BuiltInProviderOnboardingInfo;
 }
 
 const BUILT_IN_PROVIDER_IDS = Object.freeze(
-  Object.keys(BUILT_IN_PROVIDER_DEFINITIONS) as BuiltInProviderSlug[],
+  Object.keys(BUILT_IN_PROVIDER_DEFINITIONS).filter(id => id !== "agenc") as BuiltInProviderSlug[],
 );
 
 export function builtInProviderIds(): readonly BuiltInProviderSlug[] {
@@ -748,7 +743,6 @@ export function resolveBuiltInProviderInfo(
     credentials: definition.credentials,
     baseURLEnvVars: definition.baseURLEnvVars,
     supportsApiKeylessAuth: definition.supportsApiKeylessAuth,
-    requiresManagedAuth: definition.onboarding.access === "managed",
     onboarding: definition.onboarding,
   };
 }

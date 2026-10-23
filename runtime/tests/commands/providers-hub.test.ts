@@ -176,7 +176,7 @@ describe("providers screen snapshot", () => {
       access: "environment",
       status: "needs AWS credentials",
     });
-    expect(byProvider.get("agenc")).toMatchObject({ access: "managed" });
+    expect(byProvider.get("agenc")).toBeUndefined();
     const ranks = snapshot.rows.map((entry) =>
       ["current", "connected", "not-set", "error"].indexOf(entry.connection),
     );

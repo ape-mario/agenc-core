@@ -131,7 +131,7 @@ describe("abliteration.ai built-in provider", () => {
       baseURL: "https://api.abliteration.ai/v1",
       credentials: { kind: "api-key", apiKey: { envVars: ["ABLIT_KEY", "ABLITERATION_API_KEY"], required: true } },
       baseURLEnvVars: ["ABLITERATION_BASE_URL"],
-      onboarding: { access: "api-key", supportsManagedKeyAccess: false },
+      onboarding: { access: "api-key" },
     });
     expect(ABLITERATION_BASE_URL).toBe("https://api.abliteration.ai/v1");
     expect(ABLITERATION_DEFAULT_MODEL).toBe(V2);

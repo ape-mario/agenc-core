@@ -9,7 +9,6 @@ import { AdmissionDeniedError } from "../../src/budget/admission-client.js";
 import { createAllowAdmissionHarness } from "./admission-test-harness.js";
 import { LLMContextWindowExceededError, LLMManagedAdmissionError, LLMManagedUsagePendingError, LLMRateLimitError, markLLMPreGenerationRejection } from "../../src/llm/errors.js";
 import type { AuthBackend } from "../../src/auth/backend.js";
-import { AgenCProvider } from "../../src/llm/providers/agenc/index.js";
 import { OllamaProvider } from "../../src/llm/providers/ollama/adapter.js";
 import { GeminiProvider } from "../../src/llm/providers/gemini/index.js";
 import { createGeminiEndpointPlan } from "../../src/llm/providers/gemini/endpoint-plan.js";
@@ -1096,41 +1095,6 @@ describe("runAdmittedModelCall", () => {
     } as unknown as LLMProvider;
   }
 
-  test("prices the managed AgenC DeepSeek route at its own rates, not the public OpenRouter row", async () => {
-    // Live run on 2026-10-01: this call settled at $3.3204, the registry
-    // ceiling, instead of the route's $0.30/M input and $1.20/M output.
-    const state = harness({ maxCostUsd: 1 });
-
-    await runAdmittedModelCall({
-      session: state.session,
-      provider: routedProvider("deepseek/deepseek-v4.1-flash"),
-      messages: [{ role: "user", content: "hello" }],
-      options: { model: "deepseek/deepseek-v4.1-flash", maxOutputTokens: 64_000 },
-      stepId: "model:managed-deepseek",
-      model: "deepseek/deepseek-v4.1-flash",
-      providerName: "agenc",
-      // The gateway passes through OpenRouter's dated generation id.
-      invoke: async () => response({
-        model: "deepseek/deepseek-v4.1-flash-20260910",
-        usage: managedDeepSeekUsage,
-      }),
-    });
-
-    const request = state.acquire.mock.calls[0]?.[0] as AdmissionAcquireInput;
-    // Routing attribution is unchanged; only the price follows the route.
-    expect(request).toMatchObject({ provider: "openrouter", model: "deepseek/deepseek-v4.1-flash" });
-    expect(request.costEstimated).toBeUndefined();
-    expect(request.maxCostUsd).toBeCloseTo(
-      (request.maxInputTokens * 0.3 + request.maxOutputTokens * 1.2) / 1_000_000,
-      12,
-    );
-    expect(state.reconcile).toHaveBeenCalledWith("reservation-1", {
-      inputTokens: 22_116,
-      outputTokens: 5,
-      costUsd: expect.closeTo(0.0066408, 12),
-    });
-  });
-
   test.each([
     { name: "a user's own OpenRouter key", providerName: "openrouter", model: "deepseek/deepseek-v4.1-flash" },
     { name: "a managed route without its own price", providerName: "agenc", model: "deepseek/deepseek-v4-flash-0731" },
@@ -1249,97 +1213,6 @@ describe("runAdmittedModelCall", () => {
     );
     expect(state.acknowledgeCompletion).toHaveBeenCalledOnce();
     expect(state.acknowledgeCompletion).toHaveBeenCalledWith("reservation-1");
-  });
-
-  test("pins the request-option managed route through queue delay to one wire", async () => {
-    const state = harness({ maxCostUsd: 1 });
-    let nowMs = 1_000;
-    const inferAgencModel = vi.fn(
-      ({ requestedModel }: { readonly requestedModel?: string } = {}) => ({
-        provider: "grok",
-        model:
-          requestedModel === "agenc:override"
-            ? "grok-4.5"
-            : "grok-default-should-not-run",
-      }),
-    );
-    const authBackend = {
-      login: () => ({ authenticated: true, provider: "remote" }),
-      logout: () => ({ authenticated: false }),
-      whoami: () => ({ authenticated: true, provider: "remote" }),
-      inferAgencModel,
-      vendKey: (provider: string, sessionId: string) => ({
-        kind: "api-key",
-        provider,
-        sessionId,
-        apiKey: "managed-key",
-        expiresAt: new Date(nowMs + 5).toISOString(),
-      }),
-      getSubscriptionTier: () => "team" as const,
-    } as AuthBackend;
-    const delegate = {
-      name: "grok",
-      chat: vi.fn(async () => response()),
-      chatStream: vi.fn(),
-      healthCheck: vi.fn(async () => true),
-      getExecutionProfile: vi.fn(async () => ({
-        provider: "grok",
-        model: "grok-4.5",
-        usageReporting: "authoritative" as const,
-        supportsMaxOutputTokens: true,
-      })),
-    } as unknown as LLMProvider;
-    const providerFactory = vi.fn(() => delegate);
-    const managed = new AgenCProvider({
-      authBackend,
-      sessionId: "session-1",
-      model: "agenc:default",
-      providerFactory,
-      nowMs: () => nowMs,
-    });
-    const messages = [{ role: "user" as const, content: "hello" }];
-
-    await runAdmittedModelCall({
-      session: state.session,
-      provider: managed,
-      messages,
-      options: { model: "agenc:override", maxOutputTokens: 200 },
-      stepId: "model:managed-pinned",
-      model: "agenc:override",
-      providerName: "agenc",
-      invoke: async (admittedOptions) => {
-        // Force the vended route to expire while admission is pending. The
-        // dispatched call must use the profiled delegate, not refresh/reroute.
-        nowMs += 10;
-        return managed.chat(messages, admittedOptions);
-      },
-    });
-
-    expect(state.acquire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "grok-4.5",
-        provider: "grok",
-        maxCostUsd: expect.any(Number),
-      }),
-      undefined,
-    );
-    expect(inferAgencModel).toHaveBeenCalledTimes(1);
-    expect(inferAgencModel).toHaveBeenCalledWith(
-      expect.objectContaining({ requestedModel: "agenc:override" }),
-    );
-    expect(providerFactory).toHaveBeenCalledTimes(1);
-    expect(delegate.chat).toHaveBeenCalledTimes(1);
-    expect(delegate.chat).toHaveBeenCalledWith(
-      messages,
-      expect.objectContaining({
-        model: "grok-4.5",
-        maxOutputTokens: 200,
-        singleWireAttempt: true,
-      }),
-    );
-    expect(delegate.chat.mock.calls[0]?.[1]).not.toHaveProperty(
-      "providerExecutionHandle",
-    );
   });
 });
 

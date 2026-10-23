@@ -55,8 +55,8 @@ agenc onboard autonomy
 - **MCP both directions** (client + server), subagent teams and background
   agents in isolated worktrees, an eval-regression harness, and 16 model
   providers including Ollama/LM Studio.
-- **Managed OpenRouter** with free `:free` hosted routes and paid default
-  `x-ai/grok-4.5`; BYOK still wins ([managed-openrouter.md](managed-openrouter.md)).
+- **OpenRouter** with your own key, including free `:free` models and the
+  unchanged default `x-ai/grok-4.5` ([OpenRouter setup](managed-openrouter.md)).
 
 ## Persona workspace files
 

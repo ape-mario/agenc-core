@@ -22,7 +22,6 @@
 //   AGENC_CAPPED_DEFAULT_MAX_OUTPUT_TOKENS        → 8k default + retry mode
 //   AGENC_MAX_BUDGET_USD                           → session cost budget
 //   AGENC_AUTH_BACKEND                             → auth.backend
-//   AGENC_AUTH_MANAGED_KEYS_ENABLED               → auth.managedKeys.enabled
 //   AGENC_BROWSER_*                                → browser.*
 //   AGENC_BUDGET*                                  → budget.*
 //   AGENC_HEARTBEAT*                               → heartbeat.*
@@ -76,7 +75,6 @@ export interface EnvSnapshot {
   readonly AGENC_CAPPED_DEFAULT_MAX_OUTPUT_TOKENS?: string;
   readonly AGENC_MAX_BUDGET_USD?: string;
   readonly AGENC_AUTH_BACKEND?: string;
-  readonly AGENC_AUTH_MANAGED_KEYS_ENABLED?: string;
   readonly AGENC_BROWSER_EXECUTABLE?: string;
   readonly AGENC_BROWSER_HEADLESS?: string;
   readonly AGENC_BROWSER_ALLOW_PRIVATE_NETWORK?: string;
@@ -438,24 +436,6 @@ export function applyEnvOverrides(
     } else if (e.AGENC_AUTH_BACKEND.trim().length > 0) {
       onWarn?.(
         `[agenc:config] invalid AGENC_AUTH_BACKEND="${e.AGENC_AUTH_BACKEND}"; expected "local" or "remote"`,
-      );
-    }
-  }
-  if (e.AGENC_AUTH_MANAGED_KEYS_ENABLED !== undefined) {
-    const enabled = readBoolean(e.AGENC_AUTH_MANAGED_KEYS_ENABLED);
-    if (enabled !== undefined) {
-      override.auth = {
-        ...(config.auth ?? {}),
-        ...(override.auth ?? {}),
-        managedKeys: {
-          ...(config.auth?.managedKeys ?? {}),
-          ...(override.auth?.managedKeys ?? {}),
-          enabled,
-        },
-      };
-    } else if (e.AGENC_AUTH_MANAGED_KEYS_ENABLED.trim().length > 0) {
-      onWarn?.(
-        `[agenc:config] invalid AGENC_AUTH_MANAGED_KEYS_ENABLED="${e.AGENC_AUTH_MANAGED_KEYS_ENABLED}"; expected boolean-like value`,
       );
     }
   }

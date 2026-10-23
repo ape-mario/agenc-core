@@ -755,13 +755,8 @@ export type GrokCapabilityConfig = Pick<
 
 export type AuthBackendConfigKind = "local" | "remote";
 
-export interface AuthManagedKeysConfig {
-  readonly enabled?: boolean;
-}
-
 export interface AuthConfig {
   readonly backend?: AuthBackendConfigKind;
-  readonly managedKeys?: AuthManagedKeysConfig;
 }
 
 export interface LspServerConfigInput {
@@ -1221,9 +1216,6 @@ export function defaultConfig(): AgenCConfig {
     agent_max_depth: 1,
     auth: Object.freeze({
       backend: "remote",
-      managedKeys: Object.freeze({
-        enabled: true,
-      }) as AuthManagedKeysConfig,
     }) as AuthConfig,
     plugins: Object.freeze({
       enabled: false,
@@ -1652,8 +1644,7 @@ function optionalHttpStatusArray(
   return Object.freeze(out);
 }
 
-const AUTH_KEYS: ReadonlySet<string> = new Set(["backend", "managedKeys"]);
-const AUTH_MANAGED_KEYS: ReadonlySet<string> = new Set(["enabled"]);
+const AUTH_KEYS: ReadonlySet<string> = new Set(["backend", "managedKeys", "managed_keys"]);
 
 export function validateAuthConfig(raw: unknown): AuthConfig | undefined {
   if (raw === undefined) return undefined;
@@ -1676,27 +1667,6 @@ export function validateAuthConfig(raw: unknown): AuthConfig | undefined {
       );
     }
     out.backend = record.backend;
-  }
-  if (record.managedKeys !== undefined) {
-    const managedKeys = requirePlainObject(
-      record.managedKeys,
-      "managedKeys",
-      (field, detail) => new InvalidAuthConfigError(field, detail),
-    );
-    rejectUnknownFields(
-      managedKeys,
-      AUTH_MANAGED_KEYS,
-      (field, detail) => new InvalidAuthConfigError(field, detail),
-      "managedKeys",
-    );
-    const enabled = optionalBoolean(
-      managedKeys.enabled,
-      "managedKeys.enabled",
-      (field, detail) => new InvalidAuthConfigError(field, detail),
-    );
-    out.managedKeys = Object.freeze({
-      ...(enabled !== undefined ? { enabled } : {}),
-    }) as AuthManagedKeysConfig;
   }
   return Object.freeze(out as AuthConfig);
 }

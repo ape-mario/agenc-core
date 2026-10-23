@@ -19,7 +19,7 @@ import { readVeniceMenuModels } from "./venice-menu-models.js";
 import { readOllamaMenuModels } from "./ollama-menu-models.js";
 
 type ProviderRowStatus = "current" | "configured" | "default";
-export type ProviderAuthState = "managed" | "ready" | "missing" | "optional";
+export type ProviderAuthState = "ready" | "missing" | "optional";
 export type ProviderRuntimeState =
   | "active"
   | "available"
@@ -124,17 +124,7 @@ function providerMenuAuth(access: ProviderCommandAccess): {
 } {
   const rejection = formatProviderCommandRejection(access, "provider");
   if (rejection !== undefined) {
-    const label = access.rejection?.code === "provider-managed-auth-required"
-      ? "AgenC sign-in required"
-      : access.rejection?.code === "login-required"
-        ? "login or BYOK required"
-        : access.rejection?.code === "upgrade-required"
-          ? "upgrade required"
-          : access.rejection?.code === "model-not-managed"
-            ? "hosted model unavailable"
-            : access.rejection?.code === "configuration"
-              ? "configuration error"
-              : access.auth.label;
+    const label = access.rejection?.code === "configuration" ? "configuration error" : access.auth.label;
     return { state: "missing", label, source: rejection };
   }
   return {
@@ -275,26 +265,8 @@ export function readProviderMenuSnapshot(ctx: SlashCommandContext): ProviderMenu
       provider,
       model: configuredModel,
     });
-    const managedProjectionActive =
-      configuredAccess.directCredential?.status === "missing" &&
-      configuredAccess.managed.enabled &&
-      configuredAccess.managed.signedIn &&
-      configuredAccess.managed.defaultModel !== undefined;
-    const managedModelRequest = managedProjectionActive
-      ? configuredAccess.managed.defaultModel
-      : undefined;
-    const model = providerModel({
-      config,
-      provider,
-      currentProvider,
-      currentModel,
-      ...((managedModelRequest ?? discoveredDefault) === undefined
-        ? {}
-        : { requestedModel: managedModelRequest ?? discoveredDefault }),
-    });
-    const access = model === configuredModel
-      ? configuredAccess
-      : accessOverlay.inspect({ provider, model });
+    const model = configuredModel;
+    const access = configuredAccess;
     const baseURL = access.endpoint?.baseURL ?? info.baseURL;
     const auth = providerMenuAuth(access);
     const discoveredModels = provider === "venice"
@@ -303,9 +275,7 @@ export function readProviderMenuSnapshot(ctx: SlashCommandContext): ProviderMenu
         ? readOllamaMenuModels(ctx)?.map(entry => entry.model)
         : undefined;
     const rawModels = discoveredModels ?? modelCatalog[provider] ?? [];
-    const models = managedProjectionActive
-      ? access.managed.visibleModels
-      : rawModels;
+    const models = rawModels;
     const state = runtimeState({
       status,
       access,

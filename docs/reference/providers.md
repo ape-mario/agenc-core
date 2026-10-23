@@ -17,14 +17,14 @@ CLI: `agenc providers` · `agenc login` · `agenc config` · `/provider` and
 | Default provider | `grok` (xAI) |
 | Fresh-config session model | `grok-4.6` (`defaultConfig().model`) |
 | Provider-map fallback (`BUILT_IN_PROVIDER_DEFAULT_MODELS.grok`) | `grok-4.6` |
-| Managed OpenRouter paid default | `x-ai/grok-4.5` |
+| OpenRouter default | `x-ai/grok-4.5` |
 | Config keys | `model_provider`, `model` in `config.toml` |
 | Env overrides | `AGENC_PROVIDER`, `AGENC_MODEL` |
 
 Bare interactive startup with a fresh install uses the **config** default
 (`grok-4.6`). When only the direct `grok` provider slug is resolved without an
-explicit model, the registry also uses **`grok-4.6`**. Managed OpenRouter is a
-separate provider route and its paid default remains **`x-ai/grok-4.5`**.
+explicit model, the registry also uses **`grok-4.6`**. OpenRouter uses your own
+key and its default remains **`x-ai/grok-4.5`**.
 
 ## Gemini reasoning effort
 
@@ -128,7 +128,7 @@ token rates, on API-key billing only. See
 `grok-4.5` remains a selectable 500k-context catalog entry with the same input
 modalities and runtime features. Its short-context cached-input rate is
 $0.30 / 1M, versus $0.50 / 1M for Grok 4.6; it supports
-`low`/`medium`/`high` reasoning and is still the managed OpenRouter paid
+`low`/`medium`/`high` reasoning and remains the direct OpenRouter
 default. The xAI reasoning gate is fail-closed: Grok 4.3, Grok 4.5, Grok 4.6, Grok 4.7,
 and the documented 4.20 multi-agent family may receive the provider parameter;
 unknown variants have it stripped instead of inheriting support from a name
@@ -147,7 +147,7 @@ the Grok 4.6 default and capability change.
 they run only through the Grok Build CLI ACP path. See
 [grok-oauth.md](../grok-oauth.md#composer-models-acp).
 
-## Built-in providers (26)
+## Built-in providers (25)
 
 | Slug | Display name | Default model | Default base URL | Ordered credential env aliases | Ordered endpoint env aliases | Onboarding access |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -176,10 +176,9 @@ they run only through the Grok Build CLI ACP path. See
 | `minimax` | MiniMax | `MiniMax-M2.5` | `https://api.minimax.io/v1` | `MINIMAX_API_KEY` | `MINIMAX_BASE_URL` | `api-key` |
 | `github` | GitHub Copilot | `gpt-5.3-codex` | `https://api.githubcopilot.com` | `GITHUB_TOKEN`, `GH_TOKEN` | `GITHUB_BASE_URL` | `api-key` |
 | `amazon-bedrock` | Amazon Bedrock | `amazon.nova-pro-v1:0` | `https://bedrock-runtime.us-east-1.amazonaws.com` | access: `AWS_BEDROCK_ACCESS_KEY_ID`, `AWS_ACCESS_KEY_ID`; secret: `AWS_BEDROCK_SECRET_ACCESS_KEY`, `AWS_SECRET_ACCESS_KEY`; optional session: `AWS_BEDROCK_SESSION_TOKEN`, `AWS_SESSION_TOKEN` | `AWS_BEDROCK_BASE_URL` | `environment` |
-| `agenc` | AgenC | `agenc` | `https://id.agenc.ag/v1` | _(managed auth; no BYOK key alias)_ | `AGENC_BASE_URL` | `managed` |
 
-`openrouter` remains an `api-key` first-run route, but a signed-in AgenC
-subscription can supply its managed key access when that feature is enabled.
+`openrouter` uses your own OpenRouter key, including for free models. AgenC
+accounts do not supply provider credentials or model access.
 
 For current Claude models, limits and thinking behavior, see
 [Anthropic models](./anthropic-models.md).
@@ -199,11 +198,9 @@ stores credential values.
 - **Local BYOK** — explicit provider environment keys are transient inputs;
   keys saved through AgenC live only in the home-scoped native credential
   secure storage. `auth.json` contains non-secret identity/timestamp metadata only.
-- **Remote / managed** — `auth.backend = "remote"` with managed keys
-  (`agenc` provider requires managed auth). The stored bearer is native secure storage
-  state. An explicit constructor token wins over `AGENC_REMOTE_AUTH_TOKEN`,
-  which wins over the stored bearer; explicit overrides are not copied into
-  `auth.json`.
+- **AgenC account**: `auth.backend = "remote"` controls account sign-in only.
+  Account identity, remote access, and desktop sync do not grant model access.
+  The account bearer remains in native secure storage.
 - **OpenAI / ChatGPT OAuth** — `agenc openai-login` stores one home-scoped
   native `openAiOauth` record. While `openai` is selected, that stored sign-in
   wins over `OPENAI_API_KEY`; it never affects `openai-compatible` or another
@@ -947,7 +944,7 @@ Grammar-safe tool schemas and the reduced local catalog:
 
 - Tool / provider compatibility (object root, grammar-safe schemas, Gemini native JSON Schema, local catalog): [`../provider-tool-compat.md`](../provider-tool-compat.md)
 - Token admission invariant: [`../design/provider-aware-token-accounting.md`](../design/provider-aware-token-accounting.md)
-- Managed OpenRouter path: [`../managed-openrouter.md`](../managed-openrouter.md)
+- OpenRouter setup: [`../managed-openrouter.md`](../managed-openrouter.md)
 - Onboarding: `agenc onboard`
 
 ## Fast mode and service tiers

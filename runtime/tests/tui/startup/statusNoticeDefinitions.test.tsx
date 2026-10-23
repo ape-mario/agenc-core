@@ -126,7 +126,7 @@ describe("startup status notice definitions", () => {
     mocks.pluginInstalled = true;
   });
 
-  it("uses an AgenC account notice id for subscriber token conflicts", async () => {
+  it("does not show an AgenC account model notice for subscribers", async () => {
     mocks.subscriber = true;
     mocks.authTokenSource = {
       source: "ANTHROPIC_AUTH_TOKEN",
@@ -136,10 +136,8 @@ describe("startup status notice definitions", () => {
     const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
     const ids = getActiveNotices(baseContext()).map((notice) => notice.id);
 
-    expect(ids).toContain("agenc-account-external-token");
-    expect(ids.filter((id) => id.endsWith("-external-token"))).toEqual([
-      "agenc-account-external-token",
-    ]);
+    expect(ids).not.toContain("agenc-account-external-token");
+    expect(ids.filter((id) => id.endsWith("-external-token"))).toEqual([]);
     expect(mocks.credentialHomes).toEqual([]);
     expect(mocks.providerAuthContexts.length).toBeGreaterThan(0);
     expect(

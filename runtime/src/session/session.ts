@@ -100,7 +100,6 @@ import {
   type CompactionHistoryMarkerV1,
 } from "./compaction-history-marker.js";
 import {
-  MANAGED_OPENROUTER_DEFAULT_MAX_OUTPUT_TOKENS,
   type ProviderEnvironment,
 } from "../llm/provider-options.js";
 import {
@@ -1593,21 +1592,6 @@ function providerSwitchFailureReason(error: unknown, fallback: string): string {
     : fallback;
 }
 
-function capManagedOpenRouterModelInfo(modelInfo: ModelInfo): ModelInfo {
-  return {
-    ...modelInfo,
-    maxOutputTokens: MANAGED_OPENROUTER_DEFAULT_MAX_OUTPUT_TOKENS,
-    maxOutputTokensUpperLimit:
-      modelInfo.maxOutputTokensUpperLimit !== undefined
-        ? Math.min(
-            modelInfo.maxOutputTokensUpperLimit,
-            MANAGED_OPENROUTER_DEFAULT_MAX_OUTPUT_TOKENS,
-          )
-        : MANAGED_OPENROUTER_DEFAULT_MAX_OUTPUT_TOKENS,
-    maxOutputTokensCappedDefault: true,
-  };
-}
-
 export const DEFAULT_LEGACY_EVENT_QUEUE_DEPTH = 1024;
 
 /** Abort reason classification (per I-7). */
@@ -2912,9 +2896,7 @@ export class Session {
       ),
       provider.binding,
     );
-    const modelInfo = provider.managedDefaultOutputCap
-      ? capManagedOpenRouterModelInfo(rawModelInfo)
-      : rawModelInfo;
+    const modelInfo = rawModelInfo;
     const permissionContext = this.permissionModeRegistry.current();
     const promptContext = buildTurnContext({
       conversationId: this.conversationId,

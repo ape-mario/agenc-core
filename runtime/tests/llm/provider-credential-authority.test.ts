@@ -1850,7 +1850,7 @@ describe("provider credential authority", () => {
     expect(resolved.credential.status).toBe("missing");
   });
 
-  test("marks managed OpenRouter credentials for lazy vending", async () => {
+  test("never grants OpenRouter credentials from an account", async () => {
     const { providerOptions } = await loadCredentialModules();
     const vendKey = vi.fn(() => {
       throw new Error("managed credentials must remain lazy");
@@ -1879,17 +1879,9 @@ describe("provider credential authority", () => {
     );
 
     expect(vendKey).not.toHaveBeenCalled();
-    expect(resolved.managedCredential).toBe(true);
-    expect(resolved.factoryOptions).toMatchObject({
-      model: "x-ai/grok-4.3",
-      extra: {
-        authBackend,
-        managedCredential: true,
-        maxTokens: 2_048,
-        sessionId: "managed-session",
-        subscriptionTier: "pro",
-      },
-    });
+    expect(resolved.managedCredential).toBe(false);
+    expect(resolved.factoryOptions).toMatchObject({ model: "x-ai/grok-4.3" });
+    expect(resolved.factoryOptions.extra).toBeUndefined();
     expect(resolved.factoryOptions.apiKey).toBeUndefined();
     expect(resolved.factoryOptions.baseURL).toBeUndefined();
   });

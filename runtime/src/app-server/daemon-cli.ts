@@ -34,8 +34,6 @@ import { createLazyWhisperService } from "../audio/lazy-whisper.js";
 
 import type { createLazyRemoteService } from "../remote/lazy-service.js";
 
-
-
 import { remoteAuthSessionTokenSync } from "../auth/session-state.js";
 
 import { createLazyOwnerTelegramService } from "../gateway/lazy-owner-telegram.js";
@@ -148,7 +146,6 @@ import { PluginSettingsService } from "../plugins/settings-service.js";
 
 import { AgenCCleanupRegistry } from "../lifecycle/cleanup-registry.js";
 
-
 import { installAgenCShutdownSignalHandlers } from "../lifecycle/signal-handlers.js";
 
 import { summarizeAgenCShutdown } from "../lifecycle/shutdown-message.js";
@@ -161,7 +158,6 @@ import { createAuthBackend } from "../auth/selection.js";
 import type { AuthBackend } from "../auth/backend.js";
 
 import type { ToolRecoveryCategory } from "../tools/types.js";
-
 
 import { createPermissionAuditFileLogger } from "../permissions/permission-audit-log.js";
 
@@ -4046,19 +4042,16 @@ class AgenCDaemonReloadableAuthBackend implements AuthBackend {
     return this.#current.whoami(params);
   }
 
-  vendKey(
-    provider: Parameters<AuthBackend["vendKey"]>[0],
-    sessionId: Parameters<AuthBackend["vendKey"]>[1],
-  ) {
-    return this.#current.vendKey(provider, sessionId);
+  async vendKey(): Promise<never> {
+    throw new Error("AgenC accounts no longer provide models.");
   }
 
-  inferAgencModel(params?: Parameters<AuthBackend["inferAgencModel"]>[0]) {
-    return this.#current.inferAgencModel(params);
+  async inferAgencModel(): Promise<never> {
+    throw new Error("AgenC accounts no longer provide models.");
   }
 
-  getLlmUsage(params?: Parameters<AuthBackend["getLlmUsage"]>[0]) {
-    return this.#current.getLlmUsage(params);
+  async getLlmUsage(): Promise<never> {
+    throw new Error("AgenC accounts no longer provide models.");
   }
 
   getSubscriptionTier(
@@ -4101,7 +4094,7 @@ export function resolveAgenCDaemonRealtimeBaseUrl(
 }
 
 export function createAgenCDaemonRealtimeHeaderResolver(
-  authBackend: AuthBackend,
+  _authBackend: AuthBackend,
   env: NodeJS.ProcessEnv,
 ): AgenCRealtimeHeadersProvider {
   const apiKey = readNonEmptyString(env.OPENAI_API_KEY);
@@ -4109,18 +4102,8 @@ export function createAgenCDaemonRealtimeHeaderResolver(
     return { authorization: `Bearer ${apiKey}` };
   }
 
-  return async (sessionConfig) => {
-    const sessionId = readNonEmptyString(sessionConfig?.sessionId);
-    if (sessionId === undefined) {
-      throw new Error("realtime provider key vending requires a session id");
-    }
-    const vended = await authBackend.vendKey("openai", sessionId);
-    if (vended.kind !== "api-key") {
-      throw new Error(
-        "realtime provider credential vending returned non-API-key credentials",
-      );
-    }
-    return { authorization: `Bearer ${vended.apiKey}` };
+  return async () => {
+    throw new Error("OpenAI realtime requires your own OPENAI_API_KEY.");
   };
 }
 

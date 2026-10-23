@@ -108,20 +108,13 @@ The adapters and command-object set derive their membership from that list.
 
 ## `/login`
 
-`/login` signs into the AgenC account. The PromptInput footer
-[usesAnthropicAccountFlow](../../runtime/src/utils/model/providers.ts) gates
-the login prompt to first-party providers (`anthropic`, `amazon-bedrock`). A
-Grok or openai-compatible BYOK session does not show it when the provider
-selection is correct. Use `/grok-login` for Grok and `/openai-login` only for
-the `openai` provider. The `openai-compatible` provider uses
-`OPENAI_COMPATIBLE_API_KEY`, its documented fallback, or a provider-scoped
-saved BYOK credential. See
-[env.md](env.md#provider-credential-isolation).
+`/login` signs into the AgenC account for account features. It does not provide
+models or change the selected provider. Use `/grok-login` for Grok,
+`/openai-login` for OpenAI, or `/providers` to configure your own provider key.
 
 ## `/usage`
 
-`/usage` shows two sections. `AgenC account` is the hosted model usage of the
-signed-in AgenC plan. `Providers` lists every provider with a key set (an
+`/usage` lists every provider with a key set (an
 environment variable or a key saved in `/provider`) whose API reports a balance
 or usage for that same key. All lookups run at once with a 5 second timeout per
 request, and a provider that fails shows one dim line such as
@@ -150,8 +143,7 @@ endpoint, so with a different `base_url` their usage shows
 refused and keys are never printed. Providers whose APIs need an admin or
 management key for billing (OpenAI, Anthropic, xAI, Mistral) or document no
 balance API for API keys (Gemini, Groq, Cerebras, NVIDIA NIM, Meta, Qwen, Z.AI, MiniMax, GitHub
-Copilot, Amazon Bedrock) are not listed. AgenC-managed routes have no key of
-yours to read with; their usage is the AgenC account section.
+Copilot, Amazon Bedrock) are not listed. There is no AgenC account model-usage section.
 
 ## `/swarm`
 

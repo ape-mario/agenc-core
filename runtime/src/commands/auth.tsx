@@ -1,13 +1,14 @@
-import type { AuthBackend, AuthIdentity, AuthLlmUsage } from "../auth/backend.js";
+import type {
+  AuthBackend,
+  AuthIdentity,
+} from "../auth/backend.js";
 import { createAuthBackend } from "../auth/selection.js";
-import { readAccountModelAccess } from "../auth/account-access.js";
-import { saveAccountDefaultModel } from "../auth/account-default.js";
+
 import { defaultConfig } from "../config/schema.js";
-import { readBuiltInSessionSelection } from "../session/provider-model-selection.js";
+
 import { openLocalBrowser } from "../utils/browser.js";
 import {
   providerEnvironmentFromCommandContext,
-  remoteAuthContextFromCommandContext,
   requireCommandConfigStore,
 } from "./config-context.js";
 import {
@@ -16,13 +17,6 @@ import {
   type SlashCommandContext,
   type SlashCommandResult,
 } from "./types.js";
-import {
-  SUBSCRIPTION_MANAGED_DEFAULT_PROVIDER,
-  hasHostedManagedAccess,
-  subscriptionManagedDefaultModel,
-  subscriptionManagedDefaultModelForTier,
-  visibleSubscriptionManagedModelsForTier,
-} from "./subscription-managed-models.js";
 
 type AuthAction = "login" | "logout" | "whoami" | "subscription";
 
@@ -65,7 +59,7 @@ export const subscriptionCommand: SlashCommand = {
 
 export const usageCommand: SlashCommand = {
   name: "usage",
-  description: "Show AgenC plan usage and connected provider balances",
+  description: "Show connected provider usage and balances",
   argumentHint: "[provider]",
   immediate: true,
   supportsNonInteractive: true,
@@ -106,20 +100,11 @@ async function executeAuthCommand(
         clearLocalAuthNotice(ctx);
       }
       const tier = await resolveSubscriptionTier(backend);
-      const access = backend.kind === "remote" ? await readAccountModelAccess(backend) : undefined;
-      if (access !== undefined && access.models.length > 0) {
-        saveAccountDefaultModel(requireCommandConfigStore(ctx).homeContext.path, access);
-      }
-      const routeMessage = access?.models.length ?
-        "AgenC model access is ready. Your current conversation was kept; run /provider agenc to choose it." :
-        backend.kind === "remote" && tier === "free" ? "Sign-in complete. Check your model credits in AgenC account settings." :
-          hostedSubscriptionRouteMessage(ctx, tier);
       return {
         kind: "text",
         text:
           `Logged in as ${formatAgenCAuthIdentity(result.identity)}` +
-          formatSubscriptionStatus(tier) +
-          (routeMessage !== undefined ? `\n${routeMessage}` : ""),
+          formatSubscriptionStatus(tier),
       };
     }
 
@@ -155,7 +140,7 @@ async function executeAuthCommand(
 }
 
 /**
- * `/usage` shows the AgenC account and every connected provider with a usage
+ * `/usage` shows every connected provider with a usage
  * API, fetched together. `/usage <provider>` shows one provider in detail.
  */
 async function executeUsageCommand(
@@ -171,63 +156,12 @@ async function executeUsageCommand(
     if (provider !== undefined) {
       return await providerUsage.readProviderUsageDetail(ctx, provider);
     }
-    const [account, providers] = await Promise.all([
-      readAccountUsageText(ctx),
-      providerUsage.readProviderUsageSection(ctx),
-    ]);
+    const providers = await providerUsage.readProviderUsageSection(ctx);
     return {
       kind: "text",
-      text: `${providerUsage.usageHeading(ctx, "AgenC account")}\n${account}\n\n${providers}`,
+      text: providers,
     };
   });
-}
-
-async function readAccountUsageText(ctx: SlashCommandContext): Promise<string> {
-  try {
-    const backend = createSlashAuthBackend(ctx);
-    const result = await backend.whoami({ sessionId: TUI_AUTH_SESSION_ID });
-    if (!result.authenticated) {
-      return "Not logged in. Run /login to sign in with Google.";
-    }
-    const tier = await resolveSubscriptionTier(backend);
-    const usage = await resolveLlmUsage(backend);
-    return formatUsageCommandResult(usage.usage, tier, usage.error);
-  } catch (error) {
-    // Provider balances still show when the account lookup fails.
-    return `Account usage unavailable: ${error instanceof Error ? error.message : String(error)}`;
-  }
-}
-
-function managedSubscriptionTier(
-  tier: string | undefined,
-): tier is "free" | "pro" | "team" | "enterprise" {
-  return tier === "free" || tier === "pro" || tier === "team" || tier === "enterprise";
-}
-
-function hostedSubscriptionRouteMessage(
-  ctx: SlashCommandContext,
-  tier: string | undefined,
-): string | undefined {
-  if (!managedSubscriptionTier(tier)) return undefined;
-  const config = requireCommandConfigStore(ctx).current();
-  if (!hasHostedManagedAccess(config, remoteAuthContextFromCommandContext(ctx))) {
-    return undefined;
-  }
-
-  const currentProvider = readBuiltInSessionSelection(ctx.session, {
-    includePending: true,
-    fallbackConfig: config,
-  }).provider;
-  if (currentProvider === SUBSCRIPTION_MANAGED_DEFAULT_PROVIDER) {
-    return (
-      "Hosted models are ready through OpenRouter. Your current provider was kept; " +
-      "run /model to choose a hosted model."
-    );
-  }
-  return (
-    `Hosted models are ready through OpenRouter. Your current provider (${currentProvider}) was kept; ` +
-    "run /provider openrouter to switch."
-  );
 }
 
 function createSlashAuthBackend(ctx: SlashCommandContext, controller?: AbortController): AuthBackend {
@@ -267,19 +201,6 @@ async function resolveSubscriptionTier(
   }
 }
 
-async function resolveLlmUsage(
-  backend: AuthBackend,
-): Promise<{
-  readonly error?: string;
-  readonly usage?: AuthLlmUsage;
-}> {
-  try {
-    return { usage: await backend.getLlmUsage({ sessionId: TUI_AUTH_SESSION_ID }) };
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
 function clearLocalAuthNotice(ctx: SlashCommandContext): void {
   ctx.appState?.setToolJSX?.({
     jsx: null,
@@ -309,10 +230,7 @@ function formatAgenCAuthIdentity(identity: AuthIdentity | undefined): string {
 
 function formatSubscriptionStatus(tier: string | undefined): string {
   if (tier === undefined) return "";
-  if (tier === "pro" || tier === "team" || tier === "enterprise") {
-    return ` · plan=${tier} · managed keys available`;
-  }
-  return ` · plan=${tier} · check model credits (https://id.agenc.ag/account/credits)`;
+  return ` · plan=${tier}`;
 }
 
 export function formatSubscriptionCommandResult(tier: string | undefined): string {
@@ -321,135 +239,5 @@ export function formatSubscriptionCommandResult(tier: string | undefined): strin
     `Plan: ${plan}`,
     `Billing: ${SUBSCRIPTION_URL}`,
   ];
-  if (plan === "pro" || plan === "team" || plan === "enterprise") {
-    const provider = "openrouter";
-    const models = visibleSubscriptionManagedModelsForTier(provider, plan);
-    const defaultModel = subscriptionManagedDefaultModel(provider);
-    lines.push(
-      "Managed models: enabled",
-      "Model access: hosted by AgenC",
-      `Available models: ${models.length} managed OpenRouter routes`,
-      defaultModel !== undefined
-        ? `Default route: /model ${provider}:${defaultModel}`
-        : "Default route: run /provider",
-      "Choose/switch models with /provider.",
-    );
-  } else if (plan === "free") {
-    const provider = "openrouter";
-    const models = visibleSubscriptionManagedModelsForTier(provider, "free");
-    if (models.length > 0) {
-      const defaultModel = subscriptionManagedDefaultModelForTier(provider, "free");
-      lines.push(
-        "Free hosted models: enabled",
-        "Paid model allowance: upgrade to Pro",
-        `Available free models: ${models.length} OpenRouter routes`,
-        defaultModel !== undefined
-          ? `Default free route: /model ${provider}:${defaultModel}`
-          : "Default free route: run /provider",
-        "BYOK still works without a subscription.",
-      );
-    } else {
-      lines.push(
-        "Managed model access requires Pro or higher.",
-        "BYOK still works without a subscription.",
-      );
-    }
-  } else {
-    lines.push(
-      "Managed model access requires Pro or higher.",
-      "BYOK still works without a subscription.",
-    );
-  }
   return lines.join("\n");
-}
-
-export function formatUsageCommandResult(
-  usage: AuthLlmUsage | undefined,
-  fallbackTier: string | undefined,
-  error?: string,
-): string {
-  if (usage === undefined) {
-    return [
-      `Plan: ${fallbackTier ?? "unknown"}`,
-      "Managed model usage is temporarily unavailable.",
-      ...(error !== undefined ? [`Reason: ${error}`] : []),
-      `Billing: ${SUBSCRIPTION_URL}`,
-    ].join("\n");
-  }
-
-  const allowance = usage.modelAllowance;
-  const lines = [
-    `Plan: ${usage.subscriptionTier}`,
-    `Managed models: ${usage.managedModelsEnabled ? "enabled" : "not enabled"}`,
-  ];
-
-  if (
-    allowance.status === "free" &&
-    usage.managedModelsEnabled &&
-    allowance.allowedModelCount > 0
-  ) {
-    lines.push(
-      "Free hosted models: enabled",
-      "Paid usage: not active",
-      `Models: ${allowance.allowedModelCount} free hosted routes`,
-      "Free hosted routes do not consume Pro usage allowance.",
-      `Billing: ${SUBSCRIPTION_URL}`,
-    );
-    return lines.join("\n");
-  }
-
-  if (!usage.managedModelsEnabled || allowance.status === "free") {
-    lines.push(
-      "Hosted model usage requires Pro or higher.",
-      "BYOK still works without a subscription.",
-      `Billing: ${SUBSCRIPTION_URL}`,
-    );
-    return lines.join("\n");
-  }
-
-  if (allowance.status === "unavailable") {
-    lines.push("Usage: temporarily unavailable");
-  } else {
-    if (allowance.status === "pending") {
-      lines.push("Usage: ready, no hosted model usage yet");
-    } else {
-      lines.push(`Usage: ${allowance.status}`);
-    }
-    if (allowance.includedUsd !== undefined) {
-      lines.push(`Included usage: ${formatUsd(allowance.includedUsd)}`);
-    }
-    if (allowance.usedUsd !== undefined) {
-      lines.push(`Used: ${formatUsd(allowance.usedUsd)}`);
-    }
-    if (allowance.remainingUsd !== undefined) {
-      lines.push(`Remaining: ${formatUsd(allowance.remainingUsd)}`);
-    }
-    if (allowance.percentUsed !== undefined) {
-      lines.push(`Used percent: ${formatPercent(allowance.percentUsed)}`);
-    }
-  }
-
-  if (allowance.resetsAt !== undefined) {
-    lines.push(`Resets: ${formatDate(allowance.resetsAt)}`);
-  }
-  lines.push(
-    `Models: ${allowance.allowedModelCount} hosted routes`,
-    "Token counts vary by model, so usage is tracked as included USD.",
-  );
-  return lines.join("\n");
-}
-
-function formatUsd(value: number): string {
-  const decimals = value > 0 && value < 1 ? 4 : 2;
-  return `$${value.toFixed(decimals)}`;
-}
-
-function formatPercent(value: number): string {
-  return `${value.toFixed(value % 1 === 0 ? 0 : 1)}%`;
-}
-
-function formatDate(value: string): string {
-  const parsed = new Date(value);
-  if (!Number.isFinite(parsed.getTime())) return value;
-  return parsed.toISOString();
 }

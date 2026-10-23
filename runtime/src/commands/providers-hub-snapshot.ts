@@ -91,7 +91,6 @@ export type ProvidersHubModelRow = {
 };
 
 function plainStatus(row: ProviderMenuRow, keySaved: boolean): string {
-  if (row.authState === "managed") return "AgenC account";
   const source = row.credentialSource;
   if (keySaved || source === "native secure storage") return "key saved";
   if (source.startsWith("env ")) return source;
@@ -123,8 +122,8 @@ function notSetStatus(access: BuiltInProviderOnboardingAccess): string {
   switch (access) {
     case "environment":
       return "needs AWS credentials";
-    case "managed":
-      return "sign in with /login";
+    case "retired":
+      return "unavailable";
     case "local":
       return "not running";
     default:

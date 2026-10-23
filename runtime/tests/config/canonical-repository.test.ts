@@ -1677,3 +1677,17 @@ describe("retired-field migration manifest", () => {
     });
   });
 });
+
+describe("retired account model config", () => {
+  test.each(["managed_keys", "managedKeys"])("loads auth.%s without retaining the switch and emits one notice", async spelling => {
+    const homePath = temp("retired-model-config");
+    const managedPath = join(temp("retired-model-policy"), "config.toml");
+    const source = `config_version = 2\n[auth]\nbackend = "remote"\n[auth.${spelling}]\nenabled = true\n`;
+    write(join(homePath, "config.toml"), source);
+    write(managedPath, source);
+    const notices: string[] = [];
+    const loaded = await loadCanonicalDaemonConfig({ home: homePath, env: {}, managedConfigPath: managedPath, managedDropInDir: join(homePath, "empty"), onWarn: notice => notices.push(notice) });
+    expect(loaded.config.auth).toEqual({ backend: "remote" });
+    expect(notices).toEqual(["AgenC accounts no longer provide models. Use your own provider credentials or a local server."]);
+  });
+});

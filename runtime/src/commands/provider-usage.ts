@@ -605,8 +605,7 @@ function providerView(
 
 /**
  * Direct keys only: an environment variable or a saved BYOK key, resolved the
- * way the provider itself resolves them. AgenC-managed routes have no key of
- * the user's to read with, and their usage is the AgenC account section.
+ * way the provider itself resolves them.
  */
 function resolveCandidates(
   ctx: SlashCommandContext,

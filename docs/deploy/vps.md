@@ -124,10 +124,10 @@ systemctl --user edit agenc-daemon
 # Environment=OPENROUTER_API_KEY=...
 ```
 
-The unit file itself stays credential-free. Managed OpenRouter
-([managed-openrouter.md](../managed-openrouter.md)) uses remote login +
-short-lived vended keys instead of a long-lived OpenRouter secret on disk;
-BYOK still wins when set.
+The unit file itself stays credential-free. Configure your own OpenRouter key
+through the environment or native secure storage, including for free models.
+AgenC account sign-in does not supply model credentials. See
+[OpenRouter setup](../managed-openrouter.md).
 
 Channel secrets for the gateway: the native secure storage (or Docker env
 equivalents), loaded by `agenc gateway run` / the gateway user unit.
