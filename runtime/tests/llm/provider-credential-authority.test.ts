@@ -556,14 +556,21 @@ describe("provider credential authority", () => {
       ...await importOriginal<typeof import("../../src/utils/model/providers.js")>(),
       getSelectedProviderEnvironment: () => ({ AGENC_XAI_STORE: "0" }),
     }));
-    const tokenRefresh = vi.fn(async () => ({
-      accessToken: "new-xai-bearer", refreshToken: "new-xai-refresh",
-      expiresAt: Date.now() + 6 * 60 * 60 * 1000,
-    }));
-    vi.doMock("../../src/services/xai/oauth.js", async (importOriginal) => ({
-      ...await importOriginal<typeof import("../../src/services/xai/oauth.js")>(),
-      refreshXaiOauthTokens: tokenRefresh,
-    }));
+    // Stub the transport so the real refresh path stays hermetic regardless
+    // of which concurrent credential import first loads the OAuth module.
+    const tokenRefresh = vi.fn<typeof fetch>(async (input, init) => {
+      expect(String(input)).toBe("https://auth.x.ai/oauth2/token");
+      expect(init?.method).toBe("POST");
+      expect(init?.redirect).toBe("manual");
+      const body = new URLSearchParams(String(init?.body));
+      expect(body.get("grant_type")).toBe("refresh_token");
+      expect(body.get("refresh_token")).toBe("old-xai-refresh");
+      return Response.json({
+        access_token: "new-xai-bearer", refresh_token: "new-xai-refresh",
+        expires_in: 6 * 60 * 60,
+      });
+    });
+    vi.stubGlobal("fetch", tokenRefresh);
     const { xaiCredentials } = await loadCredentialModules();
     xaiCredentials.saveXaiOauthCredentials(home, {
       accessToken: "old-xai-bearer", refreshToken: "old-xai-refresh",
