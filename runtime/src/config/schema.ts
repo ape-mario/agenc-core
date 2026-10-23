@@ -299,7 +299,7 @@ export interface DurableTurnsConfig {
 export interface CompletionGateConfig {
   /** `auto` (default): only non-interactive sessions such as `agenc -p`. */
   readonly mode?: "auto" | "always" | "never";
-  /** Verification prompts per turn; default 3, at most 10. */
+  /** Verification prompts per turn; default and hard cap 3. */
   readonly max_rounds?: number;
 }
 

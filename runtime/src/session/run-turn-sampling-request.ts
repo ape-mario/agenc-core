@@ -7,6 +7,7 @@
  * @module
  */
 
+import { COMPLETION_GATE_MAX_OUTPUT_TOKENS } from "../phases/completion-gate.js";
 import { randomUUID } from "node:crypto";
 import type { LLMMessage, LLMTool } from "../llm/types.js";
 import { cloneLlmMessageSnapshot } from "../llm/content-conversion.js";
@@ -228,6 +229,8 @@ function buildSamplingRequestContract(
     samplingContext,
     baseInstructions,
   );
+  const outputLimit = state.maxOutputTokensOverride ?? request.maxOutputTokens;
+  const gateActive = state.completionGate !== undefined && state.completionGateRound > 0 && !state.completionGateSettled;
   return {
     ...request,
     contextWindowTokens: getEffectiveContextWindowSizeForEnvironment({ options: {
@@ -237,9 +240,9 @@ function buildSamplingRequestContract(
     ...(state.reasoningOnlyRecoveryPending === true
       ? { reasoningOnlyRecovery: true as const }
       : {}),
-    ...(state.maxOutputTokensOverride !== undefined
-      ? { maxOutputTokens: state.maxOutputTokensOverride }
-      : {}),
+    ...(gateActive
+      ? { maxOutputTokens: Math.min(outputLimit ?? Infinity, request.maxOutputTokens ?? Infinity, COMPLETION_GATE_MAX_OUTPUT_TOKENS) }
+      : outputLimit !== undefined ? { maxOutputTokens: outputLimit } : {}),
     ...(state.skipCacheWrite !== undefined
       ? { skipCacheWrite: state.skipCacheWrite }
       : {}),

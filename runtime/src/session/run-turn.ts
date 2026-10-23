@@ -124,6 +124,7 @@ import { readProviderConfig } from "../config/resolve-provider.js";
 import type { AgenCConfig } from "../config/schema.js";
 import {
   completionGate,
+  COMPLETION_GATE_MAX_SAMPLES,
   planCompletionGateForTurn,
 } from "../phases/completion-gate.js";
 import { goalGate, goalGateApplies } from "../phases/goal-gate.js";
@@ -3382,6 +3383,25 @@ async function* runTurnKernelInner(
     if (cancelledAtLoopStart !== null) {
       yield cancelledAtLoopStart.event;
       return cancelledAtLoopStart.terminal;
+    }
+
+    // Bound all verification samples, including tool continuations and recovery.
+    // The old round counter advanced only on tool-free answers, so a single
+    // gate prompt could launch an arbitrarily long investigation.
+    if (state.completionGate !== undefined && state.completionGateRound > 0 &&
+        !state.completionGateSettled) {
+      // Older checkpoints have only the round counter. Start conservatively
+      // from the ordinal available there; new checkpoints preserve the allowance.
+      state.completionGateSampleStart ??= Math.max(0, state.modelSampleOrdinal - COMPLETION_GATE_MAX_SAMPLES + 1);
+      if (state.modelSampleOrdinal - state.completionGateSampleStart > COMPLETION_GATE_MAX_SAMPLES) {
+        await drainInFlight(state, ctx, session);
+        await syncSessionState();
+        emitWarning(session.eventLog, session.nextInternalSubId(), "completion_gate_exhausted",
+          "Completion verification reached its sample limit; the final result remains unverified.");
+        emitTurnComplete(lastContent, "max_turns");
+        yield { type: "turn_complete", content: lastContent, usage, stopReason: "max_turns" };
+        return { reason: "max_turns" };
+      }
     }
 
     taskBudgetOf(session); // Include durable usage from delegated work.

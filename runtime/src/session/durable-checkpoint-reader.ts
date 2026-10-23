@@ -1672,6 +1672,7 @@ function parseRequiredCheckpointSlice(
 interface ParsedCheckpointRetryCounts {
   planToolRequiredRetryCount?: number;
   completionGateRound?: number;
+  completionGateSampleStart?: number;
 }
 
 function parseCheckpointRetryCounts(
@@ -1682,6 +1683,11 @@ function parseCheckpointRetryCounts(
     result.planToolRequiredRetryCount = nonNegativeInteger(
       value.planToolRequiredRetryCount,
       "resumableState.planToolRequiredRetryCount",
+    );
+  }
+  if (value.completionGateSampleStart !== undefined) {
+    result.completionGateSampleStart = nonNegativeInteger(
+      value.completionGateSampleStart, "resumableState.completionGateSampleStart",
     );
   }
   if (value.completionGateRound !== undefined) {

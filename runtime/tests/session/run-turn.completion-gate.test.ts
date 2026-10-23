@@ -7,7 +7,7 @@ import {
 } from "../../src/app-server/background-agent-runner/daemon-events.js";
 import type { ActiveBackgroundAgent } from "../../src/app-server/background-agent-runner/shared.js";
 import { classifyTurnTerminal } from "../../src/contracts/turn-terminal.js";
-import type { LLMMessage, LLMResponse } from "../../src/llm/types.js";
+import type { LLMChatOptions, LLMMessage, LLMResponse } from "../../src/llm/types.js";
 import type { PhaseEvent } from "../../src/phases/events.js";
 import { runTurn } from "../../src/session/run-turn.js";
 import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
@@ -47,9 +47,11 @@ function textStep(content: string): Partial<LLMResponse> {
 
 function scriptedProvider(script: readonly Partial<LLMResponse>[]) {
   const requests: LLMMessage[][] = [];
+  const options: (LLMChatOptions | undefined)[] = [];
   const provider = mkProvider();
   let index = 0;
-  provider.chatStream = async (messages): Promise<LLMResponse> => {
+  provider.chatStream = async (messages, _onChunk, opts): Promise<LLMResponse> => {
+    options.push(opts);
     requests.push(messages.map((message) => ({ ...message })));
     const step = script[Math.min(index, script.length - 1)] ?? {};
     index += 1;
@@ -62,7 +64,7 @@ function scriptedProvider(script: readonly Partial<LLMResponse>[]) {
       ...step,
     };
   };
-  return { provider, requests };
+  return { provider, requests, options };
 }
 
 function toolRegistry(
@@ -188,6 +190,33 @@ async function exhaustGate(maxRounds: number) {
 }
 
 describe("completion gate in the turn loop", () => {
+  test("verification respects lower output limits and caps recovery requests", async () => {
+    const {provider, requests, options} = scriptedProvider([
+      toolStep("work"), textStep("Done."),
+      {...textStep("Unfinished verification"), finishReason: "length"},
+    ]);
+    const {session} = headlessSession(provider, true);
+    const ctx = mkCtx();
+    await collect(session, {...ctx, modelInfo: {...ctx.modelInfo, maxOutputTokens: 1024}});
+    expect(options[2]?.maxOutputTokens).toBe(1024);
+    expect(requests.length).toBeLessThanOrEqual(8);
+    expect(options.slice(2).every(option => (option?.maxOutputTokens ?? Infinity) <= 1024)).toBe(true);
+  });
+
+  test("bounds tool-only verification continuations and every gated output request", async () => {
+    const { provider, requests, options } = scriptedProvider([
+      toolStep("work"), textStep("Done."),
+      ...Array.from({ length: 10 }, (_, i) => toolStep(`verify-${i}`)),
+    ]);
+    const { session, events } = headlessSession(provider, true);
+    await collect(session);
+    expect(requests).toHaveLength(8); // two work samples plus six gate samples
+    expect(options.slice(2).every(option => option?.maxOutputTokens === 8192)).toBe(true);
+    expect(gateWarnings(events).at(-1)?.message).toContain("sample limit");
+    const terminal = events.map(event => classifyTurnTerminal(event.msg)).find(item => item !== undefined);
+    expect(terminal?.outcome).not.toBe("completed");
+  });
+
   test("finishes a tool-backed data answer without a new model request", async () => {
     const task = "Look up current stock using the inventory service. Return JSON with available.";
     const final = '{"available":137}';
@@ -690,6 +719,7 @@ describe("completion gate in the turn loop", () => {
     const state = buildInitialTurnState(mkCtx(), { role: "user", content: TASK });
     expect(toCheckpointSlice(state)).not.toHaveProperty("completionGateRound");
     state.completionGateRound = 2;
+    state.completionGateSampleStart = 7;
     expect(toCheckpointSlice(state).completionGateRound).toBe(2);
     // The last request is runtime-only: a resumed turn asks once more.
     state.completionGateLastRequest = { reason: "no_checklist", unmetItems: [], unlinkedItems: [] };
@@ -698,6 +728,7 @@ describe("completion gate in the turn loop", () => {
     const restored = buildInitialTurnState(mkCtx(), { role: "user", content: TASK });
     restoreFromCheckpoint(restored, { ...toCheckpointSlice(state), completionGateRound: 2 });
     expect(restored.completionGateRound).toBe(2);
+    expect(restored.completionGateSampleStart).toBe(7);
   });
 
   test("the event schema rejects a payload without its required fields", () => {

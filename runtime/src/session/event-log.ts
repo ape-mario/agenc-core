@@ -361,6 +361,7 @@ export interface CompletionGateEvent {
     | "unavailable_checks"
     | "rounds_exhausted"
     | "no_tool_use"
+    | "literal_file_verified"
     | "answer_only"
     | "deadline_reserve";
   /** Tool calls that completed between the last injection and this decision. */

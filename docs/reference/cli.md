@@ -153,6 +153,22 @@ when AgenC cannot tell; `/status` says why
   structured output includes the event. `completion_gate.mode = "never"`
   in the config turns that off; see
   [config.md](config.md#built-in-defaults).
+  Verification requests reuse current evidence and ask for at most five grouped
+  evidence lines. They do not require repeated tests or separate items for
+  trivial properties. A narrow literal-file fast path preserves the requested
+  content-only answer: a short, explicit create/write-and-read-back request,
+  exactly one successful literal write and one complete read of the same file,
+  and a matching answer. It recognizes quoted ASCII content or consistent
+  byte-count/hexadecimal content, FileWrite/Write, and a literal `printf` with
+  an optional byte dump. Other wording, commands, extra requirements, partial
+  reads, failures and more involved tasks retain the full gate.
+  `literal_file_verified` records this decision without another model call.
+  The gate permits at most three checklist requests and six additional model
+  samples, including tool continuations and recovery samples. Each gated
+  request reserves at most 8,192 output tokens, or the lower configured limit.
+  The sample allowance is checkpointed. Transport retries retain their own
+  existing limits. If the model keeps working past six samples without a final
+  answer, the run stops with `max_turns` and an unverified-result warning.
   Clear information requests (such as MCP data queries or explanations) can finish without a workspace checklist when the turn has successful tool results and no commands or recorded workspace writes. Requests mentioning implementation, execution or output artifacts retain verification, as do ambiguous tasks, explicit checklists and verification rounds already in progress. The gate records this applicability decision as `skipped` with reason `answer_only`; it does not certify answer correctness or change tool permissions.
 - `--output-format stream-json` with `--input-format stream-json` is the
   protocol used by the SDK subprocess transport

@@ -380,6 +380,21 @@ durable, shutdown or a forced kill can still lose that unpersisted state.
 
 Clear information requests (such as MCP data queries or explanations) can finish without a workspace checklist when the turn has successful tool results and no commands or recorded workspace writes. Requests mentioning implementation, execution or output artifacts retain verification, as do ambiguous tasks, explicit checklists and verification rounds already in progress. The gate records this applicability decision as `skipped` with reason `answer_only`; it does not certify answer correctness or change tool permissions.
 
+Completion review reuses current evidence and asks for at most five grouped
+lines, rather than an item for every trivial property. Explicit literal-file
+write/read-back tasks can finish with their content-only answer when a narrow
+runtime check matches the successful write, complete read and requested
+content. Unknown wording or commands, extra requirements and substantive work
+retain the full evidence check. See [CLI completion behavior](cli.md).
+
+In addition to the three-prompt hard cap, verification has a checkpointed
+allowance of six model samples. Tool continuations and recovery consume it;
+transport retries use their existing retry limits. Every gated request is
+capped at 8,192 output tokens and never raises a lower configured limit.
+A tool loop that exhausts this allowance stops with `max_turns` and a warning
+that verification is incomplete. This is separate from settling an existing
+final answer at the checklist round cap below.
+
 `max_turns` is unset by default; an unset turn cap does not impose a
 synthetic stop. `completion_gate` defaults to `mode = "auto"` with
 `max_rounds = 3`: in a non-interactive session (`agenc -p`, a routine, an
@@ -888,7 +903,7 @@ keybinding file or watcher.
 | `durableTurns` | Durable-turn block. |
 | `durableTurns.checkpoint`, `durableTurns.checkpoint.enabled`, `durableTurns.checkpoint.minIntervalMs` | Checkpoint switch and throttle. `enabled` defaults to `true`. When false, restart reports `no-checkpoint` and opens a fresh turn. `minIntervalMs` throttles ordinary `iteration` and `postAssistant` writes. It does not defer the forced pre-admission checkpoint after `modelSampleOrdinal` advances. |
 | `durableTurns.resume`, `durableTurns.resume.onRestart` | Resume-on-restart switch. Default `true`. Automatic continuation applies only to a root whose descendant edges are all closed with recorded terminal outcomes. Turns with unfinished workers follow the ordinary bootstrap path; resuming them is follow-up work. When false, startup opens a fresh turn with reason `disabled`. The removed `resume.policy` key is stripped on migrate; it is not an operator setting. |
-| `completion_gate`, `completion_gate.mode`, `completion_gate.max_rounds` | Non-interactive verification round. `mode` is `auto` (default: only sessions created with `runtimeOptions.nonInteractive`), `always`, or `never`; `max_rounds` is `1..10`, default `3`. See [Built-in defaults](#built-in-defaults). |
+| `completion_gate`, `completion_gate.mode`, `completion_gate.max_rounds` | Non-interactive verification round. `mode` is `auto` (default: only sessions created with `runtimeOptions.nonInteractive`), `always`, or `never`; `max_rounds` is clamped to `1..3`, default `3`. See [Built-in defaults](#built-in-defaults). |
 | `goal`, `goal.max_rounds`, `goal.stall_rounds`, `goal.judge_model`, `goal.verify_timeout_ms` | Policy for `/goal`. `max_rounds` is how many continuations a goal may use before it stops as `budget_exhausted` (`1..100`, default `20`); `stall_rounds` is how many rounds in a row may end without a successful tool call before the goal stalls (default `3`); `judge_model` pins the independent reviewer's model (default: the session model); `verify_timeout_ms` bounds each verification command the runtime runs (default `600000`). See [goal.md](goal.md). |
 | `durableTurns.resume.requireLease`, `durableTurns.resume.buildPinning` | Lease and build-pinning guards. Both default `true`. Resume fail-closes when an enabled guard finds a lease or build-id mismatch. The switches enable or disable individual guards. They do not select an idempotent replay policy. |
 
