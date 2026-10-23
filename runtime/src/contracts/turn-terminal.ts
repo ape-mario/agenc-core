@@ -1,4 +1,9 @@
-import type { TransportFailure } from "../llm/transport-failure.js";
+/** Content-free facts that survive phase wrappers and can be persisted safely. */
+export type TransportFailure = {
+  readonly category: "stream_truncated" | "http_5xx" | "connection_lost" | "timeout";
+  readonly status?: number;
+};
+
 
 export const MAX_TURN_FAILURE_MESSAGE_LENGTH = 2_000;
 /**

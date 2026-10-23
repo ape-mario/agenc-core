@@ -1,10 +1,7 @@
 import { LLMInvalidResponseError, LLMServerError, LLMStreamTruncatedError, LLMTimeoutError } from "./errors.js";
 
-/** Content-free facts that survive phase wrappers and can be persisted safely. */
-export type TransportFailure = {
-  readonly category: "stream_truncated" | "http_5xx" | "connection_lost" | "timeout";
-  readonly status?: number;
-};
+import type { TransportFailure } from "../contracts/turn-terminal.js";
+export type { TransportFailure } from "../contracts/turn-terminal.js";
 
 export function transportFailureOf(error: unknown): TransportFailure | undefined {
   const seen = new Set<object>();
