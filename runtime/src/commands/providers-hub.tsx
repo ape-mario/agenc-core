@@ -230,8 +230,8 @@ function infoLines(row: ProvidersHubRow): readonly string[] {
         `${row.name} signs in with your AWS credentials.`,
         `Set ${row.envLabel ?? "the AWS credential variables"} before starting AgenC.`,
       ];
-    case "managed":
-      return [`${row.name} uses your AgenC account.`, "Run /login to sign in."];
+    case "retired":
+      return ["AgenC accounts no longer provide models."];
     default:
       return [row.status];
   }
@@ -1005,7 +1005,7 @@ export function ProvidersHubView({
       activeIndex={listIndex}
       activeRowColor={ACTIVE_ROW_COLOR}
       detail={highlighted ? <ThemedText color="text2" wrap="wrap">
-        {highlighted.access === "local" || highlighted.access === "environment" || highlighted.access === "managed"
+        {highlighted.access === "local" || highlighted.access === "environment" || highlighted.access === "retired"
           ? highlighted.connection === "current" || highlighted.connection === "connected"
             ? `${highlighted.name}: choose a model to answer in this conversation.`
             : infoLines(highlighted).join(" ")

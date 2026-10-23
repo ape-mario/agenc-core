@@ -331,6 +331,9 @@ export function validateStrictConfigDocument(
   }
 }
 
+const RETIRED_MODEL_ACCOUNT_LAYERS = new WeakSet<ConfigLayerSnapshot>();
+export const RETIRED_MODEL_ACCOUNT_NOTICE = "AgenC accounts no longer provide models. Use your own provider credentials or a local server.";
+
 export async function readStrictConfigLayer(
   path: string,
   scope: ConfigScope,
@@ -364,6 +367,9 @@ export async function readStrictConfigLayer(
     ...source(scope, label, path),
     config: validateStrictConfigDocument(parsed, path),
   });
+  if (isPlainRecord(parsed.auth) && ("managedKeys" in parsed.auth || "managed_keys" in parsed.auth)) {
+    RETIRED_MODEL_ACCOUNT_LAYERS.add(layer);
+  }
   STABLE_LAYER_IDENTITIES.set(layer, Object.freeze({
     path: resolve(path),
     resolvedPath: snapshot.resolvedPath,
@@ -1357,10 +1363,15 @@ async function loadLayeredConfigInternal(
   const ignored: IgnoredConfigValue[] = [];
   const provenance: Record<string, ConfigProvenanceEntry> = {};
 
+  let retiredModelAccountNoticeShown = false;
   const registerPhysicalSource = (
     layer: ConfigLayerSnapshot | null,
   ): void => {
     if (layer?.path === undefined) return;
+    if (!retiredModelAccountNoticeShown && RETIRED_MODEL_ACCOUNT_LAYERS.has(layer)) {
+      retiredModelAccountNoticeShown = true;
+      (options.onWarn ?? console.warn)(RETIRED_MODEL_ACCOUNT_NOTICE);
+    }
     const identity = STABLE_LAYER_IDENTITIES.get(layer);
     if (identity === undefined) return;
     for (const existing of physicalSources) {

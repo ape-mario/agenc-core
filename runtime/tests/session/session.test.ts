@@ -110,7 +110,6 @@ import { ConfigStore } from "../config/store.js";
 import { runWithCanonicalSettingsAuthority } from "../utils/settings/canonicalAuthority.js";
 import { SessionProviderService } from "./provider-service.js";
 import { resolveProviderRuntimeRequest } from "../llm/provider-request.js";
-import { isFreeSubscriptionManagedModel } from "../commands/subscription-managed-models.js";
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from "../prompts/system-prompt-boundary.js";
 
 (globalThis as Record<string, unknown>).MACRO ??= {
@@ -343,19 +342,7 @@ function buildSession(
         });
         return {
           requested: runtimeRequest.requested,
-          runtime: {
-            managedKeysEnabled:
-              currentConfig.auth?.managedKeys?.enabled === true,
-            freeManagedCredential:
-              services.authSubscriptionTier === "free" &&
-              isFreeSubscriptionManagedModel(
-                selection.provider,
-                selection.model,
-              ),
-            applyManagedDefaultOutputCap:
-              selection.provider === "openrouter" &&
-              runtimeRequest.settings?.maxOutputTokens === undefined,
-          },
+
         };
       },
     });
@@ -1734,176 +1721,6 @@ describe("Session.consumePendingProviderSwitch", () => {
     ).toBeUndefined();
   });
 
-  it("caps managed OpenRouter switches to the hosted output-token default", async () => {
-    await withEnv(
-      {
-        OPENROUTER_API_KEY: undefined,
-      },
-      async () => {
-        const calls: string[] = [];
-        const authBackend: AuthBackend = {
-          kind: "remote",
-          login: () => ({ authenticated: true, provider: "remote" }),
-          logout: () => ({ authenticated: false }),
-          whoami: () => ({ authenticated: true, provider: "remote" }),
-          vendKey: (provider, sessionId) => {
-            calls.push(`vendKey:${provider}:${sessionId}`);
-            return {
-              kind: "api-key",
-              provider,
-              sessionId,
-              apiKey: "managed-openrouter-key",
-              baseUrl: "https://llm.agenc.tech",
-            };
-          },
-          inferAgencModel: () => ({
-            provider: "openrouter",
-            model: "openai/gpt-5-nano",
-          }),
-          getSubscriptionTier: () => "team",
-        };
-        const session = buildSession({
-          services: {
-            provider: createProvider("openai", {
-              apiKey: "test-key",
-              model: "gpt-5",
-            }),
-            authBackend,
-            authSubscriptionTier: "team",
-            configStore: {
-              current: () => ({
-                auth: { managedKeys: { enabled: true } },
-              }),
-            },
-            modelsManager: {
-              getModelInfo: async (model: string) => ({
-                ...mkModelInfo(),
-                slug: model,
-                contextWindow: 128_000,
-                maxOutputTokens: 128_000,
-                maxOutputTokensUpperLimit: 128_000,
-              }),
-            },
-          },
-        });
-        session.setPendingProviderSwitch({
-          provider: "openrouter",
-          model: "openai/gpt-5-nano",
-        });
-
-        const applied = await consumePendingProviderSwitch(session);
-
-        expect(applied).toEqual({
-          applied: true,
-          provider: "openrouter",
-          model: "openai/gpt-5-nano",
-        });
-        expect(calls).toEqual([]);
-        expect(
-          readProviderFactoryOptions(session.services.provider),
-        ).toMatchObject({
-          model: "openai/gpt-5-nano",
-          extra: {
-            managedCredential: true,
-            maxTokens: 2048,
-          },
-        });
-        expect(
-          readProviderFactoryOptions(session.services.provider),
-        ).not.toHaveProperty("apiKey");
-        expect(
-          readProviderFactoryOptions(session.services.provider),
-        ).not.toHaveProperty("baseURL");
-        expect(session.modelInfo.maxOutputTokens).toBe(2048);
-        expect(session.modelInfo.maxOutputTokensUpperLimit).toBe(2048);
-        expect(session.modelInfo.maxOutputTokensCappedDefault).toBe(true);
-      },
-    );
-  });
-
-  it("caps direct managed OpenRouter key switches to the hosted output-token default", async () => {
-    await withEnv(
-      {
-        OPENROUTER_API_KEY: undefined,
-      },
-      async () => {
-        const calls: string[] = [];
-        const authBackend: AuthBackend = {
-          kind: "remote",
-          login: () => ({ authenticated: true, provider: "remote" }),
-          logout: () => ({ authenticated: false }),
-          whoami: () => ({ authenticated: true, provider: "remote" }),
-          vendKey: (provider, sessionId) => {
-            calls.push(`vendKey:${provider}:${sessionId}`);
-            return {
-              kind: "api-key",
-              provider,
-              sessionId,
-              apiKey: "managed-openrouter-key",
-            };
-          },
-          inferAgencModel: () => ({
-            provider: "openrouter",
-            model: "openai/gpt-5-nano",
-          }),
-          getSubscriptionTier: () => "team",
-        };
-        const session = buildSession({
-          services: {
-            provider: createProvider("openai", {
-              apiKey: "test-key",
-              model: "gpt-5",
-            }),
-            authBackend,
-            authSubscriptionTier: "team",
-            configStore: {
-              current: () => ({
-                auth: { managedKeys: { enabled: true } },
-              }),
-            },
-            modelsManager: {
-              getModelInfo: async (model: string) => ({
-                ...mkModelInfo(),
-                slug: model,
-                contextWindow: 128_000,
-                maxOutputTokens: 128_000,
-                maxOutputTokensUpperLimit: 128_000,
-              }),
-            },
-          },
-        });
-        session.setPendingProviderSwitch({
-          provider: "openrouter",
-          model: "openai/gpt-5-nano",
-        });
-
-        const applied = await consumePendingProviderSwitch(session);
-
-        expect(applied).toEqual({
-          applied: true,
-          provider: "openrouter",
-          model: "openai/gpt-5-nano",
-        });
-        expect(calls).toEqual([]);
-        expect(
-          readProviderFactoryOptions(session.services.provider),
-        ).toMatchObject({
-          model: "openai/gpt-5-nano",
-          extra: {
-            managedCredential: true,
-            maxTokens: 2048,
-          },
-        });
-        expect(
-          readProviderFactoryOptions(session.services.provider),
-        ).not.toHaveProperty("apiKey");
-        expect(session.modelInfo.maxOutputTokens).toBe(2048);
-        expect(session.modelInfo.maxOutputTokensUpperLimit).toBe(2048);
-        expect(session.modelInfo.maxOutputTokensCappedDefault).toBe(true);
-      },
-    );
-  });
-
   it("does not vend managed keys for local LM Studio switches", async () => {
     await withEnv(
       {
@@ -2014,7 +1831,7 @@ describe("Session.consumePendingProviderSwitch", () => {
         const applied = await consumePendingProviderSwitch(session);
 
         expect(applied.applied).toBe(false);
-        expect(applied.reason).toMatch(/Managed provider keys require/);
+        expect(applied.reason).toMatch(/openrouter provider requires credentials/);
         expect(vendKey).not.toHaveBeenCalled();
         expect(session.services.provider).toBe(startingProvider);
         expect(session.pendingProviderSwitch).toBeNull();
@@ -2060,7 +1877,7 @@ describe("Session.consumePendingProviderSwitch", () => {
     const applied = await consumePendingProviderSwitch(session);
 
     expect(applied.applied).toBe(false);
-    expect(applied.reason).toMatch(/Hosted AgenC model routing/);
+    expect(applied.reason).toMatch(/AgenC accounts no longer provide models/);
     expect(vendKey).not.toHaveBeenCalled();
     expect(session.services.provider).toBe(startingProvider);
   });

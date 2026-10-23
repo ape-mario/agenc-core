@@ -41,7 +41,6 @@ describe("built-in provider info", () => {
       ["minimax", "MiniMax", "MiniMax-M3", "https://api.minimax.io/v1", "api-key", ["MINIMAX_API_KEY"], ["MINIMAX_BASE_URL"], 130, "api-key", false],
       ["github", "GitHub Copilot", "gpt-5.3-codex", "https://api.githubcopilot.com", "api-key", ["GITHUB_TOKEN", "GH_TOKEN"], ["GITHUB_BASE_URL"], 140, "api-key", false],
       ["amazon-bedrock", "Amazon Bedrock", "amazon.nova-pro-v1:0", "https://bedrock-runtime.us-east-1.amazonaws.com", "aws-sigv4", [], ["AWS_BEDROCK_BASE_URL"], 150, "environment", false],
-      ["agenc", "AgenC", "agenc", "https://id.agenc.ag/v1", "none", [], ["AGENC_BASE_URL"], 160, "managed", false],
     ] as const;
 
     expect(
@@ -57,9 +56,8 @@ describe("built-in provider info", () => {
         provider.baseURLEnvVars,
         provider.onboarding.order,
         provider.onboarding.access,
-        provider.onboarding.supportsManagedKeyAccess,
       ]),
-    ).toEqual(expected);
+    ).toEqual(expected.map(row => row.slice(0, -1)));
     for (const provider of listBuiltInProviderInfo()) {
       expect(Object.isFrozen(BUILT_IN_PROVIDER_DEFINITIONS[provider.id])).toBe(true);
       expect(Object.isFrozen(provider.credentials)).toBe(true);
@@ -89,9 +87,7 @@ describe("built-in provider info", () => {
       expect(provider.supportsApiKeylessAuth).toBe(
         provider.id === "openai" || provider.id === "gemini",
       );
-      expect(provider.requiresManagedAuth).toBe(
-        provider.onboarding.access === "managed",
-      );
+
     }
   });
 

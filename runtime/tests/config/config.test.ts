@@ -98,7 +98,7 @@ describe("schema: defaultConfig", () => {
     expect(cfg.stream_watchdog_timeout_ms).toBe(1_200_000);
     expect(cfg.stream_quiet_warning_ms).toBe(600_000);
     expect(cfg.auth?.backend).toBe("remote");
-    expect(cfg.auth?.managedKeys?.enabled).toBe(true);
+    expect(cfg.auth).toEqual({ backend: "remote" });
     expect(cfg.plugins?.enabled).toBe(false);
     expect(cfg.plugins?.allowlist).toEqual([]);
     expect(cfg.mcp?.server).toEqual({
@@ -846,17 +846,14 @@ describe("schema: statusLine / outputStyle block (T12)", () => {
 });
 
 describe("schema: closed config block validators (CF-13)", () => {
-  test("validateAuthConfig accepts managed local/remote auth settings", () => {
+  test("validateAuthConfig ignores retired managed settings", () => {
     const out = validateAuthConfig({
       backend: "remote",
       managedKeys: { enabled: true },
     });
-    expect(out).toEqual({
-      backend: "remote",
-      managedKeys: { enabled: true },
-    });
+    expect(out).toEqual({ backend: "remote" });
     expect(Object.isFrozen(out)).toBe(true);
-    expect(Object.isFrozen(out?.managedKeys)).toBe(true);
+    expect(out?.managedKeys).toBeUndefined();
   });
 
   test("validateAuthConfig rejects unknown auth fields with field metadata", () => {
@@ -1678,7 +1675,7 @@ describe("env: resolvers", () => {
     },
   );
 
-  test("applyEnvOverrides — AGENC_AUTH_MANAGED_KEYS_ENABLED wins over TOML auth flag", () => {
+  test("applyEnvOverrides ignores the retired managed model environment flag", () => {
     const base = mergeConfigs(defaultConfig(), {
       auth: { managedKeys: { enabled: true } },
     });
@@ -1686,7 +1683,7 @@ describe("env: resolvers", () => {
       AGENC_AUTH_MANAGED_KEYS_ENABLED: "false",
     });
     expect(out.auth?.backend).toBe("remote");
-    expect(out.auth?.managedKeys?.enabled).toBe(false);
+    expect(out.auth?.managedKeys?.enabled).toBe(true);
   });
 
   test("applyEnvOverrides — AGENC_AUTH_BACKEND selects remote auth", () => {
@@ -1698,7 +1695,7 @@ describe("env: resolvers", () => {
     }, (warning) => warnings.push(warning));
 
     expect(out.auth?.backend).toBe("remote");
-    expect(out.auth?.managedKeys?.enabled).toBe(true);
+    expect(out.auth?.managedKeys).toBeUndefined();
     expect(warnings).toEqual([]);
   });
 
@@ -1907,11 +1904,10 @@ describe("env: resolvers", () => {
     );
     expect(out.max_output_tokens).toBeUndefined();
     expect(out.capped_default_max_output_tokens).toBeUndefined();
-    expect(out.auth?.managedKeys?.enabled).toBe(true);
+    expect(out.auth?.managedKeys).toBeUndefined();
     expect(warnings).toEqual([
       '[agenc:config] invalid AGENC_MAX_OUTPUT_TOKENS="bogus"; expected a positive integer',
       '[agenc:config] invalid AGENC_CAPPED_DEFAULT_MAX_OUTPUT_TOKENS="maybe"; expected boolean-like value',
-      '[agenc:config] invalid AGENC_AUTH_MANAGED_KEYS_ENABLED="sometimes"; expected boolean-like value',
     ]);
   });
 

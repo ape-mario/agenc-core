@@ -498,11 +498,11 @@ Default provider is **`grok`** (xAI). Model defaults are dual-sourced:
 | --------------------------------------------------------------- | ------------------- | ------------------------------------------- |
 | Fresh `defaultConfig().model`                                   | **`grok-4.6`**      | `runtime/src/config/schema.ts`              |
 | Provider-map fallback (`BUILT_IN_PROVIDER_DEFAULT_MODELS.grok`) | **`grok-4.6`**      | `runtime/src/llm/registry/provider-info.ts` |
-| Managed OpenRouter paid first model                             | **`x-ai/grok-4.5`** | `subscription-managed-models.ts`            |
+| Direct OpenRouter default | **`x-ai/grok-4.5`** | `runtime/src/llm/registry/provider-info.ts` |
 
 Bare interactive startup with an empty/fresh config uses the **config** default
-(`grok-4.6`). The direct Grok provider map also uses **4.6**; paid managed
-OpenRouter intentionally remains on **`x-ai/grok-4.5`**.
+(`grok-4.6`). The direct Grok provider map also uses **4.6**. OpenRouter uses
+the user's own key and keeps **`x-ai/grok-4.5`** as its default.
 API key resolution for grok: `XAI_API_KEY` → `GROK_API_KEY`. The retired
 `AGENC_XAI_API_KEY` alias is rejected at ingress.
 

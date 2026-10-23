@@ -5,7 +5,7 @@ import type { HomeContext } from '../../config/home.js';
 import { formatNumber } from '../../utils/format.js';
 import { withoutTrailingPeriod } from '../../utils/stringUtils.js';
 import type { getRuntimeState } from '../../utils/config.js';
-import { getAnthropicApiKeyWithSourceForContext, getPrimaryApiKeyFromSecureStorage, getAuthTokenSourceForContext, isAgenCAISubscriberForContext, selectedProviderUsesExternalAuth, type ProviderAuthReadContext } from '../../utils/auth.js';
+import { getAnthropicApiKeyWithSourceForContext, getPrimaryApiKeyFromSecureStorage, getAuthTokenSourceForContext, selectedProviderUsesExternalAuth, type ProviderAuthReadContext } from '../../utils/auth.js';
 import type { AgentDefinitionsResult } from '../../tools/AgentTool/loadAgentsDir.js';
 import { getAgentDescriptionsTotalTokens, AGENT_DESCRIPTIONS_THRESHOLD } from '../../utils/statusNoticeHelpers.js';
 import { isSupportedJetBrainsTerminal, toIDEDisplayName, getTerminalIdeType } from '../../utils/ide.js';
@@ -55,14 +55,6 @@ function readAuthTokenSource(
   }
 }
 
-function readSubscriberStatus(context: ProviderAuthReadContext): boolean {
-  try {
-    return isAgenCAISubscriberForContext(context);
-  } catch {
-    return false;
-  }
-}
-
 function hasManagedApiKey(context: ProviderAuthReadContext): boolean {
   try {
     return getPrimaryApiKeyFromSecureStorage(context.home) !== null;
@@ -82,7 +74,7 @@ function getAuthTokenDisplayName(source: AuthTokenSource): string {
     case 'none':
       return 'token auth';
     default:
-      return 'AgenC account token';
+      return 'provider sign-in token';
   }
 }
 
@@ -98,7 +90,7 @@ function getAuthTokenCleanupHint(source: AuthTokenSource): string {
     case 'none':
       return 'No token source is active.';
     default:
-      return 'Run agenc /logout to sign out of the AgenC account.';
+      return 'Sign out of the provider account to clear its token.';
   }
 }
 
@@ -109,19 +101,6 @@ const largeMemoryFilesNotice: StatusNoticeDefinition = {
   isActive: ctx => ctx.memoryDiagnostics.length > 0,
   render: ctx => {
     return `${ctx.memoryDiagnostics.join(' · ')} · /memory · open`;
-  }
-};
-const agencAccountExternalTokenNotice: StatusNoticeDefinition = {
-  id: 'agenc-account-external-token',
-  type: 'warning',
-  authScope: 'anthropic',
-  isActive: ctx => {
-    const authTokenInfo = readAuthTokenSource(ctx.providerAuthContext);
-    return readSubscriberStatus(ctx.providerAuthContext) && authTokenInfo.source === 'ANTHROPIC_AUTH_TOKEN';
-  },
-  render: ctx => {
-    const authTokenInfo = readAuthTokenSource(ctx.providerAuthContext);
-    return `Auth conflict: Using ${authTokenInfo.source} instead of AgenC account subscription token. Either unset ${authTokenInfo.source}, or run agenc /logout.`;
   }
 };
 const apiKeyConflictNotice: StatusNoticeDefinition = {
@@ -216,7 +195,7 @@ const jetbrainsPluginNotice: StatusNoticeDefinition = {
 };
 
 // All notice definitions
-export const statusNoticeDefinitions: StatusNoticeDefinition[] = [largeMemoryFilesNotice, largeAgentDescriptionsNotice, daemonAutostartNotice, daemonAutostartFailedNotice, agencAccountExternalTokenNotice, apiKeyConflictNotice, bothAuthMethodsNotice, jetbrainsPluginNotice];
+export const statusNoticeDefinitions: StatusNoticeDefinition[] = [largeMemoryFilesNotice, largeAgentDescriptionsNotice, daemonAutostartNotice, daemonAutostartFailedNotice, apiKeyConflictNotice, bothAuthMethodsNotice, jetbrainsPluginNotice];
 
 // Helper functions for external use
 export function getActiveNotices(context: StatusNoticeContext): StatusNoticeDefinition[] {

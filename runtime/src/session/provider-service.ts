@@ -51,7 +51,6 @@ export interface ProviderBinding {
 export interface PreparedProviderBinding {
   readonly binding: ProviderBinding;
   readonly expectedRevision: number;
-  readonly managedDefaultOutputCap: boolean;
   readonly billingSource?: "byok" | "sign_in" | "managed" | "local";
   readonly authProfile?: "api_key" | "sign_in" | "managed" | "local" | "aws_sigv4";
   readonly signInModelCapabilities?: SignInChildModelCapabilities;
@@ -65,9 +64,6 @@ export interface ApprovedChildAuthority {
 
 export interface ProviderPreparationRuntime {
   readonly signal?: AbortSignal;
-  readonly managedKeysEnabled?: boolean;
-  readonly freeManagedCredential?: boolean;
-  readonly applyManagedDefaultOutputCap?: boolean;
 }
 
 export interface ProviderPreparationRequest {
@@ -377,10 +373,6 @@ export class SessionProviderService {
       ...(this.#authBackend !== undefined ? { authBackend: this.#authBackend } : {}),
       ...(this.#sessionId !== undefined ? { sessionId: this.#sessionId } : {}),
       ...(this.#subscriptionTier !== undefined ? { subscriptionTier: this.#subscriptionTier } : {}),
-      ...(preparation.runtime?.managedKeysEnabled !== undefined
-        ? { managedKeysEnabled: preparation.runtime.managedKeysEnabled } : {}),
-      ...(preparation.runtime?.freeManagedCredential !== undefined
-        ? { freeManagedCredential: preparation.runtime.freeManagedCredential } : {}),
     });
     if (requireConnected) requireProviderRuntimeCredential(provider, authority);
     const authProfile = authority.managedCredential ? "managed" as const
@@ -434,21 +426,6 @@ export class SessionProviderService {
     return this.#prepare(selection, requested, runtime, false);
   }
 
-  async resolveManagedChildDestination(model: string): Promise<ProviderSelection> {
-    if (this.#authBackend === undefined || this.#sessionId === undefined) {
-      throw new Error("AgenC managed child needs an authenticated session");
-    }
-    const inferred = await this.#authBackend.inferAgencModel({
-      provider: "agenc", requestedModel: model, sessionId: this.#sessionId,
-      ...(this.#subscriptionTier !== undefined ? { subscriptionTier: this.#subscriptionTier } : {}),
-    });
-    const provider = resolveBuiltInProviderSlug(inferred.provider);
-    if (provider === undefined || provider === "agenc" || !inferred.model?.trim()) {
-      throw new Error("AgenC managed child resolved an invalid concrete destination");
-    }
-    return Object.freeze({ provider, model: inferred.model.trim() });
-  }
-
   /** Prepare a child, pinning durable cross-provider children to the registry endpoint. */
   async prepareChild(
     selection: ProviderSelection,
@@ -491,7 +468,6 @@ export class SessionProviderService {
     const sessionApiKey = this.#sessionApiKeys.get(provider);
     const requestedOptions = sessionApiKey === undefined ? preparation.requested
       : { ...preparation.requested, apiKey: sessionApiKey };
-    const runtimeOptions = preparation.runtime ?? {};
     const canonicalEndpointRequired = this.#crossProviderProvenance ||
       (child && (crossProviderProvenance || provider !== this.#binding.provider));
     if (child && canonicalEndpointRequired && provider === "agenc" &&
@@ -577,12 +553,6 @@ export class SessionProviderService {
       ...(this.#sessionId !== undefined ? { sessionId: this.#sessionId } : {}),
       ...(this.#subscriptionTier !== undefined
         ? { subscriptionTier: this.#subscriptionTier }
-        : {}),
-      ...(runtimeOptions.managedKeysEnabled !== undefined
-        ? { managedKeysEnabled: runtimeOptions.managedKeysEnabled }
-        : {}),
-      ...(runtimeOptions.freeManagedCredential !== undefined
-        ? { freeManagedCredential: runtimeOptions.freeManagedCredential }
         : {}),
     };
     // Resolve once from local state. Reuse this choice for live preparation so
@@ -746,9 +716,6 @@ export class SessionProviderService {
       authProfile,
       ...(signInModelCapabilities !== undefined ? { signInModelCapabilities } : {}),
       billingSource,
-      managedDefaultOutputCap:
-        authority.managedCredential &&
-        runtimeOptions.applyManagedDefaultOutputCap === true,
       binding,
     });
   }

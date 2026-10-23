@@ -40,7 +40,6 @@ import { OpenAICompatibleProvider } from "./providers/openai-compatible/index.js
 import { OpenAIProvider } from "./providers/openai/adapter.js";
 import { OpenRouterProvider } from "./providers/openrouter/index.js";
 import { OllamaCloudProvider } from "./providers/ollama-cloud/index.js";
-import { AgenCProvider } from "./providers/agenc/index.js";
 import type {
   LLMChatOptions,
   LLMMessage,
@@ -1143,30 +1142,6 @@ const MATRIX_PROVIDERS: readonly ProviderParityEntry[] = [
       }),
       payload: buildChatCompletionsPayload("deepseek-v4.1-flash", parityCase),
     }),
-  },
-  {
-    provider: "agenc", model: "grok-4-fast", env: {},
-    createHarness: (parityCase) => {
-      const delegate = createResponsesHarness({
-        providerFactory: () => new GrokProvider({
-          apiKey: "managed-test", model: "grok-4-fast",
-          tools: parityCase.tools ? [...parityCase.tools] : [],
-        }),
-        payload: buildResponsesApiPayload("grok-4-fast", parityCase),
-      });
-      return {
-        requests: delegate.requests,
-        provider: new AgenCProvider({
-          model: "grok-4-fast", tools: parityCase.tools ? [...parityCase.tools] : [],
-          sessionId: "session-matrix" as any,
-          authBackend: {
-            inferAgencModel: () => ({ provider: "grok", model: "grok-4-fast" }),
-            vendKey: () => ({ kind: "api-key", provider: "grok", sessionId: "session-matrix", apiKey: "managed-test" }),
-          } as any,
-          providerFactory: () => delegate.provider,
-        }),
-      };
-    },
   },
   {
     provider: "grok", model: "grok-4.7", env: {},

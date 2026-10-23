@@ -1287,11 +1287,8 @@ describe("AgenC daemon CLI", () => {
         createAgenCDaemonRealtimeHeaderResolver(authBackend, {}),
         session,
       ),
-    ).resolves.toEqual({ authorization: "Bearer managed-thread-realtime" });
-    expect(authBackend.vendKey).toHaveBeenCalledWith(
-      "openai",
-      "thread-realtime",
-    );
+    ).rejects.toThrow("OpenAI realtime requires your own OPENAI_API_KEY");
+    expect(authBackend.vendKey).not.toHaveBeenCalled();
   });
 
   it("pins daemon websocket defaults and trusted browser origins", () => {

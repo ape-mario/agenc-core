@@ -348,29 +348,10 @@ export const providerCommand: SlashCommand = {
         return { kind: "text", text: selection.error };
       }
       const accessOverlay = createProviderCommandAccessOverlay(ctx);
-      let access = accessOverlay.inspect({
+      const access = accessOverlay.inspect({
         provider: selection.provider,
         model: selection.model,
       });
-      if (
-        targetModel === undefined &&
-        access.effect !== "unchanged" &&
-        access.directCredential?.status === "missing" &&
-        access.managed.defaultModel !== undefined
-      ) {
-        selection = resolveProviderCommandSelection(
-          ctx,
-          targetProvider,
-          access.managed.defaultModel,
-        );
-        if (!selection.ok) {
-          return { kind: "text", text: selection.error };
-        }
-        access = accessOverlay.inspect({
-          provider: selection.provider,
-          model: selection.model,
-        });
-      }
       const rejection = formatProviderCommandRejection(access, "provider");
       if (rejection !== undefined) {
         return { kind: "text", text: rejection };

@@ -31,7 +31,6 @@ import {
 import type { SubagentSpeed } from "../../config/schema.js";
 import { CROSS_PROVIDER_AUTH_DESCRIPTION } from "../../llm/cross-provider-auth.js";
 import { DEFAULT_MODEL_COSTS, resolveModelCostEntry } from "../../session/cost.js";
-import type { ProviderSelection } from "../../session/provider-service.js";
 import { automaticChildSelectionEnabled, routeChildTask, childRoutingBudget, recordChildRoutingVerification } from "../child-routing.js";
 import { CHILD_TASK_KINDS, CHILD_TASK_COMPLEXITIES, type ChildSelectionTask, type RankedChildCandidate } from "../provider-selector.js";
 import type { ChildExecutionPlan } from "../cross-provider.js";
@@ -476,16 +475,6 @@ async function resolveSameProviderServiceTier(opts: {
 
 function tierResult(serviceTier: string | undefined): { readonly serviceTier?: string } {
   return serviceTier === undefined ? {} : { serviceTier };
-}
-
-function modelSettings(
-  reasoningEffort: ReasoningEffort | undefined,
-  serviceTier: string | undefined,
-): { readonly reasoningEffort?: ReasoningEffort; readonly serviceTier?: string } {
-  return {
-    ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
-    ...tierResult(serviceTier),
-  };
 }
 
 /** The service tier of a child on another provider: its speed limit, never the parent's tier. */
@@ -988,9 +977,8 @@ export function createSpawnAgentTool(opts: MultiAgentV2Options): Tool {
       const policy = childProviderPolicy(session);
       // Settings are the consent, and with automatic choice off only the
       // user picks a provider: the message they sent for this turn must name
-      // it. A managed AgenC route is checked by the provider it resolves to,
-      // once that is known (createChildExecutionPlan).
-      if (selection.provider !== "agenc" && policy.cross_provider_auto !== true &&
+      // it.
+      if (policy.cross_provider_auto !== true &&
           !userNamedProvider(rootSession, selection.provider, selection.model)) {
         return refuseNotRequested(new ProviderNotRequestedError(selection.provider));
       }
@@ -1109,23 +1097,6 @@ export function createSpawnAgentTool(opts: MultiAgentV2Options): Tool {
       }
       if (selection !== undefined && targetModelInfo !== undefined) {
         const keptServiceTier = serviceTierResult.serviceTier;
-        // A managed AgenC route resolves its destination only after its
-        // preliminary consent. The destination is what the user must have
-        // named, and it sets the limits: the route's own do not apply.
-        const managedDestinationSettings = selection.provider !== "agenc" ? undefined
-          : (destination: ProviderSelection, destinationModelInfo: ModelInfo) => {
-              const policyNow = childProviderPolicy(session);
-              if (crossProviderRequested && policyNow.cross_provider_auto !== true &&
-                  !userNamedProvider(rootSession, destination.provider, destination.model)) {
-                throw new ProviderNotRequestedError(destination.provider);
-              }
-              if (fullHistoryFork) return modelSettings(selectedReasoningEffort, keptServiceTier);
-              const limit = subagentLimit(policyNow, destination.provider);
-              return modelSettings(
-                limitedReasoningEffort(destinationModelInfo, effectiveReasoningEffort, limit.effort),
-                limitedServiceTier(destinationModelInfo, roleConfiguredServiceTier ?? requestedServiceTier, limit.speed),
-              );
-            };
         let proposedPlan: Awaited<ReturnType<typeof createChildExecutionPlan>>;
         try {
           proposedPlan = await createChildExecutionPlan({
@@ -1142,7 +1113,6 @@ export function createSpawnAgentTool(opts: MultiAgentV2Options): Tool {
             ...(selectedReasoningEffort !== undefined ? { reasoningEffort: selectedReasoningEffort } : {}),
             ...(keptServiceTier !== undefined ? { serviceTier: keptServiceTier } : {}),
             ...(inheritedConsentPlan !== undefined ? { inheritedConsentPlan } : {}),
-            ...(managedDestinationSettings !== undefined ? { managedDestinationSettings } : {}),
           });
         } catch (error) {
           if (error instanceof ProviderNotRequestedError) return refuseNotRequested(error);

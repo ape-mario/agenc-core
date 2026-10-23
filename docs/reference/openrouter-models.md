@@ -9,7 +9,7 @@ without function tools remain outside this agent picker.
 
 The existing `x-ai/grok-4.5` default and leading model order stay unchanged.
 Free models absent from the live response no longer appear in the BYOK
-picker. The separate managed account free-model policy is unchanged.
+picker. Free models require the user's own OpenRouter key.
 
 `runtime/scripts/generate-openrouter-catalog.mjs` generates the reviewed
 snapshot in `runtime/src/llm/registry/openrouter-models.ts`. It accepts a saved
@@ -33,7 +33,7 @@ Sources:
 - [Reasoning controls](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)
 - [Request parameters](https://openrouter.ai/docs/api/reference/parameters)
 
-Reviewed reasoning efforts use OpenRouter’s nested `reasoning: { effort }` envelope. Unlisted efforts stay omitted, and managed gateway request contracts remain separate. Source: https://openrouter.ai/docs/guides/best-practices/reasoning-tokens. Explicit NIM and local compatible provider selections retain their vendor/model identity when OpenRouter adds the same model ID.
+Reviewed reasoning efforts use OpenRouter’s nested `reasoning: { effort }` envelope. Unlisted efforts stay omitted. Source: https://openrouter.ai/docs/guides/best-practices/reasoning-tokens. Explicit NIM and local compatible provider selections retain their vendor/model identity when OpenRouter adds the same model ID.
 
 Catalog token prices are endpoint estimates, not guaranteed routing prices. Paid
 routes reserve budget at the conservative unknown price. Every OpenRouter

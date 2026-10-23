@@ -67,7 +67,6 @@ import {
 } from "../llm/provider.js";
 import { createGeminiEndpointPlan } from "../llm/providers/gemini/endpoint-plan.js";
 import { GrokProvider } from "../llm/providers/grok/adapter.js";
-import { AgenCProvider } from "../llm/providers/agenc/index.js";
 import { ZaiProvider } from "../llm/providers/zai/index.js";
 import { OpenAIProvider } from "../llm/providers/openai/adapter.js";
 import {
@@ -948,70 +947,6 @@ describe("runAgent", () => {
     }
   });
 
-  it("dispatches another hosted AgenC model using the parent session authority", async () => {
-    const parentModel = "deepseek/deepseek-v4-flash-0731";
-    const authBackend = {
-      kind: "remote" as const,
-      login: vi.fn(), logout: vi.fn(), whoami: vi.fn(),
-      vendKey: vi.fn(), inferAgencModel: vi.fn(),
-      getLlmUsage: vi.fn(), getSubscriptionTier: vi.fn(),
-    } as never;
-    const provider = createProvider("agenc", {
-      model: parentModel, extra: { authBackend, sessionId: "hosted-parent" },
-    });
-    const factoryExtra = readProviderFactoryOptions(provider).extra ?? {};
-    expect(factoryExtra).not.toHaveProperty("authBackend");
-    expect(factoryExtra).not.toHaveProperty("sessionId");
-    const providerService = new SessionProviderService({
-      initialProvider: provider,
-      authBackend,
-      sessionId: "hosted-parent",
-      subscriptionTier: "pro",
-      resolvePreparationRequest: ({ model }) => ({ requested: { model } }),
-    });
-    const prepare = vi.spyOn(providerService, "prepareChild");
-    let live!: Awaited<ReturnType<typeof spawnLive>>["live"];
-    const profile = vi.spyOn(AgenCProvider.prototype, "getExecutionProfile").mockResolvedValue({
-      provider: "agenc", model: "agenc", usageReporting: "unavailable",
-      supportsMaxOutputTokens: false,
-    });
-    const accounting = vi.spyOn(AgenCProvider.prototype, "projectRequestForAccounting")
-      .mockImplementation((messages, options) => ({ messages, options }));
-    const chat = vi.spyOn(AgenCProvider.prototype, "chatStream").mockImplementation(async () => {
-      const child = liveAgentSession(live)!;
-      expect(child.providerService.current()).toMatchObject({ provider: "agenc", model: "agenc" });
-      expect(child.services.provider).not.toBe(provider);
-      return { content: "child completed", toolCalls: [],
-        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-        model: "agenc", finishReason: "stop" };
-    });
-    const parent = makeStubSession({
-      services: { provider, providerService,
-        sandboxExecutionBroker: new SandboxExecutionBroker({ mode: "danger_full_access", cwd: "/tmp" }) },
-      sessionConfiguration: mkSessionConfiguration({ collaborationMode: { model: parentModel } }),
-      config: { ...mkConfig(), model: parentModel },
-      modelInfo: { ...mkModelInfo(), slug: parentModel },
-    });
-    try {
-      ({ live } = await spawnLive(parent));
-      const { result } = await collectRun(runAgent({ live, parent,
-        initialMessages: [{ role: "user", content: "go" }], taskPrompt: "go", model: "agenc",
-      }));
-      if (result.error) throw result.error;
-      expect(result.outcome, result.error).toBe("completed");
-      expect(prepare).toHaveBeenCalledWith({ provider: "agenc", model: "agenc" },
-        undefined, { signal: expect.any(AbortSignal) });
-      expect(chat).toHaveBeenCalledOnce();
-      expect(parent.providerService.current().model).toBe(parentModel);
-    } finally {
-      await parent.shutdown();
-      await provider.dispose?.();
-      accounting.mockRestore();
-      profile.mockRestore();
-      chat.mockRestore();
-    }
-  });
-
   it("sends a restored cross-provider child's own identity after restart", async () => {
     const configStore = new ConfigStore({ cwd: "/tmp", base: {
       agents: { cross_provider_enabled: true, allowed_providers: ["deepseek"] },
@@ -1121,58 +1056,6 @@ describe("runAgent", () => {
     }));
     expect(result.outcome).toBe("errored");
     expect(dispose).toHaveBeenCalledOnce(); // only the post-consent run preparation
-    expect(target.chatStream).not.toHaveBeenCalled();
-  });
-
-  it("never reaches the provider of a managed child whose settings change while its last check resolves the destination", async () => {
-    let enabled = true;
-    const agents = () => ({ cross_provider_enabled: enabled, allowed_providers: ["agenc", "deepseek"] });
-    const configStore = new ConfigStore({
-      cwd: "/tmp",
-      base: { model_provider: "grok", model: "grok-4.6", agents: agents() },
-      loader: async () => ({ model_provider: "grok", model: "grok-4.6", agents: agents() }),
-    });
-    const target = { ...makeProvider([{ content: "done" }]), name: "agenc", chatStream: vi.fn() } as LLMProvider;
-    const selection = { provider: "agenc", model: "agenc" };
-    const { parent, prepare, modelInfo } = crossProviderRuntime(target, configStore, selection);
-    // After preparation, the last plan check awaits the managed destination.
-    let armed = false;
-    let arrived!: () => void;
-    const atDestination = new Promise<void>((resolve) => { arrived = resolve; });
-    let release!: () => void;
-    const released = new Promise<void>((resolve) => { release = resolve; });
-    Object.assign(parent.providerService, {
-      resolveManagedChildDestination: async () => {
-        if (armed) {
-          armed = false;
-          arrived();
-          await released;
-        }
-        return { provider: "deepseek", model: "deepseek-v4-pro" };
-      },
-      previewChildDestination: async (_selection: unknown, concrete: { provider: string } | undefined) => ({
-        endpoint: concrete?.provider === "agenc" ? "https://id.agenc.ag/v1" : "https://api.deepseek.com/v1",
-        authProfile: "managed", billingSource: "managed",
-      }),
-    });
-    const plan = await authorizedCrossProviderPlan(parent, { ...modelInfo, slug: "agenc" }, selection);
-    Object.assign(parent.providerService, {
-      prepareChild: async () => {
-        const prepared = await prepare();
-        armed = true;
-        return prepared;
-      },
-    });
-    const { live } = await spawnLive(parent);
-    const run = collectRun(runAgent({ live, parent,
-      initialMessages: [{ role: "user", content: "go" }], taskPrompt: "go", plan }));
-    await atDestination;
-    // A daemon reload turns the feature off before the child subscribes.
-    enabled = false;
-    await expect(configStore.reloadAgentsSection()).resolves.toBe(true);
-    release();
-    const { result } = await run;
-    expect(result.outcome).not.toBe("completed");
     expect(target.chatStream).not.toHaveBeenCalled();
   });
 

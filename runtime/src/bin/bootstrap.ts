@@ -18,7 +18,7 @@ import {
   type ProviderName,
 } from "../llm/provider.js";
 import { withoutXaiSignInFastTier } from "../llm/providers/grok/priority-processing.js";
-import { isFreeSubscriptionManagedModel } from "../commands/subscription-managed-models.js";
+
 import type { LLMProvider } from "../llm/types.js";
 import { endpointMetadataForTransport } from "../llm/endpoint-metadata-cache.js";
 import { readLocalByokCredential } from "../auth/native-credentials.js";
@@ -141,7 +141,6 @@ import {
 } from "../session/runtime-options.js";
 import {
   assertHostedAgencModelAuthority,
-  MANAGED_OPENROUTER_DEFAULT_MAX_OUTPUT_TOKENS,
   requireProviderRuntimeCredential,
   resolveProviderRuntimeAuthority,
   snapshotProviderEnvironment,
@@ -153,7 +152,7 @@ import { runWithStartupProviderSelection } from "../utils/model/providers.js";
 import type { AgenCConfig } from "../config/schema.js";
 import type { AuthBackend, AuthSubscriptionTier } from "../auth/backend.js";
 import { LocalAuthBackend } from "../auth/backends/local.js";
-import { resolveAuthManagedKeysEnabled } from "../auth/selection.js";
+
 import { bindSessionAgentControl } from "./delegate-tool.js";
 import {
   readStartupCliFlags,
@@ -210,10 +209,6 @@ interface ResolvedAuthModelSelection {
   readonly profileModel: string;
 }
 
-function isHostedAgencProvider(provider: string): boolean {
-  return provider.trim().toLowerCase() === "agenc";
-}
-
 function firstNonEmptyString(
   ...values: Array<string | undefined>
 ): string | undefined {
@@ -240,43 +235,12 @@ async function resolveAuthModelSelection(params: {
   readonly sessionId: string;
   readonly subscriptionTier: AuthSubscriptionTier;
 }): Promise<ResolvedAuthModelSelection> {
-  if (
-    params.authBackend === undefined ||
-    !isHostedAgencProvider(params.provider)
-  ) {
-    return {
-      provider: params.provider,
-      model: params.model,
-      profileProvider: params.provider,
-      profileModel: params.model,
-    };
-  }
-  await assertHostedAgencModelAuthority({
-    provider: params.provider,
-    model: params.model,
-    sessionId: params.sessionId,
-    authBackend: params.authBackend,
-    subscriptionTier: params.subscriptionTier,
-  });
-  const inferred = await params.authBackend.inferAgencModel({
-    provider: params.provider,
-    requestedModel: params.model,
-    sessionId: params.sessionId,
-    subscriptionTier: params.subscriptionTier,
-  });
-  const inferredProvider = resolveBuiltInProviderSlug(inferred.provider);
-  const inferredModel = firstNonEmptyString(inferred.model);
-  if (inferredModel === undefined) {
-    throw new Error("AuthBackend model inference returned an empty model");
-  }
+  await assertHostedAgencModelAuthority(params);
   return {
     provider: params.provider,
     model: params.model,
-    profileProvider:
-      inferredProvider !== undefined && inferredProvider !== "agenc"
-        ? inferredProvider
-        : params.provider,
-    profileModel: inferredModel,
+    profileProvider: params.provider,
+    profileModel: params.model,
   };
 }
 
@@ -470,7 +434,6 @@ function transcriptEventsFromRollout(
   }
   return out;
 }
-
 
 /**
  * Map operator `max_turns` (schema / TOML) onto turn-loop `maxTurns`.
@@ -1482,13 +1445,6 @@ async function bootstrapLocalRuntimeSessionScoped(
         ...(explicitApiKey !== undefined ? { apiKey: explicitApiKey } : {}),
       },
       runtime: {
-        managedKeysEnabled: resolveAuthManagedKeysEnabled(currentConfig),
-        freeManagedCredential:
-          authSubscriptionTier === "free" &&
-          isFreeSubscriptionManagedModel(provider, selection.model),
-        applyManagedDefaultOutputCap:
-          provider === "openrouter" &&
-          runtimeRequest.settings?.maxOutputTokens === undefined,
       },
     };
   };
@@ -1512,7 +1468,6 @@ async function bootstrapLocalRuntimeSessionScoped(
     },
   );
   requireProviderRuntimeCredential(resolvedProvider, initialAuthority);
-  const hasManagedCredential = initialAuthority.managedCredential;
   const provider: LLMProvider = createProvider(
     resolvedProvider,
     initialAuthority.factoryOptions,
@@ -1530,7 +1485,6 @@ async function bootstrapLocalRuntimeSessionScoped(
   const cataloguedDeepSeek = resolvedProvider === "deepseek" &&
     resolveModelCatalogMetadata({ provider: resolvedProvider, model }) !== undefined;
   if (
-    !hasManagedCredential &&
     !cataloguedDeepSeek &&
     shouldProbeCapabilityEntry(capabilityEntry) &&
     typeof providerHealthCheck === "function"
@@ -1585,9 +1539,7 @@ async function bootstrapLocalRuntimeSessionScoped(
   });
   // A Grok session on the xAI sign-in route never sends priority processing,
   // so its model info does not offer the Fast tier.
-  // Two providers can list the same model id (the managed AgenC route and
-  // public OpenRouter share DeepSeek ids), so the bound provider decides
-  // whose limits the session plans with.
+  // The bound provider decides which model limits the session plans with.
   const rawModelInfo = withoutXaiSignInFastTier(
     await modelsManager.getModelInfoForProvider(resolvedProvider, model),
     {
@@ -1595,22 +1547,7 @@ async function bootstrapLocalRuntimeSessionScoped(
       factoryOptions: readProviderFactoryOptions(provider),
     },
   );
-  const modelInfo =
-    hasManagedCredential &&
-    initialPreparation.runtime.applyManagedDefaultOutputCap
-      ? {
-          ...rawModelInfo,
-          maxOutputTokens: MANAGED_OPENROUTER_DEFAULT_MAX_OUTPUT_TOKENS,
-          maxOutputTokensUpperLimit:
-            rawModelInfo.maxOutputTokensUpperLimit !== undefined
-              ? Math.min(
-                  rawModelInfo.maxOutputTokensUpperLimit,
-                  MANAGED_OPENROUTER_DEFAULT_MAX_OUTPUT_TOKENS,
-                )
-              : MANAGED_OPENROUTER_DEFAULT_MAX_OUTPUT_TOKENS,
-          maxOutputTokensCappedDefault: true,
-        }
-      : rawModelInfo;
+  const modelInfo = rawModelInfo;
   const configuredSessionConfiguration = {
     ...sessionConfigurationFromAgenCConfig({
       config: startup.config,

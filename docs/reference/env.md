@@ -226,7 +226,7 @@ Auth backend:
 | Var | Effect |
 | --- | --- |
 | `AGENC_AUTH_BACKEND` | `local` or `remote` |
-| `AGENC_AUTH_MANAGED_KEYS_ENABLED` | Boolean-like managed-keys switch |
+| `AGENC_AUTH_MANAGED_KEYS_ENABLED` | Retired and ignored. AgenC accounts do not provide models. |
 | `AGENC_REMOTE_AUTH_TOKEN` | Explicit process/session remote bearer. Overrides a stored native secure storage bearer and is never persisted to `auth.json` |
 
 Persisted local-login tokens, saved BYOK keys, remote bearers, and remote
@@ -481,7 +481,7 @@ autostart. Ordinary startup leaves it unset.
 
 ### AGENC_R*
 
-`AGENC_REMOTE`, `AGENC_REMOTE_AUTH_LOGIN_POLL_URL`, `AGENC_REMOTE_AUTH_LOGIN_START_URL`, `AGENC_REMOTE_AUTH_ME_URL`, `AGENC_REMOTE_AUTH_MODEL_URL`, `AGENC_REMOTE_AUTH_TIER_URL`, `AGENC_REMOTE_AUTH_TOKEN`, `AGENC_REMOTE_AUTH_URL`, `AGENC_REMOTE_AUTH_USAGE_URL`, `AGENC_REMOTE_DEBUG`, `AGENC_REMOTE_FULL_CONTROL`, `AGENC_REMOTE_MEMORY_DIR`, `AGENC_REMOTE_SESSION_ID`, `AGENC_ROLLOUT_TRACE_ROOT`.
+`AGENC_REMOTE`, `AGENC_REMOTE_AUTH_LOGIN_POLL_URL`, `AGENC_REMOTE_AUTH_LOGIN_START_URL`, `AGENC_REMOTE_AUTH_ME_URL`, `AGENC_REMOTE_AUTH_TIER_URL`, `AGENC_REMOTE_AUTH_TOKEN`, `AGENC_REMOTE_DEBUG`, `AGENC_REMOTE_FULL_CONTROL`, `AGENC_REMOTE_MEMORY_DIR`, `AGENC_REMOTE_SESSION_ID`, `AGENC_ROLLOUT_TRACE_ROOT`.
 
 ### AGENC_S*
 
