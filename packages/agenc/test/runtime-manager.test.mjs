@@ -14,6 +14,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   statSync,
   rmSync,
@@ -21,7 +22,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir as osTmpdir } from "node:os";
 import { basename, dirname, join, win32 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { after, before, mock, test } from "node:test";
@@ -42,6 +43,9 @@ import {
   selectArtifact,
 } from "../lib/runtime-manager.mjs";
 import { validateRuntimeArchive } from "../lib/runtime-archive.mjs";
+
+// macOS aliases /var to /private/var; expected runtime paths are canonical.
+function tmpdir() { return realpathSync(osTmpdir()); }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LAUNCHER_VERSION = JSON.parse(
@@ -186,7 +190,7 @@ function makeSyntheticArtifact(dir, version, binSource = "#!/usr/bin/env node\nc
     `${JSON.stringify(identity, null, 2)}\n`,
   );
   const artifact = join(dir, `agenc-runtime-${version}-test.tar.gz`);
-  const res = spawnSync("tar", ["-czf", artifact, "-C", tree, "node_modules"]);
+  const res = spawnSync("tar", [...(process.platform === "darwin" ? ["--no-xattrs"] : []), "-czf", artifact, "-C", tree, "node_modules"], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
   assert.equal(res.status, 0, "tar should succeed");
   const bytes = readFileSync(artifact);
   return { artifact, sha256: sha256(bytes), bytes: bytes.length };
@@ -542,6 +546,7 @@ test("selectArtifact finds the matching platform and errors clearly otherwise", 
       "999",
       {
         ...HOST_RUNTIME,
+        libcFamily: "glibc", glibcVersion: "2.39", glibcxxVersion: "3.4.33", cxxAbiVersion: "1.3.15",
         nodeMajor: 25,
         nodeModuleAbi: "999",
       },
@@ -901,7 +906,8 @@ test("ensureRuntime downloads (file://), verifies sha, extracts, and is idempote
     });
     assert.deepEqual(
       launch,
-      runtimeLaunchPaths(home, version, manifest.artifacts[0]),
+      { ...runtimeLaunchPaths(home, version, manifest.artifacts[0]),
+        ...(process.platform === "darwin" ? { nodeBin: join(home, "bin", "agenc-node") } : {}) },
     );
     assert.equal(existsSync(launch.nodeBin), true);
     if (platformSlug().os === "linux") {
@@ -1358,7 +1364,7 @@ test("durability barrier failures before promotion leave no canonical install", 
 });
 
 test("a parent-directory barrier fault after rename is reported and recoverable", async () => {
-  const work = mkdtempSync(join(tmpdir(), "agenc-durable-parent-fault-"));
+  const work = realpathSync(mkdtempSync(join(tmpdir(), "agenc-durable-parent-fault-")));
   try {
     const version = "9.8.10";
     const built = makeSyntheticArtifact(work, version);
@@ -1400,7 +1406,7 @@ test("a parent-directory barrier fault after rename is reported and recoverable"
 test("ensureRuntime collapses an existing AGENC_HOME symlink onto its canonical target", {
   skip: process.platform === "win32",
 }, async () => {
-  const work = mkdtempSync(join(tmpdir(), "agenc-home-alias-"));
+  const work = realpathSync(mkdtempSync(join(tmpdir(), "agenc-home-alias-")));
   try {
     const version = "9.9.8";
     const built = makeSyntheticArtifact(work, version);
@@ -1479,7 +1485,7 @@ test("ensureRuntime preserves the operation and every cleanup failure in order",
   unlinkSync(join(tree, "node_modules", "@tetsuo-ai", "runtime", "bin", "agenc"));
   const artifactPath = built.artifact;
   assert.equal(
-    spawnSync("tar", ["-czf", artifactPath, "-C", tree, "node_modules"]).status,
+    spawnSync("tar", [...(process.platform === "darwin" ? ["--no-xattrs"] : []), "-czf", artifactPath, "-C", tree, "node_modules"], { env: { ...process.env, COPYFILE_DISABLE: "1" } }).status,
     0,
   );
   const bytes = readFileSync(artifactPath);
@@ -1870,7 +1876,7 @@ test("ensureRuntime repairs a stale marker whose runtime bin is missing", async 
 });
 
 test("concurrent runtime installs converge without partial trees", async () => {
-  const work = mkdtempSync(join(tmpdir(), "agenc-concurrent-install-"));
+  const work = realpathSync(mkdtempSync(join(tmpdir(), "agenc-concurrent-install-")));
   try {
     const version = "9.9.9";
     const { artifact, sha256: digest, bytes } = makeSyntheticArtifact(work, version);
@@ -2521,4 +2527,23 @@ test("receiving headers refreshes the inactivity window before a delayed first b
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+});
+
+test("macOS npm activations keep one Node path and prune only before the previous version", { skip: process.platform !== "darwin" }, async () => {
+  const work = mkdtempSync(join(tmpdir(), "agenc-npm-retention-"));
+  try {
+    const home = join(work, "home");
+    const launches = [];
+    for (const version of ["0.19.13", "0.19.14", "0.19.15"]) {
+      const built = makeSyntheticArtifact(work, version);
+      const manifest = syntheticManifest(version, built.artifact, built.sha256, built.bytes);
+      launches.push(await ensureLocalRuntimeLaunch({
+        env: { AGENC_HOME: home }, manifest, runtimeCompatibility: HOST_RUNTIME, log: () => {},
+      }));
+    }
+    assert.ok(launches.every((launch) => launch.nodeBin === join(home, "bin/agenc-node")));
+    assert.equal(existsSync(launches[0].runtimeBin), false);
+    assert.equal(existsSync(launches[1].runtimeBin), true);
+    assert.equal(existsSync(launches[2].runtimeBin), true);
+  } finally { rmSync(work, { recursive: true, force: true }); }
 });

@@ -1,3 +1,4 @@
+import "../helpers/cron-os-home.js";
 // Tests for `agenc update` (runtime/src/bin/update-cli.ts).
 //
 // The updater must speak the exact install contract shared by
@@ -209,6 +210,10 @@ function makeSyntheticArtifact(
       : [
           "#!/bin/sh",
           "unset LD_LIBRARY_PATH",
+          'if [ "${1:-}" = "-e" ]; then',
+          '  shift; fixture_script="$1"; shift',
+          `  exec ${JSON.stringify(process.execPath)} -e "Object.defineProperty(process, 'platform', { value: '${options.platform === "win" ? "win32" : "linux"}' }); Object.defineProperty(process, 'arch', { value: 'x64' }); $fixture_script" "$@"`,
+          "fi",
           `exec ${JSON.stringify(process.execPath)} "$@"`,
           "",
         ].join("\n");
@@ -1035,12 +1040,14 @@ describe("agenc update CLI", () => {
       platform: "win32",
       env: { Path: `${lower};${lower};${upper}` },
       userHome: work,
-    }).map((wrapper) => wrapper.path)).toEqual([lowerWrapper, upperWrapper]);
+    }).map((wrapper) => wrapper.path)).toEqual(
+      statSync(lower).ino === statSync(upper).ino ? [lowerWrapper] : [lowerWrapper, upperWrapper],
+    );
     expect(findGeneratedWrapperCandidates({
       platform: "win32",
       env: { Path: `${lower};${lower};${upper}` },
       userHome: work,
-    })).toEqual([lowerWrapper, upperWrapper]);
+    })).toEqual(statSync(lower).ino === statSync(upper).ino ? [lowerWrapper] : [lowerWrapper, upperWrapper]);
   });
 
   test.skipIf(process.platform === "win32")(

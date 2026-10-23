@@ -1,3 +1,5 @@
+import "../helpers/cron-os-home.js";
+import { darwinPlatformFixturePrelude } from "../helpers/darwin-platform-fixture.mjs";
 // End-to-end tests for scripts/install/install.sh (TODO task 1).
 //
 // The installer must speak the exact runtime-manager install contract
@@ -52,6 +54,36 @@ const WINDOWS_NODE_BIN_REL = "node_modules/.agenc-node/node.exe";
 const NODE_LIBRARY_REL = "node_modules/.agenc-node/lib";
 const NODE_ABI = process.versions.modules;
 
+// These fixtures advertise Linux/x64 independently of the host. Only their
+// -e identity probes emulate that target; file-based helpers retain the real OS
+// for filesystem locking and extraction.
+function fixtureNodeProbeLines(platform = "linux", preload = ""): string[] {
+  return [
+    'if [ "${1:-}" = "-e" ]; then',
+    '  shift; fixture_script="$1"; shift',
+    `  exec ${JSON.stringify(process.execPath)} ${preload ? `--require ${JSON.stringify(preload)} ` : ""}-e "Object.defineProperty(process, 'platform', { value: '${platform}' }); Object.defineProperty(process, 'arch', { value: 'x64' }); $fixture_script" "$@"`,
+    "fi",
+  ];
+}
+// Concurrent installer children may still be reading these scripts. Publish a
+// new inode instead of truncating a shared executable underneath them.
+function writeFixtureScript(path: string, content: string, mode = 0o644): void {
+  const temporary = `${path}.next`;
+  writeFileSync(temporary, content, { mode });
+  renameSync(temporary, path);
+}
+
+function fixtureNodeDirectory(home: string, platform = "linux"): string {
+  const directory = join(home, "fixture-node");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const preload = join(directory, "darwin-fixture.cjs");
+  const macFixture = platform === "darwin" && process.platform !== "darwin";
+  if (macFixture) writeFixtureScript(preload, darwinPlatformFixturePrelude);
+  writeFixtureScript(join(directory, "node"), ["#!/bin/sh", ...fixtureNodeProbeLines(platform, macFixture ? preload : ""),
+    `exec ${JSON.stringify(process.execPath)} ${macFixture ? `--require ${JSON.stringify(preload)} ` : ""}"$@"`, ""].join("\n"), 0o755);
+  return directory;
+}
+
 function sha256(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
@@ -81,7 +113,7 @@ function removePersistentWrapperLocks(root: string): void {
 // node script so the generated wrapper can actually be executed.
 function makeSyntheticArtifact(
   dir: string,
-  options: { omitPrivateNode?: boolean; omitPrivateNodeLibrary?: boolean } = {},
+  options: { omitPrivateNode?: boolean; omitPrivateNodeLibrary?: boolean; platform?: string } = {},
 ): { tarball: string; sha: string } {
   const tree = join(dir, "tree");
   const binDir = join(tree, "node_modules", "@tetsuo-ai", "runtime", "bin");
@@ -110,6 +142,7 @@ function makeSyntheticArtifact(
     "  printf 'private-node-path-ok\\n'",
     "  exit 0",
     "fi",
+    ...fixtureNodeProbeLines(options.platform),
     `exec ${JSON.stringify(process.execPath)} "$@"`,
     "",
   ].join("\n");
@@ -122,6 +155,7 @@ function makeSyntheticArtifact(
   writeFileSync(join(privateNodeRoot, "LICENSE"), "synthetic Node license\n");
   writeFileSync(join(privateNodeRoot, "identity.json"), JSON.stringify({
     schemaVersion: 1,
+    executable: "bin/node", executableSha256: sha256(Buffer.from(nodeShim)), executableBytes: Buffer.byteLength(nodeShim),
     nodeVersion: process.versions.node,
     nodeMajor: Number(process.versions.node.split(".")[0]),
     nodeModuleAbi: process.versions.modules,
@@ -138,7 +172,7 @@ function makeSyntheticArtifact(
     }
   }
   const tarball = join(dir, `agenc-runtime-${VERSION}-test.tar.gz`);
-  const res = spawnSync("tar", ["-czf", tarball, "-C", tree, "node_modules"]);
+  const res = spawnSync("tar", [...(process.platform === "darwin" ? ["--no-xattrs"] : []), "-czf", tarball, "-C", tree, "node_modules"], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
   expect(res.status).toBe(0);
   return { tarball, sha: sha256(readFileSync(tarball)) };
 }
@@ -819,7 +853,7 @@ function startHttpsFixture(
   writeFileSync(config, JSON.stringify(routes));
   writeFileSync(server, `
 const https = require("node:https");
-const { readFileSync, writeFileSync } = require("node:fs");
+const { readFileSync, writeFileSync, renameSync } = require("node:fs");
 const [key, cert, config, ready] = process.argv.slice(2);
 const routes = JSON.parse(readFileSync(config, "utf8"));
 const sockets = new Set();
@@ -849,7 +883,10 @@ server.on("connection", (socket) => {
   sockets.add(socket);
   socket.on("close", () => sockets.delete(socket));
 });
-server.listen(0, "127.0.0.1", () => writeFileSync(ready, String(server.address().port)));
+server.listen(0, "127.0.0.1", () => {
+  writeFileSync(ready + ".tmp", String(server.address().port));
+  renameSync(ready + ".tmp", ready);
+});
 process.on("SIGTERM", () => {
   for (const socket of sockets) socket.destroy();
   server.close(() => process.exit(0));
@@ -883,7 +920,7 @@ function startConnectProxy(
   writeFileSync(server, `
 const http = require("node:http");
 const net = require("node:net");
-const { appendFileSync, writeFileSync } = require("node:fs");
+const { appendFileSync, writeFileSync, renameSync } = require("node:fs");
 const [ready, log] = process.argv.slice(2);
 const sockets = new Set();
 const proxy = http.createServer((_req, res) => { res.writeHead(405); res.end(); });
@@ -905,7 +942,10 @@ proxy.on("connect", (req, client, head) => {
   upstream.on("error", () => client.destroy());
   client.on("error", () => upstream.destroy());
 });
-proxy.listen(0, "127.0.0.1", () => writeFileSync(ready, String(proxy.address().port)));
+proxy.listen(0, "127.0.0.1", () => {
+  writeFileSync(ready + ".tmp", String(proxy.address().port));
+  renameSync(ready + ".tmp", ready);
+});
 process.on("SIGTERM", () => {
   for (const socket of sockets) socket.destroy();
   proxy.close(() => process.exit(0));
@@ -998,6 +1038,24 @@ function expectFailedInstallCleanup(home: string): void {
   }
 }
 
+// Installer lock registries use the OS account home, deliberately ignoring HOME.
+// Substitute that syscall in the disposable program, never in shipped code.
+function isolatedOsHomePrelude(): string {
+  const home = process.env.AGENC_TEST_HERMETIC_HOME;
+  if (!home) throw new Error("installer tests require a hermetic home");
+  return `const fixtureOs = require("node:os");
+const originalFixtureUserInfo = fixtureOs.userInfo;
+fixtureOs.userInfo = () => ({ ...originalFixtureUserInfo(), homedir: ${JSON.stringify(home)} });
+require("node:module").syncBuiltinESMExports();`;
+}
+function isolatedInstaller(path: string, home: string): string {
+  const source = readFileSync(path, "utf8");
+  const marker = "// BEGIN GENERATED AGENC RUNTIME INSTALLER PROGRAM";
+  const target = join(home, "isolated-install.sh");
+  writeFixtureScript(target, source.replace(marker, marker + "\n" + isolatedOsHomePrelude()));
+  return target;
+}
+
 type RunResult = { status: number; stdout: string; stderr: string };
 
 function runInstaller(opts: {
@@ -1019,7 +1077,7 @@ function runInstaller(opts: {
     HOME: opts.home,
     AGENC_HOME: opts.agencHome ?? join(opts.home, ".agenc"),
     TMPDIR: join(opts.home, "tmp"),
-    PATH: [...(opts.pathPrepend ?? []), process.env.PATH ?? ""].join(":"),
+    PATH: [...(opts.pathPrepend ?? []), fixtureNodeDirectory(opts.home, opts.envOverrides?.AGENC_INSTALL_PLATFORM), process.env.PATH ?? ""].join(":"),
     // Deterministic platform selection regardless of the host machine.
     AGENC_INSTALL_PLATFORM: "linux",
     AGENC_INSTALL_ARCH: "x64",
@@ -1033,7 +1091,7 @@ function runInstaller(opts: {
   const res = spawnSync(
     "sh",
     [
-      opts.installerPath ?? INSTALL_SH,
+      isolatedInstaller(opts.installerPath ?? INSTALL_SH, opts.home),
       ...(opts.repoDerived
         ? []
         : ["--manifest-url", opts.manifestUrl ?? pathToFileURL(opts.manifest!).href]),
@@ -1059,7 +1117,7 @@ function runInstallerAsync(opts: {
     HOME: opts.home,
     AGENC_HOME: join(opts.home, ".agenc"),
     TMPDIR: join(opts.home, "tmp"),
-    PATH: process.env.PATH ?? "",
+    PATH: [fixtureNodeDirectory(opts.home), process.env.PATH ?? ""].join(":"),
     AGENC_INSTALL_PLATFORM: "linux",
     AGENC_INSTALL_ARCH: "x64",
     AGENC_INSTALL_LIBC_FAMILY: "glibc",
@@ -1072,7 +1130,7 @@ function runInstallerAsync(opts: {
     const child = spawn(
       "sh",
       [
-        INSTALL_SH,
+        isolatedInstaller(INSTALL_SH, opts.home),
         "--manifest-url",
         pathToFileURL(opts.manifest).href,
         "--prefix",
@@ -1214,6 +1272,25 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
       wrapper: join(home, ".local", "bin", "agenc"),
     };
   }
+
+  test("macOS installer writes a stable Node wrapper and launchd keeps its wrapper entrypoint", () => {
+    const home = join(work, "home");
+    const artifact = makeSyntheticArtifact(work, { platform: "darwin" });
+    const manifest = writeManifest(work, artifact, { platform: "darwin", minimumMacosVersion: "13.5" });
+    const stubs = join(work, "stubs");
+    mkdirSync(stubs);
+    writeFileSync(join(stubs, "launchctl"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    writeFileSync(join(stubs, "sw_vers"), "#!/bin/sh\nprintf '26.6.2\\n'\n", { mode: 0o755 });
+    const result = runInstaller({ home, manifest, pathPrepend: [stubs], envOverrides: { AGENC_INSTALL_PLATFORM: "darwin" } });
+    expect(result.status, result.stderr).toBe(0);
+    const wrapper = join(home, ".local/bin/agenc");
+    const stable = join(home, ".agenc/bin/agenc-node");
+    expect(parseGeneratedWrapper(wrapper)?.nodeBin).toBe(stable);
+    expect(lstatSync(stable).isFile()).toBe(true);
+    expect(lstatSync(stable).isSymbolicLink()).toBe(false);
+    expect(readFileSync(stable)).toEqual(readFileSync(join(work, "tree", NODE_BIN_REL)));
+    expect(readFileSync(join(home, "Library/LaunchAgents/dev.agenc.daemon.plist"), "utf8")).toContain(`<string>${wrapper}</string>`);
+  });
 
   test("resolve_system_tool accepts the platform's stock tools, including hardlinked ones", () => {
     // Regression: the resolver required nlink === 1, but macOS ships
@@ -2663,7 +2740,7 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
     const results = await Promise.all(
       Array.from({ length: 4 }, () => runInstallerAsync({ home, manifest })),
     );
-    expect(results.map((result) => result.status)).toEqual([0, 0, 0, 0]);
+    expect(results.map((result) => result.status), JSON.stringify(results)).toEqual([0, 0, 0, 0]);
     const { installDir, marker } = paths(home, artifact.sha);
     expect(readFileSync(marker, "utf8")).toBe(artifact.sha);
     expect(readFileSync(join(installDir, BIN_REL), "utf8")).toContain("console.log");
