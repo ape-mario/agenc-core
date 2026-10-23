@@ -188,6 +188,6 @@ export function resolveBrowserExecutable(
   if (detected.found !== undefined) return detected.found;
   if (detected.skippedSnap !== undefined) throw snapInSandboxError(detected.skippedSnap);
   throw new BrowserExecutableError(
-    "no Chromium-family browser found — install Chrome/Chromium/Brave/Edge or set [browser].executable_path (AGENC_BROWSER_EXECUTABLE)",
+    "no Chromium-family browser found: install Chrome/Chromium/Brave/Edge or set [browser].executable_path (AGENC_BROWSER_EXECUTABLE)",
   );
 }

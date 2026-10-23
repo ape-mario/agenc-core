@@ -383,7 +383,7 @@ export class FileHistory {
         this.degraded.append({ filePath, messageId, isTrackEdit: true });
         this.emitDiagnostic({
           cause: "file_history_degraded",
-          message: `${(err as { code?: string }).code} — deferred trackEdit for ${filePath}`,
+          message: `${(err as { code?: string }).code}: deferred trackEdit for ${filePath}`,
         });
       } else {
         this.emitDiagnostic({
@@ -548,7 +548,7 @@ export class FileHistory {
         this.evictionWarningEmitted = true;
         this.emitDiagnostic({
           cause: "file_history_cap_reached",
-          message: `file-history LRU cap ${this.maxSnapshots} reached — evicting oldest snapshots (isFileHistoryComplete=false)`,
+          message: `file-history LRU cap ${this.maxSnapshots} reached: evicting oldest snapshots (isFileHistoryComplete=false)`,
         });
       }
     }

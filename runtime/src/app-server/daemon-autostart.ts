@@ -362,7 +362,7 @@ async function ensureAgenCDaemonAutostartCycle(
 
     let respawnReason: string | null = null;
     if (pid !== null && !host.isPidRunning(pid)) {
-      respawnReason = `daemon pid ${pid} not running — stale pid file`;
+      respawnReason = `daemon pid ${pid} not running: stale pid file`;
     } else if (pid === null) {
       respawnReason = "no daemon pid recorded";
     }

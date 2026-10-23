@@ -204,14 +204,14 @@ function dontAskRejectMessage(toolName: string): string {
 }
 
 function autoRejectMessage(toolName: string): string {
-  return `Permission to use ${toolName} was denied — permission prompts are not available in this context.`;
+  return `Permission to use ${toolName} was denied: permission prompts are not available in this context.`;
 }
 
 function buildClassifierUnavailableMessage(
   toolName: string,
   model: string,
 ): string {
-  return `Auto-mode classifier (${model}) is unavailable — ${toolName} requires manual approval.`;
+  return `Auto-mode classifier (${model}) is unavailable: ${toolName} requires manual approval.`;
 }
 
 function buildYoloRejectionMessage(reason: string): string {
@@ -1266,7 +1266,7 @@ function handleClassifierResult(
         decisionReason: {
           type: "other" as const,
           reason:
-            "Auto mode classifier transcript exceeded context window — falling back to manual approval",
+            "Auto mode classifier transcript exceeded context window: falling back to manual approval",
         },
         suggestions: askResult.suggestions,
         blockedPath: askResult.blockedPath,

@@ -211,7 +211,7 @@ describe("ResilientMCPBridge", () => {
 
     const result = await bridge.tools[0]!.execute({});
     expect(result).toEqual({
-      content: 'MCP server "srv1" lost connection — reconnecting...',
+      content: 'MCP server "srv1" lost connection: reconnecting...',
       isError: true,
     });
 

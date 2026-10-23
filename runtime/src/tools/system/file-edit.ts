@@ -604,7 +604,7 @@ class ConcurrentFileModificationError extends Error {
   readonly code = "concurrent_file_modification" as const;
   constructor(public readonly path: string) {
     super(
-      `${path} was modified between snapshot read and write — refusing to overwrite to avoid silent data loss.`,
+      `${path} was modified between snapshot read and write: refusing to overwrite to avoid silent data loss.`,
     );
     this.name = "ConcurrentFileModificationError";
   }

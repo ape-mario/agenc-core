@@ -401,7 +401,7 @@ export function createOrientTool(
         const header =
           `Orientation map for: ${query}\n` +
           `Scanned ${files.size} source file(s)${scopeNote}${cappedNote}. ` +
-          `Most relevant first — read these, don't bulk-scan:\n\n`;
+          `Most relevant first: read these, don't bulk-scan:\n\n`;
         const body = top.map((p, i) => `${i + 1}. ${p}`).join("\n");
         const mapSection = rendered
           ? `\n\nKey symbols by file:\n${rendered}`

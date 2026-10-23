@@ -60,8 +60,8 @@ The live daemon tool uses the chain and configuration described above.
 | Mode | Behavior |
 |---|---|
 | `auto` (default) | Try **configured** first-party providers in priority order; fall through on failure |
-| `firecrawl` / `tavily` / `exa` / `you` / `jina` / `bing` / `mojeek` / `linkup` / `ddg` | That provider only — throws on failure |
-| `custom` | Custom HTTP / `WEB_PROVIDER` preset only — throws on failure. **Not in the auto chain** |
+| `firecrawl` / `tavily` / `exa` / `you` / `jina` / `bing` / `mojeek` / `linkup` / `ddg` | That provider only: throws on failure |
+| `custom` | Custom HTTP / `WEB_PROVIDER` preset only: throws on failure. **Not in the auto chain** |
 | `native` | Provider-native web search only (requires firstParty / Vertex / Foundry provider) |
 
 **Auto chain (only):**
@@ -92,9 +92,9 @@ always available).
 | Bing | `BING_API_KEY` | `Ocp-Apim-Subscription-Key` | GET | yes |
 | Mojeek | `MOJEEK_API_KEY` | `Authorization: Bearer` (optional) | GET | yes |
 | Linkup | `LINKUP_API_KEY` | `Authorization: Bearer` | POST | yes |
-| DuckDuckGo | *(no key)* | — | SDK | yes (last) |
+| DuckDuckGo | *(no key)* |: | SDK | yes (last) |
 | Custom HTTP | `WEB_SEARCH_PROVIDER=custom` + `WEB_SEARCH_API` / `WEB_URL_TEMPLATE` | Configurable | GET/POST | **no** |
-| SearXNG preset | `WEB_SEARCH_PROVIDER=custom` + `WEB_PROVIDER=searxng` | — | GET | **no** |
+| SearXNG preset | `WEB_SEARCH_PROVIDER=custom` + `WEB_PROVIDER=searxng` |: | GET | **no** |
 | Google CSE preset | `WEB_SEARCH_PROVIDER=custom` + `WEB_PROVIDER=google` | `Authorization: Bearer` | GET | **no** |
 | Brave preset | `WEB_SEARCH_PROVIDER=custom` + `WEB_PROVIDER=brave` | `X-Subscription-Token` | GET | **no** |
 | SerpAPI preset | `WEB_SEARCH_PROVIDER=custom` + `WEB_PROVIDER=serpapi` | `Authorization: Bearer` | GET | **no** |
@@ -104,7 +104,7 @@ always available).
 ### Auto-chain providers (recommended)
 
 ```bash
-# Tavily (fast, RAG-ready) — participates in auto when the key is set
+# Tavily (fast, RAG-ready): participates in auto when the key is set
 export TAVILY_API_KEY=tvly-your-key
 
 # Exa (neural / semantic)
@@ -113,7 +113,7 @@ export EXA_API_KEY=your-exa-key
 # Bing
 export BING_API_KEY=your-bing-key
 
-# Firecrawl / You.com / Jina / Mojeek / Linkup — same pattern: set their *_API_KEY
+# Firecrawl / You.com / Jina / Mojeek / Linkup: same pattern: set their *_API_KEY
 # DuckDuckGo needs no key and is the auto fallback when nothing else is configured
 
 # Fail loudly if Tavily is down (don't fall through)
@@ -592,7 +592,7 @@ connection reset). A hard "anomaly in the request" block surfaces an actionable
 error listing the API-key env vars to configure instead.
 
 The first-party direct providers (Tavily, Exa, You.com, Jina, Bing, Mojeek,
-Linkup, Firecrawl) do a single request with no internal retry — in `auto` mode
+Linkup, Firecrawl) do a single request with no internal retry: in `auto` mode
 the chain itself falls through to the next provider on failure.
 
 ## Custom provider security guardrails
@@ -606,7 +606,7 @@ The custom provider enforces the following guardrails by default:
 | Header allowlist | ✅ | `WEB_CUSTOM_ALLOW_ARBITRARY_HEADERS=true` |
 | Max POST body | 300 KB | `WEB_CUSTOM_MAX_BODY_KB=<kb>` |
 | Request timeout | 120s | `WEB_CUSTOM_TIMEOUT_SEC=<seconds>` |
-| Audit log (one-time warning) | ✅ | — |
+| Audit log (one-time warning) | ✅ |: |
 
 ### Self-hosted SearXNG example
 
@@ -647,10 +647,10 @@ export const myProvider: SearchProvider = {
 }
 ```
 
-2. Register in `providers/index.ts` — add the import, push onto `ALL_PROVIDERS`
+2. Register in `providers/index.ts`: add the import, push onto `ALL_PROVIDERS`
    **only if** it should participate in the auto chain, and add a named entry
    to `PROVIDER_BY_NAME` for explicit `WEB_SEARCH_PROVIDER=<name>` mode.
 
 Custom / preset adapters that must never become the silent default belong
 behind `WEB_SEARCH_PROVIDER=custom` only (like Brave/Google/SearXNG/SerpAPI
-today) — do not add them to `ALL_PROVIDERS`.
+today), do not add them to `ALL_PROVIDERS`.

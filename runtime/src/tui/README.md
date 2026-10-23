@@ -60,7 +60,7 @@ screens, and hooks imported by live runtime paths.
 `MenuModal` backs the default interactive menu views for the slash commands:
 `/model`, `/provider`, `/hooks`, `/skills`, `/mcp`,
 `/plugins`, `/permissions`, `/memory`, `/resume`, `/config`, `/agents`,
-`/status`, `/diff` — see the `*-menu.tsx` files under `runtime/src/commands/`.
+`/status`, `/diff`: see the `*-menu.tsx` files under `runtime/src/commands/`.
 (`/provider` is the only provider-switch command; there is no `/model-provider`.)
 `/context` (alias `/ctx`, registered in `commands/session-compact.ts`) renders
 through `ContextUsageModal` when the TUI bridge is available; headless

@@ -403,7 +403,7 @@ export function createBrowserTool(
         const tabs = await mgr.listTabs(signal);
         const lines = tabs.map(
           (tab) =>
-            `${tab.active ? "*" : " "} [${tab.id}] ${tab.title || "(untitled)"} — ${tab.url || "about:blank"}`,
+            `${tab.active ? "*" : " "} [${tab.id}] ${tab.title || "(untitled)"}: ${tab.url || "about:blank"}`,
         );
         return {
           content: tabs.length > 0 ? lines.join("\n") : "No open tabs.",
