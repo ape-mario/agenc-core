@@ -892,6 +892,10 @@ async function bootstrapLocalRuntimeSessionScoped(
   let startup = resolveCanonicalStartupSelection({
     config: configStore.current(),
     env: providerEnvironment,
+    metadata: {
+      catalogHome: configStore.homeContext.path,
+      readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
+    },
     ...(profileName !== undefined ? { profileName } : {}),
   });
   const cli = options.cli;

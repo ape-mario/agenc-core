@@ -9,6 +9,7 @@ import { OPENROUTER_MODEL_IDS } from "../../../src/llm/registry/openrouter-model
 import { ModelMetadataResolver } from "../../../src/llm/model-metadata.js";
 import { modelCapabilityTags } from "../../../src/commands/model-capability-tags.js";
 import { modelCommand } from "../../../src/commands/model.js";
+import { ensureLiveModelCatalog } from "../../../src/commands/live-model-catalog.js";
 import { assertModelCatalogSelection, openRouterSelectionNotice } from "../../../src/llm/model-catalog-selection.js";
 import { resolveProviderModelLayer } from "../../../src/config/provider-model-authority.js";
 import { defaultModelForProvider } from "../../../src/config/resolve-model.js";
@@ -63,7 +64,53 @@ afterEach(() => {
   recordPublishedModelCosts("openrouter", new Map());
   resetOpenRouterZdrEndpointsForTesting();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   for (const path of homes.splice(0)) rmSync(path, { recursive: true, force: true });
+});
+
+test("default catalog and background refreshes stay offline in hermetic tests", async () => {
+  const fetchImpl = vi.spyOn(globalThis, "fetch").mockImplementation(fakeFetch());
+  const path = home();
+  const ctx = context(path);
+  expect((await new OpenRouterCatalog({ home: path }).refresh()).source).toBe("bundled");
+  await ensureLiveModelCatalog(ctx, "openrouter", "x-ai/grok-4.5");
+  await modelCommand.execute(ctx);
+  const config = { model_provider: "openrouter", model: "x-ai/grok-4.5" };
+  expect(await resolveDiscoveredStartupDefault({ provider: "openrouter", model: config.model, config },
+    "provider_default", { catalogHome: path, env: {} })).toMatchObject({ model: "x-ai/grok-4.5" });
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+
+test("a resolver without a transport stays offline even outside test mode", async () => {
+  vi.stubEnv("NODE_ENV", "production");
+  const fetchImpl = vi.spyOn(globalThis, "fetch").mockImplementation(fakeFetch());
+  const resolver = new ModelMetadataResolver({ env: {}, catalogHome: home() });
+  expect(await resolver.discoverOpenRouterModels()).toBe(false);
+  expect((await resolver.resolve({ provider: "openrouter", model: "test/unknown", config: {} })).contextWindow)
+    .toBeGreaterThan(0);
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+
+test("production catalogs still use the default transport", async () => {
+  vi.stubEnv("NODE_ENV", "production");
+  const fetchImpl = vi.spyOn(globalThis, "fetch").mockImplementation(fakeFetch());
+  expect((await new OpenRouterCatalog().refresh()).source).toBe("live");
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+});
+
+test("offline refresh keeps an expired disk catalog without requesting or rewriting it", async () => {
+  const path = home();
+  const original = new OpenRouterCatalog({ home: path, now: () => 100, fetchImpl: fakeFetch() });
+  await original.refresh();
+  const cached = readFileSync(original.cachePath!, "utf8");
+  const fetchImpl = vi.spyOn(globalThis, "fetch").mockImplementation(fakeFetch());
+  const catalog = new OpenRouterCatalog({ home: path });
+  expect((await catalog.refresh()).source).toBe("cache");
+  expect(catalog.read().models).toHaveLength(468);
+  await ensureLiveModelCatalog(context(path), "openrouter", "x-ai/grok-4.5");
+  expect(readModelMenuSnapshot(context(path)).providerCounts.openrouter).toBe(468);
+  expect(readFileSync(original.cachePath!, "utf8")).toBe(cached);
+  expect(fetchImpl).not.toHaveBeenCalled();
 });
 
 test("a mocked 468-model catalog replaces all 298 menu rows and remains searchable", async () => {
@@ -189,9 +236,27 @@ test("cached live-only metadata is available synchronously in a new resolver", a
   expect(resolver.resolveSync({ provider: "openrouter", model: "test/live-only", config: {} }).contextWindow).toBe(345678);
   expect(fetchImpl).not.toHaveBeenCalled();
   const config = resolveProviderModelLayer({}, { model: "openrouter:test/live-only" });
-  expect(resolveCanonicalStartupSelection({ config, env: { AGENC_HOME: path }, explicitModel: "openrouter:test/live-only" }).model)
+  clearPublishedModelCatalogs();
+  const metadata = { catalogHome: path };
+  expect(resolveCanonicalStartupSelection({ config, env: {}, metadata, explicitModel: "openrouter:test/live-only" }).model)
     .toBe("test/live-only");
-  expect(() => resolveCanonicalStartupSelection({ config: { ...config, model: "test/missing" }, env: { AGENC_HOME: path }, explicitModel: "openrouter:test/missing" }))
+  expect(() => resolveCanonicalStartupSelection({ config: { ...config, model: "test/missing" }, env: {}, metadata, explicitModel: "openrouter:test/missing" }))
+    .toThrow("does not list");
+});
+
+test("startup uses the captured home and saved credential partition for cached validation", async () => {
+  const path = home();
+  const otherHome = home();
+  await new OpenRouterCatalog({ home: path, apiKey: "saved-fixture", fetchImpl: fakeFetch({ data: [row()] }) }).refresh();
+  await new OpenRouterCatalog({ home: otherHome, fetchImpl: fakeFetch({ data: [row("other/model")] }) }).refresh();
+  clearPublishedModelCatalogs();
+  const readSavedApiKey = vi.fn(() => "saved-fixture");
+  const metadata = { catalogHome: path, readSavedApiKey };
+  const env = { AGENC_HOME: otherHome };
+  const config = { model_provider: "openrouter", model: "test/live-only" };
+  expect(resolveCanonicalStartupSelection({ config, env, metadata, explicitModel: config.model }).model).toBe(config.model);
+  expect(readSavedApiKey).toHaveBeenCalledWith("openrouter");
+  expect(() => resolveCanonicalStartupSelection({ config: { ...config, model: "other/model" }, env, metadata, explicitModel: "other/model" }))
     .toThrow("does not list");
 });
 
