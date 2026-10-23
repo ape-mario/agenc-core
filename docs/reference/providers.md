@@ -496,22 +496,33 @@ curated global catalog is:
 | Model | Context | Default / maximum output | Cached input / input / output per 1M tokens | Reasoning effort (default) |
 | --- | ---: | ---: | ---: | --- |
 | `kimi-k3` | 1,048,576 | 131,072 / 1,048,576 | $0.30 / $3.00 / $15.00 | `low`, `high`, `max` (`max`) |
+| `kimi-k3.1-pro` | 1,048,576 | 131,072 harness default / 1,048,576 context ceiling | not yet published | `low`, `high`, `max` (`max`) |
+| `kimi-k3.1-pro-highspeed` | 1,048,576 | 131,072 harness default / 1,048,576 context ceiling | not yet published | `low`, `high`, `max` (`max`) |
 | `kimi-k2.7-code` | 262,144 | 32,768 harness default / not published | $0.19 / $0.95 / $4.00 | provider-controlled |
 | `kimi-k2.7-code-highspeed` | 262,144 | 32,768 harness default / not published | $0.38 / $1.90 / $8.00 | provider-controlled |
 | `kimi-k2.6` | 262,144 | 32,768 harness default / not published | $0.16 / $0.95 / $4.00 | provider-controlled |
 
-All four models receive the normal AgenC function-tool catalog and vision
+The authenticated global `/v1/models` catalog returned both K3.1 Pro IDs on
+2026-10-23 with image/video input, thinking-only reasoning, dynamic tools,
+and the context and effort values above. Their public model guide and prices
+are not yet published. They use the K3 family wire contract and output budget;
+AgenC leaves their cost unknown. K3 remains the default because it has a
+published price and established behavior. OpenRouter's live catalog lists
+`moonshotai/kimi-k3`, `moonshotai/kimi-k2.7-code`, and
+`~moonshotai/kimi-latest` (currently targeting K3), but no K3.1 route.
+
+All six models receive the normal AgenC function-tool catalog and vision
 history. Requests above Moonshot's 128-tool limit fail locally rather than
 silently clipping tools. K3 accepts `required`; K2.7 and K2.6 normalize that
 unsupported mode to `auto`. Named function choices are incompatible with
-thinking and are normalized for all four. Parallel-tool and fixed sampling
+thinking and are normalized for all six. Parallel-tool and fixed sampling
 controls are omitted, and every model uses
 `max_completion_tokens`.
 The K2.x 64,000-token configurable ceiling is an AgenC safety guard, not a
 published Moonshot model maximum.
 
-K3 and K2.7 always think; AgenC omits the optional `thinking` request field for
-both. K2.6 receives `thinking: { type: "enabled", keep: "all" }`. AgenC keeps
+K3, K3.1 Pro, and K2.7 always think; AgenC omits the optional `thinking` request field for
+these models. K2.6 receives `thinking: { type: "enabled", keep: "all" }`. AgenC keeps
 `reasoning_content` outside visible assistant text and replays every historical
 block only to the exact same Kimi provider/model when the history is intact.
 Authenticated compaction markers describe an already-authoritative projected
@@ -521,12 +532,30 @@ benign adjacent user-context merging does not. Kimi streams
 fail closed on malformed JSON, missing/conflicting terminal reasons, or a
 partial tool call not finalized with `finish_reason=tool_calls`.
 
+
+Moonshot automatically caches repeated prefixes with a 5 minute TTL; no
+explicit cache-control field is needed. AgenC keeps the stable system head
+before session-specific context on native Kimi and OpenRouter Kimi. It reads
+`prompt_tokens_details.cached_tokens` and Moonshot's `cache_write_tokens`,
+including streaming usage. Both are subsets of total prompt tokens. An HTTP 429 with Moonshot's
+`exceeded_current_quota_error` and insufficient-balance evidence stops as a
+billing refusal; ordinary throttling remains retryable. K3's
+5 minute writes cost $3/M and are accounted for without double counting;
+the documented optional 1 hour tier costs $6/M and is not selected by AgenC.
+See [context caching](https://platform.kimi.ai/docs/guide/context-caching).
+
+Multiple tool calls in a response are accepted and paired with their results;
+the optional `parallel_tool_calls` control stays omitted for routing
+compatibility. Response-local IDs are made unique by the shared wire logic
+from #3220. Light uses Edit/Write for this family on both routes, including
+the OpenRouter latest alias. OpenRouter reasoning is replayed using its own
+`reasoning_details` or `reasoning` contract.
+
 Vision input must be inline base64 or an already-uploaded `ms://` reference;
 public HTTP image URLs and SVG are rejected before network dispatch. Supported
 formats are JPG, PNG, WebP, GIF, BMP, HEIC, and HEIF, and the final request is
-bounded to 100 MB. JSON Schema response format is available on all four
-models. Combining it with tools is enabled only for `kimi-k2.7-code`, whose
-complete tool-call/result/final-JSON loop has been verified; the other three
+bounded to 100 MB. JSON Schema response format follows the family contract. Combining it with tools is enabled only for `kimi-k2.7-code`, whose
+complete tool-call/result/final-JSON loop has been verified; the others
 remain fail-closed until their combined loop is verified. Kimi supplies no
 native image-generation route, so `ImagineImage` continues to use a separately
 authorized media backend. Sources: [model overview](https://platform.kimi.ai/docs/api/models-overview.md),
