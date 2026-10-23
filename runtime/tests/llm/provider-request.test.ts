@@ -58,7 +58,7 @@ describe('provider runtime request', () => {
     }
   })
 
-  test('sends provider.zdr on the wire for a default OpenRouter session', async () => {
+  test('keeps ZDR and required parameters on default OpenRouter sessions and their children', async () => {
     const bodies: Record<string, unknown>[] = []
     const fetchImpl = async (_input: unknown, init?: { body?: unknown }) => {
       bodies.push(JSON.parse(String(init?.body)))
@@ -80,12 +80,12 @@ describe('provider runtime request', () => {
     })
     const provider = createProvider('openrouter', { ...request.requested, apiKey: 'sk-or-test' })
     await provider.chat([{ role: 'user', content: 'hi' }])
-    expect(bodies[0]?.provider).toEqual({ zdr: true })
+    expect(bodies[0]?.provider).toEqual({ require_parameters: true, zdr: true })
     // A child or reviewer rebuilt from the session's provider keeps it.
     expect(readProviderFactoryOptions(provider).extra?.zeroDataRetention).toBe(true)
     const child = createProvider('openrouter', { ...readProviderFactoryOptions(provider), apiKey: 'sk-or-test' })
     await child.chat([{ role: 'user', content: 'hi' }])
-    expect(bodies[1]?.provider).toEqual({ zdr: true })
+    expect(bodies[1]?.provider).toEqual({ require_parameters: true, zdr: true })
   })
 
   test('turns Grok response continuation on unless the config turns it off', () => {
