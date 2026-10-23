@@ -755,7 +755,7 @@ export class SchemaMismatchError extends Error {
     public readonly runtimeVersion: number,
   ) {
     super(
-      `rollout schema v${rolloutVersion} is newer than runtime v${runtimeVersion} — ` +
+      `rollout schema v${rolloutVersion} is newer than runtime v${runtimeVersion}: ` +
         `please use /fork to migrate or upgrade @tetsuo-ai/runtime`,
     );
     this.name = "SchemaMismatchError";
@@ -2710,8 +2710,8 @@ export class SessionStore {
               level: "error",
               cause: "rollout_degraded",
               message: requeue
-                ? `${(err as { code?: string }).code ?? "unknown"} during append — ${toWrite.length} events queued in degraded ring buffer`
-                : `${(err as { code?: string }).code ?? "unknown"} during fsync — ${toWrite.length} events already on disk, entering degraded mode without re-queue`,
+                ? `${(err as { code?: string }).code ?? "unknown"} during append: ${toWrite.length} events queued in degraded ring buffer`
+                : `${(err as { code?: string }).code ?? "unknown"} during fsync: ${toWrite.length} events already on disk, entering degraded mode without re-queue`,
             });
           }
           return true;
@@ -4389,7 +4389,7 @@ export class SessionStore {
               at: Date.now(),
               level: "error",
               cause: "rollout_degraded",
-              message: `${(err as { code?: string }).code ?? "unknown"} during close drain — ${remaining.length} buffered events lost`,
+              message: `${(err as { code?: string }).code ?? "unknown"} during close drain: ${remaining.length} buffered events lost`,
             });
           }
         }

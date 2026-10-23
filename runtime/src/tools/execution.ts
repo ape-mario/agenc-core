@@ -519,14 +519,14 @@ function buildOffloadReferenceMessage(args: {
   // the truncation marker ("narrow the query"/"offset+limit"/"search").
   const header =
     `[full output (~${formatFileSize(originalBytes)} / ~${originalTokens} tokens) ` +
-    `saved to ${filepath} — read that file (or a byte/line range with ` +
+    `saved to ${filepath}: read that file (or a byte/line range with ` +
     `offset+limit) to see more, or narrow your query / run a more specific ` +
     `search. Head and tail preview follows:]\n`;
   // The tail routinely carries the verdict — a test run's summary line, an
   // exit status, the actual error — so the preview keeps BOTH ends and
   // marks the omitted middle, instead of hoping the head was the useful
   // part.
-  const middle = `\n[… middle omitted — full output at ${filepath}]\n`;
+  const middle = `\n[… middle omitted: full output at ${filepath}]\n`;
   const headerBytes = Buffer.byteLength(header, "utf8");
   const middleBytes = Buffer.byteLength(middle, "utf8");
   const room = Math.max(0, maxBytes - headerBytes - middleBytes);

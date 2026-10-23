@@ -421,7 +421,7 @@ export class ResilientMCPBridge implements MCPToolBridge {
         // not a transport loss inferred from arbitrary result text/URLs.
         if (result.isError && result.effectDisposition === undefined && (mcpConnectionFailure(result) ?? isMcpConnectionError(result.content))) {
           this.scheduleReconnect();
-          return { content: `MCP server "${this.serverName}" lost connection — reconnecting...`, isError: true };
+          return { content: `MCP server "${this.serverName}" lost connection: reconnecting...`, isError: true };
         }
 
         return result;
@@ -446,7 +446,7 @@ export class ResilientMCPBridge implements MCPToolBridge {
       : Math.min(this.backoffMs * BACKOFF_MULTIPLIER, MAX_BACKOFF_MS);
 
     this.logger.info(
-      `MCP server "${this.serverName}" connection lost — reconnecting in ${this.backoffMs}ms`,
+      `MCP server "${this.serverName}" connection lost: reconnecting in ${this.backoffMs}ms`,
     );
 
     this.reconnectTimer = setTimeout(() => {

@@ -1180,7 +1180,7 @@ export function reconstructFromRollout(
             type: "warning",
             payload: {
               cause: "orphaned_turn_recovered",
-              message: `turn ${turnId} started but never completed — synthesized process_killed abort (I-48)`,
+              message: `turn ${turnId} started but never completed: synthesized process_killed abort (I-48)`,
             },
           },
         },
@@ -1217,7 +1217,7 @@ export function reconstructFromRollout(
           type: "warning",
           payload: {
             cause: "snapshot_behind_rollout",
-            message: `index.json snapshot seq=${opts.indexSnapshot?.snapshotSequenceNumber ?? "?"} is behind rollout — ignoring snapshot (I-25)`,
+            message: `index.json snapshot seq=${opts.indexSnapshot?.snapshotSequenceNumber ?? "?"} is behind rollout: ignoring snapshot (I-25)`,
           },
         },
       },

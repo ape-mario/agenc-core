@@ -385,7 +385,7 @@ export function TuiHeader({
             <ThemedText color="lineSoft">│</ThemedText>
             <ThemedText color="inactive">task </ThemedText>
             <ThemedText color="subtle" wrap="truncate-middle">
-              {taskPda ?? '—'}
+              {taskPda ?? 'n/a'}
             </ThemedText>
           </>
         ) : null}

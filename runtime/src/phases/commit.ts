@@ -512,7 +512,7 @@ export async function commit(
             type: "error",
             payload: {
               cause: "stop_hook_loop",
-              message: `stop hooks blocked ${state.stopHookBlockingCount} times in a row — forcing terminal (${result.reason ?? "no_reason"})`,
+              message: `stop hooks blocked ${state.stopHookBlockingCount} times in a row: forcing terminal (${result.reason ?? "no_reason"})`,
             },
           },
         });

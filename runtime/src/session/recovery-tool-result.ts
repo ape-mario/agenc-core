@@ -27,7 +27,7 @@ export function interruptedToolCallResultContent(call: {
 export function resumedToolCallResultContent(toolName: string, halt: boolean): string {
   return halt
     ? sideEffectHaltMessage(toolName)
-    : `result not persisted before crash; the read-only tool ${toolName} was not retried automatically — safe to re-invoke if its result is needed.`;
+    : `result not persisted before crash; the read-only tool ${toolName} was not retried automatically. It is safe to re-invoke if its result is needed.`;
 }
 
 /**

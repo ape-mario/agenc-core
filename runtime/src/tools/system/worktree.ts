@@ -730,7 +730,7 @@ export function createExitWorktreeTool(config: WorktreeToolConfig): Tool {
         // Verbatim no-op message from AgenC
         // `ExitWorktreeTool.validateInput:182-188`.
         return errorResult(
-          "No-op: there is no active EnterWorktree session to exit. This tool only operates on worktrees created by EnterWorktree in the current session — it will not touch worktrees created manually or in a previous session. No filesystem changes were made.",
+          "No-op: there is no active EnterWorktree session to exit. This tool only operates on worktrees created by EnterWorktree in the current session: it will not touch worktrees created manually or in a previous session. No filesystem changes were made.",
         );
       }
 
@@ -742,7 +742,7 @@ export function createExitWorktreeTool(config: WorktreeToolConfig): Tool {
         );
         if (summary === null) {
           return errorResult(
-            `Could not verify worktree state at ${session.worktreePath}. Refusing to remove without explicit confirmation. Re-invoke with discard_changes: true to proceed — or use action: "keep" to preserve the worktree.`,
+            `Could not verify worktree state at ${session.worktreePath}. Refusing to remove without explicit confirmation. Re-invoke with discard_changes: true to proceed, or use action: "keep" to preserve the worktree.`,
           );
         }
         const { changedFiles, commits } = summary;
@@ -759,7 +759,7 @@ export function createExitWorktreeTool(config: WorktreeToolConfig): Tool {
             );
           }
           return errorResult(
-            `Worktree has ${parts.join(" and ")}. Removing will discard this work permanently. Confirm with the user, then re-invoke with discard_changes: true — or use action: "keep" to preserve the worktree.`,
+            `Worktree has ${parts.join(" and ")}. Removing will discard this work permanently. Confirm with the user, then re-invoke with discard_changes: true, or use action: "keep" to preserve the worktree.`,
           );
         }
       }

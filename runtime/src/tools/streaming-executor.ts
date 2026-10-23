@@ -1781,7 +1781,7 @@ export class StreamingToolExecutor {
     }
     const messageByReason: Record<"streaming_fallback", string> = {
       streaming_fallback:
-        "Streaming fallback occurred — results from this batch were discarded.",
+        "Streaming fallback occurred: results from this batch were discarded.",
     };
     return {
       content: JSON.stringify({
