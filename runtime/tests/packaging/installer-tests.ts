@@ -65,14 +65,22 @@ function fixtureNodeProbeLines(platform = "linux", preload = ""): string[] {
     "fi",
   ];
 }
+// Concurrent installer children may still be reading these scripts. Publish a
+// new inode instead of truncating a shared executable underneath them.
+function writeFixtureScript(path: string, content: string, mode = 0o644): void {
+  const temporary = `${path}.next`;
+  writeFileSync(temporary, content, { mode });
+  renameSync(temporary, path);
+}
+
 function fixtureNodeDirectory(home: string, platform = "linux"): string {
   const directory = join(home, "fixture-node");
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const preload = join(directory, "darwin-fixture.cjs");
   const macFixture = platform === "darwin" && process.platform !== "darwin";
-  if (macFixture) writeFileSync(preload, darwinPlatformFixturePrelude);
-  writeFileSync(join(directory, "node"), ["#!/bin/sh", ...fixtureNodeProbeLines(platform, macFixture ? preload : ""),
-    `exec ${JSON.stringify(process.execPath)} ${macFixture ? `--require ${JSON.stringify(preload)} ` : ""}"$@"`, ""].join("\n"), { mode: 0o755 });
+  if (macFixture) writeFixtureScript(preload, darwinPlatformFixturePrelude);
+  writeFixtureScript(join(directory, "node"), ["#!/bin/sh", ...fixtureNodeProbeLines(platform, macFixture ? preload : ""),
+    `exec ${JSON.stringify(process.execPath)} ${macFixture ? `--require ${JSON.stringify(preload)} ` : ""}"$@"`, ""].join("\n"), 0o755);
   return directory;
 }
 
@@ -1044,7 +1052,7 @@ function isolatedInstaller(path: string, home: string): string {
   const source = readFileSync(path, "utf8");
   const marker = "// BEGIN GENERATED AGENC RUNTIME INSTALLER PROGRAM";
   const target = join(home, "isolated-install.sh");
-  writeFileSync(target, source.replace(marker, marker + "\n" + isolatedOsHomePrelude()));
+  writeFixtureScript(target, source.replace(marker, marker + "\n" + isolatedOsHomePrelude()));
   return target;
 }
 
@@ -2732,7 +2740,7 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
     const results = await Promise.all(
       Array.from({ length: 4 }, () => runInstallerAsync({ home, manifest })),
     );
-    expect(results.map((result) => result.status)).toEqual([0, 0, 0, 0]);
+    expect(results.map((result) => result.status), JSON.stringify(results)).toEqual([0, 0, 0, 0]);
     const { installDir, marker } = paths(home, artifact.sha);
     expect(readFileSync(marker, "utf8")).toBe(artifact.sha);
     expect(readFileSync(join(installDir, BIN_REL), "utf8")).toContain("console.log");
