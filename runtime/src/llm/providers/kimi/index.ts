@@ -1,3 +1,4 @@
+import { KIMI_CHAT_MODELS, isKimiK3Model } from "../../registry/kimi-models.js";
 import type {
   LLMChatOptions,
   LLMMessage,
@@ -10,12 +11,7 @@ import type { OpenAIProviderConfig } from "../openai/types.js";
 
 export type KimiProviderConfig = OpenAIProviderConfig;
 
-export const KIMI_CHAT_MODELS = Object.freeze([
-  "kimi-k3",
-  "kimi-k2.7-code",
-  "kimi-k2.7-code-highspeed",
-  "kimi-k2.6",
-] as const);
+export { KIMI_CHAT_MODELS } from "../../registry/kimi-models.js";
 
 const KIMI_CHAT_MODEL_SET = new Set<string>(KIMI_CHAT_MODELS);
 const KIMI_GLOBAL_BASE_URL = BUILT_IN_PROVIDER_BASE_URLS.kimi;
@@ -92,7 +88,7 @@ export class KimiProvider extends OpenAIProvider {
   ): LLMChatOptions {
     const stripped = withoutFixedSamplingControls(options);
     const model = stripped?.model?.trim() || this.configuredKimiModel;
-    const defaultMaxOutputTokens = model.toLowerCase() === "kimi-k3"
+    const defaultMaxOutputTokens = isKimiK3Model(model)
       ? 131_072
       : 32_768;
     return {

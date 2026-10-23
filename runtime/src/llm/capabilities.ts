@@ -1,3 +1,4 @@
+import { isKimiChatModel, isKimiK3Model } from "./registry/kimi-models.js";
 import {
   supportsAnthropicStructuredOutputToolUse,
   supportsOpenAIStructuredOutputs,
@@ -302,17 +303,6 @@ function isZaiGlm53VisionModel(model: string): boolean {
   return matchesModelFamily(model, /(?:^|[/:])glm-5\.3-flashx?$/);
 }
 
-function isKimiGlobalChatModel(model: string): boolean {
-  return matchesModelFamily(
-    model,
-    /(?:^|[/:])kimi-(?:k3|k2\.7-code(?:-highspeed)?|k2\.6)$/,
-  );
-}
-
-function isKimiK3Model(model: string): boolean {
-  return matchesModelFamily(model, /(?:^|[/:])kimi-k3$/);
-}
-
 function isQwen38ThinkingModel(model: string): boolean {
   return matchesModelFamily(
     model,
@@ -561,10 +551,11 @@ const PROVIDER_CAPABILITIES: Readonly<Record<string, ProviderCapabilityDefinitio
   },
   kimi: {
     ...HOSTED_CHAT_COMPATIBLE_CAPABILITIES,
-    supportsImageInput: isKimiGlobalChatModel,
-    supportsExtendedThinking: isKimiGlobalChatModel,
-    acceptsImageHistory: isKimiGlobalChatModel,
-    acceptsThinkingHistory: isKimiGlobalChatModel,
+    supportsPromptCaching: isKimiChatModel,
+    supportsImageInput: isKimiChatModel,
+    supportsExtendedThinking: isKimiChatModel,
+    acceptsImageHistory: isKimiChatModel,
+    acceptsThinkingHistory: isKimiChatModel,
     acceptsReasoningEffort: isKimiK3Model,
   },
   qwen: {

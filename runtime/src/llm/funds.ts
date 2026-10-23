@@ -103,6 +103,10 @@ function isFundsFailureNode(provider: string, item: Record<string, unknown>): bo
   const status = item.status ?? item.statusCode;
   const code = nestedCode(item) ?? nestedCode(item.body);
   const message = `${nestedText(item)} ${nestedText(item.body)}`.toLowerCase();
+  // Moonshot uses 429 for a suspended, unfunded account as well as ordinary
+  // throttling. Require billing evidence so token/rate quotas remain retryable.
+  if (provider === "kimi" && status === 429 &&
+    code === "exceeded_current_quota_error" && /insufficient balance/.test(message)) return true;
   // Qwen PAYG authenticates this account but refuses inference until paid
   // access is enabled. Keep ordinary 403 permissions and 429 throttling out.
   if (provider === "qwen" && status === 403 && code === "AllocationQuota.FreeTierOnly") return true;

@@ -1,0 +1,59 @@
+# Native Kimi CLI sweep
+
+This suite drives the built `runtime/bin/agenc` in Light mode. It does not
+implement an alternative agent loop. Its six fixtures cover file read-back,
+a multi-file rename with tests, a failing-test debugging task, six sequential
+pipeline stages, an attached image, and a tokenizer-calibrated 96k to 101k
+input prompt. Native models come from authenticated Moonshot discovery.
+
+Use only an isolated sweep root containing `home-zdr` and the six exact
+`slot-zdr-1` through `slot-zdr-6` directories. Both `HOME` and `AGENC_HOME`
+are set to `home-zdr`. Trust these folders through AgenC's normal prompt
+before running with bypass approvals. The suite never writes trust records.
+It preserves previous slot contents under each run's `prior-slot` directory.
+
+Supply `MOONSHOT_API_KEY` in the calling environment, sourced inside a
+subshell with tracing disabled. Never put credentials in arguments, fixtures,
+reports, or configuration files. Only that provider credential is forwarded
+to the CLI. Stop any existing daemon for this isolated home before starting,
+so its process loads `wire.mjs` and uses the same evidence control file.
+
+```sh
+python3 runtime/eval/kimi-native/run.py \
+  --sweep /absolute/isolated/sweep \
+  --evidence /absolute/private/evidence \
+  --model kimi-k3.1-pro --task file --phase before --repeat 1
+```
+
+Run sequentially, newest models first. Use a new repeat number for independent
+samples and `--phase after` for confirmation after a fix. The task determines
+its slot. `--quota-probe` permits an unfunded refusal diagnostic. It does not
+turn a refused request into a solve. If token estimation is also refused,
+this mode records an unmeasured long-prompt probe explicitly. Normal funded
+runs require successful calibration.
+
+The owner ledger starts at $0.191416725 spent and has a $20 cumulative cap.
+It records cash plus vouchers, including debt hidden by available balance.
+Deposits never erase previously recorded spend. Each completion checks the
+balance and reserves a conservative admission envelope of $30 per million
+request bytes plus $100 per million allowed output tokens, with a separate
+image allowance. These are bounds used by the experiment, not model prices.
+K3.1 pricing remains unpublished, so neither this envelope nor observed zero
+spend proves its actual inference price. Requests have a 4,096 output cap.
+Outstanding reservations prevent another request after uncertain transport
+or capture failures. Do not reset the ledger to resume a budget-limited run.
+
+Evidence includes per-request usage and timing, balance changes, tool calls,
+and reasoning hashes. Headers and keys are never recorded. The artifact
+grader also requires observable tool behavior. A matching output file alone
+does not prove read-back, debugging, test execution, or reasoning replay.
+
+Local checks, with an isolated home:
+
+```sh
+node --test runtime/eval/kimi-native/wire.test.mjs
+python3 -m unittest discover -s runtime/eval/kimi-native -p 'test_*.py'
+node runtime/scripts/run-hermetic-vitest.mjs run \
+  tests/llm/kimi-funds.test.ts tests/llm/kimi-harness.test.ts \
+  tests/llm/providers/kimi/provider.test.ts tests/llm/wire/kimi-contract.test.ts
+```
