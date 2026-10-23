@@ -2756,14 +2756,21 @@ describe("AgenC daemon CLI", () => {
       const host = createHost(agencHome);
       const io = createIo();
       const { launchdHost, calls } = withLaunchdJob(host, agencHome);
+      // This case checks the launchd ownership decision inside the transaction.
+      // Acquire the real lock before entering it so host path validation does
+      // not consume the 50ms speculative budget. The contention case in
+      // daemon-provisional-start.test.ts retains that production deadline.
+      const release = await acquireAgenCDaemonLifecycleLock(launchdHost);
       try {
         await expect(
           startAgenCDaemon(launchdHost, io, {
             provisionalStart: { signal: new AbortController().signal },
+            lifecycleLockHeld: true,
           }),
         ).resolves.toBe(2);
         expect(calls).toEqual({ spawned: 0, kickstarts: 0 });
       } finally {
+        await release();
         await rm(agencHome, { recursive: true, force: true });
       }
     });
@@ -6514,6 +6521,11 @@ snapshot_max_bytes = 64
       "run-other",
       "run-restart",
     ]);
+    for (const agent of agentList.agents) {
+      expect(agent.metadata).not.toHaveProperty("recovery.snapshot.conversation");
+      expect(agent.metadata).not.toHaveProperty("recovery.snapshot.toolState");
+      expect(agent.metadata).not.toHaveProperty("recovery.snapshot.mcpConnectionState");
+    }
     const recoveredSessions = await client.request("session.list", {});
     expect(recoveredSessions.sessions.find(session => session.sessionId === "session-other")?.metadata?.lightMode).toBe(true);
     expect(recoveredSessions.sessions.find(session => session.sessionId === "session-restart")?.metadata?.lightMode).toBe(false);
@@ -6539,15 +6551,6 @@ snapshot_max_bytes = 64
           toolRecoveryMode: "category_policy",
           snapshot: {
             sessionId: "session-restart",
-            toolState: {
-              pending: [],
-              completed: {
-                "tool-restart": {
-                  status: "poisoned",
-                  recoveryAction: "poison",
-                },
-              },
-            },
             recoveredToolCalls: [
               {
                 toolCallId: "tool-restart",
@@ -8273,16 +8276,6 @@ snapshot_max_bytes = 64
           metadata: {
             recovery: {
               snapshot: {
-                toolState: {
-                  pending: [],
-                  completed: {
-                    "tool-poison": {
-                      status: "poisoned",
-                      recoveryCategory: "side-effecting",
-                      recoveryAction: "poison",
-                    },
-                  },
-                },
                 recoveredToolCalls: [
                   {
                     toolCallId: "tool-poison",
@@ -8311,16 +8304,6 @@ snapshot_max_bytes = 64
           metadata: {
             recovery: {
               snapshot: {
-                toolState: {
-                  pending: [],
-                  completed: {
-                    "tool-cancel": {
-                      status: "recovery_cancelled",
-                      recoveryCategory: "interactive",
-                      recoveryAction: "cancel",
-                    },
-                  },
-                },
                 recoveredToolCalls: [
                   {
                     toolCallId: "tool-cancel",

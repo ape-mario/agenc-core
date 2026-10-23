@@ -248,7 +248,18 @@ export async function resolveAgenCDaemonAutostartConfig(
 export async function ensureAgenCDaemonAutostart(
   options: AgenCDaemonAutostartOptions = {},
 ): Promise<AgenCDaemonAutostartResult> {
-  return ensureAgenCDaemonAutostartCycle(options, 0);
+  // Includes waiting behind another client's restart lifecycle lock. Healthy
+  // resident connections finish before the line is shown. Use stderr so print
+  // mode's response (including JSON output) stays intact.
+  const progress = setTimeout(() => {
+    options.io?.stderr.write("Starting AgenC...\n");
+  }, 1_000);
+  progress.unref?.();
+  try {
+    return await ensureAgenCDaemonAutostartCycle(options, 0);
+  } finally {
+    clearTimeout(progress);
+  }
 }
 
 /**

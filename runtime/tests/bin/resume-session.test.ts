@@ -30,6 +30,7 @@ import { sanitizePath } from "../utils/sessionStoragePortable.js";
 import {
   __setResumeSessionTestHooksForTest,
   reproveResumeSessionAllowingAppend,
+  resolveInitialResumeSession,
   resolveLatestSessionId as resolveLatestSessionIdWithHome,
   resolveResumeSessionId as resolveResumeSessionIdWithHome,
   type ResolvedResumeSession,
@@ -604,6 +605,61 @@ describe("resume-session CLI lookup", () => {
       reason: "source_unavailable",
     });
     expect(injected).toBe(true);
+  });
+});
+
+describe("initial resume search during startup writes", () => {
+  it.each(["latest", "exact"] as const)("retries a %s search whose source grows while metadata is read", async (kind) => {
+    const id = "conv-startupappend1";
+    const path = writeRollout(workHome, id, "2026-01-01T10-00-00-000Z", 1);
+    let appends = 0;
+    __setResumeSessionTestHooksForTest({ afterCandidateMetadataRead: (observed) => {
+      if (observed !== path || appends >= 2) return;
+      appends += 1;
+      writeFileSync(path, `${JSON.stringify({ type: "response_item", payload: { role: "assistant", content: "restored" } })}\n`, { flag: "a" });
+    } });
+    const result = await resolveInitialResumeSession(() => kind === "latest"
+      ? resolveLatestSessionId(workHome) : resolveResumeSessionId(workHome, id));
+    expect(result).toMatchObject({ kind: "ok", sessionId: id, sourceSize: String(statSync(path).size) });
+    expect(appends).toBe(2);
+    if (result.kind === "ok") {
+      expect(resolveResumeSessionId(workHome, id)).toEqual(result);
+    }
+  });
+
+  it("does not retry a search that exhausted its metadata budget", async () => {
+    let attempts = 0;
+    const result = await resolveInitialResumeSession(() => {
+      attempts += 1;
+      return { kind: "search_incomplete", input: "--continue", reason: "metadata_limit" };
+    });
+    expect(result).toMatchObject({ kind: "search_incomplete", reason: "metadata_limit" });
+    expect(attempts).toBe(1);
+  });
+
+  it("fails closed when the rollout never becomes stable", async () => {
+    const id = "conv-startupunstable1";
+    const path = writeRollout(workHome, id, "2026-01-01T10-00-00-000Z", 1);
+    let mutations = 0;
+    __setResumeSessionTestHooksForTest({ afterCandidateMetadataRead: () => {
+      mutations += 1;
+      writeFileSync(path, `${rolloutContent(id, workHome)}${" ".repeat(mutations)}\n`);
+    } });
+    const result = await resolveInitialResumeSession(() => resolveLatestSessionId(workHome));
+    expect(result).toEqual({ kind: "search_incomplete", input: "--continue", reason: "source_unavailable" });
+    expect(mutations).toBeGreaterThan(1);
+  });
+
+  it("keeps an unavailable source closed when cancelled", async () => {
+    const controller = new AbortController();
+    let attempts = 0;
+    const result = await resolveInitialResumeSession(() => {
+      attempts += 1;
+      controller.abort();
+      return { kind: "search_incomplete", input: "--continue", reason: "source_unavailable" };
+    }, controller.signal);
+    expect(result).toMatchObject({ kind: "search_incomplete", reason: "source_unavailable" });
+    expect(attempts).toBe(1);
   });
 });
 

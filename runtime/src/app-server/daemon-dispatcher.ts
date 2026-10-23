@@ -39,6 +39,7 @@ import type { RoutinePermissionAuthority } from "../routines/types.js";
 import type { RoutineUpdatedEvent } from "../routines/types.js";
 import { isSafeSessionIdSegment } from "../session/session-store.js";
 import { DaemonOperationTimeoutError } from "./operation-deadline.js";
+import { STARTUP_RESTORE_PROGRESS_METHOD } from "./startup-restore-progress.js";
 import {
   StartupSessionRestoreAbandonedError,
   type AgenCDaemonStartupRestoreGate,
@@ -1344,7 +1345,26 @@ export class AgenCDaemonJsonRpcDispatcher {
     // including ones added later, and the handler then runs unchanged.
     const restoring = this.#startupRestores?.waitForRequest(method, params, signal);
     if (restoring !== undefined) {
-      await restoring;
+      // Progress belongs to this request. Fresh sessions and health never
+      // wait for the backlog, and a client can cancel only its own waiter.
+      const progress = async (remaining: number): Promise<void> => {
+        try {
+          await connection.sendNotification?.({
+            jsonrpc: JSON_RPC_VERSION,
+            method: STARTUP_RESTORE_PROGRESS_METHOD,
+            params: { requestId: id, remaining },
+          });
+        } catch {
+          // Losing an optional progress notification cannot change recovery
+          // or leave the restore wait's rejection unobserved.
+        }
+      };
+      try {
+        await progress(this.#startupRestores?.unsettled ?? 1);
+        await restoring;
+      } finally {
+        await progress(0);
+      }
       signal.throwIfAborted();
     }
     switch (method) {
