@@ -1,3 +1,5 @@
+// Reload shared directory-sync helpers before installing filesystem race injection.
+vi.hoisted(() => vi.resetModules());
 const artifactCleanupFailure = vi.hoisted(() => ({ path: "", failOnce: false, beforeRemove: undefined as undefined | (() => void), afterRemove: undefined as undefined | (() => void) }));
 const publicationMove = vi.hoisted(() => ({ afterArtifactFsync: undefined as undefined | (() => void), linked: false }));
 const registryReclaimRace = vi.hoisted(() => ({ path: "", beforeRemove: undefined as undefined | (() => void) }));
