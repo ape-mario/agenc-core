@@ -2372,7 +2372,7 @@ describe("main() smoke", () => {
         expect(stderr()).not.toContain("retry 1/");
         expect(daemon.requests.some((request) => request.method === "message.stream")).toBe(false);
         expect(daemon.requests.find((request) => request.method === "agent.stop")?.params)
-          .toEqual({ agentId: fixture.agentId, reason: "one_shot_complete" });
+          .toEqual({ agentId: fixture.agentId, reason: "one_shot_failed" });
       });
     });
 
@@ -2490,7 +2490,7 @@ describe("main() smoke", () => {
         expect(stderr()).toContain("retryable rather than a task failure");
         expect(daemon.requests.some((request) => request.method === "message.stream")).toBe(false);
         expect(daemon.requests.find((request) => request.method === "agent.stop")?.params)
-          .toEqual({ agentId: fixture.agentId, reason: "one_shot_complete" });
+          .toEqual({ agentId: fixture.agentId, reason: "one_shot_failed" });
       });
     });
 
@@ -2672,7 +2672,7 @@ describe("main() smoke", () => {
     // event.session_event records, and turn_failed is delivered as an
     // event.session_event, never as an agent_status. The client must classify
     // that session event, write the message to stderr, settle with code 1
-    // within a bounded time, and stop the daemon agent with one_shot_complete.
+    // within a bounded time, and stop the daemon agent with one_shot_failed.
     const agentId = "agent_auth_failed";
     const sessionId = "session_auth_failed";
     const turnId = "sub-conv-auth-3";
@@ -2729,7 +2729,7 @@ describe("main() smoke", () => {
     expect(outcome.stderr).toContain(failureMessage);
     expect(outcome.stdout).toBe("");
     const stop = outcome.daemon.requests.find((request) => request.method === "agent.stop");
-    expect(stop?.params).toEqual({ agentId, reason: "one_shot_complete" });
+    expect(stop?.params).toEqual({ agentId, reason: "one_shot_failed" });
     expect(outcome.daemon.stopPromptAgent).not.toHaveBeenCalled();
     expect(outcome.daemon.client.close).toHaveBeenCalled();
   });

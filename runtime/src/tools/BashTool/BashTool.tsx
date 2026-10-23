@@ -563,6 +563,9 @@ export const BashTool = buildTool({
     return `Running ${desc}`;
   },
   async validateInput(input: BashToolInput): Promise<ValidationResult> {
+    const { selfTerminationRisk } = await import("../../permissions/self-termination.js");
+    const risk = selfTerminationRisk(input.command);
+    if (risk !== null) return { result: false, message: risk, errorCode: 11 };
     if (
       !isBackgroundTasksDisabled &&
       !input.run_in_background

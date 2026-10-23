@@ -322,10 +322,7 @@ export interface AgenCBackgroundAgentMessageResult {
   readonly terminal?: AgenCBackgroundAgentMessageTerminal;
 }
 
-export interface AgenCBackgroundAgentMessageTerminal extends JsonObject {
-  readonly code: 0 | 1 | 130;
-  readonly message?: string;
-}
+export type AgenCBackgroundAgentMessageTerminal = import("../protocol/index.js").MessageSendTerminalResult;
 
 export type AgenCBackgroundAgentMessageErrorCode =
   | "TURN_IN_PROGRESS"

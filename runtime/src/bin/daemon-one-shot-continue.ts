@@ -249,6 +249,7 @@ export async function runDaemonOneShotContinue(params: OneShotContinueResumeOpti
     }
     const content = goal?.kickoff ?? params.initialContent ?? params.prompt;
     const run = await awaitDaemonOneShotRun({
+      env: params.env,
       daemonClient,
       sessionId,
       agentId: acquired.agent.agentId,
@@ -273,10 +274,11 @@ export async function runDaemonOneShotContinue(params: OneShotContinueResumeOpti
       }),
     });
     cancelled = run.cancelled;
-    completed = !cancelled;
-    return goal !== undefined && !cancelled
+    const exitCode = goal !== undefined && !cancelled
       ? await printModeGoalExitCode(client, sessionId, run.code, params.signal)
       : run.code;
+    completed = !cancelled && exitCode === 0;
+    return exitCode;
   } catch (error) {
     if (params.signal.aborted) {
       cancelled = true;
