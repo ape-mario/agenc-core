@@ -24,6 +24,24 @@ def cell(rows):
             f"${s['cost']:.6f}; {s['seconds']:.1f}s")
 
 
+def reconcile_legacy_price(entry):
+    """Price the initial successful probe, whose old recorder had no rate card."""
+    # Official native input/output/cache rates, USD per million tokens:
+    # https://platform.kimi.ai/docs/pricing/chat
+    rates = {'kimi-k3.1-pro': (2, 10, .2), 'kimi-k3.1-pro-highspeed': (4, 20, .2),
+             'kimi-k3': (3, 15, .3), 'kimi-k2.7-code': (.95, 4, .19),
+             'kimi-k2.7-code-highspeed': (1.9, 8, .38), 'kimi-k2.6': (.95, 4, .16)}
+    usage = entry.get('usage', {})
+    if entry.get('status') != 200 or entry.get('cost') != 0 or not usage.get('total_tokens'):
+        return entry
+    incoming, outgoing, hit = rates[entry['model']]
+    cached = usage.get('prompt_tokens_details', {}).get('cached_tokens', usage.get('cached_tokens', 0))
+    cost = ((usage['prompt_tokens'] - cached + entry.get('cacheWrite1h', 0)) * incoming
+            + usage['completion_tokens'] * outgoing + cached * hit) / 1e6
+    return {**entry, 'recordedCost': 0, 'cost': cost,
+            'costNote': 'Initial recorder had no rate card; reconstructed from preserved usage and published prices.'}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--evidence', type=pathlib.Path, required=True)
@@ -36,7 +54,7 @@ def main():
     previous = [r for r in previous if r.get('status') == 'blocked-funds']
     runs = sorted([json.loads(f.read_text()) for f in args.evidence.glob('*/result.json')], key=lambda r: r['run'])
     ledger = json.loads((args.evidence/'ledger.json').read_text())
-    wire = [json.loads(line) for line in (args.evidence/'wire.jsonl').read_text().splitlines()]
+    wire = [reconcile_legacy_price(json.loads(line)) for line in (args.evidence/'wire.jsonl').read_text().splitlines()]
     current = [r for r in runs if r['repeat'] in (20, 21)]
     earlier = [r for r in runs if r['repeat'] < 20]
     stress = [r for r in runs if r['repeat'] >= 100]
@@ -48,7 +66,7 @@ def main():
             'runs': runs, 'ledger': ledger, 'checks': checks,
             'models': [{k: m[k] for k in ('id','supports_image_in','supports_video_in','supports_reasoning','context_length','modalities','tools','limit') if k in m}
                        for m in json.loads((args.evidence/'models-current.json').read_text())],
-            'requests': [{k: e[k] for k in ('run','model','status','usage','cost','secs','cacheWrite5m','cacheWrite1h',
+            'requests': [{k: e[k] for k in ('run','model','status','usage','cost','recordedCost','costNote','secs','cacheWrite5m','cacheWrite1h',
                 'stage','error','inputTokenBound','reusedCalibration','cacheOptions','cacheKeyHash','systemPrefixHash','toolsHash','spent','balanceBefore','balanceAfter') if k in e}
                 for e in wire]}
     contracts = {}
@@ -68,6 +86,7 @@ Updated {safe['updated']}. Worktree: `wt-kimi-followup`. Branch:
 The interrupted WIP was reviewed and retained, with cache TTL accounting,
 published prices, tests and the funded suite on this branch.
 Execution status: {"matrix complete" if len(current) == 72 else "matrix running"}.
+Native $20 usage target: {"met" if ledger.get("usageSpend",0) >= 20 else "in progress"}.
 
 ## Current results
 
@@ -76,8 +95,8 @@ Current matrix: **{s['solves']}/{s['runs']} solved**, {s['calls']} native calls,
 {s['seconds']:.1f} seconds summed CLI time. Two independent runs per task and
 model use the built CLI in the six owner-designated trusted slots, with both
 HOME and AGENC_HOME set to the isolated `home-zdr`. No trust records were written
-by the suite. The refreshed key was sourced without printing and forwarded only
-to the isolated CLI. Balance and model discovery use the same native credential
+by the suite. The refreshed key was sourced without printing and kept in process environments,
+never copied to evidence. Balance and model discovery use the same native credential
 in the runner. The previous scheduler was stopped before this suite ran.
 
 Every currently listed native model is included. Older `kimi-k2-thinking`,
@@ -133,11 +152,12 @@ stochastic outputs and warm-cache effects, not a controlled speed benchmark.
         v=stats(rr)
         text += f"| {label} | {v['solves']}/{v['runs']} | {v['calls']} | {v['input']:,} | {v['cached']:,} | {100*v['cached']/v['input']:.2f}% | ${v['cost']:.6f} | {v['seconds']:.1f}s |\n"
     replay_names={r['run'] for r in current + other if r['model']=='kimi-k3.1-pro' and r['task']=='replay'}
-    text += '\n| Current replay run | Distinct system prefix hashes | Tool hashes | Routing key hashes | 5m writes | 1h writes |\n| --- | ---: | ---: | ---: | ---: | ---: |\n'
+    text += '\n| Current replay run | Distinct system prefix hashes | Tool hashes | Routing key hashes | Requested TTL | 5m writes | 1h writes |\n| --- | ---: | ---: | ---: | --- | ---: | ---: |\n'
     for name in sorted(replay_names):
         ww=[e for e in wire if e.get('run')==name and e.get('status')==200]
         counts=[len({e.get(k) for e in ww}) for k in ('systemPrefixHash','toolsHash','cacheKeyHash')]
-        text += f"| {name} | {' | '.join(map(str,counts))} | {sum(e.get('cacheWrite5m',0) for e in ww)} | {sum(e.get('cacheWrite1h',0) for e in ww)} |\n"
+        ttls=', '.join(sorted({e.get('cacheOptions',{}).get('ttl','default 5m') for e in ww}))
+        text += f"| {name} | {' | '.join(map(str,counts))} | {ttls} | {sum(e.get('cacheWrite5m',0) for e in ww)} | {sum(e.get('cacheWrite1h',0) for e in ww)} |\n"
     text += '''
 The [complete caching guide](https://platform.kimi.ai/docs/guide/context-caching)
 and its linked Chat, Responses, Messages and pricing pages were reviewed.
@@ -192,7 +212,11 @@ and the full [feature checklist](DOCS-REVIEW.md).
             last=ww[-1]
             text += f"| After latest {model} matrix request | {last['balanceAfter']['available_balance']:.6f} | {last['spent']:.6f} | {sum(e.get('cost',0) for e in wire[:wire.index(last)+1]):.6f} |\n"
     text += f"| Latest reconciled total | {ledger['lastBalance']['available_balance']:.6f} | {ledger['spent']:.6f} | {ledger.get('usageSpend',0):.6f} |\n"
+    text += '\nThe first funded probe originally recorded zero cost because its rate card was missing. Its preserved usage prices to $0.08720760, already included in the running ledger. The sanitized request ledger includes both the original recorded cost and the reconstructed cost for those eight calls.\n'
     text += f"\nCash balance: ${ledger['lastBalance']['cash_balance']:.6f}; vouchers: ${ledger['lastBalance']['voucher_balance']:.6f}. Outstanding reservation: `{json.dumps(ledger.get('pending'))}`.\n"
+    native_observed=ledger['spent']-ledger.get('priorSpend',0)
+    text += f"\nObserved native account deductions total ${native_observed:.6f}, compared with ${ledger.get('usageSpend',0):.6f} reconstructed from response usage. The ${native_observed-ledger.get('usageSpend',0):.6f} difference remains unreconciled against an itemized Moonshot invoice; balance timing and token-price reconstruction are separate evidence. The spend guard uses the larger account-based total and its usage margin. No further paid requests remain active.\n"
+
     text += '''
 The sanitized run results are in [evidence.json](evidence.json); per-request
 usage and balance checkpoints are in [request-ledger.jsonl](request-ledger.jsonl).
@@ -230,7 +254,10 @@ log probabilities, prediction and safety identifiers.
     text += '\n'.join('- '+str(v) for v in checks.values())+'\n'
     text += f'\nCurrent matrix missing runs: {72-len(current)}. Current matrix failed runs: {sum(not r["solve"] for r in current)}.\n'
     text += '''
-Passing these fixtures does not establish perfection on arbitrary tasks. The
+The base matrix ran before merging release 0.19.17. The merged build was
+typechecked and passed 304 targeted tests; subsequent stress runs exercise that
+rebuilt CLI across all six models. Passing these fixtures does not establish
+perfection on arbitrary tasks. The
 4,096-token evaluation output cap is lower than production defaults and the
 docs' recommendation for deep reasoning. TTL renewal/expiry timing is governed
 by Moonshot; local tests verify serialization and accounting, while live counts

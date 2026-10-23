@@ -1,10 +1,11 @@
 # Kimi native follow-up report
 
-Updated 2026-10-23T19:35:43.191944+00:00. Worktree: `wt-kimi-followup`. Branch:
+Updated 2026-10-23T20:02:47.681836+00:00. Worktree: `wt-kimi-followup`. Branch:
 `feat/kimi-k3-1-followup`. PR #3264 and `feat/kimi-k3-1` were not modified.
 The interrupted WIP was reviewed and retained, with cache TTL accounting,
 published prices, tests and the funded suite on this branch.
 Execution status: matrix complete.
+Native $20 usage target: met.
 
 ## Current results
 
@@ -13,8 +14,8 @@ Current matrix: **72/72 solved**, 424 native calls,
 1653.3 seconds summed CLI time. Two independent runs per task and
 model use the built CLI in the six owner-designated trusted slots, with both
 HOME and AGENC_HOME set to the isolated `home-zdr`. No trust records were written
-by the suite. The refreshed key was sourced without printing and forwarded only
-to the isolated CLI. Balance and model discovery use the same native credential
+by the suite. The refreshed key was sourced without printing and kept in process environments,
+never copied to evidence. Balance and model discovery use the same native credential
 in the runner. The previous scheduler was stopped before this suite ran.
 
 Every currently listed native model is included. Older `kimi-k2-thinking`,
@@ -75,14 +76,17 @@ Earlier funded runs are preserved separately from the current matrix. They inclu
 | --- | --- |
 | Earlier funded runs | 51/52; 319; 2,779,916/52,046; $2.414123; 1315.1s |
 | Additional confirmation / TTL | 2/2; 34; 134,656/6,695; $0.142112; 189.4s |
-| Seeded long-context stress | 2/3; 10; 5,023,660/10,282; $6.444539; 356.9s |
-| Additional reasoning stress | Not run |
+| Seeded long-context stress | 13/14; 42; 11,825,131/32,810; $13.574137; 1225.7s |
+| Additional reasoning stress | 11/11; 186; 613,523/22,399; $0.545886; 573.5s |
 
 | Model | Stress result | Target token range |
 | --- | --- | --- |
-| kimi-k3.1-pro | 1/1; 4; 2,011,673/3,595; $2.350803; 111.8s | 500,000 to 500,000 |
-| kimi-k3.1-pro-highspeed | 1/1; 4; 2,008,333/3,572; $2.386654; 97.0s | 500,000 to 500,000 |
-| kimi-k3 | 0/1; 2; 1,003,654/3,115; $1.707082; 148.0s | 500,000 to 500,000 |
+| kimi-k3.1-pro | 3/3; 10; 3,217,857/7,245; $4.153169; 204.4s | 106,242 to 500,000 |
+| kimi-k3.1-pro-highspeed | 2/2; 7; 2,692,192/5,607; $3.435097; 133.9s | 225,388 to 500,000 |
+| kimi-k3 | 2/3; 8; 3,032,340/5,973; $4.188548; 302.3s | 172,966 to 500,000 |
+| kimi-k2.7-code | 2/2; 6; 1,038,751/4,768; $0.481546; 236.5s | 140,432 to 200,000 |
+| kimi-k2.7-code-highspeed | 2/2; 5; 874,777/4,521; $0.882649; 159.6s | 130,116 to 200,000 |
+| kimi-k2.6 | 2/2; 6; 969,214/4,696; $0.433128; 189.0s | 114,526 to 200,000 |
 
 The standard long-context task is tokenizer-calibrated near 98k tokens and
 requires ordered retrieval plus file write/read-back. Seeded stress variants
@@ -105,12 +109,12 @@ stochastic outputs and warm-cache effects, not a controlled speed benchmark.
 | After cache follow-up | 2/2 | 34 | 140,737 | 126,976 | 90.22% | $0.116347 | 155.2s |
 | Additional TTL confirmation | 2/2 | 34 | 134,656 | 119,808 | 88.97% | $0.142112 | 189.4s |
 
-| Current replay run | Distinct system prefix hashes | Tool hashes | Routing key hashes | 5m writes | 1h writes |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| after-kimi-k3.1-pro-replay-20 | 1 | 1 | 1 | 5376 | 0 |
-| after-kimi-k3.1-pro-replay-21 | 1 | 1 | 1 | 4096 | 0 |
-| after-kimi-k3.1-pro-replay-30 | 1 | 1 | 1 | 0 | 5632 |
-| after-kimi-k3.1-pro-replay-31 | 1 | 1 | 1 | 0 | 5120 |
+| Current replay run | Distinct system prefix hashes | Tool hashes | Routing key hashes | Requested TTL | 5m writes | 1h writes |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| after-kimi-k3.1-pro-replay-20 | 1 | 1 | 1 | default 5m | 5376 | 0 |
+| after-kimi-k3.1-pro-replay-21 | 1 | 1 | 1 | default 5m | 4096 | 0 |
+| after-kimi-k3.1-pro-replay-30 | 1 | 1 | 1 | 1h | 0 | 5632 |
+| after-kimi-k3.1-pro-replay-31 | 1 | 1 | 1 | 5m | 0 | 5120 |
 
 The [complete caching guide](https://platform.kimi.ai/docs/guide/context-caching)
 and its linked Chat, Responses, Messages and pricing pages were reviewed.
@@ -135,7 +139,7 @@ and the full [feature checklist](DOCS-REVIEW.md).
 - Initial funded file task: correct file, but the prose completion gate conflicted with the requested exact `hi` reply. The WIP changed the harness to the CLI's existing JSON output contract, leaving independent task grading intact. Current file runs confirm exact bytes, read-back and final content.
 - Cache billing gap: only default write pricing existed; one-hour writes were unaccounted for. Added actual response TTL parsing for JSON/SSE, published one-hour rates and sweep pricing, with tests for TTL locking, missing/malformed counts and no double counting.
 - Missing cache routing hint and TTL selection: added stable session `prompt_cache_key`, request-scoped TTL and isolated client `AGENC_KIMI_CACHE_TTL`. Mocked requests cover all six models and environment precedence. Stable prefix and tool hashes are measured above.
-- K3 500k-token stress timeout: the first two inference responses succeeded and the written artifact matched all 24 expected values. A later read-only preflight timed out before admission, leaving no pending inference reservation. The guard now retries transient diagnostic failures once and reuses a calibrated token bound only for byte-identical, append-only conversation history. Each appended UTF-8 byte reserves one token; changed history, model or image tails require recalibration. Regression tests cover retry limits, exhausted quota and changed prefixes. Failed run 102 remains preserved; confirmation uses the identical seed 102 and target under repeat 1020.
+- K3 500k-token stress timeout: the first two inference responses succeeded and the written artifact matched all 24 expected values. A later read-only preflight timed out before admission, leaving no pending inference reservation. The guard now retries transient diagnostic failures once and reuses a calibrated token bound only for byte-identical, append-only conversation history. Each appended UTF-8 byte reserves one token; changed history, model or image tails require recalibration. Regression tests cover retry limits, exhausted quota and changed prefixes. Failed run 102 remains preserved; confirmation used the identical seed 102 and 500k target under repeat 1020 and passed in 106.05 seconds across three calls. Both later calls reused the calibrated bound.
 - Stop limits: added local validation for the documented five-string, 32-byte limit, including multibyte regression tests.
 - Local validation found an outdated Kimi prefix expectation and a new environment entry out of sort order. Both were corrected. The first PR's latest test commit was merged into this follow-up only; its obsolete unpriced K3.1 exceptions were removed here.
 
@@ -167,15 +171,19 @@ All amounts are USD. Prior owner spend remains included. Account deductions can 
 | --- | ---: | ---: | ---: |
 | Funded account start | 24.999100 | 0.191417 prior OpenRouter | 0 |
 | Current suite start | 22.484000 | Preserved in request ledger | Earlier usage retained |
-| After latest kimi-k3.1-pro matrix request | 22.484000 | 2.706517 | 2.912399 |
-| After latest kimi-k3.1-pro-highspeed matrix request | 21.920340 | 3.270177 | 3.822177 |
-| After latest kimi-k3 matrix request | 20.803170 | 4.387347 | 4.665551 |
-| After latest kimi-k2.7-code matrix request | 20.803170 | 4.387347 | 4.939397 |
-| After latest kimi-k2.7-code-highspeed matrix request | 20.085379 | 5.105137 | 5.456548 |
-| After latest kimi-k2.6 matrix request | 20.085379 | 5.105137 | 5.793195 |
-| Latest reconciled total | 12.581470 | 12.609047 | 13.858025 |
+| After latest kimi-k3.1-pro matrix request | 22.484000 | 2.706517 | 2.999607 |
+| After latest kimi-k3.1-pro-highspeed matrix request | 21.920340 | 3.270177 | 3.909385 |
+| After latest kimi-k3 matrix request | 20.803170 | 4.387347 | 4.752758 |
+| After latest kimi-k2.7-code matrix request | 20.803170 | 4.387347 | 5.026605 |
+| After latest kimi-k2.7-code-highspeed matrix request | 20.085379 | 5.105137 | 5.543755 |
+| After latest kimi-k2.6 matrix request | 20.085379 | 5.105137 | 5.880403 |
+| Latest reconciled total | 4.945600 | 20.244917 | 20.014156 |
 
-Cash balance: $12.581470; vouchers: $0.000000. Outstanding reservation: `{"run": "after-kimi-k3-long-context-1020", "reserve": 6.8409640000000005}`.
+The first funded probe originally recorded zero cost because its rate card was missing. Its preserved usage prices to $0.08720760, already included in the running ledger. The sanitized request ledger includes both the original recorded cost and the reconstructed cost for those eight calls.
+
+Cash balance: $4.945600; vouchers: $0.000000. Outstanding reservation: `null`.
+
+Observed native account deductions total $20.053500, compared with $20.014156 reconstructed from response usage. The $0.039344 difference remains unreconciled against an itemized Moonshot invoice; balance timing and token-price reconstruction are separate evidence. The spend guard uses the larger account-based total and its usage margin. No further paid requests remain active.
 
 The sanitized run results are in [evidence.json](evidence.json); per-request
 usage and balance checkpoints are in [request-ledger.jsonl](request-ledger.jsonl).
@@ -210,15 +218,19 @@ log probabilities, prediction and safety identifiers.
 ## Validation and open issues
 
 - TypeScript and test-support typechecks passed with the pinned npm 11.17.0 in the isolated home.
-- 263 targeted TypeScript tests passed across 11 files, including the added six-model split tool/schema sequence and K3.1 combined-contract rejection tests.
+- 304 targeted TypeScript tests passed across 12 files after merging release 0.19.17, including six-model split tool/schema tests and model-family regressions.
 - 10 wire capture and budget-ledger tests passed, including append-only calibration and bounded diagnostic retry.
-- 10 Python fixture and suite budget tests passed.
-- Final build passed, including launcher preflight, package entrypoints and generated SDK type parity. Built revision: 4b39d2c580af.
+- 12 Python fixture, suite budget and legacy price reconstruction tests passed.
+- Final build passed after merging release 0.19.17, including launcher preflight, package entrypoints and generated SDK type parity. Built revision: 37cf50406e0b.
 - Live split tool/schema confirmation passed for all six native models; raw combined-contract failures remain documented.
+- The identical K3 seed 102 at 500k tokens passed under repeat 1020 after the preflight fix; both subsequent requests reused the conservative calibration.
 
 Current matrix missing runs: 0. Current matrix failed runs: 0.
 
-Passing these fixtures does not establish perfection on arbitrary tasks. The
+The base matrix ran before merging release 0.19.17. The merged build was
+typechecked and passed 304 targeted tests; subsequent stress runs exercise that
+rebuilt CLI across all six models. Passing these fixtures does not establish
+perfection on arbitrary tasks. The
 4,096-token evaluation output cap is lower than production defaults and the
 docs' recommendation for deep reasoning. TTL renewal/expiry timing is governed
 by Moonshot; local tests verify serialization and accounting, while live counts
@@ -243,4 +255,4 @@ streaming, stop limits, isolation, pricing and retention. Avoid repeated giant
 tokenizer requests with conservative append-only bounds and retry transient
 read-only diagnostic failures without retrying paid inference.
 
-Validation: 72/72 current matrix solves; 2/3 stress solves. Native priced spend $13.858025; latest account balance $12.581470. See the report for local checks, TTL verification, failed combined-schema probes and remaining API surfaces.
+Validation: 72/72 current matrix solves; 24/25 stress solves. Native priced spend $20.014156; latest account balance $4.945600. See the report for local checks, TTL verification, failed combined-schema probes and remaining API surfaces.
