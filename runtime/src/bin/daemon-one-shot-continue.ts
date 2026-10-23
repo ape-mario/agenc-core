@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { type OneShotContinueSession } from "./route.js";
 import { type AgentRuntimeOptions } from "../session/runtime-options.js";
 import { hasSupportedFileIdentity } from "../session/session-store.js";
-import { resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, reproveResumeSessionAllowingAppend, type ResolvedResumeSession, type ResumeSessionResolution } from "./resume-session.js";
+import { resolveInitialResumeSession, resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, reproveResumeSessionAllowingAppend, type ResolvedResumeSession, type ResumeSessionResolution } from "./resume-session.js";
 import { AgenCDaemonResponseError } from "../app-server/agent-cli.js";
 import type { AgentCreateParams, AgentSummary, MessageContentBlock } from "../app-server/protocol/index.js";
 import { isRecord } from "../utils/record.js";
@@ -50,19 +50,21 @@ interface OneShotContinueResumeOptions {
  * Resolve which prior session a headless continue targets, or write the
  * operator-facing reason it cannot and return the exit code.
  */
-function resolveOneShotContinueTarget(params: {
+async function resolveOneShotContinueTarget(params: {
   readonly cwd: string;
   readonly agencHome: string;
   readonly continueSession: OneShotContinueSession;
-}): { readonly descriptor: ResolvedResumeSession; readonly displayId: string } | { readonly exitCode: number } {
-  const resolved =
+  readonly signal: AbortSignal;
+}): Promise<{ readonly descriptor: ResolvedResumeSession; readonly displayId: string } | { readonly exitCode: number }> {
+  const resolved = await resolveInitialResumeSession(() =>
     params.continueSession.kind === "latest"
       ? resolveLatestSessionId(params.cwd, params.agencHome)
       : resolveResumeSessionId(
           params.cwd,
           params.continueSession.sessionId,
           params.agencHome,
-        );
+        ), params.signal);
+  if (params.signal.aborted) return { exitCode: oneShotAbortExitCode(params.signal) };
   if (resolved.kind !== "ok") {
     process.stderr.write(
       `${describeUnresolvedOneShotSession(resolved, params.continueSession)}\n`,
@@ -187,7 +189,8 @@ export async function runDaemonOneShotContinue(params: OneShotContinueResumeOpti
   if (params.signal.aborted) {
     return oneShotAbortExitCode(params.signal);
   }
-  const target = resolveOneShotContinueTarget(params);
+  const target = await resolveOneShotContinueTarget(params);
+  if (params.signal.aborted) return oneShotAbortExitCode(params.signal);
   if ("exitCode" in target) return target.exitCode;
   const { displayId } = target;
   const failResume = (error: unknown): number => {

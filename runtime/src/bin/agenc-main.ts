@@ -41,7 +41,7 @@ import type { AgenCConfig } from "../config/schema.js";
 import { providerQualifiedModel } from "../config/provider-model-authority.js";
 import type { PreparedTurnRuntimeInputs, RunSingleTurnOpts } from "./local-turn-runtime.js";
 import { clearSystemPromptSections } from "../prompts/sections.js";
-import { resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, reproveResumeSessionAllowingAppend, type ResolvedResumeSession } from "./resume-session.js";
+import { resolveInitialResumeSession, resolveLatestSessionId, resolveResumeSessionId, reproveResumeSessionAfterDaemonReady, reproveResumeSessionAllowingAppend, type ResolvedResumeSession } from "./resume-session.js";
 import { formatAgenCDaemonCliHelpText, parseAgenCDaemonCliArgs, runAgenCDaemonCli } from "../app-server/daemon-control.js";
 import { captureRemoteCliRuntimeContext, formatAgenCRemoteCliHelpText, parseAgenCRemoteCliArgs, runAgenCRemoteCli } from "./remote-cli.js";
 import { parseAgenCDaemonProxyCliArgs, runAgenCDaemonProxyCli } from "./daemon-proxy-cli.js";
@@ -4051,11 +4051,11 @@ async function resumeTUIEntryAttempt(
     }
     const workspaceRoot = cliCwd.cwd;
     const agencHome = resolveAgencHome(process.env);
-    const resolved = resolveResumeSessionId(
+    const resolved = await resolveInitialResumeSession(() => resolveResumeSessionId(
       workspaceRoot,
       args.resumeId,
       agencHome,
-    );
+    ));
     switch (resolved.kind) {
       case "ok":
         return await resumeResolvedTUIEntry(resolved, args.resumeId, {
@@ -4236,7 +4236,7 @@ export async function continueTUIEntry(
   }
   const workspaceRoot = cliCwd.cwd;
   const agencHome = resolveAgencHome(process.env);
-  const resolved = resolveLatestSessionId(workspaceRoot, agencHome);
+  const resolved = await resolveInitialResumeSession(() => resolveLatestSessionId(workspaceRoot, agencHome));
   if (resolved.kind === "search_incomplete") {
     process.stderr.write(
       `agenc: session search stopped at its ${resolved.reason.replaceAll("_", " ")} safety limit; retry with an exact session id\n`,
