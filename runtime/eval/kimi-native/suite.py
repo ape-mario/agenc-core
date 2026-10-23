@@ -59,6 +59,8 @@ def main():
     parser.add_argument('--sweep', type=pathlib.Path, required=True)
     parser.add_argument('--evidence', type=pathlib.Path, required=True)
     parser.add_argument('--first-repeat', type=int, default=10)
+    parser.add_argument('--first-stress-repeat', type=int, default=100,
+                        help='Resume after an investigated failure and a separately recorded confirmation')
     parser.add_argument('--stress-only', action='store_true')
     parser.add_argument('--target-spend', type=float, default=0,
                         help='Explicit native USD target, including existing priced usage')
@@ -72,13 +74,15 @@ def main():
     models = {m['id']: m for m in api('models')['data']}
     if set(models) != set(ORDER):
         raise SystemExit('Native inventory changed; review capabilities and prices first')
-    save(args.evidence / 'suite-balance-start.json', api('users/me/balance')['data'])
+    start_path = args.evidence / ('stress-balance-start.json' if args.stress_only else 'suite-balance-start.json')
+    if not start_path.exists():
+        save(start_path, api('users/me/balance')['data'])
     if not args.stress_only:
         for model in ORDER:
             for task in TASKS:
                 for repeat in range(args.first_repeat, args.first_repeat + 2):
                     run_one(args, model, task, repeat)
-    for repeat in range(100, 1000):
+    for repeat in range(args.first_stress_repeat, args.first_stress_repeat + 900):
         ledger = json.loads(ledger_path.read_text())
         if ledger.get('pending'):
             raise SystemExit('Unsettled reservation requires investigation')

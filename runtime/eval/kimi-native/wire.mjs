@@ -3,6 +3,36 @@ import { createHash } from 'node:crypto';
 
 export const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const totalBalance = b => b.cash_balance + b.voucher_balance;
+
+// Diagnostic endpoints do not generate tokens. Retry a transient timeout once
+// with a fresh signal; never retry authentication or exhausted-account errors.
+export async function readOnlyJson(fetchImpl, url, init = {}) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetchImpl(url, {...init, signal: AbortSignal.timeout(30000)});
+      const data = await response.json();
+      if (response.ok) return data;
+      const error = new Error(`Moonshot diagnostic HTTP ${response.status}`);
+      error.retryable = response.status >= 500 || (response.status === 429 &&
+        !/quota|balance|funds/i.test(String(data.error?.type ?? '') + String(data.error?.message ?? '')));
+      throw error;
+    } catch (error) {
+      if (attempt || !(error.retryable || ['TimeoutError', 'AbortError', 'TypeError'].includes(error.name))) throw error;
+    }
+  }
+}
+
+// A byte-for-byte appended conversation needs no second large tokenizer call.
+// Keep the calibrated base and bound every added UTF-8 byte as a token. A
+// changed prefix, model or image-bearing tail must be calibrated afresh.
+export function appendedTokenBound(previous, model, messages) {
+  if (!previous || previous.model !== model || previous.messages.length === 0 ||
+      messages.length < previous.messages.length ||
+      JSON.stringify(messages.slice(0, previous.messages.length)) !== JSON.stringify(previous.messages)) return undefined;
+  const tail = messages.slice(previous.messages.length);
+  if (tail.some(m => Array.isArray(m.content) && m.content.some(p => p.type !== 'text'))) return undefined;
+  return Math.ceil(previous.tokens * 1.1) + Buffer.byteLength(JSON.stringify(tail));
+}
 // USD per million tokens, read from the rendered official pricing table on
 // 2026-10-23: https://platform.kimi.ai/docs/pricing/chat
 // The default 5m cache-write rate equals ordinary input, not an added fee.
@@ -68,12 +98,12 @@ if (controlPath) {
     renameSync(file+'.tmp', file);
   };
   async function balance() {
-    const r = await original('https://api.moonshot.ai/v1/users/me/balance', {
-      headers: {Authorization: 'Bearer '+key}, signal: AbortSignal.timeout(30000),
+    const data = await readOnlyJson(original, 'https://api.moonshot.ai/v1/users/me/balance', {
+      headers: {Authorization: 'Bearer '+key},
     });
-    if (!r.ok) throw new Error('Balance lookup failed');
-    return (await r.json()).data;
+    return data.data;
   }
+  let calibration;
   let queue = Promise.resolve();
   globalThis.fetch = async (input, init) => {
     const url = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
@@ -84,24 +114,34 @@ if (controlPath) {
     queue = new Promise(resolve => { release = resolve; });
     await prior;
     let streaming = false;
+    let stage = 'request';
     const control = JSON.parse(readFileSync(controlPath, 'utf8'));
     const log = entry => appendFileSync(control.wire, JSON.stringify({...entry, run: control.run})+'\n', {mode: 0o600});
     try {
       const body = JSON.parse(String(init?.body));
       let inputTokenBound;
+      let reusedCalibration = false;
       if (Buffer.byteLength(JSON.stringify(body)) > 64000) {
         // Calibrate large requests rather than treating every UTF-8 byte as
         // a token. The endpoint estimates the conversation; reserve tool
         // definitions separately by bytes plus framing and a 10% margin.
-        const estimate = await original('https://api.moonshot.ai/v1/tokenizers/estimate-token-count', {
-          method: 'POST', headers: {Authorization: 'Bearer '+key, 'Content-Type': 'application/json'},
-          body: JSON.stringify({model: body.model, messages: body.messages}), signal: AbortSignal.timeout(30000),
+        stage = 'token-estimate';
+        const appended = appendedTokenBound(calibration, body.model, body.messages);
+        if (appended !== undefined) {
+          reusedCalibration = true;
+          inputTokenBound = appended + Buffer.byteLength(JSON.stringify(body.tools ?? [])) + 1024;
+        } else {
+          const estimate = await readOnlyJson(original, 'https://api.moonshot.ai/v1/tokenizers/estimate-token-count', {
+            method: 'POST', headers: {Authorization: 'Bearer '+key, 'Content-Type': 'application/json'},
+            body: JSON.stringify({model: body.model, messages: body.messages}),
         });
-        if (!estimate.ok) throw new Error('Request token calibration failed');
-        const count = (await estimate.json()).data?.total_tokens;
+        const count = estimate.data?.total_tokens;
         if (!Number.isInteger(count) || count < 1) throw new Error('Invalid tokenizer response');
+        calibration = {model: body.model, messages: body.messages, tokens: count};
         inputTokenBound = Math.ceil(count * 1.1) + Buffer.byteLength(JSON.stringify(body.tools ?? [])) + 1024;
+        }
       }
+      stage = 'balance-before';
       let ledger = reconcile(JSON.parse(readFileSync(control.ledger, 'utf8')), await balance());
       save(control.ledger, ledger);
       if (ledger.lastBalance.available_balance <= 0 && !control.quotaProbe) throw new Error('Moonshot account needs funding');
@@ -109,7 +149,7 @@ if (controlPath) {
       ledger = {...ledger, pending: {run: control.run, reserve}};
       save(control.ledger, ledger);
       const started = Date.now();
-      const entry = {started, model: body.model, bytes: Buffer.byteLength(JSON.stringify(body)), inputTokenBound,
+      const entry = {started, model: body.model, bytes: Buffer.byteLength(JSON.stringify(body)), inputTokenBound, reusedCalibration,
         maxOutput: body.max_completion_tokens ?? body.max_tokens, effort: body.reasoning_effort,
         thinking: body.thinking, stream: body.stream,
         cacheOptions: body.prompt_cache_options, cacheKeyHash: body.prompt_cache_key ? digest(body.prompt_cache_key) : undefined,
@@ -121,6 +161,7 @@ if (controlPath) {
           // Tool output evidence is generated solely by the isolated fixtures.
           toolOutput: m.role === 'tool' ? String(m.content).slice(0, 12000) : undefined,
           toolCalls: m.tool_calls})), reserve};
+      stage = 'chat';
       const response = await original(input, init);
       // Only billing counts, never arbitrary headers or authorization values.
       entry.cacheWrite5m = Number(response.headers.get('Msh-Usage-Cache-Write-Tokens-5m') ?? 0);
@@ -176,7 +217,7 @@ if (controlPath) {
       return response;
     } catch (error) {
       // No request headers, request objects or credential values are logged.
-      log({status: 'guard-or-transport-error', error: error instanceof Error ? error.message.replaceAll(key ?? '\0', '[redacted]') : 'unknown'});
+      log({status: 'guard-or-transport-error', stage, error: error instanceof Error ? error.message.replaceAll(key ?? '\0', '[redacted]') : 'unknown'});
       throw error;
     } finally {
       // A successful streamed request keeps the reservation until capture ends.

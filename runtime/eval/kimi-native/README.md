@@ -113,3 +113,11 @@ fix and its regression test, then use new repeat numbers for confirmation.
 It preserves solved runs and the cumulative ledger when resumed. Larger
 seeded retrieval tasks exercise 200k-token K2 and up to 500k-token K3 contexts
 within the same per-request budget guard.
+
+Large requests are calibrated with Moonshot's tokenizer. Subsequent turns reuse
+that calibration only while the model and complete message prefix match exactly.
+Each appended UTF-8 byte counts as a token in the conservative reservation;
+changed prefixes or image tails require fresh calibration. Free diagnostic
+requests retry one transient failure, with a fresh timeout. Paid inference is
+not retried by this guard. After separately confirming a failed stress seed
+under a new repeat number, resume with `--stress-only --first-stress-repeat N`.

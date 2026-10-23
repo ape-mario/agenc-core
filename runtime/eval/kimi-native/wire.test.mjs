@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { admit, reconcile, totalBalance, usageCost, budgetSpend, reserveUsd } from './wire.mjs';
+import { admit, reconcile, totalBalance, usageCost, budgetSpend, reserveUsd, appendedTokenBound, readOnlyJson } from './wire.mjs';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -91,6 +91,17 @@ test('stream capture preserves reasoning, joins tool fragments and settles befor
     const calibrated = readFileSync(wire,'utf8').trim().split('\n').map(JSON.parse).at(-1);
     assert.equal(calibrated.inputTokenBound,28527);
     assert.equal(calls,3);
+    const appended = await globalThis.fetch('https://api.moonshot.ai/v1/chat/completions', {
+      method:'POST', body:JSON.stringify({...request,model:'kimi-k3',stream:true,
+        messages:[{role:'user',content:'x'.repeat(100000)}, {role:'assistant',content:'é'.repeat(1024)}]}),
+    });
+    await appended.text();
+    for (let i=0; i<50 && JSON.parse(readFileSync(ledger)).pending; i++) await new Promise(r=>setTimeout(r,5));
+    assert.equal(estimates,1);
+    assert.equal(calls,4);
+    const reused = readFileSync(wire,'utf8').trim().split('\n').map(JSON.parse).at(-1);
+    assert.equal(reused.reusedCalibration,true);
+    assert.ok(reused.inputTokenBound >= calibrated.inputTokenBound + 2048);
     assert.ok(!readFileSync(wire,'utf8').includes('test-only-secret'));
   } finally {
     globalThis.fetch = priorFetch;
@@ -125,4 +136,40 @@ test('one-hour writes replace the input rate with twice that rate', () => {
   assert.equal(usageCost('kimi-k3.1-pro', usage, 20000), 0.142);
   assert.throws(() => usageCost('kimi-k3.1-pro', usage, 30001), /Invalid/);
   assert.throws(() => usageCost('kimi-k3.1-pro', usage, NaN), /Invalid/);
+});
+
+test('append-only calibration avoids repeated huge tokenizer requests without trusting changed history', () => {
+  const messages = [{role:'user',content:'archive'.repeat(10000)}];
+  const prior = {model:'kimi-k3',messages,tokens:25000};
+  const grown = [...messages, {role:'assistant',content:'é'.repeat(1000)}, {role:'tool',content:'result'}];
+  const bound = appendedTokenBound(prior, 'kimi-k3', grown);
+  assert.ok(bound >= 27500 + 2000);
+  assert.equal(appendedTokenBound(prior,'kimi-k2.6',grown),undefined);
+  assert.equal(appendedTokenBound(prior,'kimi-k3',[{role:'user',content:'changed'},...grown.slice(1)]),undefined);
+  assert.equal(appendedTokenBound(prior,'kimi-k3',[]),undefined);
+  assert.equal(appendedTokenBound(prior,'kimi-k3',[...messages,{role:'user',content:[{type:'image_url',image_url:{url:'data:image/png;base64,YWJj'}}]}]),undefined);
+});
+
+test('read-only diagnostics retry one timeout with a fresh signal but never retry exhausted quota', async () => {
+  let calls=0;
+  const signals=[];
+  const result = await readOnlyJson(async (_url, init) => {
+    calls++; signals.push(init.signal);
+    if (calls===1) throw new DOMException('timeout','TimeoutError');
+    return Response.json({data:{total_tokens:100}});
+  }, 'https://api.moonshot.ai/v1/tokenizers/estimate-token-count');
+  assert.equal(result.data.total_tokens,100);
+  assert.equal(calls,2);
+  assert.notEqual(signals[0],signals[1]);
+  calls=0;
+  await assert.rejects(readOnlyJson(async () => {
+    calls++;
+    return Response.json({error:{type:'exceeded_current_quota_error'}},{status:429});
+  }, 'https://api.moonshot.ai/v1/users/me/balance'), /HTTP 429/);
+  assert.equal(calls,1);
+  calls=0;
+  await assert.rejects(readOnlyJson(async () => {
+    calls++; throw new DOMException('timeout','TimeoutError');
+  }, 'https://api.moonshot.ai/v1/users/me/balance'), /timeout/);
+  assert.equal(calls,2);
 });

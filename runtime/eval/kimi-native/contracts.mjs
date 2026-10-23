@@ -36,6 +36,7 @@ for (const model of models) {
         result.error = {type:'unexpected-tool-contract'};break;
       }
       messages.push(choice.message, {role:'tool',tool_call_id:choice.message.tool_calls[0].id,content:'test'});
+      if (split) messages.push({role:'user',content:'Tool work is complete. Return only a raw JSON object matching the supplied schema.'});
     } else {
       try { result.solve = choice?.finish_reason==='stop' && JSON.parse(choice.message.content).ok===true; }
       catch { result.error = {type:'invalid-schema-content'}; }
