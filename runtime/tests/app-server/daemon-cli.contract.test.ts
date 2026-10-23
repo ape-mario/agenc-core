@@ -2756,14 +2756,21 @@ describe("AgenC daemon CLI", () => {
       const host = createHost(agencHome);
       const io = createIo();
       const { launchdHost, calls } = withLaunchdJob(host, agencHome);
+      // This case checks the launchd ownership decision inside the transaction.
+      // Acquire the real lock before entering it so host path validation does
+      // not consume the 50ms speculative budget. The contention case in
+      // daemon-provisional-start.test.ts retains that production deadline.
+      const release = await acquireAgenCDaemonLifecycleLock(launchdHost);
       try {
         await expect(
           startAgenCDaemon(launchdHost, io, {
             provisionalStart: { signal: new AbortController().signal },
+            lifecycleLockHeld: true,
           }),
         ).resolves.toBe(2);
         expect(calls).toEqual({ spawned: 0, kickstarts: 0 });
       } finally {
+        await release();
         await rm(agencHome, { recursive: true, force: true });
       }
     });
