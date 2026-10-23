@@ -120,9 +120,12 @@ describe("StaticModelsManager", () => {
     }
   });
 
-  it("uses the exact OpenRouter contract for its vendor-qualified Opus ID", async () => {
+  it("caps the OpenRouter Opus default while retaining its catalog ceiling and effort contract", async () => {
     expect(await claudeManager().getModelInfo("anthropic/claude-opus-5.5")).toMatchObject({
-      contextWindow: 1_000_000, maxOutputTokens: 128_000,
+      contextWindow: 1_000_000, maxOutputTokens: 32_000,
+      maxOutputTokensUpperLimit: 128_000,
+      maxOutputTokensExplicit: false,
+      maxOutputTokensCappedDefault: true,
       supportedReasoningLevels: ["max", "xhigh", "high", "medium", "low"],
       defaultReasoningLevel: "high",
     });
@@ -722,7 +725,10 @@ describe("StaticModelsManager", () => {
 
     const info = await manager.getModelInfo("openrouter:x-ai/grok-code-fast-1");
     expect(info.contextWindow).toBe(256_000);
-    expect(info.maxOutputTokens).toBe(64_000);
+    expect(info.maxOutputTokens).toBe(32_000);
+    expect(info.maxOutputTokensUpperLimit).toBe(64_000);
+    expect(info.maxOutputTokensExplicit).toBe(false);
+    expect(info.maxOutputTokensCappedDefault).toBe(true);
     expect(info.usedFallbackModelMetadata).toBe(false);
   });
 
