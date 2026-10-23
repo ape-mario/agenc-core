@@ -37,6 +37,7 @@ import {
   resetOpenRouterZdrEndpointsForTesting,
 } from "../llm/registry/openrouter-zdr-endpoints.js";
 import type { SlashCommandContext } from "./types.js";
+import { readModelMenuSnapshot } from "./model-menu-snapshot.js";
 
 const homes: string[] = [];
 
@@ -126,6 +127,14 @@ describe("saved provider keys", () => {
 });
 
 describe("providers screen snapshot", () => {
+  it("lists Large Flash in /model and /providers with its catalog label and capabilities", () => {
+    const { home, environment } = tempHome();
+    const ctx = ctxFor({ home, environment, provider: "abliteration", model: "abliterated-model-large-v2" });
+    expect(readModelMenuSnapshot(ctx).rows.find(row => row.provider === "abliteration" && row.displayModel === "abliterated-model-large-flash"))
+      .toMatchObject({ model: "abliterated-model-large-flash", selectable: true });
+    expect(readProvidersHubModels(ctx, "abliteration").find(row => row.displayModel === "abliterated-model-large-flash"))
+      .toMatchObject({ label: "Abliterated Large Flash", tags: "vision · thinking", current: false, isDefault: false });
+  });
   it("uses the discovered Venice trait default in the provider picker", () => {
     const { home, environment } = tempHome();
     const ctx = ctxFor({ home, environment });
