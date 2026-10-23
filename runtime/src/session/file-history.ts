@@ -42,7 +42,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { syncDirectory } from "../utils/durable-atomic-file.js";
 import { collectShellWorkspaceMutationTargets } from "../llm/shell-write-policy.js";
 import { monotonicMs } from "./_deps/utils.js";
@@ -299,7 +299,7 @@ export class FileHistory {
               (backup.backupFileName !== null &&
                (typeof backup.backupFileName !== "string" ||
                 resolve(backup.backupFileName) !== backup.backupFileName ||
-                !backup.backupFileName.startsWith(`${this.historyDir}/`)))) {
+                !backup.backupFileName.startsWith(`${this.historyDir}${sep}`)))) {
             throw new Error("Invalid file-history backup");
           }
           trackedFiles.add(filePath);

@@ -311,14 +311,16 @@ function compileWindowsProcessBroker(): void {
   const errors: string[] = [];
   for (const compiler of compilers) {
     const result = spawnSync(
-      compiler,
+      compiler.path,
       [
         '/nologo',
         '/target:exe',
         '/optimize+',
         '/checked+',
-        '/deterministic+',
-        `/pathmap:${runtimeRoot}=.`,
+        // The in-box .NET Framework 4.x compiler predates these Roslyn flags.
+        ...(compiler.supportsReproducibleBuild
+          ? ['/deterministic+', `/pathmap:${runtimeRoot}=.`]
+          : []),
         `/out:${windowsProcessBrokerDist}`,
         windowsProcessBrokerSource,
       ],
@@ -342,10 +344,10 @@ function compileWindowsProcessBroker(): void {
       return;
     }
     errors.push(
-      `${compiler}: ${
+      `${compiler.path}: ${
         result.error?.message ??
-        result.stderr?.trim() ??
-        `exit ${result.status ?? 'unknown'}`
+        ([result.stdout?.trim(), result.stderr?.trim()].filter(Boolean).join('\n') ||
+          `exit ${result.status ?? 'unknown'}`)
       }`,
     );
   }
@@ -354,8 +356,13 @@ function compileWindowsProcessBroker(): void {
   );
 }
 
-function windowsCSharpCompilerCandidates(): string[] {
-  const candidates: string[] = [];
+interface WindowsCSharpCompiler {
+  path: string;
+  supportsReproducibleBuild: boolean;
+}
+
+function windowsCSharpCompilerCandidates(): WindowsCSharpCompiler[] {
+  const candidates: WindowsCSharpCompiler[] = [];
   const programFilesX86 = process.env['ProgramFiles(x86)'];
   const programFiles = process.env.ProgramFiles;
   const visualStudioRoots = [programFilesX86, programFiles].filter(
@@ -390,7 +397,7 @@ function windowsCSharpCompilerCandidates(): string[] {
             candidate &&
             isTrustedWindowsBuildTool(candidate, visualStudioRoots)
           ) {
-            candidates.push(candidate);
+            candidates.push({ path: candidate, supportsReproducibleBuild: true });
           }
         }
       }
@@ -405,11 +412,11 @@ function windowsCSharpCompilerCandidates(): string[] {
     ]) {
       const candidate = resolve(systemRoot, relativePath);
       if (isTrustedWindowsBuildTool(candidate, [systemRoot])) {
-        candidates.push(candidate);
+        candidates.push({ path: candidate, supportsReproducibleBuild: false });
       }
     }
   }
-  return [...new Set(candidates)];
+  return [...new Map(candidates.map(candidate => [candidate.path, candidate])).values()];
 }
 
 function isTrustedWindowsBuildTool(
@@ -802,6 +809,7 @@ const agencKnownMissingOptionalExternal = {
 
 export const __agencBuildConfigTest = {
   agencOptionalExternal,
+  compileWindowsProcessBroker,
   entry,
   featureFlagLiteral,
   inlineCopiedTreeFeatureCalls,

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createWarmSessionSetupCeiling } from "./warm-session-setup-ceiling.js";
+import { itWhen } from "../helpers/platform-registration.js";
 
 // Reload the shared helper before installing filesystem fault injection.
 vi.hoisted(() => vi.resetModules());
@@ -47,7 +48,6 @@ describe("warm daemon session setup ceiling", () => {
       const journal = JSON.parse(readFileSync(join(dir, "fx-warm-request-one.jsonl"), "utf8"));
       expect(journal.body).toBe(body);
       expect(journal).not.toHaveProperty("headers");
-      expect(statSync(join(dir, "fx-warm-request-one.jsonl")).mode & 0o777).toBe(0o600);
       expect(init?.body).toBe(body);
       expect(setup).not.toHaveBeenCalled();
       return response;
@@ -57,7 +57,8 @@ describe("warm daemon session setup ceiling", () => {
     const pending = fetch("https://provider.invalid/v1/chat/completions", {
       method: "POST", body, headers: { authorization: "test-secret" },
     }).then((value) => { exposed = true; return value; });
-    await started;
+    // Surface a failed transport assertion instead of waiting for setup forever.
+    await Promise.race([started, pending]);
     expect(setup).toHaveBeenCalledOnce();
     expect(exposed).toBe(false);
     release();
@@ -66,6 +67,18 @@ describe("warm daemon session setup ceiling", () => {
       "https://provider.invalid", { method: "POST", body },
     )).resolves.toBeInstanceOf(Response);
     expect(setup).toHaveBeenCalledOnce();
+  });
+
+  // Windows stat modes do not represent POSIX owner/group permissions.
+  itWhen(process.platform !== "win32")("creates a private journal before dispatch", async () => {
+    const dir = home();
+    const ceiling = createWarmSessionSetupCeiling(dir, "private");
+    const transport = vi.fn<typeof fetch>(async () => {
+      expect(statSync(join(dir, "fx-warm-request-private.jsonl")).mode & 0o777).toBe(0o600);
+      return new Response("ok");
+    });
+    await ceiling.wrap(transport)("https://provider.invalid/chat", { method: "POST", body: "{}" });
+    expect(transport).toHaveBeenCalledOnce();
   });
 
   it("does not consume setup for GET or cross into another session", async () => {
