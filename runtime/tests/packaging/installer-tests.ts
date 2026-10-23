@@ -1,4 +1,5 @@
 import "../helpers/cron-os-home.js";
+import { darwinPlatformFixturePrelude } from "../helpers/darwin-platform-fixture.mjs";
 // End-to-end tests for scripts/install/install.sh (TODO task 1).
 //
 // The installer must speak the exact runtime-manager install contract
@@ -56,19 +57,22 @@ const NODE_ABI = process.versions.modules;
 // These fixtures advertise Linux/x64 independently of the host. Only their
 // -e identity probes emulate that target; file-based helpers retain the real OS
 // for filesystem locking and extraction.
-function fixtureNodeProbeLines(platform = "linux"): string[] {
+function fixtureNodeProbeLines(platform = "linux", preload = ""): string[] {
   return [
     'if [ "${1:-}" = "-e" ]; then',
     '  shift; fixture_script="$1"; shift',
-    `  exec ${JSON.stringify(process.execPath)} -e "Object.defineProperty(process, 'platform', { value: '${platform}' }); Object.defineProperty(process, 'arch', { value: 'x64' }); $fixture_script" "$@"`,
+    `  exec ${JSON.stringify(process.execPath)} ${preload ? `--require ${JSON.stringify(preload)} ` : ""}-e "Object.defineProperty(process, 'platform', { value: '${platform}' }); Object.defineProperty(process, 'arch', { value: 'x64' }); $fixture_script" "$@"`,
     "fi",
   ];
 }
 function fixtureNodeDirectory(home: string, platform = "linux"): string {
   const directory = join(home, "fixture-node");
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  writeFileSync(join(directory, "node"), ["#!/bin/sh", ...fixtureNodeProbeLines(platform),
-    `exec ${JSON.stringify(process.execPath)} "$@"`, ""].join("\n"), { mode: 0o755 });
+  const preload = join(directory, "darwin-fixture.cjs");
+  const macFixture = platform === "darwin" && process.platform !== "darwin";
+  if (macFixture) writeFileSync(preload, darwinPlatformFixturePrelude);
+  writeFileSync(join(directory, "node"), ["#!/bin/sh", ...fixtureNodeProbeLines(platform, macFixture ? preload : ""),
+    `exec ${JSON.stringify(process.execPath)} ${macFixture ? `--require ${JSON.stringify(preload)} ` : ""}"$@"`, ""].join("\n"), { mode: 0o755 });
   return directory;
 }
 
@@ -841,7 +845,7 @@ function startHttpsFixture(
   writeFileSync(config, JSON.stringify(routes));
   writeFileSync(server, `
 const https = require("node:https");
-const { readFileSync, writeFileSync } = require("node:fs");
+const { readFileSync, writeFileSync, renameSync } = require("node:fs");
 const [key, cert, config, ready] = process.argv.slice(2);
 const routes = JSON.parse(readFileSync(config, "utf8"));
 const sockets = new Set();
@@ -871,7 +875,10 @@ server.on("connection", (socket) => {
   sockets.add(socket);
   socket.on("close", () => sockets.delete(socket));
 });
-server.listen(0, "127.0.0.1", () => writeFileSync(ready, String(server.address().port)));
+server.listen(0, "127.0.0.1", () => {
+  writeFileSync(ready + ".tmp", String(server.address().port));
+  renameSync(ready + ".tmp", ready);
+});
 process.on("SIGTERM", () => {
   for (const socket of sockets) socket.destroy();
   server.close(() => process.exit(0));
@@ -905,7 +912,7 @@ function startConnectProxy(
   writeFileSync(server, `
 const http = require("node:http");
 const net = require("node:net");
-const { appendFileSync, writeFileSync } = require("node:fs");
+const { appendFileSync, writeFileSync, renameSync } = require("node:fs");
 const [ready, log] = process.argv.slice(2);
 const sockets = new Set();
 const proxy = http.createServer((_req, res) => { res.writeHead(405); res.end(); });
@@ -927,7 +934,10 @@ proxy.on("connect", (req, client, head) => {
   upstream.on("error", () => client.destroy());
   client.on("error", () => upstream.destroy());
 });
-proxy.listen(0, "127.0.0.1", () => writeFileSync(ready, String(proxy.address().port)));
+proxy.listen(0, "127.0.0.1", () => {
+  writeFileSync(ready + ".tmp", String(proxy.address().port));
+  renameSync(ready + ".tmp", ready);
+});
 process.on("SIGTERM", () => {
   for (const socket of sockets) socket.destroy();
   proxy.close(() => process.exit(0));
@@ -1255,13 +1265,14 @@ describe.skipIf(process.platform === "win32")("install.sh", () => {
     };
   }
 
-  test.skipIf(process.platform !== "darwin")("macOS installer writes a stable Node wrapper and launchd keeps its wrapper entrypoint", () => {
+  test("macOS installer writes a stable Node wrapper and launchd keeps its wrapper entrypoint", () => {
     const home = join(work, "home");
     const artifact = makeSyntheticArtifact(work, { platform: "darwin" });
     const manifest = writeManifest(work, artifact, { platform: "darwin", minimumMacosVersion: "13.5" });
     const stubs = join(work, "stubs");
     mkdirSync(stubs);
     writeFileSync(join(stubs, "launchctl"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    writeFileSync(join(stubs, "sw_vers"), "#!/bin/sh\nprintf '26.6.2\\n'\n", { mode: 0o755 });
     const result = runInstaller({ home, manifest, pathPrepend: [stubs], envOverrides: { AGENC_INSTALL_PLATFORM: "darwin" } });
     expect(result.status, result.stderr).toBe(0);
     const wrapper = join(home, ".local/bin/agenc");

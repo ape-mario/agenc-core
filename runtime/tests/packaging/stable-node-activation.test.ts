@@ -1,12 +1,15 @@
 import "../helpers/cron-os-home.js";
 import { createHash } from "node:crypto";
+import childProcess from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { activateGeneratedWrappers, parseGeneratedWrapper, renderGeneratedWrapper } from "../../src/bin/update-cli.js";
+import { darwinPlatformFixturePrelude, installDarwinPlatformFixture } from "../helpers/darwin-platform-fixture.mjs";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -34,7 +37,12 @@ function runtime(home: string, version: string) {
   return { nodeBin, runtimeBin, targetVersion: version };
 }
 
-describe.skipIf(process.platform !== "darwin")("stable macOS activation", () => {
+describe.skipIf(process.platform === "win32")("stable macOS activation", () => {
+  let restorePlatform: () => void;
+  // The filesystem contract is POSIX. Exercise the macOS activation branch
+  // on Linux as well; native macOS runs use these same assertions.
+  beforeEach(() => { restorePlatform = installDarwinPlatformFixture(childProcess, syncBuiltinESMExports); });
+  afterEach(() => { restorePlatform(); });
   test("updater migrates both wrappers, retains newer on unpinned activation, and supports pin rollback", async () => {
     const home = fixture(), old = runtime(home, "0.19.14"), next = runtime(home, "0.19.15");
     const paths = [join(home, "agenc-a"), join(home, "agenc-b")];
@@ -59,7 +67,8 @@ describe.skipIf(process.platform !== "darwin")("stable macOS activation", () => 
     writeFileSync(desired, renderGeneratedWrapper({ kind: "posix", agencHome: home, ...next }));
     const helper = join(home, "installer.cjs");
     const source = readFileSync(resolve("../scripts/install/runtime-installer.cjs"), "utf8");
-    writeFileSync(helper, `const os = require("node:os"); const userInfo = os.userInfo;
+    writeFileSync(helper, `${darwinPlatformFixturePrelude}
+const os = require("node:os"); const userInfo = os.userInfo;
 os.userInfo = () => ({ ...userInfo(), homedir: ${JSON.stringify(process.env.AGENC_TEST_HERMETIC_HOME)} });
 require("node:module").syncBuiltinESMExports();\n` + source);
     const child = spawn(process.execPath, [helper, "activate", desired, wrapper, home, next.targetVersion, "false"], {
