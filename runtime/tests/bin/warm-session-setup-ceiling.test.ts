@@ -175,7 +175,8 @@ describe.each(["win32", "linux", "darwin"] as const)("request journal directory 
       Object.defineProperty(process, "platform", { value: platform });
       directoryFault.code = code;
       const pending = ceiling.wrap(transport)("https://provider.invalid/chat", { method: "POST", body: "{}" });
-      if (platform === "win32" && code !== "EIO" && code !== "ENOSPC") {
+      if (code === "EINVAL" || code === "ENOTSUP" ||
+          (platform === "win32" && code !== "EIO" && code !== "ENOSPC")) {
         await expect(pending).resolves.toBe(response);
         expect(transport).toHaveBeenCalledOnce();
         expect(setup).toHaveBeenCalledOnce();

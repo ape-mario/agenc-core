@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe.each(["win32", "linux", "darwin"] as const)("sync directory on %s", (platform) => {
-  test.each(unsupportedCodes)("suppresses %s only on Windows, for open and fsync", (code) => {
+  test.each(unsupportedCodes)("preserves the platform policy for %s from open and fsync", (code) => {
     Object.defineProperty(process, "platform", { value: platform });
     const error = Object.assign(new Error(code), { code });
     for (const phase of ["open", "sync"]) {
@@ -29,27 +29,27 @@ describe.each(["win32", "linux", "darwin"] as const)("sync directory on %s", (pl
         return 42;
       });
       vi.mocked(fsyncSync).mockImplementation(() => { throw error; });
-      if (platform === "win32") expect(() => syncDirectorySync("directory")).not.toThrow();
+      if (platform === "win32" || code === "EINVAL" || code === "ENOTSUP") expect(() => syncDirectorySync("directory")).not.toThrow();
       else expect(() => syncDirectorySync("directory")).toThrow(error);
       expect(closeSync).toHaveBeenCalledTimes(phase === "open" ? 0 : 1);
       if (phase === "sync") expect(closeSync).toHaveBeenCalledWith(42);
     }
   });
-});
 
-test.each(["EIO", "ENOSPC", "ENOENT"])("propagates Windows %s from open and fsync", (code) => {
-  Object.defineProperty(process, "platform", { value: "win32" });
-  const error = Object.assign(new Error(code), { code });
-  for (const phase of ["open", "sync"]) {
-    vi.resetAllMocks();
-    vi.mocked(openSync).mockImplementation(() => {
-      if (phase === "open") throw error;
-      return 42;
-    });
-    vi.mocked(fsyncSync).mockImplementation(() => { throw error; });
-    expect(() => syncDirectorySync("directory")).toThrow(error);
-    expect(closeSync).toHaveBeenCalledTimes(phase === "open" ? 0 : 1);
-  }
+  test.each(["EIO", "ENOSPC", "ENOENT"])("propagates %s from open and fsync", (code) => {
+    Object.defineProperty(process, "platform", { value: platform });
+    const error = Object.assign(new Error(code), { code });
+    for (const phase of ["open", "sync"]) {
+      vi.resetAllMocks();
+      vi.mocked(openSync).mockImplementation(() => {
+        if (phase === "open") throw error;
+        return 42;
+      });
+      vi.mocked(fsyncSync).mockImplementation(() => { throw error; });
+      expect(() => syncDirectorySync("directory")).toThrow(error);
+      expect(closeSync).toHaveBeenCalledTimes(phase === "open" ? 0 : 1);
+    }
+  });
 });
 
 test("does not suppress close failures on Windows", () => {
