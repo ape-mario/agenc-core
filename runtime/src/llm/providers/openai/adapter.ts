@@ -2513,8 +2513,7 @@ export class OpenAIProvider implements LLMProvider {
         !requiresStrictChatCompletionsSse(this.name) &&
         streamCapabilityHints.acceptsCleanEofAsTerminal !== true &&
         !sawFinishReason &&
-        !sawDone &&
-        !unterminatedFragmentNamesToolCalls;
+        !sawDone;
       if (missingStrictTerminal || missingCompatibleTerminal) {
         // EOF before either terminal signal is a cut stream, including
         // buffered tool fragments. Chat-completions calls are not published

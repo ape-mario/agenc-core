@@ -1,7 +1,8 @@
 /**
  * abliteration.ai catalog. Limits, modalities and prices come from
  * docs.abliteration.ai (models, pricing and thinking pages) and match the
- * authenticated `GET /v1/models` list, both read on 2026-10-22.
+ * authenticated `GET /v1/models` list. Large Flash was checked on 2026-10-23;
+ * the other rows were checked on 2026-10-22.
  * https://docs.abliteration.ai/models
  * https://docs.abliteration.ai/pricing
  * https://docs.abliteration.ai/capabilities/thinking
@@ -67,6 +68,8 @@ function rates(input: number, cachedInput: number, output: number): ModelCostEnt
  *   docs/reference/providers.md).
  * - abliterated-model-large: two modes. minimal through high run high; xhigh
  *   and max run max. The provider's default is high.
+ * - abliterated-model-large-flash: none turns reasoning off; low, high and
+ *   max are distinct modes. The provider's default is high.
  */
 export const ABLITERATION_MODELS: readonly AbliterationModel[] = Object.freeze([
   Object.freeze({
@@ -100,6 +103,17 @@ export const ABLITERATION_MODELS: readonly AbliterationModel[] = Object.freeze([
     reasoningLevels: Object.freeze(["high", "max"] as const),
     defaultReasoningLevel: "high",
     cost: rates(3, 0.3, 5),
+  }),
+  Object.freeze({
+    model: "abliterated-model-large-flash",
+    displayName: "Abliterated Large Flash",
+    contextWindow: 1_048_576,
+    maxOutputTokens: 262_144,
+    vision: true,
+    thinking: true,
+    reasoningLevels: Object.freeze(["none", "low", "high", "max"] as const),
+    defaultReasoningLevel: "high",
+    cost: rates(1, 0.1, 2),
   }),
 ]);
 

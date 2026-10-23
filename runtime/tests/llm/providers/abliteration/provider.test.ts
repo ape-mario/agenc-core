@@ -1,6 +1,7 @@
 /**
  * abliteration.ai as a built-in provider. The `/v1/models` fixture holds the
- * three rows of the authenticated live list (2026-10-22), whose limits and
+ * three rows of the authenticated live list (2026-10-22) and the Large Flash
+ * metadata read on 2026-10-23, whose limits and
  * prices match docs.abliteration.ai, and four `fixture-*` rows shaped by the
  * OpenAPI schema (`PublicModelListResponse`): a locked model, a model that is
  * not ready, a model without tools, and a model the bundled catalog does not
@@ -29,6 +30,7 @@ import { resolveProviderCapabilityEntry } from "../../../../src/llm/capabilities
 import { resolveReasoningEffort } from "../../../../src/llm/reasoning-effort.js";
 import { chatCompletionsCapabilityHintsForProvider } from "../../../../src/llm/wire/capability-gating.js";
 import { ModelMetadataResolver } from "../../../../src/llm/model-metadata.js";
+import { resolveZeroDataRetentionStatus } from "../../../../src/llm/zero-data-retention.js";
 import { EndpointMetadataCache } from "../../../../src/llm/endpoint-metadata-cache.js";
 import { collectProviderAvailability } from "../../../../src/llm/discovery/provider-discovery.js";
 import { modelOffersEffortOffForContext } from "../../../../src/utils/effort.js";
@@ -57,6 +59,7 @@ const key = "ak_fixture_only_credential";
 const V2 = "abliterated-model-large-v2";
 const BASE = "abliterated-model";
 const LARGE = "abliterated-model-large";
+const FLASH = "abliterated-model-large-flash";
 const IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const tool: LLMTool = {
   type: "function",
@@ -161,15 +164,17 @@ describe("abliteration.ai built-in provider", () => {
     expect(JSON.stringify(redactDurableSecrets({ envOverrides: { ABLIT_KEY: key } }, "rollout"))).not.toContain(key);
   });
 
-  test("bundles the three documented models with their limits, modalities and prices", async () => {
+  test("bundles the documented models with their limits, modalities and prices", async () => {
     expect(ABLITERATION_MODELS.map(model => [model.model, model.displayName])).toEqual([
       [V2, "Abliterated Large v2"], [BASE, "Abliterated Model"], [LARGE, "Abliterated Large"],
+      [FLASH, "Abliterated Large Flash"],
     ]);
-    expect(BUILT_IN_PROVIDER_MODEL_CATALOG.abliteration).toEqual([V2, BASE, LARGE]);
+    expect(BUILT_IN_PROVIDER_MODEL_CATALOG.abliteration).toEqual([V2, BASE, LARGE, FLASH]);
     const expected = {
       [BASE]: { context: 262_144, output: 262_134, image: true, prices: [1, 0.1, 3] },
       [V2]: { context: 1_000_000, output: 999_990, image: false, prices: [3, 0.3, 5] },
       [LARGE]: { context: 1_000_000, output: 999_990, image: false, prices: [3, 0.3, 5] },
+      [FLASH]: { context: 1_048_576, output: 262_144, image: true, prices: [1, 0.1, 2] },
     } as const;
     for (const [model, facts] of Object.entries(expected)) {
       const entry = resolveRegisteredModelCatalogEntry({ provider: "abliteration", model });
@@ -202,6 +207,16 @@ describe("abliteration.ai built-in provider", () => {
     expect(await new ModelMetadataResolver({ env: {} }).resolve({ provider: "abliteration", model: BASE, config: {} })).toMatchObject({
       contextWindow: 262_144, maxOutputTokens: 65_536, maxOutputTokensUpperLimit: 262_134, usedFallbackModelMetadata: false,
     });
+    expect(await new ModelMetadataResolver({ env: {} }).resolve({ provider: "abliteration", model: FLASH, config: {} })).toMatchObject({
+      contextWindow: 1_048_576, maxOutputTokens: 64_000, maxOutputTokensUpperLimit: 262_144, usedFallbackModelMetadata: false,
+    });
+  });
+
+  test("Large Flash inherits abliteration's retention policy, including endpoint overrides", () => {
+    const status = (model: string, env = {}) => resolveZeroDataRetentionStatus({ provider, model, env, config: {} });
+    expect(status(FLASH)).toEqual(status(V2));
+    expect(status(FLASH)).toMatchObject({ state: "zdr" });
+    expect(status(FLASH, { ABLITERATION_BASE_URL: "https://proxy.example/v1" })).toMatchObject({ state: "unknown" });
   });
 
   test("offers each model's own reasoning modes and sends only those", () => {
@@ -210,15 +225,17 @@ describe("abliteration.ai built-in provider", () => {
     expect(contract(BASE).defaultLevel).toBeUndefined();
     expect(contract(V2)).toMatchObject({ registered: true, levels: ["low", "high", "max"], defaultLevel: "high" });
     expect(contract(LARGE)).toMatchObject({ registered: true, levels: ["high", "max"], defaultLevel: "high" });
-    for (const model of [BASE, V2, LARGE]) {
+    expect(contract(FLASH)).toMatchObject({ registered: true, levels: ["none", "low", "high", "max"], defaultLevel: "high" });
+    for (const model of [BASE, V2, LARGE, FLASH]) {
       const hints = chatCompletionsCapabilityHintsForProvider("abliteration", model);
       expect(hints.acceptsReasoningEffort).toBe(true);
       expect(hints.reasoningEffortAllowedValues).toEqual(new Set(contract(model).levels));
     }
   });
 
-  test("gates image input to abliterated-model", async () => {
+  test("gates image input to the base model and Large Flash", async () => {
     expect(resolveProviderCapabilityEntry({ provider: "abliteration", model: BASE })).toMatchObject({ supportsImageInput: true, acceptsImageHistory: true });
+    expect(resolveProviderCapabilityEntry({ provider: "abliteration", model: FLASH })).toMatchObject({ supportsImageInput: true, acceptsImageHistory: true });
     for (const model of [V2, LARGE]) {
       expect(resolveProviderCapabilityEntry({ provider: "abliteration", model })).toMatchObject({ supportsImageInput: false, acceptsImageHistory: false });
     }
@@ -227,18 +244,20 @@ describe("abliteration.ai built-in provider", () => {
     await expect(createProvider(provider, { apiKey: key, model: V2, extra: { fetchImpl: text.fetchImpl, maxRetries: 0 } })
       .chat([message])).rejects.toThrow("does not support image input");
     expect(text.chat).not.toHaveBeenCalled();
-    const vision = chatFetch(reply());
-    await createProvider(provider, { apiKey: key, model: BASE, extra: { fetchImpl: vision.fetchImpl, maxRetries: 0 } }).chat([message]);
-    expect(JSON.stringify(vision.body().messages)).toContain(IMAGE);
+    for (const model of [BASE, FLASH]) {
+      const vision = chatFetch(reply());
+      await createProvider(provider, { apiKey: key, model, extra: { fetchImpl: vision.fetchImpl, maxRetries: 0 } }).chat([message]);
+      expect(JSON.stringify(vision.body().messages)).toContain(IMAGE);
+    }
   });
 
-  test("sends the documented request shape: no empty tools, a session cache key and streamed usage", async () => {
+  test.each([V2, FLASH])("%s sends abliteration's request shape and streamed usage", async model => {
     const http = chatFetch(reply(), sse([
       { choices: [{ index: 0, delta: { content: "ok" } }] },
       { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
       { choices: [], usage: { prompt_tokens: 12, completion_tokens: 1, total_tokens: 13, prompt_tokens_details: { cached_tokens: 8 } } },
     ]));
-    const client = createProvider(provider, { apiKey: key, model: V2, extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } });
+    const client = createProvider(provider, { apiKey: key, model, extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } });
     expect(readProviderIdentity(client)).toBe("abliteration");
     await client.chat([{ role: "user", content: "hi" }], {
       tools: [], toolChoice: "auto", parallelToolCalls: true, promptCacheKey: "session-7d2a9f", reasoningEffort: "high",
@@ -246,7 +265,10 @@ describe("abliteration.ai built-in provider", () => {
     expect(String(http.chat.mock.calls[0]?.[0])).toBe("https://api.abliteration.ai/v1/chat/completions");
     expect(new Headers(http.chat.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${key}`);
     const plain = http.body(0);
-    expect(plain).toMatchObject({ model: V2, prompt_cache_key: "session-7d2a9f", reasoning_effort: "high" });
+    expect(plain).toMatchObject({ model, prompt_cache_key: "session-7d2a9f", reasoning_effort: "high" });
+    expect(plain).not.toHaveProperty("thinking");
+    expect(chatCompletionsCapabilityHintsForProvider(provider, model).sharesPromptPrefixAcrossSessions).not.toBe(true);
+    expect(chatCompletionsCapabilityHintsForProvider(provider, model).promptCacheKeyScope).not.toBe("prefix");
     // Chat Completions rejects an empty tools array and a tool choice without tools.
     expect(plain).not.toHaveProperty("tools");
     expect(plain).not.toHaveProperty("tool_choice");
@@ -259,14 +281,14 @@ describe("abliteration.ai built-in provider", () => {
     expect(streamed.usage).toMatchObject({ promptTokens: 12, cachedInputTokens: 8 });
   });
 
-  test("repeats the session's cache key in x-abliteration-session-id, the routing hint the provider reads", async () => {
+  test.each([V2, FLASH])("%s repeats the session cache key in the provider's routing header", async model => {
     const http = chatFetch(reply(), sse([
       { choices: [{ index: 0, delta: { content: "ok" } }] },
       { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
       { choices: [], usage: { prompt_tokens: 12, completion_tokens: 1, total_tokens: 13 } },
     ]), reply(), reply(), reply());
     const header = (index: number) => new Headers(http.chat.mock.calls[index]?.[1]?.headers);
-    const client = createProvider(provider, { apiKey: key, model: V2, extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } });
+    const client = createProvider(provider, { apiKey: key, model, extra: { fetchImpl: http.fetchImpl, maxRetries: 0 } });
     await client.chat([{ role: "user", content: "hi" }], { promptCacheKey: "conv-7d2a9f" });
     expect(header(0).get("x-abliteration-session-id")).toBe("conv-7d2a9f");
     expect(http.body(0).prompt_cache_key).toBe("conv-7d2a9f");
@@ -340,12 +362,13 @@ describe("abliteration.ai built-in provider", () => {
     expect(computeUsdCostWithResolution(usage(V2, 1_000_000, 400_000, 100_000), DEFAULT_MODEL_COSTS).costUsd).toBeCloseTo(2.42, 10);
     // 500k fresh at $1, 500k cached at $0.10 and 1M out at $3 per million.
     expect(computeUsdCostWithResolution(usage(BASE, 1_000_000, 500_000, 1_000_000), DEFAULT_MODEL_COSTS).costUsd).toBeCloseTo(3.55, 10);
+    expect(computeUsdCostWithResolution(usage(FLASH, 1_000_000, 500_000, 100_000), DEFAULT_MODEL_COSTS).costUsd).toBeCloseTo(0.75, 10);
   });
 
   test("reads the live model list: available, ready models with their limits, modalities and prices", async () => {
     const models = parseAbliterationModels(fixture);
     // Locked, not-ready and tool-less models are left out; the default model leads.
-    expect(models.map(model => model.model)).toEqual([V2, BASE, LARGE, "fixture-new-model"]);
+    expect(models.map(model => model.model)).toEqual([V2, BASE, LARGE, FLASH, "fixture-new-model"]);
     expect(models.find(model => model.model === "fixture-new-model")).toMatchObject({
       displayName: "Fixture New Model", contextWindow: 524_288, maxOutputTokens: 524_278, vision: true, thinking: true,
       // Effort levels are not published; an unknown model is sent none.
@@ -364,7 +387,7 @@ describe("abliteration.ai built-in provider", () => {
     expect(await new ModelMetadataResolver({ fetchImpl, env: {} }).discoverAbliterationModels({})).toBeUndefined();
     expect(fetchImpl).not.toHaveBeenCalled();
     const discovered = await new ModelMetadataResolver({ fetchImpl, env: { ABLIT_KEY: key } }).discoverAbliterationModels({});
-    expect(discovered?.map(model => model.model)).toEqual([V2, BASE, LARGE, "fixture-new-model"]);
+    expect(discovered?.map(model => model.model)).toEqual([V2, BASE, LARGE, FLASH, "fixture-new-model"]);
     expect(String(fetchImpl.mock.calls[0]?.[0])).toBe("https://api.abliteration.ai/v1/models");
     expect(new Headers(fetchImpl.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${key}`);
     // The published rows and prices now answer for the live-only model.
@@ -380,7 +403,7 @@ describe("abliteration.ai built-in provider", () => {
     const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => json(fixture));
     const saved = vi.fn((name: string) => name === "abliteration" ? "ak_saved_fixture" : undefined);
     const models = await new ModelMetadataResolver({ fetchImpl, env: {}, readSavedApiKey: saved }).discoverAbliterationModels({});
-    expect(models?.map(model => model.model)).toEqual([V2, BASE, LARGE, "fixture-new-model"]);
+    expect(models?.map(model => model.model)).toEqual([V2, BASE, LARGE, FLASH, "fixture-new-model"]);
     expect(saved).toHaveBeenCalledWith("abliteration");
     expect(new Headers(fetchImpl.mock.calls[0]?.[1]?.headers).get("authorization")).toBe("Bearer ak_saved_fixture");
     // A variable wins over the saved key.
@@ -401,8 +424,9 @@ describe("abliteration.ai built-in provider", () => {
     expect(JSON.stringify(present)).not.toContain(key);
   });
 
-  test("offers /effort off on abliterated-model only", () => {
+  test("offers /effort off on the base model and Large Flash", () => {
     expect(modelOffersEffortOffForContext(BASE, { provider: "abliteration" } as never)).toBe(true);
+    expect(modelOffersEffortOffForContext(FLASH, { provider: "abliteration" } as never)).toBe(true);
     expect(modelOffersEffortOffForContext(V2, { provider: "abliteration" } as never)).toBe(false);
     expect(modelOffersEffortOffForContext(LARGE, { provider: "abliteration" } as never)).toBe(false);
   });

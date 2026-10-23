@@ -15,7 +15,7 @@ import {
   shellBypassesApprovalsAndSandbox,
   shellWorkspaceMutationPermission,
 } from "./shell-mutation-permission.js";
-import { preflightShellWorkspaceWritePolicy } from "./shell-preflight.js";
+import { preflightSelfTermination, preflightShellWorkspaceWritePolicy } from "./shell-preflight.js";
 import { recordSessionRead, resolveSessionId } from "./filesystem.js";
 import { isCompletePrintedOutput, rememberPrintedOutput, stableWorkspaceText } from "./printed-read-proof.js";
 import type { BashToolConfig } from "./types.js";
@@ -1066,7 +1066,7 @@ export function createExecCommandTool(config?: ExecCommandToolConfig): Tool {
     },
     async execute(rawArgs: Record<string, unknown>): Promise<ToolResult> {
       const args = rawArgs as Record<string, unknown> & ToolExecutionInjectedArgs;
-      const failure = validateExecCommandInput(args, config);
+      const failure = validateExecCommandInput(args, config) ?? preflightSelfTermination(args);
       if (failure !== null) {
         return {
           content: safeStringify({ error: failure.message }),

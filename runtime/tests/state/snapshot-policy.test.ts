@@ -738,7 +738,7 @@ describe("AgenCSessionSnapshotPolicy", () => {
     );
   });
 
-  // The daemon's hydrateStartupRecovery makes these calls per recovered run:
+  // The daemon's hydrateStartupRun makes these calls per recovered run:
   // trackSession, hydrateSession, and flushSession when startup recovery
   // reconciled stale tool calls for the session (here one poisoned call).
   // The flush writes the reconciled state at once, before the daemon

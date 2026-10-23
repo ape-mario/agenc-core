@@ -11584,7 +11584,11 @@ describe("AgenC delegate background-agent runner", () => {
     { name: "continued and open", finalEvent: undefined, state: "incomplete", terminal: undefined },
     { name: "continued and completed", finalEvent: { type: "turn_complete", payload: { turnId: "continued-turn", lastAgentMessage: "final answer" } }, state: "completed", terminal: { code: 0, message: "final answer" } },
     { name: "continued and interrupted", finalEvent: { type: "turn_aborted", payload: { turnId: "continued-turn", reason: "interrupted" } }, state: "completed", terminal: { code: 130, message: "interrupted" } },
-    { name: "continued and failed", finalEvent: { type: "turn_failed", payload: { turnId: "continued-turn", code: "provider_error", message: "provider failed" } }, state: "completed", terminal: { code: 1, message: "provider failed" } },
+    { name: "continued and failed", finalEvent: { type: "turn_failed", payload: { turnId: "continued-turn", code: "provider_error", message: "provider failed" } }, state: "completed", terminal: { code: 1, failureCode: "provider_error", message: "provider failed" } },
+    { name: "transport failed", finalEvent: { type: "turn_failed", payload: { turnId: "continued-turn", code: "transport_error", message: "stream ended", durationMs: 125,
+      remainingDeadlineMs: 500, usableFinalAnswer: false, transportFailure: { category: "stream_truncated" } } }, state: "completed",
+      terminal: { code: 1, failureCode: "transport_error", message: "stream ended", durationMs: 125, remainingDeadlineMs: 500, usableFinalAnswer: false,
+        transportFailure: { category: "stream_truncated" } } },
     { name: "shutdown without continuation", finalEvent: null, state: "completed", terminal: { code: 130, message: "daemon_shutdown" } },
   ] as const)("[managed-thread] reconstructs a $name retry from the full journal", async ({ name, finalEvent, state, terminal }) => {
     const event = (sequence: number, msg: JsonObject) => ({

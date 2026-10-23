@@ -1,3 +1,4 @@
+import type { TransportFailure } from "../../contracts/turn-terminal.js";
 /**
  * AgenC daemon JSON-RPC envelope, method registry, and public wire types.
  *
@@ -4241,6 +4242,11 @@ export interface MessageSendResult extends JsonObject {
 export interface MessageSendTerminalResult extends JsonObject {
   readonly code: 0 | 1 | 130;
   readonly message?: string;
+  readonly failureCode?: string;
+  readonly durationMs?: number;
+  readonly remainingDeadlineMs?: number;
+  readonly usableFinalAnswer?: boolean;
+  readonly transportFailure?: TransportFailure;
 }
 
 export interface MessageStreamResult extends MessageSendResult {

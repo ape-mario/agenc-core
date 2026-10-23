@@ -2742,9 +2742,20 @@ export interface PluginSettingsResult extends JsonObject {
     readonly needsSetup: readonly string[];
 }
 
+/** Content-free facts that survive phase wrappers and can be persisted safely. */
+export type TransportFailure = {
+    readonly category: "stream_truncated" | "http_5xx" | "connection_lost" | "timeout";
+    readonly status?: number;
+};
+
 export interface MessageSendTerminalResult extends JsonObject {
     readonly code: 0 | 1 | 130;
     readonly message?: string;
+    readonly failureCode?: string;
+    readonly durationMs?: number;
+    readonly remainingDeadlineMs?: number;
+    readonly usableFinalAnswer?: boolean;
+    readonly transportFailure?: TransportFailure;
 }
 
 export interface MessageSendResult extends JsonObject {

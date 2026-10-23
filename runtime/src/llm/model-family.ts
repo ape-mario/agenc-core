@@ -6,7 +6,8 @@
  * layout and per-call output default. That tuning is keyed on the native
  * provider (`deepseek`, `openai`), so the same model reached through a gateway
  * that serves it under its own id (OpenRouter, Ollama Cloud, Venice) used to
- * miss it. This module maps those gateway ids back to the family.
+ * miss it. This module maps those gateway ids and known abliteration builds
+ * back to the family.
  *
  * The managed AgenC route and custom OpenAI-compatible endpoints are not
  * gateways here: the managed route carries its own reviewed contract and a
@@ -19,11 +20,12 @@ import { normalizeProviderMetadataIdentity } from "../provider-identity.js";
 
 export type ModelFamily = "deepseek" | "openai" | "kimi";
 
-/** Gateways that serve other vendors' models under ids that name the model. */
+/** Gateways with model ids whose underlying family is known. */
 export const MODEL_FAMILY_GATEWAYS: ReadonlySet<string> = new Set([
   "openrouter",
   "ollama-cloud",
   "venice",
+  "abliteration",
 ]);
 
 // GPT-5 and later, the o-series and Codex: the hosted reasoning models whose
@@ -45,6 +47,11 @@ export function gatewayModelFamily(
 ): ModelFamily | undefined {
   const slug = normalizeProviderMetadataIdentity(provider);
   if (slug === undefined || !MODEL_FAMILY_GATEWAYS.has(slug) || model === undefined) return undefined;
+  if (slug === "abliteration") {
+    // This exact build is based on DeepSeek-V4.1-Flash-1017. Other
+    // abliteration ids do not establish a model family.
+    return model.trim().toLowerCase() === "abliterated-model-large-flash" ? "deepseek" : undefined;
+  }
   const id = modelSlug(model);
   if (id.length === 0) return undefined;
   if (slug === "openrouter") {

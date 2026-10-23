@@ -1,6 +1,6 @@
 # Daemon reference
 
-The local **app-server** control plane for AgenC **0.19.16**. One daemon per
+The local **app-server** control plane for AgenC **0.19.17**. One daemon per
 `AGENC_HOME`. Clients (TUI, print CLI, gateway, remote, SDK, background
 agents) attach over a local socket and speak JSON-RPC.
 
@@ -1202,10 +1202,14 @@ current Ledger action is documented in
 
 ## Startup and restored sessions
 
-The daemon recovers its state databases and its execution admission state
-before it listens. It then listens, publishes its identity record, and
-restores the sessions that were open at its last shutdown in the background,
-four at a time. A client can connect as soon as the identity record appears.
+The daemon validates canonical journals, repairs cancellations, classifies
+stale tools, and recovers execution admission state before it listens.
+It then listens, publishes its identity record, and loads snapshot payloads
+inside each session's restore gate. It restores the sessions that were open
+at its last shutdown in the background,
+four at a time, yielding to socket I/O between batches. A client can connect
+as soon as the identity record appears. Startup never runs a full database
+VACUUM; existing incremental reclamation remains bounded.
 
 A request that names a session still restoring waits until that restore
 settles, then runs as it would have once startup had finished. The daemon
@@ -1219,6 +1223,22 @@ session comes back with a live runtime, the create fails with the error data
 code `CANONICAL_SESSION_ALREADY_ACTIVE`, and the client attaches to the
 restored agent instead. `agenc --continue` and `agenc --resume`, headless or
 in the TUI, do this, so they work right after a daemon restart.
+
+While waiting for readiness, the CLI shows `Starting AgenC...` after one
+second. A TUI or print request waiting for a specific restored session shows
+`Reopening 193 sessions...` with the current backlog. That wait has a
+120-second deadline and sends `request.cancel` on timeout. The subsequent
+agent turn keeps its normal execution and cancellation rules. New sessions
+do not wait for the backlog. Progress is written to stderr, preserving print
+mode's stdout, and uses an optional `event.startup_restore` notification with
+`requestId` and `remaining` (zero ends that request's restore wait).
+
+`metadata.recovery.snapshot` contains the snapshot location, timestamp, and
+tool recovery notices. Full conversation, tool state, and MCP state stay in
+the snapshot database and the restored runtime. They are not duplicated in
+list responses or the daemon shutdown summary. Durable tool classifications
+survive a crash before deferred hydration; hydration reapplies and flushes
+them before the session can replay tools or be published.
 
 These answer at once: `health.*`, `daemon.*`, `request.cancel`,
 `session.list`, `agent.list`, and every request that names no session still

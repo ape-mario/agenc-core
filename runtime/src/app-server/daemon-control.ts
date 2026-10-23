@@ -1,4 +1,7 @@
 import { resolveHomeContext } from "../config/home.js";
+import { daemonMemoryEvidence, type DaemonMemoryEvidence } from "./daemon-memory-evidence.js";
+import { redactSecrets } from "../secrets/sanitizer.js";
+import { writeDurableAtomicFileSync } from "../utils/durable-atomic-file.js";
 import { installAgencDaemonWinSWService } from "../packaging/windows-winsw-service.js";
 import { readAgenCDaemonPid } from "./daemon-discovery.js";
 export { readAgenCDaemonPid, AGENC_DAEMON_PID_MAX_BYTES } from "./daemon-discovery.js";
@@ -925,20 +928,25 @@ export function installAgenCDaemonExitDiagnostics(options: {
   readonly proc?: DaemonExitDiagnosticsProcess;
   readonly now?: () => string;
   readonly exit?: (code: number) => void;
+  readonly memoryEvidence?: () => DaemonMemoryEvidence;
 }): () => void {
   const proc = options.proc ?? (process as DaemonExitDiagnosticsProcess);
   const now = options.now ?? (() => new Date().toISOString());
   const exit = options.exit ?? ((code: number) => process.exit(code));
   const line = (text: string): void => {
     try {
-      options.sink.write(`agenc: daemon ${text} (pid ${proc.pid}) at ${now()}\n`);
+      options.sink.write(`agenc: daemon ${redactSecrets(text)} (pid ${proc.pid}) at ${now()}\n`);
     } catch {
       /* the sink may already be closed; the exit must not fail on its own log */
     }
   };
   const describe = (thrown: unknown): string =>
     thrown instanceof Error ? (thrown.stack ?? thrown.message) : String(thrown);
-  const onExit = (code: number): void => line(`process exit code=${code}`);
+  const evidence = (code: number | null, signal: NodeJS.Signals | null): void => {
+    try { options.sink.write(JSON.stringify({ type: "daemon_exit", pid: proc.pid, at: now(), code, signal,
+      memory: (options.memoryEvidence ?? daemonMemoryEvidence)() }) + "\n"); } catch { /* best effort at exit */ }
+  };
+  const onExit = (code: number): void => { evidence(code, null); line(`process exit code=${code}`); };
   const onUncaught = (error: unknown): void => {
     line(`uncaught exception: ${describe(error)}`);
     exit(1);
@@ -954,6 +962,7 @@ export function installAgenCDaemonExitDiagnostics(options: {
   };
   for (const signal of DAEMON_EXIT_SIGNALS) {
     const handler = (): void => {
+      evidence(null, signal);
       line(`received ${signal}`);
       // Re-raise with our handlers gone so the default termination, and the
       // exit code that goes with it, stands.
@@ -3359,6 +3368,15 @@ export function createNodeDaemonCliHost(
         throw new Error("AgenC daemon child process did not expose a pid");
       }
       const childPid = child.pid;
+      // A parent that is still alive can observe even SIGKILL. No exit status
+      // is inferred from a disappeared PID when this observer is unavailable.
+      child.once("exit", (code, signal) => {
+        try {
+          const path = join(daemonHome, "daemon-exit.json");
+          writeDurableAtomicFileSync(path, `${path}.${childPid}.${randomUUID()}.tmp`,
+            JSON.stringify({ pid: childPid, at: new Date().toISOString(), code, signal }) + "\n");
+        } catch { /* retain the existing log and heartbeat if writing fails */ }
+      });
       const controller = createAgenCDaemonStartupGuardController(
         startupGuardToken,
         createChildProcessStartupGuardChannel(child),

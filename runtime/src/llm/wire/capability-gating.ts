@@ -606,7 +606,7 @@ export function chatCompletionsCapabilityHintsForProvider(
       ...(gatewayFamily === "openai" ? { replaysReasoningDetails: true } : {}),
     } : {}),
     ...(slug === "abliteration" ? {
-      // Only abliterated-model takes images; the large models answer 400.
+      // Image input follows the model catalog, including Large Flash.
       acceptsDirectImageInput: acceptsToolResultImages,
       toolResultImagePolicy: acceptsToolResultImages ? "relay_as_user" as const : "strip" as const,
       // Chat Completions rejects an empty `tools` array and a tool choice

@@ -8,6 +8,9 @@ import { computeUsdCostWithResolution, DEFAULT_MODEL_COSTS } from "../../src/ses
 // offers needs a published rate or a known zero (local, free or included in a
 // plan). OpenRouter is exempt: each response reports what the call cost.
 const UNPRICED: ReadonlyMap<string, string> = new Map([
+  // https://platform.kimi.ai/docs/pricing/chat, checked 2026-10-23.
+  ["kimi:kimi-k3.1-pro", "Moonshot has not published a verified K3.1 Pro rate"],
+  ["kimi:kimi-k3.1-pro-highspeed", "Moonshot has not published a verified K3.1 Pro Highspeed rate"],
   // The bare managed identity resolves to a priced route before any call.
   ["agenc:agenc", "managed identity, priced per route"],
   ["groq:minimaxai/minimax-m2.7", "Enterprise preview on a contract price; Groq publishes none"],

@@ -66,6 +66,24 @@ it("refuses trust before connecting or creating a session", async () => {
   expect(mocks.ready).not.toHaveBeenCalled(); expect(mocks.connect).not.toHaveBeenCalled(); expect(request).not.toHaveBeenCalled();
 });
 
+it("keeps a transport failure distinct from completed one-shot cleanup and JSON output", async () => {
+  process.argv = ["node", "agenc", "-p", "--light", "--output-format", "json", "hello"];
+  mocks.connect.mockResolvedValue({ request, close, subscribeToConnectionState: () => () => {},
+    subscribeToSessionEvents: (_id: string, callback: (event: unknown) => void) => {
+      queueMicrotask(() => callback({ params: { sessionId: "session", event: { type: "turn_failed", payload: {
+        turnId: "failed-turn", code: "transport_error", message: "model stream interrupted",
+        durationMs: 125, remainingDeadlineMs: 500, usableFinalAnswer: false,
+        transportFailure: { category: "http_5xx", status: 502 },
+      } } } }));
+      return () => {};
+    },
+  });
+  expect(await oneShotCLI("hello")).toBe(1);
+  expect(request).toHaveBeenCalledWith("agent.stop", { agentId: "agent", reason: "one_shot_failed" });
+  expect(JSON.parse(writes.join(""))).toMatchObject({ exitCode: 1, failureCode: "transport_error",
+    durationMs: 125, remainingDeadlineMs: 500, usableFinalAnswer: false, transportFailure: { category: "http_5xx", status: 502 } });
+});
+
 it("loads continuation only for the existing resume selector and forwards its exact prepared inputs", async () => {
   const selector = { kind: "latest" as const };
   expect(await oneShotCLI("next turn", [], { permissionMode: "plan", model: "grok-4.7" }, selector)).toBe(23);

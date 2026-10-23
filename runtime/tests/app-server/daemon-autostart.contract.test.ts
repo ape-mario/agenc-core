@@ -131,6 +131,28 @@ async function tempAgencHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), "agenc-daemon-autostart-"));
 }
 
+it("prints startup progress while waiting and retains a finite readiness deadline", async () => {
+  const home = await tempAgencHome();
+  vi.useFakeTimers();
+  const host = createHost(home);
+  host.runningPids.add(5201);
+  host.recordDaemon(5201);
+  await writeAgenCDaemonPid(resolveAgenCDaemonPidPath(host.env, host.userHome), 5201);
+  host.sleep = async () => { vi.advanceTimersByTime(250); };
+  const write = vi.fn(() => true);
+  try {
+    await expect(ensureAgenCDaemonAutostart({
+      host, io: { stdout: { write }, stderr: { write } },
+      isReady: () => false, waitTimeoutMs: 1_500, pollMs: 250,
+      findOrphanDaemonPids: () => [], findSupersededDaemonPids: () => [],
+    })).rejects.toThrow("did not become ready before timeout");
+    expect(write.mock.calls.filter(([line]) => line === "Starting AgenC...\n")).toHaveLength(1);
+  } finally {
+    vi.useRealTimers();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 function createSignalProcess(): AgenCSignalProcess & {
   emit(signal: AgenCShutdownSignal): void;
 } {

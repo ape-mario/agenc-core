@@ -10,8 +10,9 @@
  * download the platform tarball named in agenc-runtime-manifest-v2.json, verify
  * its sha256, extract under <AGENC_HOME>/runtime/<version>/, record the sha in
  * the .agenc-runtime-ok marker, then repoint the generated shell wrapper at
- * the new runtime. Old runtime trees stay in place so a running daemon keeps
- * working until it is restarted.
+ * the new runtime. On macOS, activation also replaces a stable signed Node
+ * executable and then prunes unused runtimes, keeping current and previous
+ * versions plus any version still used by a running process.
  *
  * npm-launcher installs pin their runtime through the manifest bundled into
  * @tetsuo-ai/agenc, so there is no wrapper to rewrite — update detects that
@@ -108,6 +109,15 @@ import {
   resolveTrustedWindowsSystemExecutable,
   resolveTrustedWindowsSystemPaths,
 } from "../utils/windows-system-path.js";
+
+import {
+  describeStableNode, installStableNode, stableNodePath,
+  type StableNodeDescription,
+} from "../../../packages/agenc/lib/stable-node.mjs";
+import {
+  beginRuntimeUpdate, endRuntimeUpdate, recordRuntimeActivation, pruneRuntimes,
+  type RuntimePruneResult,
+} from "../../../packages/agenc/lib/runtime-maintenance.mjs";
 
 export const DEFAULT_RELEASE_REPO = OFFICIAL_RELEASE_REPOSITORY;
 export const MINIMUM_PRIVATE_NODE_UPDATE_VERSION =
@@ -3374,11 +3384,14 @@ interface WrapperActivationTransaction {
   readonly version: 1;
   readonly targetVersion: string;
   readonly entries: readonly WrapperActivationEntry[];
+  readonly stableNode?: StableNodeDescription;
+  readonly previousVersion?: string;
 }
 
 export interface WrapperActivationResult {
   readonly activated: boolean;
   readonly retainedVersion?: string;
+  readonly nodeBin?: string;
 }
 
 function readOptionalFile(path: string): string | null {
@@ -3429,6 +3442,10 @@ function validateActivationTransaction(raw: string): WrapperActivationTransactio
     parsed.entries.length === 0 ||
     parsed.entries.length > 64
   ) throw new Error("wrapper activation journal is invalid");
+  if (parsed.previousVersion !== undefined &&
+      !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(parsed.previousVersion)) {
+    throw new Error("wrapper activation previous version is invalid");
+  }
   const seen = new Set<string>();
   for (const candidate of parsed.entries) {
     const entry = candidate as Partial<WrapperActivationEntry>;
@@ -3469,10 +3486,25 @@ function completeActivationTransaction(journalPath: string): void {
       );
     }
   }
+  if (transaction.stableNode !== undefined) {
+    const home = dirname(dirname(journalPath));
+    const checked = describeStableNode(home, transaction.stableNode.source);
+    if (checked.sha256 !== transaction.stableNode.sha256 ||
+        runtimeVersionFromBin(checked.source, home) !== transaction.targetVersion ||
+        transaction.entries.some((entry) => {
+          const wrapper = recognizedGeneratedWrapperContent(entry.path, entry.desired)!;
+          return wrapper.agencHome !== home || wrapper.nodeBin !== stableNodePath(home) ||
+            runtimeVersionFromBin(wrapper.runtimeBin, home) !== transaction.targetVersion;
+        })) throw new Error("stable Node activation journal is invalid");
+    installStableNode(home, checked);
+  }
   for (const entry of transaction.entries) {
     if (readOptionalFile(entry.path) !== entry.desired) {
       replaceFileAtomically(entry.path, entry.desired, entry.mode);
     }
+  }
+  if (transaction.stableNode !== undefined) {
+    recordRuntimeActivation(dirname(dirname(journalPath)), transaction.targetVersion, transaction.previousVersion);
   }
   rmSync(journalPath, { force: true });
   syncDirectoryEntry(dirname(journalPath));
@@ -3665,6 +3697,11 @@ export async function activateGeneratedWrappers(options: {
       }
     }
 
+    const stableNode = process.platform === "darwin" && basename(targetRuntimeTree).startsWith("darwin-")
+      ? describeStableNode(agencHome, options.nodeBin)
+      : undefined;
+    const nodeBin = stableNode === undefined ? options.nodeBin : stableNodePath(agencHome);
+    const previousVersion = runtimeVersionFromBin(freshWrappers[0]!.runtimeBin, agencHome);
     const entries: WrapperActivationEntry[] = freshWrappers.map((wrapper) => ({
       path: wrapper.path,
       original: readFileSync(wrapper.path, "utf8"),
@@ -3672,7 +3709,7 @@ export async function activateGeneratedWrappers(options: {
         kind: wrapper.kind,
         agencHome,
         runtimeBin: options.runtimeBin,
-        nodeBin: options.nodeBin,
+        nodeBin,
         ...(options.nodeLibraryPath === undefined
           ? {}
           : { nodeLibraryPath: options.nodeLibraryPath }),
@@ -3680,6 +3717,7 @@ export async function activateGeneratedWrappers(options: {
       mode: wrapper.kind === "cmd" ? 0o644 : 0o755,
     }));
     const transaction: WrapperActivationTransaction = {
+      ...(stableNode === undefined ? {} : { stableNode, previousVersion }),
       version: 1,
       targetVersion: options.targetVersion,
       entries,
@@ -3699,7 +3737,7 @@ export async function activateGeneratedWrappers(options: {
         { cause: activationError },
       );
     }
-    return { activated: true };
+    return { activated: true, ...(stableNode === undefined ? {} : { nodeBin }) };
   } catch (error) {
     operationError = error;
     throw error;
@@ -4035,7 +4073,9 @@ export async function runAgenCUpdateCli(
     ...(deps.onProgress === undefined ? {} : { onLine: deps.onProgress }),
   });
   let result: InstallRuntimeResult;
+  let updateLease: string | undefined;
   try {
+    if (platform === "darwin") updateLease = await beginRuntimeUpdate(agencHome);
     deps.onProgress?.("Downloading and verifying the runtime.");
     result = await installRuntimeFromManifest({
       manifest,
@@ -4049,6 +4089,7 @@ export async function runAgenCUpdateCli(
         : { verifyStagedPrivateNode: deps.verifyStagedPrivateNode }),
     });
   } catch (error) {
+    if (updateLease !== undefined) endRuntimeUpdate(updateLease);
     downloads.endLine();
     stderr(`agenc: update failed: ${describeUpdateFailure(error, platform)}`);
     return 1;
@@ -4070,10 +4111,21 @@ export async function runAgenCUpdateCli(
       allowDowngrade: pinned,
     });
   } catch (error) {
+    if (updateLease !== undefined) endRuntimeUpdate(updateLease);
     stderr(
       `agenc: installed runtime ${latestVersion} but wrapper activation failed: ${error instanceof Error ? error.message : String(error)}`,
     );
     return 1;
+  }
+
+  if (updateLease !== undefined) endRuntimeUpdate(updateLease);
+  let pruning: RuntimePruneResult | undefined;
+  if (platform === "darwin" && activation.activated) {
+    try { pruning = await pruneRuntimes(agencHome); }
+    catch (error) {
+      pruning = { removed: [], freedBytes: 0,
+        skipped: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   if (command.json) {
@@ -4085,7 +4137,8 @@ export async function runAgenCUpdateCli(
         installed: true,
         downloaded: result.downloaded,
         runtimeBin: result.binPath,
-        nodeBin: result.nodeBinPath,
+        nodeBin: activation.nodeBin ?? result.nodeBinPath,
+        ...(pruning === undefined ? {} : { pruning }),
         ...(result.nodeLibraryPath === undefined
           ? {}
           : { nodeLibraryPath: result.nodeLibraryPath }),
@@ -4103,6 +4156,10 @@ export async function runAgenCUpdateCli(
       );
       for (const wrapper of wrappers) {
         stdout(`  wrapper repointed: ${wrapper.path}`);
+      }
+      if (pruning !== undefined) {
+        stdout(`Runtime cleanup: ${pruning.removed.length} trees, ${pruning.freedBytes} bytes freed` +
+          (pruning.skipped === undefined ? "." : ` (deferred: ${sanitizeTerminalText(pruning.skipped, 512)}).`));
       }
       stdout("Restart the daemon to pick it up: agenc daemon restart");
     } else {

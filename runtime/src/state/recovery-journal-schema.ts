@@ -1029,12 +1029,17 @@ const EVENT_PAYLOAD_VALIDATORS = defineEventPayloadValidators({
       lastAgentMessage: isString,
       completedAt: isNumber,
       durationMs: isNumber,
+      usableFinalAnswer: isBoolean,
     },
   ),
   turn_aborted: objectShape({ reason: isString }, { turnId: isString }),
   turn_failed: objectShape(
     { turnId: isTurnFailureId, code: validFailureCode, message: isTurnFailureMessage },
-    { completedAt: isTurnFailureTime, durationMs: isTurnFailureTime },
+    { completedAt: isTurnFailureTime, durationMs: isTurnFailureTime,
+      remainingDeadlineMs: isTurnFailureTime, usableFinalAnswer: isBoolean,
+      transportFailure: objectShape({ category: oneOf("stream_truncated", "http_5xx", "connection_lost", "timeout") },
+        { status: isNonNegativeInteger }),
+    },
   ),
   turn_checkpoint: isTurnCheckpoint,
   turn_resumed: objectShape(

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   closeSync,
   constants as fsConstants,
@@ -213,6 +214,27 @@ export type ResumeSessionResolution =
         | "identity_unavailable"
         | "time_limit";
     };
+
+/**
+ * Startup restore may append while the first search is reading. Before a
+ * descriptor has been selected or authorized, repeat the complete search
+ * within the same bounded window used for append reproof. Every attempt
+ * still requires stable metadata, source identity and a complete hash.
+ * Reproof after selection must keep using the descriptor-bound checks.
+ */
+export async function resolveInitialResumeSession(
+  resolveSession: () => ResumeSessionResolution,
+  signal?: AbortSignal,
+): Promise<ResumeSessionResolution> {
+  const deadline = Date.now() + APPEND_REPROOF_WINDOW_MS;
+  for (;;) {
+    const result = resolveSession();
+    if (result.kind !== "search_incomplete" || result.reason !== "source_unavailable" ||
+        signal?.aborted || Date.now() >= deadline) return result;
+    await delay(Math.min(APPEND_REPROOF_RETRY_MS, Math.max(0, deadline - Date.now())));
+    if (signal?.aborted) return result;
+  }
+}
 
 interface ResumeCandidate extends Omit<ResolvedResumeSession, "sourceSha256"> {
   readonly mtimeNs: bigint;

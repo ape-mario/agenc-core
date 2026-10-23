@@ -1419,7 +1419,7 @@ function extractTarGz(archive, destDir) {
 // Ensure the runtime for `manifest.runtimeVersion` is present and return every
 // path needed to launch it with the artifact's private Node. Idempotent: a
 // verified existing install short-circuits the download.
-export async function ensureRuntimeLaunch({
+async function ensureRuntimeInstalled({
   env = process.env,
   userHome = homedir(),
   manifest = readManifest(),
@@ -1632,6 +1632,53 @@ export async function ensureRuntimeLaunch({
       );
     }
   }
+}
+
+// The npm launcher shares the standalone stable executable on macOS. Development
+// links bypass this manager and continue using their host Node.
+export async function ensureRuntimeLaunch(options = {}) {
+  const manifest = options.manifest ?? readManifest();
+  const artifact = selectArtifact(manifest, options.slug ?? platformSlug(), process.versions.modules,
+    options.runtimeCompatibility ?? currentRuntimeCompatibility(),
+    { trustMode: options.manifestTrust ?? "official" });
+  if (process.platform !== "darwin" || artifact.platform !== "darwin" ||
+      manifest.runtimeVersion === FROZEN_LEGACY_RUNTIME_VERSION) {
+    return ensureRuntimeInstalled({ ...options, manifest });
+  }
+  const home = canonicalizeAgenCHome(resolveAgenCHome(options.env ?? process.env, options.userHome ?? homedir()));
+  const maintenance = await import("./runtime-maintenance.mjs");
+  const stable = await import("./stable-node.mjs");
+  const lease = await maintenance.beginRuntimeUpdate(home);
+  let releaseActivation;
+  let result;
+  let activated = false;
+  try {
+    const launch = await ensureRuntimeInstalled({ ...options, manifest });
+    releaseActivation = await acquireLocalSqliteLock(join(home, "runtime", ".activation-lock.sqlite"), {
+      label: "npm Node activation", timeoutMs: 60_000,
+    });
+    if (existsSync(join(home, "runtime", ".activation-transaction.json"))) {
+      throw new Error("standalone activation recovery pending; rerun the installer");
+    }
+    const nodeBin = stable.installStableNode(home, stable.describeStableNode(home, launch.nodeBin));
+    activated = maintenance.recordRuntimeActivation(home, manifest.runtimeVersion);
+    result = { ...launch, nodeBin };
+  } finally {
+    try { releaseActivation?.(); }
+    finally { maintenance.endRuntimeUpdate(lease); }
+  }
+  if (activated) {
+    // A cached launch does not prune. Only a completed version activation does.
+    try {
+      const pruning = await maintenance.pruneRuntimes(home);
+      if (pruning.removed.length > 0) {
+        (options.log ?? ((message) => process.stderr.write(message + "\n")))(
+          `agenc: runtime cleanup freed ${pruning.freedBytes} bytes in ${pruning.removed.length} trees`,
+        );
+      }
+    } catch { /* cleanup must not fail a verified launch */ }
+  }
+  return result;
 }
 
 // Backward-compatible install-only surface used by npm postinstall and callers

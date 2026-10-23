@@ -1647,6 +1647,7 @@ describe("Light's model-family tuning follows the model through gateways", () =>
     ["openrouter", "deepseek/deepseek-v4.1-flash-1017"],
     ["ollama-cloud", "deepseek-v4.1-flash:1017"],
     ["venice", "deepseek-v4-1-flash-1017"],
+    ["abliteration", "abliterated-model-large-flash"],
   ])("DeepSeek through %s retains the batch-editor head and task limits", async (provider, model) => {
     const prompt = await head(provider, model);
     expect(prompt).toContain(LIGHT_LIMITED_FINISH);
