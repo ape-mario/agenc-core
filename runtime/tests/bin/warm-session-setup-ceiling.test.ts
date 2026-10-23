@@ -4,6 +4,29 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createWarmSessionSetupCeiling } from "./warm-session-setup-ceiling.js";
 
+// Reload the shared helper before installing filesystem fault injection.
+vi.hoisted(() => vi.resetModules());
+const directoryFault = vi.hoisted(() => ({ code: undefined as string | undefined, fileSyncs: 0 }));
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, fsyncSync: (fd: number) => {
+    if (actual.fstatSync(fd).isDirectory()) {
+      if (directoryFault.code !== undefined) {
+        throw Object.assign(new Error(`directory fsync: ${directoryFault.code}`), { code: directoryFault.code });
+      }
+    } else {
+      directoryFault.fileSyncs += 1;
+    }
+    return actual.fsyncSync(fd);
+  } };
+});
+const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform")!;
+afterEach(() => {
+  Object.defineProperty(process, "platform", platformDescriptor);
+  directoryFault.code = undefined;
+  directoryFault.fileSyncs = 0;
+});
+
 const homes: string[] = [];
 function home(): string { const path = mkdtempSync(join(tmpdir(), "fx-warm-")); homes.push(path); return path; }
 afterEach(() => { for (const path of homes.splice(0)) rmSync(path, { recursive: true, force: true }); });
@@ -138,4 +161,31 @@ describe("warm daemon session setup ceiling", () => {
     release(); await closing; await rejected;
   });
 
+});
+
+describe.each(["win32", "linux", "darwin"] as const)("request journal directory sync on %s", (platform) => {
+  it.each(["EPERM", "EBADF", "EISDIR", "EINVAL", "ENOTSUP", "EACCES", "EIO", "ENOSPC"])(
+    "handles %s before fake transport dispatch",
+    async (code) => {
+      const ceiling = createWarmSessionSetupCeiling(home(), "directory-sync");
+      const setup = vi.fn(async () => {});
+      ceiling.register(setup);
+      const response = new Response("pong");
+      const transport = vi.fn<typeof fetch>().mockResolvedValue(response);
+      Object.defineProperty(process, "platform", { value: platform });
+      directoryFault.code = code;
+      const pending = ceiling.wrap(transport)("https://provider.invalid/chat", { method: "POST", body: "{}" });
+      if (platform === "win32" && code !== "EIO" && code !== "ENOSPC") {
+        await expect(pending).resolves.toBe(response);
+        expect(transport).toHaveBeenCalledOnce();
+        expect(setup).toHaveBeenCalledOnce();
+      } else {
+        await expect(pending).rejects.toMatchObject({ code });
+        expect(transport).not.toHaveBeenCalled();
+        expect(setup).not.toHaveBeenCalled();
+      }
+      expect(directoryFault.fileSyncs).toBe(1);
+      await ceiling.close();
+    },
+  );
 });

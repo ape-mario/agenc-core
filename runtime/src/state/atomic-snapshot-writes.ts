@@ -15,6 +15,8 @@ import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
 import type { SqliteDatabase, StateSqliteDriver } from "./sqlite-driver.js";
 
+import { syncDirectorySync as fsyncDirectory } from "../utils/durable-atomic-file.js";
+
 const PENDING_SNAPSHOT_DIR = "session_state_snapshots.pending";
 const SNAPSHOT_WRITE_FORMAT = "agenc.session_state_snapshot_write";
 const SNAPSHOT_WRITE_SCHEMA_VERSION = 1;
@@ -400,19 +402,6 @@ function atomicWriteFile(
       }
     }
     throw error;
-  }
-}
-
-function fsyncDirectory(directory: string): void {
-  let fd: number | undefined;
-  try {
-    fd = openSync(directory, "r");
-    fsyncSync(fd);
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code !== "EINVAL" && code !== "EPERM") throw error;
-  } finally {
-    if (fd !== undefined) closeSync(fd);
   }
 }
 
