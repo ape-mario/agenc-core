@@ -814,5 +814,7 @@ export function resolveBuiltInProviderSlug(
 // funds.ts imports nothing so the catalog can load first; give it the display
 // names it uses for billing refusals.
 registerProviderFundsDisplayNames(
-  (provider) => listBuiltInProviderInfo().find((info) => info.id === provider)?.name,
+  (provider) => Object.hasOwn(BUILT_IN_PROVIDER_DEFINITIONS, provider)
+    ? BUILT_IN_PROVIDER_DEFINITIONS[provider as BuiltInProviderSlug].name
+    : undefined,
 );

@@ -35,6 +35,7 @@ import { DEEPSEEK_MODELS, DEEPSEEK_MODEL_ALIASES } from "./deepseek-models.js";
 import { QWEN_FLASH_NEXT_MODEL } from "./qwen-flash-next.js";
 import { QWEN_CODER_30B_MODEL } from "./qwen-coder-30b.js";
 import { QWEN_CURRENT_MODEL_CATALOG } from "./qwen-current-models.js";
+import { AGENC_DEEPSEEK_MODELS, AGENC_DEEPSEEK_REASONING_LEVELS } from "./agenc-deepseek.js";
 import {
   GEMINI_THINKING_MODELS,
   resolveGeminiThinkingModel,
@@ -979,9 +980,38 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
       priority: index,
       visibility: index < DEEPSEEK_MODELS.length ? "list" : "none",
     })),
-    // Metadata only: exposing this private route requires configured model access.
+    // Historical session metadata only. The retired account provider cannot run
+    // inference, and visibility none keeps these entries out of model menus.
+    ...AGENC_DEEPSEEK_MODELS.map((entry): RegisteredModelCatalogEntry => ({
+      provider: "agenc",
+      model: entry.model,
+      displayName: entry.label,
+      contextWindow: 1_048_576,
+      maxContextWindow: 1_048_576,
+      // Reasoning and tool arguments share this budget. An 8k allowance can
+      // finish entirely in reasoning and repeat the same truncation on recovery.
+      maxOutputTokens: 64_000,
+      maxOutputTokensUpperLimit: 384_000,
+      maxOutputTokensCappedDefault: true,
+      // V4.1 supports inline images under the reviewed managed gateway policy.
+      inputModalities: entry.vision ? TEXT_IMAGE_MODALITIES : TEXT_MODALITIES,
+      supportsToolUse: true,
+      supportsParallelToolCalls: false,
+      supportsStructuredOutput: true,
+      supportsSearchTool: false,
+      supportsVerbosity: false,
+      webSearchToolType: "none",
+      supportsReasoningSummaries: false,
+      defaultReasoningSummary: "none",
+      supportedReasoningLevels: AGENC_DEEPSEEK_REASONING_LEVELS,
+      defaultReasoningLevel: "high",
+      additionalSpeedTiers: NO_ADDITIONAL_SPEED_TIERS,
+      priority: 0,
+      visibility: "none",
+    })),
+    // Historical account metadata and direct Qwen metadata; never a model offer.
     // https://huggingface.co/Qwen/Qwen3.8-Flash-Next/tree/de4b8e4d43b917e7706784d8bb445c9af86a3540
-    ...["qwen"].map((provider): RegisteredModelCatalogEntry => ({
+    ...["agenc", "qwen"].map((provider): RegisteredModelCatalogEntry => ({
       provider,
       model: QWEN_FLASH_NEXT_MODEL,
       displayName: "Qwen Flash Next",
@@ -1006,7 +1036,7 @@ const NON_OPENROUTER_MODEL_CATALOG: readonly RegisteredModelCatalogEntry[] =
     })),
     // Private pilot metadata; output budgets are pilot policy caps, not model limits.
     // https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct/tree/b2cff646eb4bb1d68355c01b18ae02e7cf42d120
-    ...["qwen"].map((provider): RegisteredModelCatalogEntry => ({
+    ...["agenc", "qwen"].map((provider): RegisteredModelCatalogEntry => ({
       provider,
       model: QWEN_CODER_30B_MODEL,
       displayName: "Qwen Coder 30B",

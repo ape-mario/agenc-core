@@ -84,16 +84,10 @@ describe("ImagineImage on an OpenRouter or Venice session", () => {
     expect(refused.isError).toBe(true);
     expect(refused.content).toContain("OpenRouter image model must be one of");
     expect(fetchImpl).not.toHaveBeenCalled();
-    const managed = createProvider("openrouter", {
+    expect(() => createProvider("openrouter", {
       apiKey: "agenc-managed", model: "openrouter/deepseek/deepseek-v4.1-flash", baseURL: "https://gateway.invalid/v1",
       extra: { managedGateway: true },
-    } as never);
-    const noBackend = createImagineImageTool({
-      workspaceRoot: root, home: testHome(root), env: {}, fetchImpl: fetchImpl as unknown as typeof fetch,
-      getSession: session(managed),
-    });
-    const result = await noBackend.execute({ prompt: "x" });
-    expect(result.isError).toBe(true);
+    })).toThrow("AgenC accounts no longer provide models");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

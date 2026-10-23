@@ -42,6 +42,9 @@ describe("OpenRouter zero data retention default", () => {
 });
 
 describe("ZDR badge state", () => {
+  it("does not advertise a retention guarantee for the retired account provider", () => {
+    expect(resolveZeroDataRetentionStatus({ provider: "agenc", model: "agenc" })).toBeUndefined();
+  });
   it("is green only where retention is guaranteed, at every provider's defaults", () => {
     const states = Object.fromEntries(builtInProviderIds().map(provider => [provider, state(provider)?.state]));
     expect(states).toEqual({
@@ -72,7 +75,6 @@ describe("ZDR badge state", () => {
       minimax: "retained",
       github: "retained",
       "amazon-bedrock": "retained",
-      agenc: "zdr",
     });
   });
 
