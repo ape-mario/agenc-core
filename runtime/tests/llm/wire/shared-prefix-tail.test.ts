@@ -132,7 +132,7 @@ describe("shared-prefix tail placement", () => {
   });
 
   it("leaves providers without the hint unchanged", () => {
-    const hints = chatCompletionsCapabilityHintsForProvider("kimi", "kimi-k3");
+    const hints = chatCompletionsCapabilityHintsForProvider("openai", "gpt-4.1");
     expect(hints.sharesPromptPrefixAcrossSessions).toBeUndefined();
     const messages = request("alpha", [...SETUP, user("fix sum.js")], hints);
     expect(messages[0]).toEqual({ role: "system", content: prompt("alpha") });

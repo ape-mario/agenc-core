@@ -673,6 +673,7 @@ const COST_TIER_KIMI_K31_PRO: Readonly<ModelCostEntry> = Object.freeze({
   cachedInputUsdPer1K: 0.0002,
   cachedInputIncludedInInputTokens: true,
   cacheCreationUsdPer1K: 0.002,
+  cacheCreation1hUsdPer1K: 0.004,
   cacheCreationIncludedInInputTokens: true,
 });
 const COST_TIER_KIMI_K31_PRO_HIGHSPEED: Readonly<ModelCostEntry> = Object.freeze({
@@ -681,11 +682,13 @@ const COST_TIER_KIMI_K31_PRO_HIGHSPEED: Readonly<ModelCostEntry> = Object.freeze
   cachedInputUsdPer1K: 0.0002,
   cachedInputIncludedInInputTokens: true,
   cacheCreationUsdPer1K: 0.004,
+  cacheCreation1hUsdPer1K: 0.008,
   cacheCreationIncludedInInputTokens: true,
 });
 const COST_TIER_KIMI_K3: Readonly<ModelCostEntry> = Object.freeze({
   // Automatic 5m cache writes are included in prompt_tokens, at the input rate.
   cacheCreationUsdPer1K: 0.003,
+  cacheCreation1hUsdPer1K: 0.006,
   cacheCreationIncludedInInputTokens: true,
   inputUsdPer1K: 0.003,
   outputUsdPer1K: 0.015,

@@ -119,3 +119,10 @@ test('large-request token bounds preserve output reservations and reject invalid
   for (const invalid of [0, -1, NaN, 2.5]) assert.throws(() => reserveUsd(large, invalid), /Invalid/);
   assert.throws(() => admit({cap:1,spent:0}, large,110000), /cap/);
 });
+
+test('one-hour writes replace the input rate with twice that rate', () => {
+  const usage = {prompt_tokens:100000, completion_tokens:1000, prompt_tokens_details:{cached_tokens:60000,cache_write_tokens:30000}};
+  assert.equal(usageCost('kimi-k3.1-pro', usage, 20000), 0.142);
+  assert.throws(() => usageCost('kimi-k3.1-pro', usage, 30001), /Invalid/);
+  assert.throws(() => usageCost('kimi-k3.1-pro', usage, NaN), /Invalid/);
+});

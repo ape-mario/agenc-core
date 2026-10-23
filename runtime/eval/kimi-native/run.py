@@ -160,6 +160,8 @@ def main():
     env = {'PATH': os.environ['PATH'], 'HOME': str(home), 'AGENC_HOME': str(home),
            'MOONSHOT_API_KEY': os.environ['MOONSHOT_API_KEY'], 'AGENC_MAX_OUTPUT_TOKENS': '4096',
            'NODE_OPTIONS': '--import='+str(HERE/'wire.mjs'), 'KIMI_SWEEP_CONTROL': str(out/'control.json')}
+    if 'AGENC_KIMI_CACHE_TTL' in os.environ:
+        env['AGENC_KIMI_CACHE_TTL'] = os.environ['AGENC_KIMI_CACHE_TTL']
     # Node tool processes need no provider credentials when grading fixtures.
     grade_env = {k:v for k,v in env.items() if k not in ('MOONSHOT_API_KEY','NODE_OPTIONS','KIMI_SWEEP_CONTROL')}
     records = 6500

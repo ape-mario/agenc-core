@@ -14,14 +14,17 @@ export const RATES = Object.freeze({
   'kimi-k2.7-code-highspeed': [1.9, 8, 0.38],
   'kimi-k2.6': [0.95, 4, 0.16],
 });
-export function usageCost(model, usage) {
+export function usageCost(model, usage, oneHourWrites = 0) {
   const rates = RATES[model];
   if (!rates || !Number.isFinite(usage?.prompt_tokens) || !Number.isFinite(usage?.completion_tokens)) {
     throw new Error('Missing price or usage; retain the reservation');
   }
   const cached = usage.prompt_tokens_details?.cached_tokens ?? usage.cached_tokens ?? 0;
   if (cached < 0 || cached > usage.prompt_tokens) throw new Error('Invalid cache usage');
-  return ((usage.prompt_tokens - cached) * rates[0] + usage.completion_tokens * rates[1] + cached * rates[2]) / 1e6;
+  if (!Number.isSafeInteger(oneHourWrites) || oneHourWrites < 0 || oneHourWrites > (usage.prompt_tokens_details?.cache_write_tokens ?? 0)) {
+    throw new Error('Invalid one-hour cache writes');
+  }
+  return ((usage.prompt_tokens - cached + oneHourWrites) * rates[0] + usage.completion_tokens * rates[1] + cached * rates[2]) / 1e6;
 }
 // Balance updates can lag streamed usage. Never interpret an unchanged balance
 // as free inference. Keep a 10% margin on priced usage until charges catch up.
@@ -109,6 +112,8 @@ if (controlPath) {
       const entry = {started, model: body.model, bytes: Buffer.byteLength(JSON.stringify(body)), inputTokenBound,
         maxOutput: body.max_completion_tokens ?? body.max_tokens, effort: body.reasoning_effort,
         thinking: body.thinking, stream: body.stream,
+        cacheOptions: body.prompt_cache_options, cacheKeyHash: body.prompt_cache_key ? digest(body.prompt_cache_key) : undefined,
+        systemPrefixHash: digest(body.messages[0]), toolsHash: digest(body.tools ?? []),
         images: body.messages.flatMap(m => Array.isArray(m.content) ? m.content : []).filter(p => p.type === 'image_url').length,
         messages: body.messages.map(m => ({role: m.role, toolCallId: m.tool_call_id,
           reasoningHash: m.reasoning_content === undefined ? undefined : digest(m.reasoning_content),
@@ -117,6 +122,9 @@ if (controlPath) {
           toolOutput: m.role === 'tool' ? String(m.content).slice(0, 12000) : undefined,
           toolCalls: m.tool_calls})), reserve};
       const response = await original(input, init);
+      // Only billing counts, never arbitrary headers or authorization values.
+      entry.cacheWrite5m = Number(response.headers.get('Msh-Usage-Cache-Write-Tokens-5m') ?? 0);
+      entry.cacheWrite1h = Number(response.headers.get('Msh-Usage-Cache-Write-Tokens-1h') ?? 0);
       // Tee capture preserves the CLI stream. The daemon owns this task until
       // its response is fully drained. The runner waits for the ledger to settle.
       const capture = async () => {
@@ -147,7 +155,7 @@ if (controlPath) {
         }
         const after = await balance();
         const settled = reconcile(ledger, after);
-        const pricedCost = response.ok ? usageCost(body.model, entry.usage) : 0;
+        const pricedCost = response.ok ? usageCost(body.model, entry.usage, entry.cacheWrite1h) : 0;
         if (inputTokenBound !== undefined && entry.usage?.prompt_tokens > inputTokenBound) {
           throw new Error('Prompt usage exceeded its reservation bound');
         }

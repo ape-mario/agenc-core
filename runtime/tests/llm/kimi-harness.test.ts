@@ -8,6 +8,7 @@ import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY_MARKER } from "../../src/llm/wire/shared
 import { lightEditsWithApplyPatch, lightUsesBatchEdit } from "../../src/tools/light-profile.js";
 import { computeUsdCostWithResolution, DEFAULT_MODEL_COSTS, resolveModelCostEntry } from "../../src/session/cost.js";
 import type { LLMMessage, LLMTool } from "../../src/llm/types.js";
+import { runWithStartupProviderSelection } from "../../src/utils/model/providers.js";
 import { bodyAt, sseResponse } from "./providers/openai-compatible-test-helpers.js";
 
 const tool: LLMTool = { type: "function", function: {
@@ -115,4 +116,76 @@ test.each([
   }, DEFAULT_MODEL_COSTS);
   expect(result.known).toBe(true);
   expect(result.costUsd).toBeCloseTo(expected, 9);
+});
+
+test.each([false, true])("bills the returned cache TTL even when a later request asks for 5m, stream=%s", async stream => {
+  const usage = { prompt_tokens: 100, completion_tokens: 5, total_tokens: 105,
+    prompt_tokens_details: { cached_tokens: 60, cache_write_tokens: 30 } };
+  const response = stream ? sseResponse([
+    'data: {"choices":[{"index":0,"delta":{"content":"done"},"finish_reason":"stop"}]}\n\n',
+    `data: ${JSON.stringify({ choices: [], usage })}\n\n`, 'data: [DONE]\n\n',
+  ]) : Response.json({ choices: [{ message: { content: "done" }, finish_reason: "stop" }], usage });
+  response.headers.set("Msh-Usage-Cache-Write-Tokens-5m", "10");
+  response.headers.set("Msh-Usage-Cache-Write-Tokens-1h", "20");
+  const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(response);
+  const provider = new KimiProvider({ model: "kimi-k3.1-pro", apiKey: "test-key", fetchImpl });
+  const messages: LLMMessage[] = [{ role: "user", content: "Go" }];
+  const options = { promptCacheTtl: "5m" as const, promptCacheKey: "stable-task" };
+  const result = await (stream ? provider.chatStream(messages, () => undefined, options) : provider.chat(messages, options));
+  expect(bodyAt(fetchImpl)).toMatchObject({ prompt_cache_key: "stable-task", prompt_cache_options: { mode: "implicit", ttl: "5m" } });
+  expect(result.usage).toMatchObject({ promptTokens: 100, cacheCreationInputTokens: 30, cacheCreation1hInputTokens: 20 });
+  const cost = computeUsdCostWithResolution({
+    model: "kimi-k3.1-pro", provider: "kimi", inputTokens: 100, outputTokens: 5,
+    cachedInputTokens: 60, cacheCreationInputTokens: 30, cacheCreation1hInputTokens: 20,
+    reasoningOutputTokens: 0, webSearchRequests: 0, totalTokens: 105, turns: 1,
+  }, DEFAULT_MODEL_COSTS);
+  expect(cost.costUsd).toBeCloseTo(0.000182, 9);
+});
+
+test.each(KIMI_CHAT_MODELS)("cache controls follow the documented family contract: %s", model => {
+  const request = (ttl?: "5m" | "1h") => buildChatCompletionsRequest({ model, tools: [],
+    messages: [{ role: "user", content: "Go" }], options: { promptCacheKey: "resumed-session", promptCacheTtl: ttl },
+    providerCapabilityHints: chatCompletionsCapabilityHintsForProvider("kimi", model) });
+  expect(request()).not.toHaveProperty("prompt_cache_options");
+  for (const ttl of ["5m", "1h"] as const) {
+    expect(request(ttl).prompt_cache_options).toEqual(isKimiK3Model(model) ? { mode: "implicit", ttl } : undefined);
+    expect(request(ttl).prompt_cache_key).toBe("resumed-session");
+  }
+});
+
+test("cache TTL is taken from the bound client environment, with request overrides", async () => {
+  const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }));
+  const model = "kimi-k3.1-pro";
+  const provider = new KimiProvider({ model, apiKey: "test-key", fetchImpl });
+  const run = (ttl: string, override?: "5m") => runWithStartupProviderSelection(
+    { provider: "kimi", model, environment: { AGENC_KIMI_CACHE_TTL: ttl } },
+    () => provider.chat([{ role: "user", content: "Go" }], { promptCacheTtl: override }),
+  );
+  await run("1h");
+  expect(bodyAt(fetchImpl).prompt_cache_options).toEqual({ mode: "implicit", ttl: "1h" });
+  await run("1h", "5m");
+  expect(bodyAt(fetchImpl, 1).prompt_cache_options).toEqual({ mode: "implicit", ttl: "5m" });
+  await expect(run("24h")).rejects.toThrow("AGENC_KIMI_CACHE_TTL must be 5m or 1h");
+  expect(fetchImpl).toHaveBeenCalledTimes(2);
+});
+
+test.each([
+  ["kimi-k3.1-pro", 0.000202], ["kimi-k3.1-pro-highspeed", 0.000392], ["kimi-k3", 0.000303],
+])("one-hour writes use the published rate without double counting: %s", (model, expected) => {
+  const cost = computeUsdCostWithResolution({ model, provider: "kimi", inputTokens: 100, outputTokens: 5,
+    cachedInputTokens: 60, cacheCreationInputTokens: 30, cacheCreation1hInputTokens: 30,
+    reasoningOutputTokens: 0, webSearchRequests: 0, totalTokens: 105, turns: 1,
+  }, DEFAULT_MODEL_COSTS);
+  expect(cost.costUsd).toBeCloseTo(expected, 9);
+});
+
+test("stop limits count UTF-8 bytes and reject invalid requests before HTTP", async () => {
+  const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }));
+  const provider = new KimiProvider({ model: "kimi-k3.1-pro", apiKey: "test-key", fetchImpl });
+  const messages: LLMMessage[] = [{ role: "user", content: "Go" }];
+  await provider.chat(messages, { stopSequences: ["é".repeat(16), "END"] });
+  expect(bodyAt(fetchImpl).stop).toEqual(["é".repeat(16), "END"]);
+  await expect(provider.chat(messages, { stopSequences: ["é".repeat(17)] })).rejects.toThrow("32 UTF-8 bytes");
+  await expect(provider.chatStream(messages, () => undefined, { stopSequences: Array(6).fill("END") })).rejects.toThrow("five stop sequences");
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
 });

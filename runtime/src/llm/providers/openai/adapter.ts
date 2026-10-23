@@ -1206,7 +1206,7 @@ export class OpenAIProvider implements LLMProvider {
           maxTokenField: this.resolveChatCompletionsMaxTokenField(model),
           providerCapabilityHints,
           toolCallIdNamespace: headers?.["Idempotency-Key"],
-        });
+        }, { responseHeaders: response.headers });
       }, { singleWireAttempt: options?.singleWireAttempt, signal: options?.signal });
     } catch (error) {
       if (isFallbackTriggeredError(error)) {
@@ -2691,7 +2691,7 @@ export class OpenAIProvider implements LLMProvider {
               : {}),
           },
           requestOptions,
-          { discardedReasoningContent, conflictingReasoningModel },
+          { discardedReasoningContent, conflictingReasoningModel, responseHeaders: response.headers },
         ),
       );
       onChunk({

@@ -75,3 +75,41 @@ node runtime/scripts/run-hermetic-vitest.mjs run \
   tests/llm/kimi-funds.test.ts tests/llm/kimi-harness.test.ts \
   tests/llm/providers/kimi/provider.test.ts tests/llm/wire/kimi-contract.test.ts
 ```
+
+## Context caching
+
+Native Kimi caches prefixes automatically with a five-minute TTL. AgenC sends
+its stable session `prompt_cache_key` and keeps stable system instructions
+before the changing session tail. No explicit cache objects, IDs, breakpoints,
+or special message roles are required. Moonshot documents block-based writes
+but does not publish a numeric minimum block size.
+
+For K3-family sessions whose turns may be more than five minutes apart, set
+`AGENC_KIMI_CACHE_TTL=1h` in the client environment. `5m` is also accepted;
+omitting the variable retains Moonshot's default. API callers can override it
+with `LLMChatOptions.promptCacheTtl`. K2 requests omit this unsupported control.
+Hits renew the original TTL at no extra write charge. The first write locks the
+TTL until the entry expires, so changing the setting does not convert an
+existing entry. AgenC uses the response's five-minute and one-hour write counts
+for billing, rather than guessing from the requested TTL. Writes and hits are
+subsets of total input, and reasoning is part of output, not additional usage.
+
+See the [complete caching guide](https://platform.kimi.ai/docs/guide/context-caching),
+[Chat API](https://platform.kimi.ai/docs/api/chat), and
+[pricing](https://platform.kimi.ai/docs/pricing/chat). The wire evidence records
+only the two numeric cache billing headers, prefix/tool hashes and a hash of
+the routing key. It never records authentication headers.
+
+Run the complete matrix and the explicitly authorized native spend target:
+
+```sh
+python3 runtime/eval/kimi-native/suite.py \
+  --sweep /absolute/isolated/sweep --evidence /absolute/private/evidence \
+  --first-repeat 20 --target-spend 20
+```
+
+The suite stops on any failed or incomplete run. Investigate, add the general
+fix and its regression test, then use new repeat numbers for confirmation.
+It preserves solved runs and the cumulative ledger when resumed. Larger
+seeded retrieval tasks exercise 200k-token K2 and up to 500k-token K3 contexts
+within the same per-request budget guard.
