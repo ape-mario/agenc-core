@@ -1,3 +1,4 @@
+import { DEFAULT_MODEL_COSTS, resolveModelCostEntry } from "../session/cost.js";
 import { withSecureStorageDisplaySnapshot } from "../utils/secureStorage/index.js";
 import { modelCapabilityTags } from "./model-capability-tags.js";
 /**
@@ -88,6 +89,7 @@ export type ProvidersHubModelRow = {
    * zero-retention endpoint, so OpenRouter would refuse it.
    */
   readonly zdrUnavailable?: true;
+  readonly catalogDetail?: string;
 };
 
 function plainStatus(row: ProviderMenuRow, keySaved: boolean): string {
@@ -293,13 +295,23 @@ export function readProvidersHubModels(
   return snapshot.rows
     .filter((row) => row.provider === provider && row.selectable)
     .map((row) => {
-      const label = resolveRegisteredModelCatalogEntry({ provider, model: row.displayModel })?.displayName;
+      const metadata = resolveRegisteredModelCatalogEntry({ provider, model: row.displayModel });
+      const label = metadata?.displayName;
+      const cost = resolveModelCostEntry({ provider, model: row.displayModel }, DEFAULT_MODEL_COSTS)?.entry;
+      const catalogDetail = provider === "openrouter" ? [
+        ...(metadata?.contextWindow === undefined ? [] : [`${metadata.contextWindow.toLocaleString("en-US")} context`]),
+        ...(cost === undefined || cost.costEstimated ? [] : [
+          `$${Number((cost.inputUsdPer1K * 1000).toPrecision(6))}/M input`,
+          `$${Number((cost.outputUsdPer1K * 1000).toPrecision(6))}/M output`,
+        ]),
+      ].join(" · ") : undefined;
       return {
         model: row.model,
         displayModel: row.displayModel,
         current: row.status === "current",
         isDefault: row.status === "default",
         tags: modelCapabilityTags(provider, row.displayModel),
+        ...(catalogDetail ? { catalogDetail } : {}),
         ...(label === undefined ? {} : { label }),
         ...(checksZdr && openRouterModelHasZdrEndpoint(row.displayModel) === false
           ? { zdrUnavailable: true as const }

@@ -1199,6 +1199,7 @@ async function bootstrapLocalRuntimeSessionScoped(
   );
   const localByokAuthBackend = new LocalAuthBackend({ agencHome, env });
   startup = await resolveDiscoveredStartupDefault(startup, configStore.modelSelectionSource(), {
+    catalogHome: configStore.homeContext.path,
     fetchImpl,
     env: providerEnvironment,
     readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,
@@ -1519,6 +1520,7 @@ async function bootstrapLocalRuntimeSessionScoped(
     config: startup.config,
     fallbackProvider: profileProvider,
     metadata: {
+      catalogHome: configStore.homeContext.path,
       fetchImpl,
       env,
       readSavedApiKey: provider => readLocalByokCredential(configStore.homeContext, provider)?.apiKey,

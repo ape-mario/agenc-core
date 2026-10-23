@@ -193,14 +193,14 @@ describe("OpenRouter: current catalog, thinking flags and live rows", () => {
       id: "acme/image-only", architecture: { input_modalities: ["text"], output_modalities: ["image"] },
       supported_parameters: [], context_length: 1000, pricing: {},
     }] };
-    expect(openRouterRowFromListing(listing.data[1], "2026-10-20")).toBeUndefined();
+    expect(openRouterRowFromListing(listing.data[1], "2026-10-20")?.model).toBe("acme/image-only");
     expect(resolveRegisteredModelCatalogEntry({ provider: "openrouter", model: "acme/next-vision" })).toBeUndefined();
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(json(listing));
     expect(await new ModelMetadataResolver({ fetchImpl }).discoverOpenRouterModels()).toBe(true);
     expect(String(fetchImpl.mock.calls[0]?.[0])).toBe("https://openrouter.ai/api/v1/models");
     expect(resolveImageInputSupport({ provider: "openrouter", model: "acme/next-vision" })).toBe("supported");
     expect(resolveReasoningEffort({ provider: "openrouter", model: "acme/next-vision" }).levels).toEqual(["high", "low", "none"]);
-    expect(modelCapabilityTags("openrouter", "acme/next-vision")).toBe("vision · thinking · retires 2027-01-31");
+    expect(modelCapabilityTags("openrouter", "acme/next-vision")).toBe("vision · thinking · tools · retires 2027-01-31");
   });
 
   test("picker tags name free routes", () => {

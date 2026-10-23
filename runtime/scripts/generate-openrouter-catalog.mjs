@@ -6,25 +6,18 @@ const source = process.argv[2]
   ? JSON.parse(await readFile(process.argv[2], 'utf8'))
   : await (await fetch('https://openrouter.ai/api/v1/models')).json();
 const efforts = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
-// Models whose announced expiration date has passed are left out; the date is
-// the generation day (UTC), or AGENC_CATALOG_DATE for a reproducible rerun.
-const today = process.env.AGENC_CATALOG_DATE ?? new Date().toISOString().slice(0, 10);
-const rows = source.data.filter(row =>
-  row.supported_parameters?.includes('tools') &&
-  row.architecture?.output_modalities?.length === 1 &&
-  row.architecture.output_modalities[0] === 'text' &&
-  !row.id.endsWith(':batch') && !row.id.startsWith('~') &&
-  (!row.expiration_date || row.expiration_date.slice(0, 10) >= today)
+// Keep every model the provider offers, regardless of tools or output modality.
+const rows = source.data.filter(row => typeof row.id === 'string' && row.id.length > 0
 ).map(row => ({
   model: row.id, label: row.name,
   context: row.context_length,
   ...(row.top_provider?.max_completion_tokens > 0 ? { output: row.top_provider.max_completion_tokens } : {}),
-  modalities: row.architecture.input_modalities.filter(value => ['text', 'image', 'audio'].includes(value)),
-  parameters: row.supported_parameters,
+  modalities: (row.architecture?.input_modalities ?? []).filter(value => ['text', 'image', 'audio'].includes(value)),
+  parameters: row.supported_parameters ?? [],
   efforts: (row.reasoning?.supported_efforts ?? []).filter(value => efforts.has(value)),
   ...(efforts.has(row.reasoning?.default_effort) ? { defaultEffort: row.reasoning.default_effort } : {}),
-  pricing: Object.fromEntries(Object.entries(row.pricing).filter(([, value]) => typeof value === 'string')),
-  ...(row.pricing.overrides ? {priceOverrides: row.pricing.overrides} : {}),
+  pricing: Object.fromEntries(Object.entries(row.pricing ?? {}).filter(([, value]) => typeof value === 'string')),
+  ...(row.pricing?.overrides ? {priceOverrides: row.pricing?.overrides} : {}),
   ...(row.expiration_date ? { expires: row.expiration_date.slice(0, 10) } : {}),
 }));
 if (new Set(rows.map(row => row.model)).size !== rows.length) throw new Error('Duplicate provider model IDs');
@@ -41,4 +34,4 @@ await writeFile(resolve(directory, 'openrouter-model-ids.ts'),
   '/** Generated with openrouter-models.data.json; preserve provider order. */\n' +
   'export const OPENROUTER_MODEL_IDS: readonly string[] = Object.freeze(' +
   JSON.stringify(rows.map(row => row.model), null, 2) + ');\n');
-console.log(`Generated ${rows.length} OpenRouter models (expiry filter ${today})`);
+console.log(`Generated ${rows.length} OpenRouter models`);

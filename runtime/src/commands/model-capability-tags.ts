@@ -28,9 +28,9 @@ export function modelCapabilityTags(provider: string, model: string): string {
   if (entry.inputModalities.includes("image")) tags.push("vision");
   if (entry.supportsThinking === true || entry.supportedReasoningLevels.length > 0) tags.push("thinking");
   if (!entry.supportsToolUse) tags.push("no tools");
+  else if (provider === "openrouter") tags.push("tools");
   const cost = resolveModelCostEntry({ provider, model }, DEFAULT_MODEL_COSTS)?.entry;
-  if (cost?.localZeroCost === true && cost.label === "free") tags.push("free");
-  else if (provider === "openrouter" && model.endsWith(":free")) tags.push("free");
+  if (entry.isFree || (cost?.localZeroCost === true && cost.label === "free")) tags.push("free");
   if (entry.retiresOn !== undefined) tags.push(`retires ${entry.retiresOn}`);
   return tags.join(" · ");
 }

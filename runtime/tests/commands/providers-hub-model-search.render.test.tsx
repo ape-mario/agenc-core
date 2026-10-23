@@ -137,6 +137,35 @@ function openOpenRouter(services = fakeServices()) {
 }
 
 describe("model search on the providers screen", () => {
+  it("keeps search usable during refresh, shows all 468 models and explains a no-tools choice", async () => {
+    let models = openrouterModels;
+    let complete!: (result: {}) => void;
+    const services = fakeServices({
+      modelsFor: () => models,
+      refreshModels: () => new Promise(resolve => { complete = resolve; }),
+    });
+    const onDone = vi.fn();
+    const screen = await mount(
+      <ProvidersHubView initial={snapshot} initialProvider="openrouter" services={services} onDone={onDone} />,
+    );
+    try {
+      expect(screen.screen()).toContain("298 models");
+      await screen.press(..."liveonly");
+      expect(screen.screen()).toContain("no models match");
+      models = [...openrouterModels, ...Array.from({ length: 170 }, (_, index) => ({
+        model: `fixture/liveonly-${index}`, displayModel: `fixture/liveonly-${index}`,
+        current: false, isDefault: false, tags: "no tools",
+      }))];
+      complete({});
+      await sleep(60);
+      expect(screen.screen()).toContain("170 of 468 models");
+      await screen.press("\r");
+      expect(services.choose).toHaveBeenCalledWith("openrouter", "fixture/liveonly-0");
+      expect(screen.screen()).toContain("agent tools will not work with this model");
+      expect(onDone).not.toHaveBeenCalled();
+    } finally { screen.unmount(); }
+  });
+
   it("shows the search line, the model count and the key rows on a long list before anything is typed", async () => {
     expect(OPENROUTER_MODELS).toHaveLength(298);
     const screen = await openOpenRouter();

@@ -132,9 +132,10 @@ describe("model catalog admission", () => {
 
   test.each(["ollama", "lmstudio", "openai-compatible", "openrouter"])(
     "accepts a custom name on open provider %s", (provider) => {
+      const model = provider === "openrouter" ? "vendor/my-custom-model" : "my-custom-model";
       expect(resolveProviderModelSelection({}, current, {
-        model_provider: provider, model: "my-custom-model",
-      })).toMatchObject({ provider, model: "my-custom-model" });
+        model_provider: provider, model,
+      })).toMatchObject({ provider, model });
     },
   );
 

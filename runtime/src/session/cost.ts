@@ -105,6 +105,8 @@ export interface ModelCostEntry {
   readonly localZeroCost?: boolean;
   /** A policy estimate, never a published provider price. */
   readonly costEstimated?: boolean;
+  /** Published catalog rates used until the provider reports the actual charge. */
+  readonly catalogEstimate?: boolean;
 }
 
 export interface CostSummaryProcessLike {
@@ -1575,8 +1577,8 @@ export function computeUsdCostWithResolution(
     : tokenCostUsd;
   return {
     costUsd,
-    known: match !== null && documented && !estimated,
-    ...(estimated ? { costEstimated: true } : {}),
+    known: match !== null && documented && !estimated && !standardEntry.catalogEstimate,
+    ...(estimated || standardEntry.catalogEstimate ? { costEstimated: true } : {}),
     ...(match ? { matchedKey: match.key } : {}),
   };
 }

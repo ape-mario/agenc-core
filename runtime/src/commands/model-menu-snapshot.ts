@@ -1,3 +1,5 @@
+import { openRouterMenuCatalog } from "./openrouter-menu-models.js";
+import { OPENROUTER_CATALOG_FALLBACK_NOTE } from "../llm/registry/openrouter-live-catalog.js";
 import { withSecureStorageDisplaySnapshot } from "../utils/secureStorage/index.js";
 import {
   buildProviderModelCatalog,
@@ -45,6 +47,7 @@ export type ModelMenuSnapshot = {
   readonly defaultModel: string;
   readonly rows: readonly ModelMenuRow[];
   readonly activeIndex: number;
+  readonly catalogNote?: string;
   readonly providerCounts: Readonly<Record<string, number>>;
 };
 
@@ -217,6 +220,7 @@ export function readModelMenuSnapshot(ctx: SlashCommandContext): ModelMenuSnapsh
 }
 
 function readModelMenuSnapshotFromStorage(ctx: SlashCommandContext): ModelMenuSnapshot {
+  const openrouter = openRouterMenuCatalog(ctx).read();
   const config = readCommandConfig(ctx);
   const sessionSelection = readBuiltInSessionSelection(ctx.session, {
     includePending: true,
@@ -307,6 +311,7 @@ function readModelMenuSnapshotFromStorage(ctx: SlashCommandContext): ModelMenuSn
     rows,
     activeIndex,
     providerCounts,
+    ...(provider === "openrouter" && openrouter.source === "bundled" ? { catalogNote: OPENROUTER_CATALOG_FALLBACK_NOTE } : {}),
   };
 }
 
@@ -316,6 +321,7 @@ export function modelMenuFallback(snapshot: ModelMenuSnapshot): string {
     `Provider: ${snapshot.provider}`,
     `Current: ${snapshot.currentModel}`,
     "",
+    ...(snapshot.catalogNote === undefined ? [] : [snapshot.catalogNote]),
     "Available models:",
   ];
   for (const row of snapshot.rows) {
