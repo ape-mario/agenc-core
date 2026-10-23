@@ -31,6 +31,42 @@ function continuation(reply: LLMResponse): LLMMessage[] {
 }
 
 describe("OpenRouter model compatibility", () => {
+  test("cancels a reasoning-only stream at the caller's deadline without another request", async () => {
+    const abort = new AbortController();
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async (_input, init) => {
+      const signal = init!.signal!;
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"reasoning":"Still thinking"}}]}\n\n'));
+          signal.addEventListener("abort", () => controller.error(signal.reason), { once: true });
+          // A stream can keep producing reasoning without an answer or call.
+          // The caller's deadline must still interrupt it.
+          setTimeout(() => abort.abort(new Error("test deadline reached")), 10);
+        },
+      }), { headers: { "content-type": "text/event-stream" } });
+    });
+    const provider = new OpenRouterProvider({ apiKey: "test", model: "vendor/reasoner", tools, fetchImpl });
+    await expect(provider.chatStream([user], () => {}, { signal: abort.signal, singleWireAttempt: true }))
+      .rejects.toThrow(/deadline|abort/i);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([false, true])("rejects a native call with no name instead of guessing an executable tool (stream=%s)", async streaming => {
+    const broken = { id: "broken", type: "function", function: { arguments: '{"file_path":"hello.txt"}' } };
+    const body = streaming
+      ? `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, ...broken }] }, finish_reason: "tool_calls" }] })}\n\ndata: [DONE]\n\n`
+      : JSON.stringify({ choices: [{ message: { content: "", tool_calls: [broken] }, finish_reason: "tool_calls" }] });
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, {
+      headers: { "content-type": streaming ? "text/event-stream" : "application/json" },
+    }));
+    const provider = new OpenRouterProvider({ apiKey: "test", model: "deepseek/deepseek-r1-0528", tools, fetchImpl });
+    const reply = streaming
+      ? provider.chatStream([user], () => {}, { singleWireAttempt: true })
+      : provider.chat([user], { singleWireAttempt: true });
+    await expect(reply).rejects.toThrow(/missing a non-empty name/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   test("shares a proportional small-window buffer between admission and the actual request", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify({
       choices: [{ message: { content: "hi" }, finish_reason: "stop" }],
