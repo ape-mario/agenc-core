@@ -54,13 +54,13 @@ function failDirectory(code: string, phase: "open" | "sync") {
 }
 
 describe.each(platforms)("file-history directory sync on %s", (platform) => {
-  test.each(unsupportedCodes)("handles unsupported %s only on Windows", async (code) => {
+  test.each(unsupportedCodes)("preserves the platform policy for unsupported %s", async (code) => {
     Object.defineProperty(process, "platform", { value: platform });
     const { error, close } = failDirectory(code, "sync");
     await history.makeSnapshot("first");
     await history.flush();
     expect(close).toHaveBeenCalledOnce();
-    if (platform === "win32") {
+    if (platform === "win32" || code === "EINVAL" || code === "ENOTSUP") {
       expect(diagnostics).toEqual([]);
       await expect(history["persistState"]()).resolves.toBeUndefined();
     } else {
@@ -82,13 +82,15 @@ test.each(unsupportedCodes)("tolerates unsupported directory open %s on Windows"
   expect(close).not.toHaveBeenCalled();
 });
 
-test.each(["EIO", "ENOSPC", "ENOENT"])("propagates Windows directory %s", async (code) => {
-  Object.defineProperty(process, "platform", { value: "win32" });
-  const { error, close } = failDirectory(code, "sync");
-  await expect(history["persistState"]()).rejects.toBe(error);
-  expect(close).toHaveBeenCalledOnce();
-  await history.makeSnapshot("first");
-  expect(diagnostics).toEqual([{ cause: "file_history_save_failed", message: String(error) }]);
+describe.each(platforms)("file-history directory errors on %s", (platform) => {
+  test.each(["EIO", "ENOSPC", "ENOENT"])("propagates directory %s", async (code) => {
+    Object.defineProperty(process, "platform", { value: platform });
+    const { error, close } = failDirectory(code, "sync");
+    await expect(history["persistState"]()).rejects.toBe(error);
+    expect(close).toHaveBeenCalledOnce();
+    await history.makeSnapshot("first");
+    expect(diagnostics).toEqual([{ cause: "file_history_save_failed", message: String(error) }]);
+  });
 });
 
 test("flushes the index file before rename and never suppresses its EPERM on Windows", async () => {
