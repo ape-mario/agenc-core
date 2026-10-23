@@ -323,6 +323,8 @@ describe("model search on the providers screen", () => {
       expect(screen.screen()).toContain("no models match");
 
       await screen.press(DOWN);
+      expect(screen.highlighted()).toMatch(/web search\s+auto/);
+      await screen.press(DOWN);
       expect(screen.highlighted()).toBe("replace api key");
       await screen.press("\r");
       expect(screen.screen()).toContain("openrouter api key");

@@ -1,3 +1,4 @@
+import { resolveWebSearchMode, WEB_SEARCH_ON_INSTRUCTION } from "../tools/web-search-mode.js";
 /**
  * System prompt assembly — AgenC-owned sections, static-then-dynamic,
  * with a cache-boundary marker separating cross-session cacheable content
@@ -1379,6 +1380,10 @@ export async function assembleSystemPrompt(
   // exactly at the boundary. The boundary marker stays in `sections`/`text`
   // for back-compat, but is never folded into `staticPrefix`/`dynamicSuffix`.
   const staticParts: string[] = [];
+  if (resolveWebSearchMode(session.services?.providerEnvironment ?? {},
+    session.services?.configStore?.current().web_search) === "on") {
+    staticSections.push(WEB_SEARCH_ON_INSTRUCTION);
+  }
   for (const s of staticSections) {
     if (s !== null && s.length > 0) staticParts.push(s);
   }

@@ -1,3 +1,4 @@
+import { applyWebSearchInstruction, resolveWebSearchMode } from "../tools/web-search-mode.js";
 import { validateAgentInvocationMessageSequence } from "../contracts/agent-invocation-envelope.js";
 import { assistantMessageFromResponse, parseToolUseBlocks, admittedModelStepId } from "../phases/stream-model.js";
 import { cumulativeUsage } from "./cumulative-usage.js";
@@ -2462,7 +2463,9 @@ async function resolveInitialTurnInstructions(
   const instructionEnvelope = await resolveLiveInstructionEnvelope({
     session,
     ctx,
-    baseInstructions: rawSystemPrompt ?? "",
+    baseInstructions: applyWebSearchInstruction(rawSystemPrompt ?? "", resolveWebSearchMode(
+      session.services.providerEnvironment ?? {}, session.services.configStore?.current().web_search,
+    )),
     ...(opts.instructionPolicy !== undefined
       ? { policy: opts.instructionPolicy }
       : {}),

@@ -29,6 +29,7 @@ import { prepareModelToolArgs, validateToolPreflight } from "./tools/execution.j
 
 import type { LLMTool, LLMToolCall } from "./llm/types.js";
 import { lightPresentation, standardPresentation } from "./tools/light-presentation.js";
+import { WEB_SEARCH_INITIAL_TOOLS } from "./tools/web-search-mode.js";
 import { LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES, LIGHT_INITIAL_TOOL_NAMES, lightEditsWithApplyPatch, lightUsesBatchEdit } from "./tools/light-profile.js";
 import type { FunctionCallOutputContentItem } from "./tools/context.js";
 import type {
@@ -694,6 +695,8 @@ export interface BuildToolRegistryOptions {
    * from the session's `AGENC_DEFER_RARE_TOOLS`.
    */
   readonly deferRareTools?: boolean;
+  /** Read for every request so a live config reload updates tool exposure. */
+  readonly webSearchEnabled?: () => boolean;
   /**
    * Session-configured structured-output JSON schema. Consumed by the
    * bootstrap model-facing tool assembly (`bin/bootstrap-tool-registry.ts`):
@@ -1334,7 +1337,12 @@ export function buildToolRegistry(
     return buildRouter().getSpecs();
   }
 
+  function manualWebTool(name: string): boolean {
+    return options.webSearchEnabled?.() === true && WEB_SEARCH_INITIAL_TOOLS.has(name);
+  }
+
   function isDeferredSpec(spec: ConfiguredToolSpec): boolean {
+    if (manualWebTool(spec.tool.name)) return false;
     if (standardDeferral && PLAN_MODE_TOOLS.has(spec.tool.name) && planModeActive()) return false;
     return spec.deferred === true ||
       (deferRareTools && (standardDeferral
@@ -1372,7 +1380,7 @@ export function buildToolRegistry(
     const lightIdentity = options.lightMode === true ? sessionModelIdentity() : { provider: undefined, model: undefined };
     return specs.filter(
       (spec) =>
-        (options.lightMode === true
+        manualWebTool(spec.tool.name) || (options.lightMode === true
           ? (lightEditsWithApplyPatch(lightIdentity.provider, lightIdentity.model)
             ? LIGHT_APPLY_PATCH_INITIAL_TOOL_NAMES : LIGHT_INITIAL_TOOL_NAMES).has(spec.tool.name) ||
             (spec.tool.name === "StructuredOutput" && options.outputSchema !== undefined) ||
@@ -1479,7 +1487,7 @@ export function buildToolRegistry(
   }
 
   let presentationMemo: { router: ToolRouter; discovered: readonly string[];
-    provider: string | undefined; planMode: boolean; tools: LLMTool[] } | undefined;
+    provider: string | undefined; planMode: boolean; webSearch: boolean; tools: LLMTool[] } | undefined;
   function buildPresentedTools(router: ToolRouter): LLMTool[] {
       const visible = standardDeferral ? loadOrderedSpecs(visibleSpecs(router)) : visibleSpecs(router);
       const searchVisible = visible.some(spec => spec.tool.name === SYSTEM_SEARCH_TOOLS_NAME);
@@ -1502,7 +1510,7 @@ export function buildToolRegistry(
       });
       if (!deferRareTools) return tools;
       const pointer = rareToolPointer(new Set(router.getSpecs()
-        .filter(spec => spec.unavailable !== true && (standardDeferral
+        .filter(spec => spec.unavailable !== true && !manualWebTool(spec.tool.name) && (standardDeferral
           ? isStandardDeferredTool(spec.tool.name)
           : isRareDeferredTool(spec.tool.name)))
         .map(spec => spec.tool.name)), { standard: standardDeferral });
@@ -1525,12 +1533,13 @@ export function buildToolRegistry(
       const discovered = [...discoveredToolNames];
       // Plan mode adds AskUserQuestion and ExitPlanMode (visibleSpecs, isDeferredSpec).
       const planMode = planModeActive();
+      const webSearch = options.webSearchEnabled?.() === true;
       const memo = presentationMemo;
-      if (memo?.router === router && memo.provider === provider && memo.planMode === planMode &&
+      if (memo?.router === router && memo.provider === provider && memo.planMode === planMode && memo.webSearch === webSearch &&
           memo.discovered.length === discovered.length &&
           memo.discovered.every((name, i) => name === discovered[i])) return memo.tools;
       const tools = buildPresentedTools(router);
-      presentationMemo = { router, provider, planMode, discovered, tools };
+      presentationMemo = { router, provider, planMode, webSearch, discovered, tools };
       return tools;
     },
     getDiscoveredToolNames(): ReadonlySet<string> {

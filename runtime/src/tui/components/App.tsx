@@ -1,3 +1,4 @@
+import { resolveWebSearchMode } from "../../tools/web-search-mode.js";
 import { useSessionEffortCatalog } from "../hooks/useSessionEffortCatalog.js";
 import { isEffectReviewRequired } from "../../session/effect-review-gate.js";
 import { usePendingEffectReviews } from "../hooks/usePendingEffectReviews.js";
@@ -97,7 +98,7 @@ import {
 import { useSettings } from "../hooks/useSettings.js";
 import { useMainLoopModel } from "../hooks/useMainLoopModel.js";
 import { GitStatusChrome } from "./GitStatusLine.js";
-import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext, StatusPromptCacheContext, StatusOffPeakContext, StatusZdrContext } from "../context/statusEffortContext.js";
+import { StatusEffortContext, StatusContextUsageContext, StatusTurnBusyContext, StatusPromptCacheContext, StatusOffPeakContext, StatusZdrContext, StatusWebSearchContext } from "../context/statusEffortContext.js";
 import { resolveZeroDataRetentionStatus } from "../../llm/zero-data-retention.js";
 import { readVeniceMenuModels } from "../../commands/venice-menu-models.js";
 import { readSessionSelection } from "../../session/provider-model-selection.js";
@@ -5196,6 +5197,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
     <StatusPromptCacheContext value={transcript.promptCacheShare}>
     <StatusOffPeakContext value={statusOffPeakSchedule}>
     <StatusZdrContext value={statusZdr}>
+    <StatusWebSearchContext value={resolveWebSearchMode(remoteAuthSessionContext.environment, config.web_search) === "on"}>
     <StatusTurnBusyContext value={isLoading || shellAbortController !== null}>
       <AnimatedTerminalTitle isAnimating={titleIsAnimating} title={title} />
       <GlobalKeybindingHandlers
@@ -5257,6 +5259,7 @@ function AgenCTuiShell(props: AgenCTuiShellProps): React.ReactElement {
       {exitFlow}
 
     </StatusTurnBusyContext>
+    </StatusWebSearchContext>
     </StatusZdrContext>
     </StatusOffPeakContext>
     </StatusPromptCacheContext>

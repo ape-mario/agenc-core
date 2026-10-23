@@ -6646,12 +6646,14 @@ describe("WebSearch through DeepSeek's Search API", () => {
     readonly session: Session | null;
     readonly env?: NodeJS.ProcessEnv;
     readonly deepseekWebSearch?: boolean;
+    readonly webSearchEnabled?: () => boolean;
     readonly emitWarning?: (warning: { cause: string; message: string }) => void;
   }) {
     return createModelFacingTools({
       workspaceRoot: process.cwd(),
       getSession: () => options.session,
       env: options.env ?? {},
+      ...(options.webSearchEnabled ? { webSearchEnabled: options.webSearchEnabled } : {}),
       ...(options.deepseekWebSearch !== undefined
         ? { deepseekWebSearch: options.deepseekWebSearch }
         : {}),
@@ -6914,6 +6916,21 @@ describe("WebSearch through DeepSeek's Search API", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(JSON.parse(result.content).source).toBe("deepseek_search");
     expect(result.admissionUsage?.costUsd).toBe(0.00075);
+  });
+
+  it("manual On forces proxy search but the DeepSeek environment switch still wins", async () => {
+    const endpoint = "https://proxy.example/deepseek/v1/tools/search";
+    for (const override of [undefined, "0", "1"]) {
+      const fetchMock = routedFetch([[endpoint, json200(searchBody)], ["https://html.duckduckgo.com/html/", ddgHtml]]);
+      const tool = webSearch({
+        session: deepseekSession({ baseURL: "https://proxy.example/deepseek/v1" }),
+        deepseekWebSearch: false, webSearchEnabled: () => true,
+        env: override === undefined ? {} : { AGENC_DEEPSEEK_WEB_SEARCH: override },
+      });
+      const result = await withFetch(fetchMock, () => tool.execute({ query: "news" }));
+      expect(JSON.parse(result.content).source).toBe(override === "0" ? "duckduckgo_html" : "deepseek_search");
+      expect(String(fetchMock.mock.calls[0]?.[0]).startsWith(endpoint)).toBe(override !== "0");
+    }
   });
 
   it("cancels the DeepSeek request on the admitted abort instead of falling back", async () => {

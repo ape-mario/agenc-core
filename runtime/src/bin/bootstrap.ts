@@ -1342,6 +1342,8 @@ async function bootstrapLocalRuntimeSessionScoped(
     workspaceRoot,
     agencHome,
     environment: providerEnvironment,
+    ...(startup.config.web_search !== undefined
+      ? { configuredWebSearch: startup.config.web_search } : {}),
     ...(startup.config.defer_rare_tools !== undefined
       ? { configuredDeferRareTools: startup.config.defer_rare_tools }
       : {}),

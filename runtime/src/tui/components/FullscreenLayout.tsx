@@ -29,7 +29,7 @@ import type { PermissionMode } from '../../permissions/types.js';
 import type { StickyPrompt } from './VirtualMessageList';
 import { useAppStateMaybeOutsideOfProvider } from '../state/AppState.js';
 import { PlanModeBanner } from './v2/primitives.js';
-import { useStatusEffort, useStatusContextUsage, useStatusPromptCache, useStatusOffPeakSchedule, useStatusZdr } from '../context/statusEffortContext.js';
+import { useStatusEffort, useStatusContextUsage, useStatusPromptCache, useStatusOffPeakSchedule, useStatusZdr, useStatusWebSearch } from '../context/statusEffortContext.js';
 import ThemedText from './design-system/ThemedText.js';
 import { useTheme } from './design-system/ThemeProvider.js';
 import { LedgerStatus } from './LedgerStatus.js';
@@ -750,6 +750,7 @@ export function statusLineZdrFact(status: ZeroDataRetentionStatus | null): Statu
 export function statusLineRightFacts(
   items: readonly StatusLineUsageItem[],
   zdr: ZeroDataRetentionStatus | null,
+  webSearch = false,
 ): StatusLineFact[] {
   const facts: StatusLineFact[] = items.map((item): StatusLineFact => {
     const short = item.key === 'cache'
@@ -764,6 +765,7 @@ export function statusLineRightFacts(
     const changed = short !== null && short.some((span, index) => span.text !== item.spans[index]?.text);
     return { key: item.key, forms: changed ? [item.spans, short] : [item.spans] };
   });
+  if (webSearch) facts.push({ key: "web-search", forms: [[{ text: "Web", color: "subtle" }]] });
   const badge = statusLineZdrFact(zdr);
   return badge === null ? facts : [...facts, badge];
 }
@@ -885,6 +887,7 @@ function StatusLineChrome({ columns, onRowsChange }: {
   const offPeakSchedule = useStatusOffPeakSchedule();
   const offPeak = useOffPeakNow(offPeakSchedule);
   const zdr = useStatusZdr();
+  const webSearch = useStatusWebSearch();
   // Unset means the default (Light). A session sets it from its runtime options.
   const lightMode = useAppStateMaybeOutsideOfProvider(state => state.lightMode) !== false;
   const [themeName] = useTheme();
@@ -905,7 +908,7 @@ function StatusLineChrome({ columns, onRowsChange }: {
       shellCount,
       runningAgents,
     }),
-    statusLineRightFacts(statusLineUsageItems(contextPercent, cachePercent, segments.spend, offPeak, valueColor), zdr),
+    statusLineRightFacts(statusLineUsageItems(contextPercent, cachePercent, segments.spend, offPeak, valueColor), zdr, webSearch),
   );
   useLayoutEffect(() => {
     onRowsChange?.(layout.rows);

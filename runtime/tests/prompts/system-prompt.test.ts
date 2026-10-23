@@ -1,3 +1,4 @@
+import { WEB_SEARCH_ON_INSTRUCTION, applyWebSearchInstruction } from "../../src/tools/web-search-mode.js";
 /**
  * Tests for the AgenC-owned system prompt assembly + dynamic boundary.
  *
@@ -1675,5 +1676,20 @@ describe("Light's model-family tuning follows the model through gateways", () =>
     expect(prompt).toContain(LIGHT_FINISH);
     expect(prompt).not.toContain("Edit and create files with apply_patch; put all hunks of one change in one patch.");
     expect(prompt).toBe(await head("anthropic", "claude-haiku-5-5"));
+  });
+});
+
+
+describe("manual web search instruction", () => {
+  test.each([true, false])("On supplies one short instruction (Light=%s)", async (lightProfile) => {
+    const session = fakeSession;
+    const services = { ...session.services, providerEnvironment: { AGENC_WEB_SEARCH: "on" } };
+    const on = await assembleSystemPrompt({ session: { ...session, services } as never, ctx: fakeCtx(), lightProfile });
+    expect(on.staticPrefix).toContain(WEB_SEARCH_ON_INSTRUCTION);
+    expect(on.text.split(WEB_SEARCH_ON_INSTRUCTION)).toHaveLength(2);
+    const auto = await assembleSystemPrompt({ session, ctx: fakeCtx(), lightProfile });
+    expect(auto.text).not.toContain(WEB_SEARCH_ON_INSTRUCTION);
+    expect(applyWebSearchInstruction(applyWebSearchInstruction(auto.text, "on"), "auto")).toBe(auto.text);
+    expect(applyWebSearchInstruction(on.text, "on").split(WEB_SEARCH_ON_INSTRUCTION)).toHaveLength(2);
   });
 });

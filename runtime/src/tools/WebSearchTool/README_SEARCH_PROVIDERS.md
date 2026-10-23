@@ -3,6 +3,42 @@
 AgenC supports multiple search backends through a provider adapter system in
 `runtime/src/tools/WebSearchTool/providers/`.
 
+## Manual web search
+
+In `/model`, select **Web search** and press Enter to switch between **Auto**
+(the default) and **On**. The same row appears on each provider's model page
+in `/providers`. On the DeepSeek page, its detail also shows the DeepSeek
+Search setting after the provider environment override. Changes apply to the
+current conversation and are saved for future sessions. The footer shows a monochrome `Web` marker while On.
+
+Set the top-level preference in `config.toml`:
+
+```toml
+web_search = "on" # "auto" preserves normal tool discovery
+```
+
+The session environment overrides this preference:
+
+```bash
+export AGENC_WEB_SEARCH=on # or auto
+```
+
+On advertises `WebSearch` and `web_fetch` from the first request in Light and
+standard sessions. It adds one short system instruction to search with
+`WebSearch` and read pages with `web_fetch`, instead of shell curl or wget.
+Auto adds no tools or prompt text. Explicit tool restrictions and approvals
+still apply. Tools already discovered in a conversation remain available
+when switching back to Auto.
+
+For a DeepSeek session, On also enables DeepSeek Search, including on the
+session's configured proxy host. It has the same effect as
+`[providers.deepseek] web_search = true`. The existing
+`AGENC_DEEPSEEK_WEB_SEARCH` override still wins: `0` disables DeepSeek Search
+even when manual web search is On; `1` enables it even when manual search is
+Auto. Auto otherwise leaves the provider's existing configuration intact.
+Other providers keep their existing native, configured-backend and DuckDuckGo
+selection and fallback behavior.
+
 ## Live agent WebSearch
 
 The daemon's model-facing `WebSearch` now uses these same HTTP adapters.

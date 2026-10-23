@@ -283,3 +283,54 @@ describe("the session switch reaches a session's tools", () => {
     for (const name of [...rare, "spawn_agent"]) expect(deferred.searchDescription).toContain(name);
   });
 });
+
+
+describe("manual web search exposure", () => {
+  test.each([true, false])("On updates the first tool set and reloads live (Light=%s)", (lightMode) => {
+    let on = false;
+    const tools = buildToolRegistry({
+      workspaceRoot: "/tmp", requireAdmission: false,
+      sandboxExecutionBroker: explicitDangerBroker,
+      lightMode, deferRareTools: true,
+      webSearchEnabled: () => on,
+      extraTools: [fakeTool("WebSearch"), fakeTool("web_fetch")],
+    });
+    expect(advertised(tools)).not.toContain("WebSearch");
+    const auto = tools.toLLMTools();
+    on = true;
+    expect(advertised(tools)).toContain("WebSearch");
+    expect(tools.getDeferredToolNames?.()).not.toContain("WebSearch");
+    expect(advertised(tools)).toContain("web_fetch");
+    on = false;
+    expect(tools.toLLMTools()).toEqual(auto);
+  });
+
+  test("On does not override disabled tools", () => {
+    const tools = buildToolRegistry({
+      workspaceRoot: "/tmp", requireAdmission: false,
+      sandboxExecutionBroker: explicitDangerBroker,
+      lightMode: true, webSearchEnabled: () => true,
+      toolsConfig: { disabled_tools: ["WebSearch"] },
+      extraTools: [fakeTool("WebSearch")],
+    });
+    expect(advertised(tools)).not.toContain("WebSearch");
+  });
+});
+
+
+test.each([true, false])("bootstrap applies config and captured environment to initial web tools (Light=%s)", (lightMode) => {
+  for (const [configuredWebSearch, override, expected] of [
+    [undefined, undefined, false], ["auto", undefined, false], ["on", undefined, true],
+    ["on", "auto", false], ["auto", "on", true],
+  ] as const) {
+    const tools = buildBootstrapToolRegistry({
+      workspaceRoot: "/tmp", getSession: () => null, emitWarning: () => {},
+      ...(configuredWebSearch === undefined ? {} : { configuredWebSearch }),
+      environment: override === undefined ? {} : { AGENC_WEB_SEARCH: override },
+      mcpManager: { getTools: () => [], effectiveServers: async () => new Map(), toolPluginProvenance: async () => null } as never,
+      csvAgentJobsRepositories: { async withRepository(): Promise<never> { throw new Error("unused"); } },
+      toolRegistryOptions: { lightMode, sandboxExecutionBroker: explicitDangerBroker },
+    });
+    for (const name of ["WebSearch", "web_fetch"]) expect(advertised(tools).includes(name)).toBe(expected);
+  }
+});

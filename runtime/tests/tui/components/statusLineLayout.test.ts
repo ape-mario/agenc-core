@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, test } from "vitest";
 
 import {
   layoutStatusLine,
@@ -145,4 +145,12 @@ describe("status line layout", () => {
     const usage = statusLineRightFacts(statusLineUsageItems(null, null, null, false), null);
     expect(layoutStatusLine(40, set.left, usage)).toMatchObject({ rows: 1, right: [] });
   });
+});
+
+
+test("manual web search has a monochrome footer marker only when On", () => {
+  expect(statusLineRightFacts([], null, false)).toEqual([]);
+  expect(statusLineRightFacts([], null, true)).toEqual([
+    { key: "web-search", forms: [[{ text: "Web", color: "subtle" }]] },
+  ]);
 });
