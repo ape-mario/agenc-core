@@ -6,7 +6,7 @@
 import type { LLMContentPart } from "../../llm/types.js";
 import type { AgentStatus as ThreadAgentStatus } from "../../agents/status.js";
 import type { Event } from "../../session/event-log.js";
-import { classifyTurnTerminal, createTurnFailedEvent } from "../../contracts/turn-terminal.js";
+import { classifyTurnTerminal, createTurnFailedEvent, turnTerminalResult } from "../../contracts/turn-terminal.js";
 import type {
   AgenCDaemonSessionNotification,
   AgentRunStatus,
@@ -170,10 +170,7 @@ function messageTerminalFromDaemonEvent(
   expectedTurnId: string | undefined,
 ): AgenCBackgroundAgentMessageTerminal | undefined {
   const terminal = classifyTurnTerminal(event, { expectedTurnId });
-  return terminal === undefined ? undefined : {
-    code: terminal.code,
-    ...(terminal.message !== undefined ? { message: terminal.message } : {}),
-  };
+  return terminal === undefined ? undefined : turnTerminalResult(terminal);
 }
 
 /**

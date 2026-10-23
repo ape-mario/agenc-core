@@ -3,6 +3,7 @@ import { readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { writeDurableAtomicFileSync } from "../utils/durable-atomic-file.js";
+import { readCgroupMemoryEvidence } from "./daemon-memory-evidence.js";
 
 /**
  * The daemon's heartbeat file: rewritten every few seconds with the process's
@@ -28,6 +29,7 @@ export interface DaemonHeartbeat {
   readonly rssMb: number;
   readonly heapUsedMb: number;
   readonly eventLoopLagMs: number;
+  readonly cgroup?: Readonly<Record<string, number>>;
 }
 
 export interface DaemonHeartbeatProcess {
@@ -137,6 +139,7 @@ export function installAgenCDaemonHeartbeat(options: {
   readonly proc?: DaemonHeartbeatProcess;
   readonly now?: () => number;
   readonly onError?: (error: unknown) => void;
+  readonly cgroupMemory?: () => Readonly<Record<string, number>> | undefined;
 }): () => void {
   const proc = options.proc ?? (process as DaemonHeartbeatProcess);
   const intervalMs = options.intervalMs ?? AGENC_DAEMON_HEARTBEAT_INTERVAL_MS;
@@ -146,6 +149,7 @@ export function installAgenCDaemonHeartbeat(options: {
   const write = (lagMs: number): void => {
     beat += 1;
     const memory = proc.memoryUsage();
+    const cgroup = options.cgroupMemory?.() ?? (process.platform === "linux" ? readCgroupMemoryEvidence() : undefined);
     const heartbeat: DaemonHeartbeat = {
       pid: proc.pid,
       beat,
@@ -154,6 +158,7 @@ export function installAgenCDaemonHeartbeat(options: {
       rssMb: Math.round(memory.rss / 1_048_576),
       heapUsedMb: Math.round(memory.heapUsed / 1_048_576),
       eventLoopLagMs: Math.round(lagMs),
+      ...(cgroup ? { cgroup } : {}),
     };
     try {
       writeDurableAtomicFileSync(
@@ -199,7 +204,17 @@ export function readAgenCDaemonHeartbeat(path: string): DaemonHeartbeat | null {
     return null;
   }
   if (typeof record.at !== "string" || Number.isNaN(Date.parse(record.at))) return null;
-  return record as unknown as DaemonHeartbeat;
+  const cgroup: Record<string, number> = {};
+  if (record.cgroup && typeof record.cgroup === "object") {
+    for (const key of ["currentBytes", "limitBytes", "peakBytes", "oom", "oom_kill", "oom_group_kill", "high", "max"]) {
+      const value = (record.cgroup as Record<string, unknown>)[key];
+      if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) cgroup[key] = value;
+    }
+  }
+  return { pid: record.pid as number, beat: record.beat as number, at: new Date(record.at).toISOString(),
+    uptimeS: record.uptimeS as number, rssMb: record.rssMb as number, heapUsedMb: record.heapUsedMb as number,
+    eventLoopLagMs: record.eventLoopLagMs as number,
+    ...(Object.keys(cgroup).length > 0 ? { cgroup } : {}) };
 }
 
 export function heartbeatAgeSeconds(heartbeat: DaemonHeartbeat, nowMs: number): number {
@@ -241,7 +256,8 @@ function describeUptime(uptimeS: number): string {
 export function describeDaemonHeartbeatVitals(heartbeat: DaemonHeartbeat): string {
   return (
     `rss ${heartbeat.rssMb} MB, heap ${heartbeat.heapUsedMb} MB, ` +
-    `event-loop lag ${heartbeat.eventLoopLagMs} ms, up ${describeUptime(heartbeat.uptimeS)}`
+    `event-loop lag ${heartbeat.eventLoopLagMs} ms, up ${describeUptime(heartbeat.uptimeS)}` +
+    (heartbeat.cgroup ? `, cgroup=${JSON.stringify(heartbeat.cgroup)}` : "")
   );
 }
 

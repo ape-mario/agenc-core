@@ -8,7 +8,7 @@ import { PendingEffectReviews } from "../../session/pending-effect-reviews.js";
 import type { LocalRuntimeBootstrap } from "../../bin/bootstrap.js";
 import type { Event } from "../../session/event-log.js";
 import { isHiddenGoalContinuation } from "../../session/hidden-goal-history.js";
-import { classifyTurnTerminal, type TurnTerminal } from "../../contracts/turn-terminal.js";
+import { classifyTurnTerminal, createTurnFailedEvent, turnTerminalResult, type TurnTerminal } from "../../contracts/turn-terminal.js";
 import { isStreamAttemptDiscard } from "../../contracts/stream-attempt-boundary.js";
 import type { RolloutItem } from "../../session/rollout-item.js";
 import { persistDisplayArtifactBytes } from "../../session/display-artifact-store.js";
@@ -177,10 +177,7 @@ function messageTerminalFromEvent(
   expectedTurnId: string | undefined,
 ): AgenCBackgroundAgentMessageTerminal | undefined {
   const terminal = classifyTurnTerminal(event, { expectedTurnId, legacyJournal: true });
-  return terminal === undefined ? undefined : {
-    code: terminal.code,
-    ...(terminal.message !== undefined ? { message: terminal.message } : {}),
-  };
+  return terminal === undefined ? undefined : turnTerminalResult(terminal);
 }
 
 interface MutableTranscriptV2Message extends JsonObject {
@@ -343,7 +340,8 @@ function transcriptNoticesFromRollout(
     if (terminal.outcome === "errored") {
       notices.push({
         eventId, committedSequence, type: "turn_failed",
-        payload: { turnId, code: terminal.failureCode, message: terminal.message ?? "" },
+        payload: { ...createTurnFailedEvent({ ...terminal, turnId: turnId!, code: terminal.failureCode,
+          message: terminal.message ?? "" }).payload },
       });
     } else if (terminal.outcome === "aborted") {
       notices.push({

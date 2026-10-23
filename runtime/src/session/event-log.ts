@@ -147,6 +147,7 @@ export interface TurnStartedEvent {
 }
 
 export interface TurnCompleteEvent {
+  readonly usableFinalAnswer?: boolean;
   readonly turnId: string;
   /** Agent-assignment correlation id, when this is a reusable worker turn. */
   readonly taskId?: string;

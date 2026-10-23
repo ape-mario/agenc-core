@@ -60,6 +60,7 @@ import type {
   LLMUsage,
   LLMResponse,
 } from "../llm/types.js";
+import { transportFailureOf } from "../llm/transport-failure.js";
 import {
   classifyUntrustedToolResult,
   frameUntrustedToolResultContent,
@@ -203,6 +204,7 @@ import { emitError, emitWarning, type EventMsg } from "./event-log.js";
 import {
   DEADLINE_REACHED_CAUSE,
   DEADLINE_REACHED_MESSAGE,
+  RunDeadlineReachedError,
   armRunDeadline,
   claimDeadlineReserveAnnouncement,
   deadlineRemainingMs,
@@ -1269,6 +1271,7 @@ async function runSamplingRequest(
   beforeOutageRetry?: () => void,
   childRoutingOwnsRetries?: (error: unknown) => boolean,
   checkpointPolicyIntent?: () => void,
+  recordTransportFailure?: (failure: ReturnType<typeof transportFailureOf>) => void,
 ): Promise<SamplingRequestResult> {
   let prepared = await prepareSamplingRequestBoundary(
     state,
@@ -1329,12 +1332,32 @@ async function runSamplingRequest(
   };
   let waitedMs = 0;
   let outageRetries = 0;
+  let transportAttempts = 0;
+  let lastTransportFailure: ReturnType<typeof transportFailureOf>;
+  const recoveryStartedAt = Date.now();
+  const recoveryReceipt = (outcome: string, error?: unknown): void => {
+    const failure = transportFailureOf(error) ?? lastTransportFailure;
+    if (failure === undefined) return;
+    lastTransportFailure = failure;
+    recordTransportFailure?.(failure);
+    const deadline = runDeadlineOf(session);
+    session.emit({ id: session.nextInternalSubId(), msg: { type: "warning", payload: {
+      cause: "transport_recovery", turnId: ctx.subId,
+      message: `Model transport recovery: ${outcome}.`,
+      details: { outcome, category: failure.category, status: failure.status ?? null,
+        attempts: transportAttempts, elapsedMs: Math.max(0, Date.now() - recoveryStartedAt),
+        remainingDeadlineMs: deadline ? Math.max(0, deadlineRemainingMs(deadline)) : null,
+        completedToolCallIds: state.completedToolResults.map(result => result.callId).join(","),
+        toolReplay: false },
+    } } }, { durable: true });
+  };
   let stallRetryStarted = false;
   const stallRetryController = new AbortController();
   signal = AbortSignal.any([signal, stallRetryController.signal]);
   let stallRetryTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     for (;;) {
+      const retryDeadline = runDeadlineOf(session);
       let retryBlocked = false;
       let retryBlockMessage: string | undefined;
       const blockInterruptedRetry = (error: unknown): boolean => {
@@ -1344,6 +1367,7 @@ async function runSamplingRequest(
         const blockedReason = interruptedStreamRetryBlockReason(state, error);
         if (blockedReason === null) return false;
         retryBlocked = true;
+        recoveryReceipt("blocked_by_dispatched_tool", error);
         retryBlockMessage = `The model stream disconnected; automatic retry stopped because ${blockedReason}. Type continue and press Enter to resume from the recorded tool results.`;
         suppressInterruptedStreamToolHistory(state);
         emitError(session, session.nextInternalSubId(), {
@@ -1362,9 +1386,14 @@ async function runSamplingRequest(
         // The reservation hook remains authoritative when another recovery path
         // has already consumed part of the shared A1 ladder.
         maxAttempts: MAX_RECOVERY_REENTRIES + 1,
-        giveUpMs: STREAM_RETRY_WINDOW_MS,
-        attempt: () =>
-          tryRunSamplingRequest(
+        giveUpMs: Math.max(1, Math.min(STREAM_RETRY_WINDOW_MS,
+          retryDeadline ? deadlineRemainingMs(retryDeadline) : STREAM_RETRY_WINDOW_MS)),
+        attempt: () => {
+          if (retryDeadline && deadlineRemainingMs(retryDeadline) <= 0) {
+            throw new StreamModelError(new RunDeadlineReachedError(retryDeadline.at));
+          }
+          transportAttempts += 1;
+          return tryRunSamplingRequest(
             state,
             samplingContext,
             session,
@@ -1373,9 +1402,11 @@ async function runSamplingRequest(
             events,
             assistantOutputSink,
             stallRetryStarted,
-          ),
+          );
+        },
         isTransient: isTransientSamplingError,
         onTransientRetry: async (attempt, err) => {
+          recoveryReceipt("interrupted", err);
           // The routing supervisor retries this task on another provider.
           if (supervisorOwnsRetry(err)) return false;
           // A stopped stream gets at most one new physical request, including
@@ -1417,8 +1448,13 @@ async function runSamplingRequest(
         },
       });
 
-      if (outcome.kind === "ok") return outcome.value;
+      if (outcome.kind === "ok") {
+        recoveryReceipt("recovered");
+        recordTransportFailure?.(undefined);
+        return outcome.value;
+      }
       if (outcome.kind === "aborted") {
+        recoveryReceipt("aborted");
         throw samplingAbortError(signal, outcome.reason);
       }
       // The fast ladder is exhausted. A provider that is down for minutes is
@@ -1435,9 +1471,12 @@ async function runSamplingRequest(
         !stallRetryStarted &&
         !isStreamProgressStop(lastError) &&
         outage.waitMs > 0 &&
+        outageRetries < MAX_RECOVERY_REENTRIES &&
         waitedMs + delayMs <= outage.waitMs &&
+        (retryDeadline === undefined || delayMs < deadlineRemainingMs(retryDeadline)) &&
         isTransientSamplingError(lastError);
       if (!canWait) {
+        recoveryReceipt("exhausted", lastError);
         if (!retryBlocked) {
           suppressInterruptedStreamToolHistory(state);
           cancelQueuedInterruptedTools(state);
@@ -2107,6 +2146,8 @@ export async function* runTurnKernel(
   const turnStartedAt = Date.now();
   let turnStarted = false;
   let terminalAttempted = false;
+  let usableFinalAnswer = false;
+  let lastTurnTransportFailure: ReturnType<typeof transportFailureOf>;
   const emitTurnStarted = (turnContextItem: TurnContextItem): void => {
     session.emit({
       id: session.nextInternalSubId(),
@@ -2172,6 +2213,7 @@ export async function* runTurnKernel(
           ? error.message
           : messages[stopReason],
         stopReason,
+        error,
       );
       return;
     }
@@ -2185,6 +2227,7 @@ export async function* runTurnKernel(
           lastAgentMessage: content,
           completedAt: Date.now(),
           durationMs: Date.now() - turnStartedAt,
+          usableFinalAnswer: content.trim().length > 0,
         },
       },
     });
@@ -2197,18 +2240,24 @@ export async function* runTurnKernel(
   const emitTurnFailed = (
     message: string,
     code = "turn_execution_failed",
+    error?: unknown,
   ): void => {
     if (terminalAttempted) return;
     terminalAttempted = true;
     const completedAt = Date.now();
+    const transportFailure = transportFailureOf(error) ?? (code === "deadline_reached" ? lastTurnTransportFailure : undefined);
+    const deadline = runDeadlineOf(session);
     session.emit({
       id: session.nextInternalSubId(),
       msg: createTurnFailedEvent({
         turnId: ctx.subId,
-        code,
+        code: transportFailure && code === "turn_execution_failed" ? "transport_error" : code,
         message,
         completedAt,
         durationMs: completedAt - turnStartedAt,
+        usableFinalAnswer,
+        ...(transportFailure ? { transportFailure } : {}),
+        ...(deadline ? { remainingDeadlineMs: Math.max(0, deadlineRemainingMs(deadline)) } : {}),
       }),
     });
   };
@@ -2312,6 +2361,8 @@ export async function* runTurnKernel(
       runningTask,
       {
         turnStartedAt,
+        recordFinalAnswer: () => { usableFinalAnswer = true; },
+        recordTransportFailure: failure => { lastTurnTransportFailure = failure; },
         emitTurnStarted,
         emitTurnComplete,
         emitTurnAborted,
@@ -2328,7 +2379,7 @@ export async function* runTurnKernel(
   } catch (error) {
     session.writeBehind?.finish();
     if (turnStarted) {
-      emitTurnFailed(error instanceof Error ? error.message : String(error));
+      emitTurnFailed(error instanceof Error ? error.message : String(error), undefined, error);
     }
     throw error;
   } finally {
@@ -2368,7 +2419,9 @@ interface RunTurnKernelCommons {
     error?: unknown,
   ) => void;
   readonly emitTurnAborted: (reason: string) => void;
-  readonly emitTurnFailed: (message: string, code?: string) => void;
+  readonly emitTurnFailed: (message: string, code?: string, error?: unknown) => void;
+  readonly recordFinalAnswer: () => void;
+  readonly recordTransportFailure: (failure: ReturnType<typeof transportFailureOf>) => void;
   readonly referenceContextItem: TurnContextItem;
   readonly sessionOwner: Session & {
     consumePendingProviderSwitch?: () => Promise<void>;
@@ -3279,7 +3332,7 @@ async function* runTurnKernelInner(
       DEADLINE_REACHED_CAUSE,
       DEADLINE_REACHED_MESSAGE,
     );
-    emitTurnComplete(DEADLINE_REACHED_MESSAGE, "deadline_reached");
+    emitTurnComplete(DEADLINE_REACHED_MESSAGE, "deadline_reached", error);
     return {
       terminal: { reason: "deadline_reached" },
       event: {
@@ -3766,6 +3819,7 @@ async function* runTurnKernelInner(
           persistNewResponseItems();
           emitTurnCheckpoint("iteration", { force: true });
         },
+        commons.recordTransportFailure,
       );
       for (const ev of pending) {
         yield ev;
@@ -3776,6 +3830,8 @@ async function* runTurnKernelInner(
       usage = cumulativeUsage(usage, result.usage);
       // Preserve visible text before a recovery transition resets sample state.
       if (result.assistantText.length > 0) lastContent = result.assistantText;
+      if (result.assistantText.trim().length > 0 && state.toolUseBlocks.length === 0 &&
+          state.transition === undefined && result.terminal === undefined) commons.recordFinalAnswer();
       const removedCorrectionIndex = clearTextToolCallCorrectionPrompt(state, consumedCorrection);
       if (removedCorrectionIndex !== undefined && removedCorrectionIndex < persistedMessageCount) {
         persistedMessageCount -= 1;
@@ -3827,11 +3883,11 @@ async function* runTurnKernelInner(
       const underlying =
         (sme?.cause instanceof Error ? sme.cause : undefined) ??
         (error instanceof Error ? error : new Error(String(error)));
-      if (signal.aborted) {
+      if (signal.aborted || underlying instanceof RunDeadlineReachedError) {
         // T6 gap #119: cancelled-with-error still gets `turn_aborted`
         // so rollout reconstruction sees a closed turn boundary.
         await syncSessionState();
-        if (isDeadlineAbort(signal)) {
+        if (isDeadlineAbort(signal) || underlying instanceof RunDeadlineReachedError) {
           const stopped = finishDeadlineReached(underlying);
           yield stopped.event;
           return stopped.terminal;
@@ -3870,9 +3926,10 @@ async function* runTurnKernelInner(
           ? underlying.message
           : "turn failed",
         underlying instanceof StreamProgressError ? underlying.reason : undefined,
+        underlying,
       );
       const terminal: Terminal = {
-        reason: underlying instanceof StreamProgressError ? "model_error" : "completed",
+        reason: "model_error",
         error: underlying,
       };
       yield {

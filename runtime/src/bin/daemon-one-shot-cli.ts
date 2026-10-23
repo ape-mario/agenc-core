@@ -1,4 +1,5 @@
 import "../bootstrap/node-env.js";
+import { readDaemonDisconnectEvidence } from "../app-server/daemon-disconnect-evidence.js";
 import { readLocalByokCredential } from "../auth/native-credentials.js";
 import { resolveCliCwdForStartup } from "./cli-cwd.js";
 import { requireProjectTrustForTui } from "./project-trust-preflight.js";
@@ -336,7 +337,7 @@ export async function stopDaemonAgentBestEffort(params: {
     });
 }
 
-type DaemonOneShotFinalStatus = {
+type DaemonOneShotFinalStatus = Pick<TurnTerminal, "durationMs" | "remainingDeadlineMs" | "transportFailure" | "usableFinalAnswer"> & {
   readonly code: number;
   readonly message?: string;
   /** `turn_failed` code (`compact_failed`, `max_turns`, …); absent for run death. */
@@ -350,6 +351,11 @@ type OneShotJsonResult = {
   readonly sessionId: string;
   readonly agentId: string;
   readonly exitCode: number;
+  readonly failureCode?: string;
+  readonly durationMs?: number;
+  readonly remainingDeadlineMs?: number;
+  readonly transportFailure?: TurnTerminal["transportFailure"];
+  readonly usableFinalAnswer?: boolean;
   /** Continuation turns started after a `compact_failed` stop (#2497). */
   readonly compactFailedRetries?: number;
   readonly finalMessage: string;
@@ -735,6 +741,10 @@ function oneShotStatusForTerminal(terminal: TurnTerminal): DaemonOneShotFinalSta
   }
   return {
     code: oneShotExitCodeForTerminal(terminal),
+    durationMs: terminal.durationMs,
+    remainingDeadlineMs: terminal.remainingDeadlineMs,
+    transportFailure: terminal.transportFailure,
+    usableFinalAnswer: terminal.usableFinalAnswer,
     ...(terminal.message !== undefined ? { message: terminal.message } : {}),
     ...(terminal.outcome === "errored" ? { failureCode: terminal.failureCode } : {}),
   };
@@ -745,15 +755,17 @@ function oneShotStatusForTerminal(terminal: TurnTerminal): DaemonOneShotFinalSta
  * RPC result, or a status without its turn event. The denial is recognized
  * there too, so the run's outcome does not depend on which arrives first.
  */
-function oneShotStatusForRpcTerminal(terminal: {
-  readonly code: number;
-  readonly message?: string;
-}): DaemonOneShotFinalStatus {
+function oneShotStatusForRpcTerminal(terminal: import("../app-server/protocol/index.js").MessageSendTerminalResult): DaemonOneShotFinalStatus {
   if (terminal.code === 130 && terminal.message === APPROVAL_DENIED_ABORT_REASON) {
     return { code: terminal.code, approvalDenied: true };
   }
   return {
-    code: terminal.code,
+    code: oneShotExitCodeForTerminal({ ...terminal, outcome: terminal.code === 1 ? "errored" : "completed" }),
+    failureCode: terminal.failureCode,
+    durationMs: terminal.durationMs,
+    remainingDeadlineMs: terminal.remainingDeadlineMs,
+    transportFailure: terminal.transportFailure,
+    usableFinalAnswer: terminal.usableFinalAnswer,
     ...(terminal.message !== undefined ? { message: terminal.message } : {}),
   };
 }
@@ -791,6 +803,7 @@ interface DaemonOneShotRunOutcome {
  * event, or from the `terminal` the `message.stream` RPC returns.
  */
 export async function awaitDaemonOneShotRun(params: {
+  readonly env?: NodeJS.ProcessEnv;
   readonly daemonClient: Awaited<
     ReturnType<AgenCDaemonCliDeps["createConnectedTuiClient"]>
   >;
@@ -807,6 +820,7 @@ export async function awaitDaemonOneShotRun(params: {
   readonly deadlineAt?: number;
 }): Promise<DaemonOneShotRunOutcome> {
   const { daemonClient, sessionId, outputFormat } = params;
+  const runStartedAt = Date.now();
   const io: OneShotIo = params.io ?? process;
   let unsubscribeEvents: (() => void) | null = null;
   let unsubscribeConnection: (() => void) | null = null;
@@ -877,6 +891,7 @@ export async function awaitDaemonOneShotRun(params: {
       const writeFinalResult = async (result: {
         readonly exitCode: number;
         readonly finalMessage: string;
+        readonly terminal?: DaemonOneShotFinalStatus;
       }): Promise<void> => {
         if (outputFormat === "text") return;
         const snapshotFields = await snapshotFieldsForStructuredOutput();
@@ -887,6 +902,11 @@ export async function awaitDaemonOneShotRun(params: {
           agentId: params.agentId,
           exitCode: result.exitCode,
           finalMessage: result.finalMessage,
+          failureCode: result.terminal?.failureCode,
+          durationMs: result.terminal?.durationMs ?? Math.max(0, Date.now() - runStartedAt),
+          remainingDeadlineMs: result.terminal?.remainingDeadlineMs,
+          transportFailure: result.terminal?.transportFailure,
+          usableFinalAnswer: result.terminal?.usableFinalAnswer ?? (result.exitCode === 0 && result.finalMessage.trim().length > 0),
           ...(retriesUsed > 0 ? { compactFailedRetries: retriesUsed } : {}),
           deniedPermissionRequestIds: [...deniedPermissionRequestIds],
           ...snapshotFields,
@@ -994,6 +1014,7 @@ export async function awaitDaemonOneShotRun(params: {
         await writeFinalResult({
           exitCode: finalStatus.code,
           finalMessage,
+          terminal: finalStatus,
         });
         settle({ code: finalStatus.code });
       };
@@ -1032,6 +1053,15 @@ export async function awaitDaemonOneShotRun(params: {
       unsubscribeConnection = daemonClient.subscribeToConnectionState(
         (state) => {
           if (state.status === "disconnected") {
+            if (settled || finalizing) return;
+            const evidence = readDaemonDisconnectEvidence(params.env);
+            const diagnostic = { type: "result", sessionId, agentId: params.agentId,
+              exitCode: 1, failureCode: "daemon_disconnected", finalMessage: "Daemon connection closed",
+              durationMs: Math.max(0, Date.now() - runStartedAt), usableFinalAnswer: false,
+              ...(params.deadlineAt !== undefined ? { remainingDeadlineMs: Math.max(0, params.deadlineAt - Date.now()) } : {}),
+              daemonEvidence: evidence };
+            if (outputFormat !== "text") writeOneShotJsonLine(diagnostic, io);
+            io.stderr.write(`agenc: daemon disconnect evidence ${JSON.stringify(evidence)}\n`);
             settle({
               error: new Error(state.message ?? "daemon connection closed"),
             });
@@ -1403,6 +1433,7 @@ async function runDaemonOneShotPrompt(params: {
     }
 
     const run = await awaitDaemonOneShotRun({
+      env: params.env,
       daemonClient,
       ...(params.io !== undefined ? { io: params.io } : {}),
       sessionId,
@@ -1437,10 +1468,11 @@ async function runDaemonOneShotPrompt(params: {
       }),
     });
     cancelled = run.cancelled;
-    completed = !cancelled;
-    return goal !== undefined && !cancelled
+    const exitCode = goal !== undefined && !cancelled
       ? await printModeGoalExitCode(daemonClient, sessionId, run.code, params.signal, params.io)
       : run.code;
+    completed = !cancelled && exitCode === 0;
+    return exitCode;
   } catch (error) {
     if (params.signal.aborted) cancelled = true;
     throw error;
