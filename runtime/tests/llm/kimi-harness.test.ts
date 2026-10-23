@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { KimiProvider } from "../../src/llm/providers/kimi/index.js";
+import { KIMI_CHAT_MODELS, isKimiK3Model } from "../../src/llm/registry/kimi-models.js";
 import { OpenRouterProvider } from "../../src/llm/providers/openrouter/index.js";
 import { buildChatCompletionsRequest } from "../../src/llm/wire/chat-completions.js";
 import { chatCompletionsCapabilityHintsForProvider } from "../../src/llm/wire/capability-gating.js";
@@ -13,8 +14,7 @@ const tool: LLMTool = { type: "function", function: {
   name: "FileRead", description: "Read a file", parameters: { type: "object", properties: { path: { type: "string" } } },
 } };
 const routes = [
-  ["kimi", "kimi-k3.1-pro"],
-  ["kimi", "kimi-k3.1-pro-highspeed"],
+  ...KIMI_CHAT_MODELS.map(model => ["kimi", model] as const),
   ["openrouter", "moonshotai/kimi-k3"],
 ] as const;
 
@@ -51,9 +51,19 @@ describe.each(routes)("%s %s harness", (providerName, model) => {
     // Both routes emit multiple calls without an optional parallel control.
     expect(body.parallel_tool_calls).toBeUndefined();
     if (providerName === "kimi") {
-      expect(body.reasoning_effort).toBe("high");
-      expect(body.max_completion_tokens).toBe(131_072);
-      expect(body).not.toHaveProperty("thinking");
+      if (isKimiK3Model(model)) {
+        expect(body.reasoning_effort).toBe("high");
+        expect(body.max_completion_tokens).toBe(131_072);
+        expect(body).not.toHaveProperty("thinking");
+      } else {
+        expect(body).not.toHaveProperty("reasoning_effort");
+        expect(body.max_completion_tokens).toBe(32_768);
+        if (model === "kimi-k2.6") {
+          expect(body.thinking).toEqual({ type: "enabled", keep: "all" });
+        } else {
+          expect(body).not.toHaveProperty("thinking");
+        }
+      }
       expect(body).not.toHaveProperty("temperature");
     }
   });
