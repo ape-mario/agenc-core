@@ -3013,6 +3013,21 @@ async function* runTurnKernelInner(
     });
   };
 
+  const syncAbortedSessionState = async (reason: TurnAbortReason | undefined): Promise<void> => {
+    if (reason === "interrupted") {
+      // A cancelled stream need not return an assistant message. Persist a
+      // nonempty assistant boundary so the next prompt does not leave two
+      // unanswered user requests, including after resume or in a child session.
+      // Do this after draining tools, without replaying incomplete tool calls
+      // or provider-specific reasoning from the cancelled sample.
+      state.messages.push({
+        role: "assistant",
+        content: "[The user stopped this response before it finished. Do not continue the previous request unless the user asks you to.]",
+      });
+    }
+    await syncSessionState();
+  };
+
   // ── GOAL #4b Stage 1 — durable iteration checkpoint emit ──────────────
   // The checkpoint promotes the already-consistent CB-Iteration boundary
   // (assistant + all its tool results appended; message threading valid) to
@@ -3287,7 +3302,7 @@ async function* runTurnKernelInner(
     const underlying = compactFailureError(error);
     if (signal.aborted) {
       await drainInFlight(state, ctx, session);
-      await syncSessionState();
+      await syncAbortedSessionState(turnSignalAbortReason(signal.reason));
       emitTurnAborted(turnSignalAbortReason(signal.reason));
       const terminal: Terminal = { reason: "cancelled" };
       yield {
@@ -3358,7 +3373,7 @@ async function* runTurnKernelInner(
     if (!signal.aborted) return null;
     state.reasoningCapPolicy = undefined;
     await drainInFlight(state, ctx, session);
-    await syncSessionState();
+    await syncAbortedSessionState(abortReason ?? (isDeadlineAbort(signal) ? undefined : turnSignalAbortReason(signal.reason)));
     if (abortReason === undefined && isDeadlineAbort(signal)) return finishDeadlineReached();
     emitTurnAborted(abortReason ?? turnSignalAbortReason(signal.reason));
     return {
@@ -3909,7 +3924,8 @@ async function* runTurnKernelInner(
       if (signal.aborted || underlying instanceof RunDeadlineReachedError) {
         // T6 gap #119: cancelled-with-error still gets `turn_aborted`
         // so rollout reconstruction sees a closed turn boundary.
-        await syncSessionState();
+        await syncAbortedSessionState(isDeadlineAbort(signal) || underlying instanceof RunDeadlineReachedError
+          ? undefined : turnSignalAbortReason(signal.reason));
         if (isDeadlineAbort(signal) || underlying instanceof RunDeadlineReachedError) {
           const stopped = finishDeadlineReached(underlying);
           yield stopped.event;
