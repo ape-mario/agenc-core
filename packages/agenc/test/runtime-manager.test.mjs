@@ -1793,7 +1793,11 @@ test("redirects and headers consume one shared runtime fetch budget", async () =
   let calls = 0;
   let cancellations = 0;
   let signal;
-  const started = performance.now();
+  // Leave room for scheduling jitter between the two redirects and the deadline.
+  const timeoutMs = 600;
+  const redirectDelayMs = 200;
+  let started;
+  let elapsed;
   try {
     const manifest = httpsManifest("7.6.3", "a".repeat(64), 1);
     await assert.rejects(
@@ -1802,12 +1806,25 @@ test("redirects and headers consume one shared runtime fetch budget", async () =
         manifest,
         manifestTrust: "explicitHttps",
         runtimeCompatibility: HOST_RUNTIME,
-        runtimeFetchTimeoutMs: 75,
+        runtimeFetchTimeoutMs: timeoutMs,
         log: () => {},
         async fetchImpl(_requested, options) {
+          // Filesystem and SQLite lock setup are outside the fetch budget.
+          started ??= performance.now();
           signal = options.signal;
           calls += 1;
-          await delay(35);
+          // Stall the third header wait so a fresh budget still reaches the
+          // call/cancellation/abort assertions, but fails the elapsed bound.
+          if (calls === 3) {
+            return new Promise((_resolve, reject) => {
+              signal.addEventListener("abort", () => {
+                // End at fetch rejection, before installer filesystem cleanup.
+                elapsed = performance.now() - started;
+                reject(signal.reason);
+              }, { once: true });
+            });
+          }
+          await delay(redirectDelayMs);
           return {
             status: 302,
             headers: {
@@ -1821,12 +1838,15 @@ test("redirects and headers consume one shared runtime fetch budget", async () =
           };
         },
       }),
-      /runtime artifact response headers timed out after 75 ms total/,
+      /runtime artifact response headers timed out after 600 ms total/,
     );
     assert.equal(calls, 3, "each redirect received a fresh timeout budget");
     assert.equal(cancellations, 2, "completed redirect bodies were not cancelled");
     assert.equal(signal.aborted, true);
-    assert.ok(performance.now() - started < 160, "redirects multiplied the timeout budget");
+    // Shared deadline: 600 ms. Reset per redirect: at least 200 + 200 + 600
+    // = 1000 ms. The 800 ms bound separates them with 200 ms of headroom.
+    assert.ok(elapsed < timeoutMs + redirectDelayMs,
+      `redirects multiplied the timeout budget: ${elapsed} ms`);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
