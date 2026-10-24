@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { describe, expect, test } from "vitest";
 import { sourcePath } from "../../helpers/source-path.ts";
 
-import { adaptTranscriptEvents } from "../session-transcript.js";
+import { adaptTranscriptEvents } from "../../../src/tui/session-transcript.js";
 
 const HOOK_SOURCE_PATH = sourcePath("tui/session-transcript.ts");
 

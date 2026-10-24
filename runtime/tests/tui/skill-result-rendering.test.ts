@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatStructuredToolResult } from "./session-transcript.js";
+import { formatStructuredToolResult } from "../../src/tui/session-transcript.js";
 
 /**
  * A successful Skill load returns the entire skill prompt as the tool result

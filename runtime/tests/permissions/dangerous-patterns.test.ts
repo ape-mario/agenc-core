@@ -6,7 +6,7 @@ import {
   hasShellConstructRequiringAsk,
   isDangerousShellCommand,
   matchedDangerousShellCommandLabel,
-} from "./dangerous-patterns.js";
+} from "../../src/permissions/dangerous-patterns.js";
 import {
   INERT_SHELL_SCRIPT_COMMANDS,
   REMOVAL_FLOOR_SHELL_CASES,

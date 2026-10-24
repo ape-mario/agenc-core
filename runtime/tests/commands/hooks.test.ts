@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { PassThrough } from "node:stream";
 import stripAnsi from "strip-ansi";
 
-import hooksCommand from "./hooks.js";
-import type { SlashCommandContext } from "./types.js";
-import type { Session } from "../session/session.js";
-import { ConfiguredHooksRuntime } from "../hooks/configured-hooks.js";
-import { createHookExecutionAuthority } from "../hooks/execution-authority.js";
+import hooksCommand from "../../src/commands/hooks.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import type { Session } from "../../src/session/session.js";
+import { ConfiguredHooksRuntime } from "../../src/hooks/configured-hooks.js";
+import { createHookExecutionAuthority } from "../../src/hooks/execution-authority.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
 
 function runtime(simpleMode = false): ConfiguredHooksRuntime {

@@ -34,9 +34,9 @@ vi.mock('react-reconciler', () => ({
 async function importHostConfig(): Promise<{
   hostConfig: HostConfig
   fakeReconciler: FakeReconciler
-  module: typeof import('./reconciler.ts')
-  dom: typeof import('./dom.ts')
-  focus: typeof import('./focus.ts')
+  module: typeof import('../../../src/tui/ink/reconciler.js')
+  dom: typeof import('../../../src/tui/ink/dom.js')
+  focus: typeof import('../../../src/tui/ink/focus.js')
 }> {
   vi.resetModules()
   reconcilerMock.hostConfig = undefined
@@ -45,9 +45,9 @@ async function importHostConfig(): Promise<{
     .mockImplementation((fn, ...args) => fn(...args))
 
   const [module, dom, focus] = await Promise.all([
-    import('./reconciler.ts'),
-    import('./dom.ts'),
-    import('./focus.ts'),
+    import('../../../src/tui/ink/reconciler.js'),
+    import('../../../src/tui/ink/dom.js'),
+    import('../../../src/tui/ink/focus.js'),
   ])
 
   if (!reconcilerMock.hostConfig) {
@@ -74,7 +74,7 @@ test('development devtools loader handles optional missing module asynchronously
   try {
     vi.resetModules()
     process.env.NODE_ENV = 'test'
-    const { loadDevtoolsForDevelopment } = await import('./reconciler.ts')
+    const { loadDevtoolsForDevelopment } = await import('../../../src/tui/ink/reconciler.js')
 
     const skippedImporter = vi.fn(async () => undefined)
     await loadDevtoolsForDevelopment(skippedImporter)

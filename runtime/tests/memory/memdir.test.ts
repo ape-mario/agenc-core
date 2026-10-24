@@ -7,36 +7,36 @@ import {
   getProjectRoot,
   setOriginalCwd,
   setProjectRoot,
-} from "../bootstrap/state.js";
+} from "../../src/bootstrap/state.js";
 import { resolveAutoMemoryDirectory, resolveGlobalMemoryDirectory } from "../../src/services/extractMemories/memory-paths.js";
-import { ConfigStore } from "../config/store.js";
-import { enterCanonicalSettingsAuthority } from "../utils/settings/canonicalAuthority.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { enterCanonicalSettingsAuthority } from "../../src/utils/settings/canonicalAuthority.js";
 import {
   getGlobalMemoryEntrypoint,
   getGlobalMemoryPath,
   getProjectMemoryEntrypoint,
   getProjectMemoryPath,
-} from "./paths.js";
+} from "../../src/memory/paths.js";
 
 vi.mock("bun:bundle", () => ({ feature: () => false }));
-vi.mock("../tools/GrepTool/prompt.js", () => ({ GREP_TOOL_NAME: "Grep" }));
-vi.mock("../tools/REPLTool/constants.js", () => ({ isReplModeEnabled: () => false }));
-vi.mock("../utils/embeddedTools.js", () => ({ hasEmbeddedSearchTools: () => false }));
-vi.mock("../utils/sessionStorage.js", () => ({ getProjectDir: (cwd: string) => cwd }));
-vi.mock("../utils/hooks.js", () => ({
+vi.mock("../../src/tools/GrepTool/prompt.js", () => ({ GREP_TOOL_NAME: "Grep" }));
+vi.mock("../../src/tools/REPLTool/constants.js", () => ({ isReplModeEnabled: () => false }));
+vi.mock("../../src/utils/embeddedTools.js", () => ({ hasEmbeddedSearchTools: () => false }));
+vi.mock("../../src/utils/sessionStorage.js", () => ({ getProjectDir: (cwd: string) => cwd }));
+vi.mock("../../src/utils/hooks.js", () => ({
   executeInstructionsLoadedHooks: async () => undefined,
   hasInstructionsLoadedHook: () => false,
 }));
-vi.mock("../tools.js", () => ({}));
+vi.mock("../../src/tools.js", () => ({}));
 vi.mock("src/tools.js", () => ({}));
-vi.mock("../utils/settings/settings.js", () => ({
+vi.mock("../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: () => ({ autoMemoryEnabled: true }),
   getInitialSettings: () => ({ autoMemoryEnabled: true }),
   getSettingsForSource: () => undefined,
 }));
 
-let memory: typeof import("./memdir.js");
-let agencmd: typeof import("./agencmd.js");
+let memory: typeof import("../../src/memory/memdir.js");
+let agencmd: typeof import("../../src/memory/agencmd.js");
 
 let tempRoot = "";
 let oldProjectRoot = "";
@@ -44,8 +44,8 @@ let oldOriginalCwd = "";
 let oldAgencHome: string | undefined;
 
 beforeAll(async () => {
-  memory = await import("./memdir.js");
-  agencmd = await import("./agencmd.js");
+  memory = await import("../../src/memory/memdir.js");
+  agencmd = await import("../../src/memory/agencmd.js");
 }, 30_000);
 
 beforeEach(() => {

@@ -8,7 +8,7 @@ import {
   __setAutoModeGateResolverForTesting,
   __setRemoteClassifierStageRunnerForTesting,
   __setClassifierWarningSinkForTesting,
-} from "./classifier.js";
+} from "../../src/permissions/classifier.js";
 import {
   attachContextDefaults,
   checkRuleBasedPermissions,
@@ -17,23 +17,23 @@ import {
   type AppStateSnapshot,
   type ToolEvaluatorContext,
   type ToolLike,
-} from "./evaluator.js";
+} from "../../src/permissions/evaluator.js";
 import {
   freshDenialTracking,
   type DenialTrackingState,
-} from "./denial-tracking.js";
-import type { PermissionRule } from "./rules.js";
-import { applyPermissionUpdate } from "./permission-updates.js";
+} from "../../src/permissions/denial-tracking.js";
+import type { PermissionRule } from "../../src/permissions/rules.js";
+import { applyPermissionUpdate } from "../../src/permissions/permission-updates.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionMode,
   type PermissionResult,
   type ToolPermissionContext,
-} from "./types.js";
-import { createUnattendedPermissionPolicy } from "./unattended-policy.js";
-import type { Session } from "../session/session.js";
-import { createWriteStdinTool } from "../tools/system/write-stdin.js";
-import { createBashTool } from "../tools/system/bash.js";
+} from "../../src/permissions/types.js";
+import { createUnattendedPermissionPolicy } from "../../src/permissions/unattended-policy.js";
+import type { Session } from "../../src/session/session.js";
+import { createWriteStdinTool } from "../../src/tools/system/write-stdin.js";
+import { createBashTool } from "../../src/tools/system/bash.js";
 
 // ---------------------------------------------------------------------------
 // Test harness

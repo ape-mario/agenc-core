@@ -5,7 +5,7 @@ const detectionMock = vi.hoisted(() => ({
   leaderPaneId: "%lead",
 }));
 
-vi.mock("../../../utils/swarm/backends/detection.js", () => ({
+vi.mock("../../../../src/utils/swarm/backends/detection.js", () => ({
   getLeaderPaneId: () => detectionMock.leaderPaneId,
   IT2_COMMAND: "it2",
   isInsideTmuxSync: () => detectionMock.insideTmux,
@@ -19,9 +19,9 @@ describe("resolveTeammateShowTargetPane", () => {
 
   test("selects a valid show target and rejects self-targeting", async () => {
     const { SWARM_SESSION_NAME, SWARM_VIEW_WINDOW_NAME } = await import(
-      "../../../utils/swarm/constants.js"
+      "../../../../src/utils/swarm/constants.js"
     );
-    const { resolveTeammateShowTargetPane } = await import("./TeamsDialog.js");
+    const { resolveTeammateShowTargetPane } = await import("../../../../src/tui/components/teams/TeamsDialog.js");
 
     detectionMock.insideTmux = true;
     detectionMock.leaderPaneId = "%lead";

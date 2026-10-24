@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
-import { JSON_RPC_VERSION } from "./protocol/index.js";
-import type { ElicitationRespondParams } from "./protocol/index.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
+import type { ElicitationRespondParams } from "../../src/app-server/protocol/index.js";
 
 describe("daemon elicitation response dispatch", () => {
   it("routes elicitation.respond to the agent manager", async () => {

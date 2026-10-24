@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 
-import type { Frame } from './frame.ts'
-import { LogUpdate } from './log-update.ts'
+import type { Frame } from '../../../src/tui/ink/frame.js'
+import { LogUpdate } from '../../../src/tui/ink/log-update.js'
 import {
   CellWidth,
   CharPool,
@@ -9,7 +9,7 @@ import {
   HyperlinkPool,
   setCellAt,
   StylePool,
-} from './screen.ts'
+} from '../../../src/tui/ink/screen.js'
 
 function stdoutText(diff: ReturnType<LogUpdate['render']>): string {
   return diff

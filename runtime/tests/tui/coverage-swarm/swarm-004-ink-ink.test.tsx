@@ -3,12 +3,12 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import type Ink from '../ink/ink.tsx'
-import type { Frame } from '../ink/frame.ts'
-import instances from '../ink/instances.ts'
-import { createRoot, type Root } from '../ink/root.ts'
-import { CURSOR_HOME, DISABLE_KITTY_KEYBOARD, DISABLE_MODIFY_OTHER_KEYS, ERASE_SCREEN } from '../ink/termio/csi.ts'
-import { DISABLE_MOUSE_TRACKING, ENABLE_MOUSE_TRACKING, ENTER_ALT_SCREEN, EXIT_ALT_SCREEN } from '../ink/termio/dec.ts'
+import type Ink from '../../../src/tui/ink/ink.js'
+import type { Frame } from '../../../src/tui/ink/frame.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot, type Root } from '../../../src/tui/ink/root.js'
+import { CURSOR_HOME, DISABLE_KITTY_KEYBOARD, DISABLE_MODIFY_OTHER_KEYS, ERASE_SCREEN } from '../../../src/tui/ink/termio/csi.js'
+import { DISABLE_MOUSE_TRACKING, ENABLE_MOUSE_TRACKING, ENTER_ALT_SCREEN, EXIT_ALT_SCREEN } from '../../../src/tui/ink/termio/dec.js'
 
 type TestStdout = PassThrough & {
   columns: number

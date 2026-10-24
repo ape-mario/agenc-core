@@ -7,13 +7,13 @@ vi.mock('bun:bundle', () => ({
 import {
   dropTextInBriefTurns,
   filterForBriefTool,
-} from './messagesBriefFiltering.js'
+} from '../../../src/tui/components/messagesBriefFiltering.js'
 import {
   getStreamingThinkingExpiryDelayMs,
   shouldRenderStreamingThinking,
   shouldShowStreamingThinking,
   STREAMING_THINKING_GRACE_MS,
-} from './Messages.js'
+} from '../../../src/tui/components/Messages.js'
 
 const BRIEF_TOOL = 'SendUserMessage'
 const FILE_TOOL = 'SendUserFile'

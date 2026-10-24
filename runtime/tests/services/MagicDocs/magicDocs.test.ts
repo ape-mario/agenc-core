@@ -4,24 +4,24 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LLMMessage } from "../../llm/types.js";
-import type { RunAgentParams } from "../../agents/run-agent.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
+import type { RunAgentParams } from "../../../src/agents/run-agent.js";
 import {
   clearFileReadListenersForTests,
   createFileReadTool,
   registerFileReadListener,
-} from "../../tools/system/file-read.js";
+} from "../../../src/tools/system/file-read.js";
 import {
   clearSessionReadState,
   getSessionReadSnapshot,
   seedSessionReadState,
   SESSION_ID_ARG,
-} from "../../tools/system/filesystem.js";
-import type { Session } from "../../session/session.js";
+} from "../../../src/tools/system/filesystem.js";
+import type { Session } from "../../../src/session/session.js";
 import {
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,
-} from "../../session/runtime-options.js";
+} from "../../../src/session/runtime-options.js";
 import {
   createMagicDocsEditPolicy,
   detectMagicDocHeader,
@@ -32,17 +32,17 @@ import {
   setMagicDocsAgentRunnerForTests,
   trackedMagicDocPathsForTests,
   type MagicDocsAgentRequest,
-} from "./magicDocs.js";
+} from "../../../src/services/MagicDocs/magicDocs.js";
 import {
   buildMagicDocsUpdatePrompt,
   substituteMagicDocsVariables,
-} from "./prompts.js";
+} from "../../../src/services/MagicDocs/prompts.js";
 
 const runAgentMockState = vi.hoisted(() => ({
   calls: [] as unknown[],
 }));
 
-vi.mock("../../agents/run-agent.js", () => ({
+vi.mock("../../../src/agents/run-agent.js", () => ({
   runAgent: async function* (params: unknown) {
     runAgentMockState.calls.push(params);
     return {

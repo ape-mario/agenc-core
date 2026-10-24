@@ -5,12 +5,12 @@ import { join } from "node:path";
 
 import { describe, expect, test, vi } from "vitest";
 
-import { createLSPClient } from "./LSPClient.js";
+import { createLSPClient } from "../../../src/services/lsp/LSPClient.js";
 import {
   SandboxExecutionBroker,
   type SandboxPreparedSpawn,
-} from "../../sandbox/execution-broker.js";
-import { registerSandboxExecutionLifecycleParticipant } from "../../sandbox/execution-lifecycle.js";
+} from "../../../src/sandbox/execution-broker.js";
+import { registerSandboxExecutionLifecycleParticipant } from "../../../src/sandbox/execution-lifecycle.js";
 import { explicitDangerBroker } from "../../helpers/explicit-danger-boundary.js";
 
 function registerLspParticipant(broker: SandboxExecutionBroker): void {

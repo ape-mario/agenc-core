@@ -9,11 +9,11 @@ import type {
   ParsedCommandElement,
   ParsedPowerShellCommand,
 } from "../../src/utils/powershell/parser.js";
-import { applyPermissionUpdate } from "../permissions/permission-updates.js";
+import { applyPermissionUpdate } from "../../src/permissions/permission-updates.js";
 import {
   createEmptyToolPermissionContext,
   type ToolPermissionContext,
-} from "../permissions/types.js";
+} from "../../src/permissions/types.js";
 
 function parsedCommand(
   name: string,

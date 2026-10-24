@@ -3,14 +3,14 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { canonicalTmpdir } from "../helpers/canonical-temp-dir.js";
-import { RolloutStore } from "../session/rollout-store.js";
-import { FileThreadStore } from "../thread-store/store.js";
-import { resolveLatestSessionId } from "../bin/resume-session.js";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { canonicalRolloutHoldsNoInput } from "../session/rollout-input.js";
-import { UNUSED_TUI_PREWARM_STOP_REASON } from "./agent-stop-reasons.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { FileThreadStore } from "../../src/thread-store/store.js";
+import { resolveLatestSessionId } from "../../src/bin/resume-session.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { canonicalRolloutHoldsNoInput } from "../../src/session/rollout-input.js";
+import { UNUSED_TUI_PREWARM_STOP_REASON } from "../../src/app-server/agent-stop-reasons.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 
 // The TUI creates its daemon session while the user types the first prompt.
 // When nobody uses that session (the TUI closes first, a staged startup choice

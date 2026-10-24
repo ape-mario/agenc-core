@@ -14,8 +14,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../session/event-log.js";
-import { RolloutStore } from "../session/rollout-store.js";
+import type { Event } from "../../src/session/event-log.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
 import {
   CSV_RECOVERY_CANDIDATE_PAGE_SIZE,
   CSV_RECOVERY_DEFERRED_PROCESS_IDENTITY_COARSE,
@@ -25,7 +25,7 @@ import {
   createCsvProcessIdentityProbe,
   CsvAgentJobsRepository,
   type CsvProcessIdentityProbe,
-} from "./csv-agent-jobs.js";
+} from "../../src/state/csv-agent-jobs.js";
 import {
   __setCsvOutputAfterExactUnlinkCaptureForTesting,
   __setCsvOutputAfterRecoveryReadChunkForTesting,
@@ -40,23 +40,23 @@ import {
   recoverCsvOutputIntents,
   writeCsvOutput,
   type CsvOutputIntentStore,
-} from "../agents/jobs/csv-output.js";
-import { csvOutputWriterAnchorPaths } from "../agents/jobs/csv-output-writer-anchor.js";
+} from "../../src/agents/jobs/csv-output.js";
+import { csvOutputWriterAnchorPaths } from "../../src/agents/jobs/csv-output-writer-anchor.js";
 import {
   canonicalizeCsvResult,
   compileCsvOutputSchema,
   validateCsvResultForPersistence,
-} from "../agents/jobs/csv-schema.js";
+} from "../../src/agents/jobs/csv-schema.js";
 import {
   CSV_MAX_DURABLE_BYTES,
   CSV_MAX_OUTPUT_STAGING_BYTES_GLOBAL,
   CSV_MAX_OUTPUT_STAGING_FILES_GLOBAL,
   CSV_MAX_RESULT_BLOB_BYTES_GLOBAL,
   CSV_MAX_STAGING_ROWS_GLOBAL,
-} from "../contracts/csv-job-contract.js";
-import { createOperatorEffectReviewResolution } from "./effect-review.js";
-import { StateRunDurabilityRepository } from "./run-durability.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+} from "../../src/contracts/csv-job-contract.js";
+import { createOperatorEffectReviewResolution } from "../../src/state/effect-review.js";
+import { StateRunDurabilityRepository } from "../../src/state/run-durability.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 
 let home = "";
 let cwd = "";

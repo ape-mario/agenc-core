@@ -9,22 +9,22 @@ import {
   __installTuiSessionContractForTest,
   oneShotCLI,
   type PreparedTurnRuntimeInputs,
-} from "./agenc-main.js";
-import { __installDaemonTurnDriverHooksForTest } from "../app-server/background-agent-runner.js";
-import { DAEMON_LOCAL_MCP_ACCESS, DAEMON_USER_PROMPT_PREPARED } from "../app-server/background-agent-runner/shared.js";
-import { hasLocalMcpAccess } from "../mcp-client/local-control.js";
-import { defaultConfig } from "../config/schema.js";
+} from "../../src/bin/agenc-main.js";
+import { __installDaemonTurnDriverHooksForTest } from "../../src/app-server/background-agent-runner.js";
+import { DAEMON_LOCAL_MCP_ACCESS, DAEMON_USER_PROMPT_PREPARED } from "../../src/app-server/background-agent-runner/shared.js";
+import { hasLocalMcpAccess } from "../../src/mcp-client/local-control.js";
+import { defaultConfig } from "../../src/config/schema.js";
 import {
   resolveProjectTrustRootSync,
   trustProjectSync,
-} from "../permissions/trust/project-trust.js";
-import type { PhaseEvent } from "../phases/events.js";
-import { AutonomousKeepaliveScheduler } from "../session/autonomous-mode.js";
+} from "../../src/permissions/trust/project-trust.js";
+import type { PhaseEvent } from "../../src/phases/events.js";
+import { AutonomousKeepaliveScheduler } from "../../src/session/autonomous-mode.js";
 import {
   canonicalizePath,
   clearSessionReadState,
   getSessionReadSnapshot,
-} from "../tools/system/filesystem.js";
+} from "../../src/tools/system/filesystem.js";
 
 function fakeSession(cwd: string) {
   let installed: {

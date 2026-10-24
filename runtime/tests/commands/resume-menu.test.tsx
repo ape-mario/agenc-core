@@ -11,17 +11,17 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { openResumeMenu } from "./resume-menu.js";
-import type { RolloutEntry } from "./resume.js";
-import type { SlashCommandContext } from "./types.js";
-import { createRoot } from "../tui/ink.js";
-import { AppStateProvider, getDefaultAppState } from "../tui/state/AppState.js";
+import { openResumeMenu } from "../../src/commands/resume-menu.js";
+import type { RolloutEntry } from "../../src/commands/resume.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import { createRoot } from "../../src/tui/ink.js";
+import { AppStateProvider, getDefaultAppState } from "../../src/tui/state/AppState.js";
 import {
   clearPendingResumeSessionId,
   consumePendingResumeSessionId,
   resetPendingResumeSessionIdForTestingOnly,
   setPendingResumeSessionId,
-} from "../tui/pending-resume.js";
+} from "../../src/tui/pending-resume.js";
 
 function makeCtx(
   appState?: SlashCommandContext["appState"],

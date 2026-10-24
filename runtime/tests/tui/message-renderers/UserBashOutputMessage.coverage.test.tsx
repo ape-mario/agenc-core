@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { UserBashOutputMessage } from './UserBashOutputMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { UserBashOutputMessage } from '../../../src/tui/message-renderers/UserBashOutputMessage.js'
 
 describe('UserBashOutputMessage', () => {
   it('renders persisted stdout preview and stderr from tagged bash output', async () => {

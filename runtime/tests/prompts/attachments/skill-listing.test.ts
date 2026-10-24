@@ -4,10 +4,10 @@
  */
 import { describe, expect, test } from "vitest";
 
-import { getAttachmentTrackingState } from "../../session/attachment-state.js";
-import { attachmentsToMessages, SKILL_LISTING_REMINDER_HEADER } from "./messages.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
-import { LIGHT_SKILL_LISTING_MAX_CHARS, skillListingProducer } from "./skill-listing.js";
+import { getAttachmentTrackingState } from "../../../src/session/attachment-state.js";
+import { attachmentsToMessages, SKILL_LISTING_REMINDER_HEADER } from "../../../src/prompts/attachments/messages.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
+import { LIGHT_SKILL_LISTING_MAX_CHARS, skillListingProducer } from "../../../src/prompts/attachments/skill-listing.js";
 
 function makeOpts(
   partial?: Partial<GetAttachmentsOptions>,

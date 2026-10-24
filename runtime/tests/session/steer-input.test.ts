@@ -19,28 +19,28 @@
 
 import { describe, expect, it } from "vitest";
 
-import { AsyncQueue } from "../utils/async-queue.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
+} from "../../src/session/session.js";
 import {
   type Config,
   type ManagedFeatures,
   type ModelInfo,
   type SessionConfiguration,
-} from "./turn-context.js";
+} from "../../src/session/turn-context.js";
 import {
   describeSteerInputError,
   isSteerable,
   nonSteerableTurnKindFrom,
   type SteerInputError,
-} from "./tasks.js";
-import type { LLMProvider, LLMMessage } from "../llm/types.js";
+} from "../../src/session/tasks.js";
+import type { LLMProvider, LLMMessage } from "../../src/llm/types.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Fixture helpers (mirror tasks.test.ts)

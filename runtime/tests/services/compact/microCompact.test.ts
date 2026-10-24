@@ -3,8 +3,8 @@ import {
   getMicrocompactSequenceForTests,
   microcompactMessages,
   resetMicrocompactState,
-} from "./microCompact.js";
-import type { RuntimeMessage } from "./types.js";
+} from "../../../src/services/compact/microCompact.js";
+import type { RuntimeMessage } from "../../../src/services/compact/types.js";
 
 describe("micro compact", () => {
   beforeEach(() => {

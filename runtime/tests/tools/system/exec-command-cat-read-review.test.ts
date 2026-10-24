@@ -10,11 +10,11 @@ import { mkdtemp, realpath, readFile, rm, stat, symlink, unlink, utimes, writeFi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { createExecCommandTool } from "./exec-command.js";
-import { createFileEditTool } from "./file-edit.js";
-import { getSessionReadSnapshot, SESSION_ID_ARG } from "./filesystem.js";
+import { createExecCommandTool } from "../../../src/tools/system/exec-command.js";
+import { createFileEditTool } from "../../../src/tools/system/file-edit.js";
+import { getSessionReadSnapshot, SESSION_ID_ARG } from "../../../src/tools/system/filesystem.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
-import type { ExecCommandToolOutput, UnifiedExecProcessManagerLike } from "../../unified-exec/types.js";
+import type { ExecCommandToolOutput, UnifiedExecProcessManagerLike } from "../../../src/unified-exec/types.js";
 
 const growth = vi.hoisted(() => ({ target: "", enabled: false, fired: false, maxRead: 0 }));
 const race = vi.hoisted(() => ({

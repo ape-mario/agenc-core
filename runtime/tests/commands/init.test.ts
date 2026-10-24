@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PROJECT_INSTRUCTIONS_FILENAME } from "../config/project-init.js";
-import type { Session } from "../session/session.js";
-import { initCommand } from "./init.js";
-import type { SlashCommandContext } from "./types.js";
+import { PROJECT_INSTRUCTIONS_FILENAME } from "../../src/config/project-init.js";
+import type { Session } from "../../src/session/session.js";
+import { initCommand } from "../../src/commands/init.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function stubSession(): Session {
   return {

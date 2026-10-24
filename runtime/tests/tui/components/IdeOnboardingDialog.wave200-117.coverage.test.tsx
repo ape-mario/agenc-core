@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 import {
   hasIdeOnboardingDialogBeenShown,
   IdeOnboardingDialog,
-} from "./IdeOnboardingDialog.js";
+} from "../../../src/tui/components/IdeOnboardingDialog.js";
 
 type TestConfig = {
   hasIdeOnboardingBeenShown?: Record<string, boolean>;
@@ -41,14 +41,14 @@ const harness = vi.hoisted(() => ({
   titleStaticPrefix: "*",
 }));
 
-vi.mock("../../utils/config.js", () => ({
+vi.mock("../../../src/utils/config.js", () => ({
   getRuntimeState: harness.getRuntimeState,
   updateRuntimeState: harness.updateRuntimeState,
 }));
 
-vi.mock("../../utils/env.js", async () => {
-  const actual = await vi.importActual<typeof import("../../utils/env.js")>(
-    "../../utils/env.js",
+vi.mock("../../../src/utils/env.js", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/utils/env.js")>(
+    "../../../src/utils/env.js",
   );
 
   return {
@@ -62,10 +62,10 @@ vi.mock("../../utils/env.js", async () => {
   };
 });
 
-vi.mock("../../utils/envDynamic.js", async () => {
+vi.mock("../../../src/utils/envDynamic.js", async () => {
   const actual = await vi.importActual<
-    typeof import("../../utils/envDynamic.js")
-  >("../../utils/envDynamic.js");
+    typeof import("../../../src/utils/envDynamic.js")
+  >("../../../src/utils/envDynamic.js");
 
   return {
     ...actual,
@@ -78,7 +78,7 @@ vi.mock("../../utils/envDynamic.js", async () => {
   };
 });
 
-vi.mock("../../utils/ide.js", () => ({
+vi.mock("../../../src/utils/ide.js", () => ({
   getTerminalIdeType: () => harness.terminalIdeType,
   isJetBrainsIde: (ide: string | null) =>
     ide === "intellij" || ide === "pycharm",
@@ -89,20 +89,20 @@ vi.mock("../../utils/ide.js", () => ({
   },
 }));
 
-vi.mock("../glyphs.js", () => ({
+vi.mock("../../../src/tui/glyphs.js", () => ({
   selectAgenCTuiGlyphs: () => ({
     statusDot: harness.statusDot,
     titleStaticPrefix: harness.titleStaticPrefix,
   }),
 }));
 
-vi.mock("../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybindings: (handlers: KeybindingHandlers, options: unknown) => {
     harness.keybindings = { handlers, options };
   },
 }));
 
-vi.mock("./design-system/Dialog.js", async () => {
+vi.mock("../../../src/tui/components/design-system/Dialog.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
 
   return {

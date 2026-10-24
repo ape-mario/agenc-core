@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 async function importAdapter() {
   vi.resetModules()
-  return import('./messagesOptionalModules.js')
+  return import('../../../src/tui/components/messagesOptionalModules.js')
 }
 
 afterEach(() => {

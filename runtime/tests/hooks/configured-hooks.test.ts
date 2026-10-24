@@ -10,13 +10,13 @@ import {
   ConfiguredHooksRuntime as ProductionConfiguredHooksRuntime,
   matchesPattern,
   type HookInstallTarget,
-} from "./configured-hooks.js";
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
-import type { HooksMap } from "../config/schema.js";
+} from "../../src/hooks/configured-hooks.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
+import type { HooksMap } from "../../src/config/schema.js";
 import {
   createHookExecutionAuthority,
   type HookExecutionAuthority,
-} from "../hooks/execution-authority.js";
+} from "../../src/hooks/execution-authority.js";
 
 const explicitDangerBroker = new SandboxExecutionBroker({
   mode: "danger_full_access",

@@ -2,17 +2,17 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { AgenCDaemonAgentManager } from "../app-server/agent-lifecycle.js";
-import { AgenCDaemonJsonRpcDispatcher } from "../app-server/daemon-dispatcher.js";
-import { JSON_RPC_VERSION } from "../app-server/protocol/index.js";
-import { LocalAuthBackend } from "../auth/backends/local.js";
-import { readNativeSecureStorage } from "../utils/secureStorage/native.js";
-import { resolveSecureStorageHome } from "../utils/secureStorage/home.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
+import { LocalAuthBackend } from "../../src/auth/backends/local.js";
+import { readNativeSecureStorage } from "../../src/utils/secureStorage/native.js";
+import { resolveSecureStorageHome } from "../../src/utils/secureStorage/home.js";
 import {
   createAgenCPortalDaemonInitializeRequest,
   AGENC_PORTAL_AUTH_METHODS,
   AGENC_PORTAL_METHODS,
-} from "./index.js";
+} from "../../src/app-server-protocol/index.js";
 
 describe("AgenC portal AuthBackend contract", () => {
   it("routes portal auth actions through the daemon AuthBackend token store", async () => {

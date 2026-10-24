@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { monotonicMs, monotonicNs, startElapsedMs } from "./monotonic.js";
+import { monotonicMs, monotonicNs, startElapsedMs } from "../../src/utils/monotonic.js";
 
 describe("monotonicMs", () => {
   test("returns a finite non-negative number", () => {

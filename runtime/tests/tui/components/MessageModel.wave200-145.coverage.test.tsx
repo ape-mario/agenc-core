@@ -3,13 +3,13 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import type { NormalizedMessage } from "../../types/message.js";
-import type { DOMElement, DOMNode } from "../ink/dom.js";
-import instances from "../ink/instances.js";
-import { createRoot } from "../ink/root.js";
-import { stringWidth } from "../ink/stringWidth.js";
-import type { TextStyles } from "../ink/styles.js";
-import { MessageModel } from "./MessageModel.js";
+import type { NormalizedMessage } from "../../../src/types/message.js";
+import type { DOMElement, DOMNode } from "../../../src/tui/ink/dom.js";
+import instances from "../../../src/tui/ink/instances.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { stringWidth } from "../../../src/tui/ink/stringWidth.js";
+import type { TextStyles } from "../../../src/tui/ink/styles.js";
+import { MessageModel } from "../../../src/tui/components/MessageModel.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

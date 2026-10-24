@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { renderToString } from '../../../utils/staticRender.js'
-import { Box } from '../../ink.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { Box } from '../../../../src/tui/ink.js'
 
 const harness = vi.hoisted(() => ({ platform: 'linux' }))
 
@@ -9,20 +9,20 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../keybindings/useShortcutDisplay.js', () => ({
+vi.mock('../../../../src/tui/keybindings/useShortcutDisplay.js', () => ({
   useShortcutDisplay: (_action: string, _context: string, fallback: string) =>
     fallback,
 }))
 
-vi.mock('../../keybindings/loadUserBindings.js', () => ({
+vi.mock('../../../../src/tui/keybindings/loadUserBindings.js', () => ({
   isKeybindingCustomizationEnabled: () => false,
 }))
 
-vi.mock('../../../utils/platform.js', () => ({
+vi.mock('../../../../src/utils/platform.js', () => ({
   getPlatform: () => harness.platform,
 }))
 
-vi.mock('../../../utils/config.js', () => ({
+vi.mock('../../../../src/utils/config.js', () => ({
   getRuntimeState: () => {
     throw new Error('global runtime state must not be read while rendering help')
   },
@@ -30,7 +30,7 @@ vi.mock('../../../utils/config.js', () => ({
 
 describe('PromptInputHelpMenu', () => {
   it('keeps one prefix row and two compact shortcut columns at narrow widths (<100)', async () => {
-    const { PromptInputHelpMenu } = await import('./PromptInputHelpMenu.js')
+    const { PromptInputHelpMenu } = await import('../../../../src/tui/components/PromptInput/PromptInputHelpMenu.js')
     const output = await renderToString(
       <PromptInputHelpMenu runtimeState={{}} />,
       80,
@@ -56,7 +56,7 @@ describe('PromptInputHelpMenu', () => {
   })
 
   it('puts prefix, editing and viewing groups side by side at wide widths (>=100)', async () => {
-    const { PromptInputHelpMenu } = await import('./PromptInputHelpMenu.js')
+    const { PromptInputHelpMenu } = await import('../../../../src/tui/components/PromptInput/PromptInputHelpMenu.js')
     const output = await renderToString(
       <PromptInputHelpMenu runtimeState={{}} />,
       120,
@@ -77,7 +77,7 @@ describe('PromptInputHelpMenu', () => {
   })
 
   it('keeps shortcut rows separate while the transcript yields room in a short parent', async () => {
-    const { PromptInputHelpMenu } = await import('./PromptInputHelpMenu.js')
+    const { PromptInputHelpMenu } = await import('../../../../src/tui/components/PromptInput/PromptInputHelpMenu.js')
     const output = await renderToString(
       <Box height={7} flexDirection="column">
         <Box flexGrow={1} flexShrink={1}><Box height={3} /></Box>
@@ -95,7 +95,7 @@ describe('PromptInputHelpMenu', () => {
 
   it.each(['linux', 'windows', 'macos'])('advertises both mode keys on %s', async platform => {
     harness.platform = platform
-    const { PromptInputHelpMenu } = await import('./PromptInputHelpMenu.js')
+    const { PromptInputHelpMenu } = await import('../../../../src/tui/components/PromptInput/PromptInputHelpMenu.js')
     const output = await renderToString(
       <PromptInputHelpMenu runtimeState={{}} />,
       120,
@@ -108,7 +108,7 @@ describe('PromptInputHelpMenu', () => {
   })
 
   it.each(['linux', 'windows', 'macos'])('formats keyboard names and undo on %s', async platform => {
-    const { formatHelpKey } = await import('./PromptInputHelpMenu.js')
+    const { formatHelpKey } = await import('../../../../src/tui/components/PromptInput/PromptInputHelpMenu.js')
     const modifier = platform === 'macos' ? 'option' : 'alt'
     expect(formatHelpKey('meta+m', platform)).toBe(`${modifier}+m`)
     expect(formatHelpKey('alt+p', platform)).toBe(`${modifier}+p`)

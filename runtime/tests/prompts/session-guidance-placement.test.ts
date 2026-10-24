@@ -13,11 +13,11 @@
  */
 import { describe, expect, test } from "vitest";
 
-import type { TurnContext } from "../session/turn-context.js";
-import type { Session } from "../session/session.js";
-import { assembleSystemPrompt } from "./system-prompt.js";
-import { buildOpenAIResponsesRequest } from "../llm/wire/responses-openai.js";
-import type { LLMMessage } from "../llm/types.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import type { Session } from "../../src/session/session.js";
+import { assembleSystemPrompt } from "../../src/prompts/system-prompt.js";
+import { buildOpenAIResponsesRequest } from "../../src/llm/wire/responses-openai.js";
+import type { LLMMessage } from "../../src/llm/types.js";
 
 function fakeCtx(): TurnContext {
   const cfg = {

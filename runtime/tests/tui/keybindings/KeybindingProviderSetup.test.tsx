@@ -1,10 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("../ink.js", () => ({
+vi.mock("../../../src/tui/ink.js", () => ({
   useInput: () => {},
 }));
 
-vi.mock("../context/notifications.js", () => ({
+vi.mock("../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({
     addNotification: () => {},
     removeNotification: () => {},
@@ -15,18 +15,18 @@ import {
   createChordInputHandler,
   formatKeybindingWarningNotification,
   formatKeybindingWarningSummary,
-} from "./KeybindingProviderSetup.js";
-import { DEFAULT_BINDINGS } from "./defaultBindings.js";
-import { parseBindings } from "./parser.js";
-import { resolveKeyWithChordState } from "./resolver.js";
-import type { Key } from "../ink.js";
+} from "../../../src/tui/keybindings/KeybindingProviderSetup.js";
+import { DEFAULT_BINDINGS } from "../../../src/tui/keybindings/defaultBindings.js";
+import { parseBindings } from "../../../src/tui/keybindings/parser.js";
+import { resolveKeyWithChordState } from "../../../src/tui/keybindings/resolver.js";
+import type { Key } from "../../../src/tui/ink.js";
 import {
   INITIAL_STATE,
   parseMultipleKeypresses,
   type ParsedKey,
-} from "../ink/parse-keypress.js";
-import { InputEvent } from "../ink/events/input-event.js";
-import type { KeybindingContextName, ParsedKeystroke } from "./types.js";
+} from "../../../src/tui/ink/parse-keypress.js";
+import { InputEvent } from "../../../src/tui/ink/events/input-event.js";
+import type { KeybindingContextName, ParsedKeystroke } from "../../../src/tui/keybindings/types.js";
 
 type HandlerRegistration = {
   action: string;

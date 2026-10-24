@@ -5,13 +5,13 @@
  */
 import { describe, expect, test, vi } from "vitest";
 
-import type { LLMMessage } from "../../llm/types.js";
-import type { ToolPermissionContext } from "../../permissions/types.js";
-import { getAttachmentTrackingState } from "../../session/attachment-state.js";
-import { LIGHT_MEMORY_RULES_MARKER } from "../../memory/memdir.js";
-import { attachmentsToMessages } from "./messages.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
-import { asksAboutMemory, memoryOnRequestProducer } from "./memory-on-request.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
+import type { ToolPermissionContext } from "../../../src/permissions/types.js";
+import { getAttachmentTrackingState } from "../../../src/session/attachment-state.js";
+import { LIGHT_MEMORY_RULES_MARKER } from "../../../src/memory/memdir.js";
+import { attachmentsToMessages } from "../../../src/prompts/attachments/messages.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
+import { asksAboutMemory, memoryOnRequestProducer } from "../../../src/prompts/attachments/memory-on-request.js";
 
 const RULES = `# auto memory\n\n${LIGHT_MEMORY_RULES_MARKER}: ...\n\n# Memory directories (both exist: Write there directly, without mkdir)\n- Global: \`/home/u/.agenc/memory/\``;
 

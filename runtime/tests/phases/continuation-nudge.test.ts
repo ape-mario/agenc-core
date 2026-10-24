@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { continuationNudge } from "./continuation-nudge.js";
-import type { TurnContext } from "../session/turn-context.js";
-import type { TurnState } from "../session/turn-state.js";
-import type { Session } from "../session/session.js";
+import { continuationNudge } from "../../src/phases/continuation-nudge.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import type { TurnState } from "../../src/session/turn-state.js";
+import type { Session } from "../../src/session/session.js";
 
 function mkCtx(): TurnContext {
   return {

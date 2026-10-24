@@ -4,11 +4,11 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import {
   MessageActionsBar,
   type MessageActionsState,
-} from './messageActions.js'
+} from '../../../src/tui/components/messageActions.js'
 
 function createStreams(): {
   stdout: PassThrough

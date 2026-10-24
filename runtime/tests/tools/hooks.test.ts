@@ -14,13 +14,13 @@ import {
   type PostToolUseFailureHook,
   type PostToolUseHook,
   type PreToolUseHook,
-} from "./hooks.js";
-import type { Tool } from "./types.js";
-import type { ToolInvocation } from "./context.js";
+} from "../../src/tools/hooks.js";
+import type { Tool } from "../../src/tools/types.js";
+import type { ToolInvocation } from "../../src/tools/context.js";
 import {
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,
-} from "../session/runtime-options.js";
+} from "../../src/session/runtime-options.js";
 
 const stubTool: Tool = {
   name: "stub",

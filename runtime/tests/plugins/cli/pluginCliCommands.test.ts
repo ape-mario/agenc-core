@@ -3,31 +3,31 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { parseToml } from "../../config/loader.js";
-import { pluginFilesystemKey } from "../directories.js";
+import { parseToml } from "../../../src/config/loader.js";
+import { pluginFilesystemKey } from "../../../src/plugins/directories.js";
 import {
   defaultRunProcess,
   marketplaceInstalledPath,
   marketplaceIndexPath,
   marketplaceStoreRoot,
   type FetchResponse,
-} from "../marketplace/marketplace.js";
-import { updateMarketplaceInventory } from "../marketplace/inventory.js";
+} from "../../../src/plugins/marketplace/marketplace.js";
+import { updateMarketplaceInventory } from "../../../src/plugins/marketplace/inventory.js";
 import {
   formatAgenCPluginCliHelpText,
   parseAgenCPluginCliArgs,
   pluginListWithCatalog,
   runAgenCPluginCli,
   type AgenCPluginCliOptions,
-} from "./pluginCliCommands.js";
-import type { PluginCliIo } from "./pluginOperations.js";
-import { loadPlugins } from "../loader.js";
-import { installPluginOp, listInstalledPlugins, uninstallPluginOp } from "./pluginOperations.js";
-import { addMarketplaceOp } from "../marketplace/marketplace.js";
+} from "../../../src/plugins/cli/pluginCliCommands.js";
+import type { PluginCliIo } from "../../../src/plugins/cli/pluginOperations.js";
+import { loadPlugins } from "../../../src/plugins/loader.js";
+import { installPluginOp, listInstalledPlugins, uninstallPluginOp } from "../../../src/plugins/cli/pluginOperations.js";
+import { addMarketplaceOp } from "../../../src/plugins/marketplace/marketplace.js";
 import { buildMarketplaceCatalog, OFFICIAL_MARKETPLACE_NAME,
-  OFFICIAL_MARKETPLACE_REFRESH_MS, OFFICIAL_MARKETPLACE_URL } from "../marketplace/catalog-cli.js";
-import { substitutePluginTemplate } from "../registration/common.js";
-import { pluginSignaturePayloadBytes } from "../resolution.js";
+  OFFICIAL_MARKETPLACE_REFRESH_MS, OFFICIAL_MARKETPLACE_URL } from "../../../src/plugins/marketplace/catalog-cli.js";
+import { substitutePluginTemplate } from "../../../src/plugins/registration/common.js";
+import { pluginSignaturePayloadBytes } from "../../../src/plugins/resolution.js";
 
 function createIo(): PluginCliIo & {
   readonly stdoutText: () => string;

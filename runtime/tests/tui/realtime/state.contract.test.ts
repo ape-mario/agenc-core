@@ -6,7 +6,7 @@ import {
   initialRealtimeTuiState,
   realtimeLevelBar,
   reduceRealtimeTuiState,
-} from "./state.js";
+} from "../../../src/tui/realtime/state.js";
 
 describe("AgenC TUI realtime state", () => {
   test("tracks voice lifecycle phases and close/error banners", () => {

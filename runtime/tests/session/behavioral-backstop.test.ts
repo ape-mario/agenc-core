@@ -20,13 +20,13 @@ import {
   stepActionSignature,
   stepResultHash,
   type BehavioralConfig,
-} from "./behavioral-backstop.js";
+} from "../../src/session/behavioral-backstop.js";
 import type {
   AssistantMessage,
   CompletedToolResultRecord,
   TurnState,
-} from "./turn-state.js";
-import type { LLMUsage } from "../llm/types.js";
+} from "../../src/session/turn-state.js";
+import type { LLMUsage } from "../../src/llm/types.js";
 
 // ── Minimal fixtures ────────────────────────────────────────────────
 

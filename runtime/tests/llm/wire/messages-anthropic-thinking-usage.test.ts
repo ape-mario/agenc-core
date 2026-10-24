@@ -2,7 +2,7 @@ import { taskUsageTokens, TaskBudget } from "../../../src/session/task-budget.js
 import { describe, expect, test } from "vitest";
 import {
   parseAnthropicMessagesResponse,
-} from "./messages-anthropic.js";
+} from "../../../src/llm/wire/messages-anthropic.js";
 import {
   computeUsdCost,
   DEFAULT_MODEL_COSTS,

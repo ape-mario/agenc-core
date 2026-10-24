@@ -28,10 +28,10 @@ vi.mock("axios", () => {
     isAxiosError: () => false,
   };
 });
-import { createAgentRoleWorkspace } from "../agents/role.js";
+import { createAgentRoleWorkspace } from "../../src/agents/role.js";
 import { mkSession as mkRuntimeSession } from "../fixtures.js";
-import { MAX_RECOVERY_REENTRIES } from "../recovery/fallback-ladder.js";
-import { EventLog, type Event } from "./event-log.js";
+import { MAX_RECOVERY_REENTRIES } from "../../src/recovery/fallback-ladder.js";
+import { EventLog, type Event } from "../../src/session/event-log.js";
 import {
   type AssistantMessageStreamParsersLike,
   createPlanModeStreamState,
@@ -41,9 +41,9 @@ import {
   isPlanMode,
   maybeCompletePlanItemFromMessage,
   realtimeTextForEvent,
-} from "./plan-mode.js";
-import type { Session } from "./session.js";
-import type { TurnContext } from "./turn-context.js";
+} from "../../src/session/plan-mode.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Session + ctx stubs
@@ -486,7 +486,7 @@ describe("runSamplingRequest — reconnectWithBackoff wiring", () => {
   test("calls reconnectWithBackoff with the expected shape", async () => {
     // Import via module spies: we mock the reconnection module and
     // verify runSamplingRequest routes through it.
-    const reconnectionMod = await import("../recovery/reconnection.js");
+    const reconnectionMod = await import("../../src/recovery/reconnection.js");
     const spy = vi
       .spyOn(reconnectionMod, "reconnectWithBackoff")
       .mockResolvedValue({
@@ -563,14 +563,14 @@ describe("runSamplingRequest — reconnectWithBackoff wiring", () => {
   test("isTransient classifier accepts typed LLMServerError and raw ECONNRESET", async () => {
     // Exercise the classifier fn directly by grabbing it through a
     // spy; we don't need a full runTurn drive here.
-    const { isRetryableStreamError } = await import("./run-turn.js");
+    const { isRetryableStreamError } = await import("../../src/session/run-turn.js");
     const { isTransientProviderError } =
-      await import("../recovery/api-errors.js");
+      await import("../../src/recovery/api-errors.js");
 
     // Typed path (covers the 5xx branch that was previously a
     // brittle substring match).
-    const { StreamModelError } = await import("../phases/stream-model.js");
-    const { LLMServerError } = await import("../llm/errors.js");
+    const { StreamModelError } = await import("../../src/phases/stream-model.js");
+    const { LLMServerError } = await import("../../src/llm/errors.js");
     const typed = new StreamModelError(
       new LLMServerError("openai", 503, "Service Unavailable"),
     );

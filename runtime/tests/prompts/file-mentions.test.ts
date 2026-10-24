@@ -10,14 +10,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
-import { roughTokenCountEstimationForFileType } from "../llm/token-estimation.js";
-import { DEFAULT_MAX_OUTPUT_TOKENS } from "../tools/system/file-read.js";
+import { roughTokenCountEstimationForFileType } from "../../src/llm/token-estimation.js";
+import { DEFAULT_MAX_OUTPUT_TOKENS } from "../../src/tools/system/file-read.js";
 import {
   expandFileMentions,
   extractMentionAllowedRoots,
   scanMentions,
   validateMentionPath,
-} from "./file-mentions.js";
+} from "../../src/prompts/file-mentions.js";
 
 function makeWorkspace(): string {
   return mkdtempSync(join(tmpdir(), "agenc-file-mentions-"));

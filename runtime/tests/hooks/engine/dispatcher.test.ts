@@ -4,9 +4,9 @@ import {
   DEFAULT_HOOK_TIMEOUT_MS,
   HookEngine,
   matchesPattern,
-} from "./dispatcher.js";
-import { readHookSpecificOutput } from "./output-parser.js";
-import type { HooksMap } from "../../config/schema.js";
+} from "../../../src/hooks/engine/dispatcher.js";
+import { readHookSpecificOutput } from "../../../src/hooks/engine/output-parser.js";
+import type { HooksMap } from "../../../src/config/schema.js";
 import { explicitDangerBroker } from "../../helpers/explicit-danger-boundary.js";
 
 function makeEngine(config: HooksMap): HookEngine {

@@ -1,10 +1,10 @@
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import type { NormalizedMessage } from "../../types/message.js";
-import { renderToString } from "../../utils/staticRender.js";
-import { Box } from "../ink.js";
-import { MessageTimestamp } from "./MessageTimestamp.js";
+import type { NormalizedMessage } from "../../../src/types/message.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { Box } from "../../../src/tui/ink.js";
+import { MessageTimestamp } from "../../../src/tui/components/MessageTimestamp.js";
 
 function assistantMessage(
   content: Array<Record<string, unknown>>,

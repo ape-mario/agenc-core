@@ -7,12 +7,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createAgentRoleWorkspace } from "../agents/role.js";
-import { ConfigStore } from "../config/store.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import { AsyncQueue } from "../utils/async-queue.js";
+import { createAgentRoleWorkspace } from "../../src/agents/role.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import {
   MAILBOX_SOURCE_IDLE_INPUT,
   MAX_AGENT_MAILBOX_MESSAGES_PER_TURN,
@@ -22,7 +22,7 @@ import {
   type Event,
   type InterAgentCommunication,
   type SessionOpts,
-} from "./session.js";
+} from "../../src/session/session.js";
 
 const ROLE_WORKSPACE = createAgentRoleWorkspace("/tmp/agenc-idle-input-test");
 

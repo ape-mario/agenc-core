@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { formatAgentsKilledNotification } from "./App.js";
+import { formatAgentsKilledNotification } from "../../../src/tui/components/App.js";
 
 describe("App local agent cancellation notifications", () => {
   test("renders no notification for an empty cancellation list", () => {

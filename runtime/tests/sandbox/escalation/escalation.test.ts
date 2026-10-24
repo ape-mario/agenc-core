@@ -3,28 +3,28 @@ import { promisify } from "node:util";
 
 import { describe, expect, test, vi } from "vitest";
 
-import { NetworkApprovalService } from "../../permissions/network-approval.js";
-import { Policy } from "../execpolicy/policy.js";
-import type { Tool } from "../../tools/types.js";
+import { NetworkApprovalService } from "../../../src/permissions/network-approval.js";
+import { Policy } from "../../../src/sandbox/execpolicy/policy.js";
+import type { Tool } from "../../../src/tools/types.js";
 import {
   availableDecisionKinds,
   defaultAvailableApprovalDecisions,
   effectiveApprovalId,
   effectiveAvailableApprovalDecisions,
   reviewDecisionAllowsEscalation,
-} from "./approvals.js";
+} from "../../../src/sandbox/escalation/approvals.js";
 import {
   managedNetworkApprovalContext,
   networkApprovalSandboxGate,
   requestManagedNetworkApprovalForSandbox,
-} from "./network-approval.js";
+} from "../../../src/sandbox/escalation/network-approval.js";
 import {
   approvalSandboxPermissions,
   managedNetworkForSandboxPermissions,
   sandboxOverrideForFirstAttempt,
   selectFirstAttemptSandbox,
   toolWantsNoSandboxApproval,
-} from "./sandboxing.js";
+} from "../../../src/sandbox/escalation/sandboxing.js";
 import {
   REJECT_RULES_APPROVAL_REASON,
   commandsForInterceptedExecPolicy,
@@ -32,7 +32,7 @@ import {
   evaluateInterceptedExecPolicy,
   execvePromptRejectedByPolicy,
   joinProgramAndArgv,
-} from "./unix-escalation.js";
+} from "../../../src/sandbox/escalation/unix-escalation.js";
 
 const execFileAsync = promisify(execFile);
 

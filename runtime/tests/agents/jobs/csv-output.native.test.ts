@@ -9,7 +9,7 @@ import { expect, test } from "vitest";
 import {
   assertWindowsPrivatePathSecurity,
 } from "../../../src/agents/workflow-private-path.js";
-import { createCsvOutputRootCapability, writeCsvOutput } from "./csv-output.js";
+import { createCsvOutputRootCapability, writeCsvOutput } from "../../../src/agents/jobs/csv-output.js";
 
 const NATIVE_CSV_TEST_TIMEOUT_MS = 90_000;
 

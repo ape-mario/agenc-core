@@ -6,14 +6,14 @@ import { describe, expect, test } from "vitest";
 import {
   MAX_ONBOARDING_INPUT_LENGTH,
   maybeTruncateInput,
-} from "./inputPaste.js";
+} from "../../src/onboarding/inputPaste.js";
 import {
   cleanupOldPastes,
   deletePastedText,
   hashPastedText,
   retrievePastedText,
   storePastedText,
-} from "./pasteStore.js";
+} from "../../src/onboarding/pasteStore.js";
 
 describe("onboarding input paste helpers", () => {
   test("leaves short input unchanged", () => {

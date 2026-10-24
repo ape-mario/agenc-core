@@ -16,7 +16,7 @@ import {
   parseWordOnlyShellSequence,
   shellWrapperCodeSubcommandsForPermission,
   splitCommand,
-} from "./parser.js";
+} from "../../src/shell-command/parser.js";
 
 describe("shell string parsing", () => {
   test("keeps parseShellCommand as a conservative single-command tokenizer", () => {

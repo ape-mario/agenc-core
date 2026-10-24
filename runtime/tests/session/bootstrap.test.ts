@@ -22,31 +22,31 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AsyncQueue } from "../utils/async-queue.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import type { MCPManager, MCPManagerStartOpts } from "../mcp-client/manager.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import type { MCPManager, MCPManagerStartOpts } from "../../src/mcp-client/manager.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
+} from "../../src/session/session.js";
 import {
   bootstrapSession,
   emitSessionConfigured,
   RequiredMcpStartupError,
   BootstrapAbortError,
   type BootstrapSessionOptions,
-} from "./bootstrap.js";
+} from "../../src/session/bootstrap.js";
 import type {
   Config,
   ManagedFeatures,
   ModelInfo,
   SessionConfiguration,
-} from "./turn-context.js";
-import type { LLMProvider } from "../llm/types.js";
-import type { RolloutItem } from "./rollout-item.js";
+} from "../../src/session/turn-context.js";
+import type { LLMProvider } from "../../src/llm/types.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Fixture helpers

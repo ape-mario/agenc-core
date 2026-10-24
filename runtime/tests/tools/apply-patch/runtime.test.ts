@@ -14,16 +14,16 @@ import { tmpdir } from "node:os";
 
 import { afterEach, describe, expect, test } from "vitest";
 
-import { ConfigStore } from "../../config/store.js";
-import { enterCanonicalSettingsAuthority } from "../../utils/settings/canonicalAuthority.js";
-import { applyPatchText, unifiedDiffFromChunks } from "./runtime.js";
-import { ApplyPatchRuntimeError } from "./types.js";
-import { parsePatch } from "./parser.js";
+import { ConfigStore } from "../../../src/config/store.js";
+import { enterCanonicalSettingsAuthority } from "../../../src/utils/settings/canonicalAuthority.js";
+import { applyPatchText, unifiedDiffFromChunks } from "../../../src/tools/apply-patch/runtime.js";
+import { ApplyPatchRuntimeError } from "../../../src/tools/apply-patch/types.js";
+import { parsePatch } from "../../../src/tools/apply-patch/parser.js";
 import {
   canonicalizePath,
   clearSessionReadState,
   recordSessionRead,
-} from "../system/filesystem.js";
+} from "../../../src/tools/system/filesystem.js";
 
 async function tempRoot(): Promise<string> {
   return mkdtemp(join(tmpdir(), "agenc-apply-patch-"));

@@ -16,7 +16,7 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('./fileSuggestions.js', () => ({
+vi.mock('../../../src/tui/hooks/fileSuggestions.js', () => ({
   generateFileSuggestions: harness.generateFileSuggestions,
 }))
 
@@ -24,11 +24,11 @@ vi.mock('src/tools/AgentTool/agentColorManager.js', () => ({
   getAgentColor: harness.getAgentColor,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-import { generateUnifiedSuggestions } from './unifiedSuggestions.js'
+import { generateUnifiedSuggestions } from '../../../src/tui/hooks/unifiedSuggestions.js'
 
 beforeEach(() => {
   harness.reset()

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "vitest";
 
-import { clearAskUserQuestionResponsesForTest, createAskUserQuestionTool, parseAskUserQuestionInput, recordAskUserQuestionResponse } from "./tool.js";
-import type { AskUserQuestionInput } from "./tool.js";
+import { clearAskUserQuestionResponsesForTest, createAskUserQuestionTool, parseAskUserQuestionInput, recordAskUserQuestionResponse } from "../../../src/tools/ask-user-question/tool.js";
+import type { AskUserQuestionInput } from "../../../src/tools/ask-user-question/tool.js";
 
 const BASE_INPUT: AskUserQuestionInput = {
   questions: [

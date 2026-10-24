@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { AsyncLock } from "../utils/async-lock.js";
-import type { RolloutItem } from "./rollout-item.js";
-import type { Session } from "./session.js";
+import { AsyncLock } from "../../src/utils/async-lock.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
+import type { Session } from "../../src/session/session.js";
 import {
   isSessionMemoryExtractionState,
   latestPersistedMemoryExtractionState,
   persistMemoryExtractionState,
   readMemoryExtractionState,
   restorePersistedMemoryExtractionState,
-} from "./memory-extraction-state.js";
+} from "../../src/session/memory-extraction-state.js";
 
 function sessionWith(opts: {
   readonly state?: boolean;

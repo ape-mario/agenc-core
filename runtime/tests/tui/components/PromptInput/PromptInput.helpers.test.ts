@@ -4,19 +4,19 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../../utils/config.js', () => ({
+vi.mock('../../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({}),
   updateRuntimeState: () => {},
 }))
 
-vi.mock('../../../utils/env.js', () => ({
+vi.mock('../../../../src/utils/env.js', () => ({
   env: {
     isSSH: () => false,
     terminal: undefined,
   },
 }))
 
-import { getNextPasteIdAfter } from './PromptInput.js'
+import { getNextPasteIdAfter } from '../../../../src/tui/components/PromptInput/PromptInput.js'
 
 describe('PromptInput helper behavior', () => {
   test('allocates after paste ids in current input, saved contents, and array-form messages', () => {

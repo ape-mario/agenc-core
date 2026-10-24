@@ -1,7 +1,7 @@
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 
 type KeybindingCall = {
   handlers: Record<string, () => unknown>;
@@ -29,25 +29,25 @@ const harness = vi.hoisted(() => {
   return state;
 });
 
-vi.mock("../context/notifications", () => ({
+vi.mock("../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({
     addNotification: harness.addNotification,
   }),
 }));
 
-vi.mock("../hooks/useCopyOnSelect", () => ({
+vi.mock("../../../src/tui/hooks/useCopyOnSelect.js", () => ({
   useCopyOnSelect: vi.fn(),
   useSelectionBgColor: vi.fn(),
 }));
 
-vi.mock("../ink/hooks/use-selection.js", () => ({
+vi.mock("../../../src/tui/ink/hooks/use-selection.js", () => ({
   useSelection: () => harness.selection,
 }));
 
-vi.mock("../ink/terminal.js", async () => {
+vi.mock("../../../src/tui/ink/terminal.js", async () => {
   const actual =
-    await vi.importActual<typeof import("../ink/terminal.js")>(
-      "../ink/terminal.js",
+    await vi.importActual<typeof import("../../../src/tui/ink/terminal.js")>(
+      "../../../src/tui/ink/terminal.js",
     );
   return {
     ...actual,
@@ -55,7 +55,7 @@ vi.mock("../ink/terminal.js", async () => {
   };
 });
 
-vi.mock("../ink/termio/osc.js", () => ({
+vi.mock("../../../src/tui/ink/termio/osc.js", () => ({
   getClipboardPath: harness.getClipboardPath,
 }));
 
@@ -63,7 +63,7 @@ vi.mock("src/utils/debug.js", () => ({
   logForDebugging: vi.fn(),
 }));
 
-vi.mock("../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybindings: (
     handlers: Record<string, () => unknown>,
     options: { context: string; isActive: boolean },
@@ -72,8 +72,8 @@ vi.mock("../keybindings/useKeybinding.js", () => ({
   },
 }));
 
-vi.mock("../ink.js", async () => {
-  const actual = await vi.importActual<typeof import("../ink.js")>("../ink.js");
+vi.mock("../../../src/tui/ink.js", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/tui/ink.js")>("../../../src/tui/ink.js");
   return {
     ...actual,
     useInput: vi.fn(),
@@ -91,7 +91,7 @@ describe("ScrollKeybindingHandler copy notification coverage", () => {
   });
 
   test("reports OSC 52 clipboard delivery when copying a selection", async () => {
-    const { ScrollKeybindingHandler } = await import("./ScrollKeybindingHandler.js");
+    const { ScrollKeybindingHandler } = await import("../../../src/tui/components/ScrollKeybindingHandler.js");
 
     await renderToString(
       <ScrollKeybindingHandler

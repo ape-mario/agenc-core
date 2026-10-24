@@ -4,21 +4,21 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test, vi } from 'vitest'
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),
 }))
 
-vi.mock('../../llm/context-window-upgrade.js', () => ({
+vi.mock('../../../src/llm/context-window-upgrade.js', () => ({
   getUpgradeMessage: () => 'switch to a larger context model',
 }))
 
-vi.mock('../../utils/secureStorage/macOsKeychainStorage.js', () => ({
+vi.mock('../../../src/utils/secureStorage/macOsKeychainStorage.js', () => ({
   isMacOsKeychainLocked: () => true,
 }))
 
-import { ERROR_MESSAGE_USER_ABORT } from '../../services/compact/compact.js'
+import { ERROR_MESSAGE_USER_ABORT } from '../../../src/services/compact/compact.js'
 import {
   API_ERROR_MESSAGE_PREFIX,
   CREDIT_BALANCE_TOO_LOW_ERROR_MESSAGE,
@@ -26,9 +26,9 @@ import {
   INVALID_API_KEY_ERROR_MESSAGE_EXTERNAL,
   PROMPT_TOO_LONG_ERROR_MESSAGE,
   TOKEN_REVOKED_ERROR_MESSAGE,
-} from '../../errors/api.js'
-import { createRoot } from '../ink/root.js'
-import { AssistantTextMessage } from '../message-renderers/AssistantTextMessage.js'
+} from '../../../src/errors/api.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { AssistantTextMessage } from '../../../src/tui/message-renderers/AssistantTextMessage.js'
 
 type TestStdin = PassThrough & {
   isTTY: boolean

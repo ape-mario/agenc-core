@@ -1,7 +1,7 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 
 ;(globalThis as Record<string, unknown>).MACRO = {
   DISPLAY_VERSION: "0.0.0-test",
@@ -14,11 +14,11 @@ vi.mock("usehooks-ts", () => ({
   useInterval: () => {},
 }));
 
-vi.mock("../hooks/useUpdateNotification", () => ({
+vi.mock("../../../src/tui/hooks/useUpdateNotification.js", () => ({
   useUpdateNotification: () => true,
 }));
 
-vi.mock("../hooks/useSettings.js", () => ({
+vi.mock("../../../src/tui/hooks/useSettings.js", () => ({
   useSettings: () => ({ autoUpdatesChannel: "latest" }),
 }));
 
@@ -26,11 +26,11 @@ vi.mock("src/utils/debug.js", () => ({
   logForDebugging: () => {},
 }));
 
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: vi.fn(),
 }));
 
-vi.mock("../../utils/autoUpdater.js", () => ({
+vi.mock("../../../src/utils/autoUpdater.js", () => ({
   getLatestVersion: vi.fn(async () => null),
   getMaxVersion: vi.fn(async () => null),
   getMaxVersionMessage: vi.fn(async () => null),
@@ -38,21 +38,21 @@ vi.mock("../../utils/autoUpdater.js", () => ({
   shouldSkipVersion: vi.fn(() => false),
 }));
 
-vi.mock("../../utils/config.js", () => ({
+vi.mock("../../../src/utils/config.js", () => ({
   getRuntimeState: () => ({}),
   isAutoUpdaterDisabled: () => true,
 }));
 
-vi.mock("../../utils/doctorDiagnostic.js", () => ({
+vi.mock("../../../src/utils/doctorDiagnostic.js", () => ({
   getCurrentInstallationType: vi.fn(async () => "development"),
 }));
 
-vi.mock("../../utils/localInstaller.js", () => ({
+vi.mock("../../../src/utils/localInstaller.js", () => ({
   installOrUpdateAgenCPackage: vi.fn(async () => "success"),
   localInstallationExists: vi.fn(async () => false),
 }));
 
-vi.mock("../../utils/nativeInstaller/installer.js", () => ({
+vi.mock("../../../src/utils/nativeInstaller/installer.js", () => ({
   installLatest: vi.fn(async () => ({
     latestVersion: "1.2.3",
     lockFailed: false,
@@ -61,12 +61,12 @@ vi.mock("../../utils/nativeInstaller/installer.js", () => ({
   removeInstalledSymlink: vi.fn(async () => {}),
 }));
 
-vi.mock("../../utils/semver.js", () => ({
+vi.mock("../../../src/utils/semver.js", () => ({
   gt: () => false,
   gte: () => true,
 }));
 
-vi.mock("../../utils/settings/settings.js", () => ({
+vi.mock("../../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: () => ({ autoUpdatesChannel: "latest" }),
   getInitialSettings: () => ({ autoUpdatesChannel: "latest" }),
 }));
@@ -87,7 +87,7 @@ describe("auto updater ASCII rendering", () => {
   });
 
   test("JS updater success and failure rows avoid decorative Unicode", async () => {
-    const { AutoUpdater } = await import("./AutoUpdater.js");
+    const { AutoUpdater } = await import("../../../src/tui/components/AutoUpdater.js");
 
     const success = await renderToString(
       <AutoUpdater
@@ -130,7 +130,7 @@ describe("auto updater ASCII rendering", () => {
   });
 
   test("native updater success and failure rows avoid decorative Unicode", async () => {
-    const { NativeAutoUpdater } = await import("./NativeAutoUpdater.js");
+    const { NativeAutoUpdater } = await import("../../../src/tui/components/NativeAutoUpdater.js");
 
     const success = await renderToString(
       <NativeAutoUpdater

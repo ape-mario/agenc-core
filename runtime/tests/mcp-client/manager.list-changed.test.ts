@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MCPManager } from "./manager.js";
-import type { MCPServerConfig } from "./types.js";
+import { MCPManager } from "../../src/mcp-client/manager.js";
+import type { MCPServerConfig } from "../../src/mcp-client/types.js";
 import {
   installEmptyCompanionBridgeDefaults,
   makeConfig,
@@ -15,18 +15,18 @@ interface MCPListChangedHandlers {
   readonly onResourcesListChanged: () => void;
 }
 
-vi.mock("./connection.js", () => ({ createMCPConnection: vi.fn() }));
-vi.mock("./tools.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./tools.js")>()),
+vi.mock("../../src/mcp-client/connection.js", () => ({ createMCPConnection: vi.fn() }));
+vi.mock("../../src/mcp-client/tools.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/mcp-client/tools.js")>()),
   createToolBridge: vi.fn(),
 }));
-vi.mock("./resources.js", () => ({ createResourceBridge: vi.fn() }));
-vi.mock("./prompts.js", () => ({ createPromptBridge: vi.fn() }));
+vi.mock("../../src/mcp-client/resources.js", () => ({ createResourceBridge: vi.fn() }));
+vi.mock("../../src/mcp-client/prompts.js", () => ({ createPromptBridge: vi.fn() }));
 
-import { createMCPConnection } from "./connection.js";
-import { createToolBridge } from "./tools.js";
-import { createResourceBridge } from "./resources.js";
-import { createPromptBridge } from "./prompts.js";
+import { createMCPConnection } from "../../src/mcp-client/connection.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
+import { createResourceBridge } from "../../src/mcp-client/resources.js";
+import { createPromptBridge } from "../../src/mcp-client/prompts.js";
 
 const mockCreateMCPConnection = vi.mocked(createMCPConnection);
 const mockCreateToolBridge = vi.mocked(createToolBridge);

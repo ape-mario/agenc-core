@@ -4,9 +4,9 @@ import type {
   AgenCDaemonMethod,
   AgenCDaemonResultByMethod,
   JsonObject,
-} from "../../app-server/protocol/index.js";
-import type { RealtimeAudioPlayer } from "./audio.js";
-import { createRealtimeTuiControls } from "./controller.js";
+} from "../../../src/app-server/protocol/index.js";
+import type { RealtimeAudioPlayer } from "../../../src/tui/realtime/audio.js";
+import { createRealtimeTuiControls } from "../../../src/tui/realtime/controller.js";
 
 function createClient(): {
   readonly requests: Array<{

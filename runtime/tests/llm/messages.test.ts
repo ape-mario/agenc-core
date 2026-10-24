@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { normalizeMessagesForAPI } from "./messages.js";
-import type { LLMMessage } from "./types.js";
+import { normalizeMessagesForAPI } from "../../src/llm/messages.js";
+import type { LLMMessage } from "../../src/llm/types.js";
 
 describe("normalizeMessagesForAPI", () => {
   test("keeps only leading system messages for provider requests", () => {

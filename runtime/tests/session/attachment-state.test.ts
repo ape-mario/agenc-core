@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "./attachment-state.js";
+} from "../../src/session/attachment-state.js";
 
 describe("attachment-state", () => {
   test("returns a fresh state with all flags initialized to false", () => {

@@ -4,8 +4,8 @@ import { describe, expect, test } from "vitest";
 import {
   SwarmStatusIndicator,
   swarmStatusPresentation,
-} from "./SwarmStatusIndicator.js";
-import { renderToString } from "../../utils/staticRender.js";
+} from "../../../src/tui/components/SwarmStatusIndicator.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 
 describe("SwarmStatusIndicator", () => {
   test.each([

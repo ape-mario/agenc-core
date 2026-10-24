@@ -1,7 +1,7 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderToString } from "../../../utils/staticRender.js";
+import { renderToString } from "../../../../src/utils/staticRender.js";
 
 type TeamContext = {
   teamName: string;
@@ -25,7 +25,7 @@ const appStateMock = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof appStateMock.state) => unknown) =>
     selector(appStateMock.state),
 }));
@@ -56,7 +56,7 @@ describe("TeamStatus coverage", () => {
   });
 
   it("counts visible teammates and only shows the selected hint when requested", async () => {
-    const { TeamStatus } = await import("./TeamStatus.js");
+    const { TeamStatus } = await import("../../../../src/tui/components/teams/TeamStatus.js");
 
     const noTeam = await renderToString(
       <TeamStatus teamsSelected={false} showHint={false} />,

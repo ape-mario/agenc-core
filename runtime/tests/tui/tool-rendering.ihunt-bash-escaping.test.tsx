@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 // Mock the Ink primitives the same way the sibling tool-rendering tests do:
 // Box/Text become inert components so the views can be invoked directly and
 // their React-element tree inspected via `props`.
-vi.mock("./ink.js", () => {
+vi.mock("../../src/tui/ink.js", () => {
   function Box(_props: { readonly children?: unknown }) {
     return null;
   }
@@ -17,7 +17,7 @@ import {
   BashOutputView,
   createTuiTool,
   ToolErrorView,
-} from "./tool-rendering.js";
+} from "../../src/tui/tool-rendering.js";
 import { escapeXml } from "../../src/utils/xml.js";
 
 interface ChildProps {

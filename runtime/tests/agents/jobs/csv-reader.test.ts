@@ -11,7 +11,7 @@ import {
   CsvParseError,
   createCsvInputRootCapability,
   deriveCsvItemIdentity,
-} from "./csv-reader.js";
+} from "../../../src/agents/jobs/csv-reader.js";
 
 function fixture(name: string): string {
   return readFileSync(

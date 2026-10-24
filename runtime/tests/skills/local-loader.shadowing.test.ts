@@ -8,7 +8,7 @@ import {
   buildSkillListingWithinBudget,
   createLocalSkillsServices,
   loadLocalSkillsSnapshot,
-} from "./local-loader.js";
+} from "../../src/skills/local-loader.js";
 
 /**
  * Temp dirs named so that plain path order disagrees with the precedence

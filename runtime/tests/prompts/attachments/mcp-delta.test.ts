@@ -3,9 +3,9 @@ import { describe, expect, test } from "vitest";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
-import { mcpInstructionsDeltaProducer } from "./mcp-delta.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+} from "../../../src/session/attachment-state.js";
+import { mcpInstructionsDeltaProducer } from "../../../src/prompts/attachments/mcp-delta.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 
 interface FakeManager {
   servers: Map<string, string | undefined>;

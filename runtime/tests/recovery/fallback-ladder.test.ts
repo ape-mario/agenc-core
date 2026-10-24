@@ -1,14 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { EventLog } from "../session/event-log.js";
-import type { Session } from "../session/session.js";
-import type { TurnState } from "../session/turn-state.js";
+import { EventLog } from "../../src/session/event-log.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnState } from "../../src/session/turn-state.js";
 import {
   getRecoveryLock,
   MAX_RECOVERY_REENTRIES,
   RecoveryLadder,
   resetRecoveryReentries,
-} from "./fallback-ladder.js";
-import type { TriggerActions, TriggerOutcome } from "./triggers.js";
+} from "../../src/recovery/fallback-ladder.js";
+import type { TriggerActions, TriggerOutcome } from "../../src/recovery/triggers.js";
 
 function mkSession(log: EventLog): Session {
   let i = 0;

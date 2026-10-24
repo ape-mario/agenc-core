@@ -4,7 +4,7 @@ import {
   getPromptInputProactiveNextTickAt,
   isPromptInputProactiveActive,
   subscribeToPromptInputProactiveChanges,
-} from './proactiveAdapter.js'
+} from '../../../../src/tui/components/PromptInput/proactiveAdapter.js'
 
 describe('PromptInput proactive adapter', () => {
   it('does not throw when optional proactive modules are absent', () => {

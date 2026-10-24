@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import type { PastedContent } from "../utils/config.js";
-import { pastedContentsToLLMMessage } from "./pasted-content.js";
+import type { PastedContent } from "../../src/utils/config.js";
+import { pastedContentsToLLMMessage } from "../../src/llm/pasted-content.js";
 
 describe("pastedContentsToLLMMessage (TUI attachments → multipart user message)", () => {
   it("returns null for an empty record", () => {

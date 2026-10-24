@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { extractCompletionToken } from './typeaheadTokens';
+import { extractCompletionToken } from '../../../src/tui/hooks/typeaheadTokens.js';
 import {
   applyDirectorySuggestion,
   applyShellSuggestion,
   formatReplacementValue,
-} from './useTypeahead.js';
+} from '../../../src/tui/hooks/useTypeahead.js';
 
 /**
  * Tests for useTypeahead's @-token extractor.

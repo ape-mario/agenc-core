@@ -2,8 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { AuthBackend } from "./backend.js";
-import { bootstrapLocalRuntimeSession } from "../bin/bootstrap.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
+import { bootstrapLocalRuntimeSession } from "../../src/bin/bootstrap.js";
 
 function localBackendThatCannotVend(calls: string[]): AuthBackend {
   return {

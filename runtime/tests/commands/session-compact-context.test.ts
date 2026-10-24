@@ -15,8 +15,8 @@ const { loadTieredInstructionsMock } = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("../prompts/agenc-md.js", async importOriginal => ({
-  ...(await importOriginal<typeof import("../prompts/agenc-md.js")>()),
+vi.mock("../../src/prompts/agenc-md.js", async importOriginal => ({
+  ...(await importOriginal<typeof import("../../src/prompts/agenc-md.js")>()),
   loadTieredInstructions: loadTieredInstructionsMock,
 }));
 
@@ -33,9 +33,9 @@ import {
   computeContextUsageBreakdown,
   contextCommand,
   projectManualCompactionReplacementHistoryForTests,
-} from "./session-compact.js";
-import type { LLMMessage, LLMTool } from "../llm/types.js";
-import type { RuntimeMessage } from "../services/compact/types.js";
+} from "../../src/commands/session-compact.js";
+import type { LLMMessage, LLMTool } from "../../src/llm/types.js";
+import type { RuntimeMessage } from "../../src/services/compact/types.js";
 
 const TEST_PROVIDER_ENVIRONMENT = Object.freeze({});
 

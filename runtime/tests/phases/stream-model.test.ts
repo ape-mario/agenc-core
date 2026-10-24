@@ -1,12 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
-import { EventLog, type Event } from "../session/event-log.js";
-import { CostSidecar } from "../session/cost.js";
-import type { Session } from "../session/session.js";
-import { AsyncLock } from "../utils/async-lock.js";
-import type { TurnContext } from "../session/turn-context.js";
-import { TurnTimingState } from "../session/turn-context.js";
-import { buildInitialTurnState } from "../session/turn-state.js";
-import { BudgetTracker } from "../conversation/token-budget.js";
+import { EventLog, type Event } from "../../src/session/event-log.js";
+import { CostSidecar } from "../../src/session/cost.js";
+import type { Session } from "../../src/session/session.js";
+import { AsyncLock } from "../../src/utils/async-lock.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import { TurnTimingState } from "../../src/session/turn-context.js";
+import { buildInitialTurnState } from "../../src/session/turn-state.js";
+import { BudgetTracker } from "../../src/conversation/token-budget.js";
 import type {
   LLMMessage,
   LLMChatOptions,
@@ -15,34 +15,34 @@ import type {
   LLMTool,
   LLMToolCall,
   StreamProgressCallback,
-} from "../llm/types.js";
-import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
-import type { Tool } from "../tools/types.js";
-import { parseAnthropicMessagesResponse } from "../llm/wire/messages-anthropic.js";
-import { requestUsageFromGemini } from "../llm/providers/gemini/usage.js";
+} from "../../src/llm/types.js";
+import type { ToolRegistry, ToolDispatchResult } from "../../src/tool-registry.js";
+import type { Tool } from "../../src/tools/types.js";
+import { parseAnthropicMessagesResponse } from "../../src/llm/wire/messages-anthropic.js";
+import { requestUsageFromGemini } from "../../src/llm/providers/gemini/usage.js";
 import type {
   AdmissionAcquireInput,
   ExecutionAdmissionClient,
-} from "../budget/admission-client.js";
-import type { AdmissionLease } from "../budget/admission-types.js";
-import { WorkflowHandoffSpool } from "../agents/workflow-handoff-spool.js";
-import { defaultConfig } from "../config/schema.js";
+} from "../../src/budget/admission-client.js";
+import type { AdmissionLease } from "../../src/budget/admission-types.js";
+import { WorkflowHandoffSpool } from "../../src/agents/workflow-handoff-spool.js";
+import { defaultConfig } from "../../src/config/schema.js";
 import {
   STREAM_IDLE_ABORT_REASON,
   STREAM_IDLE_WARNING_REASON,
   STREAM_QUIET_WARNING_MS,
-} from "../llm/stream-watchdog.js";
+} from "../../src/llm/stream-watchdog.js";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isRetryableStreamError } from "../session/run-turn.js";
-import { OpenAIProvider } from "../llm/providers/openai/adapter.js";
-import { promptCacheScopeKeyForHome } from "../llm/prompt-cache-key.js";
-import { getAgencHomeDir } from "../session/session-store.js";
+import { isRetryableStreamError } from "../../src/session/run-turn.js";
+import { OpenAIProvider } from "../../src/llm/providers/openai/adapter.js";
+import { promptCacheScopeKeyForHome } from "../../src/llm/prompt-cache-key.js";
+import { getAgencHomeDir } from "../../src/session/session-store.js";
 
 const streamedDispatchCalls: string[] = [];
 
-vi.mock("./execute-tools.js", () => ({
+vi.mock("../../src/phases/execute-tools.js", () => ({
   ensureStreamingToolExecutor: () => ({ mocked: true }),
   queueStreamingToolCall: (
     _executor: unknown,
@@ -111,7 +111,7 @@ import {
   buildProviderOptions,
   type StreamModelRequestContract,
   StreamModelError,
-} from "./stream-model.js";
+} from "../../src/phases/stream-model.js";
 
 const TEST_CONTEXT_WINDOW_TOKENS = 131_072;
 

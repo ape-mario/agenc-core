@@ -3,15 +3,15 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import Text from "../../ink/components/Text.js";
-import { createRoot } from "../../ink/root.js";
-import type { InputEvent } from "../../ink/events/input-event.js";
-import type { OptionWithDescription } from "./select.js";
+import Text from "../../../../src/tui/ink/components/Text.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import type { InputEvent } from "../../../../src/tui/ink/events/input-event.js";
+import type { OptionWithDescription } from "../../../../src/tui/components/CustomSelect/select.js";
 import {
   type MultiSelectState,
   type UseMultiSelectStateProps,
   useMultiSelectState,
-} from "./use-multi-select-state.js";
+} from "../../../../src/tui/components/CustomSelect/use-multi-select-state.js";
 
 const inputMock = vi.hoisted(() => ({
   handler: undefined as
@@ -28,11 +28,11 @@ const overlayMock = vi.hoisted(() => ({
   useRegisterOverlay: vi.fn(),
 }));
 
-vi.mock("../../context/overlayContext.js", () => overlayMock);
+vi.mock("../../../../src/tui/context/overlayContext.js", () => overlayMock);
 
-vi.mock("../../ink.js", async () => {
-  const actual = await vi.importActual<typeof import("../../ink.js")>(
-    "../../ink.js",
+vi.mock("../../../../src/tui/ink.js", async () => {
+  const actual = await vi.importActual<typeof import("../../../../src/tui/ink.js")>(
+    "../../../../src/tui/ink.js",
   );
   return {
     ...actual,
@@ -50,25 +50,25 @@ vi.mock("../../ink.js", async () => {
   };
 });
 
-vi.mock("../../../utils/debug.js", () => ({
+vi.mock("../../../../src/utils/debug.js", () => ({
   logForDebugging: () => {},
 }));
-vi.mock("../../../bootstrap/state.js", () => ({
+vi.mock("../../../../src/bootstrap/state.js", () => ({
   flushInteractionTime: () => {},
   getActiveTimeCounter: () => 0,
   markScrollActivity: () => {},
   updateLastInteractionTime: () => {},
 }));
-vi.mock("../../../utils/earlyInput.js", () => ({
+vi.mock("../../../../src/utils/earlyInput.js", () => ({
   stopCapturingEarlyInput: () => {},
 }));
-vi.mock("../../../utils/envUtils.js", () => ({
+vi.mock("../../../../src/utils/envUtils.js", () => ({
   isEnvTruthy: () => false,
 }));
-vi.mock("../../../utils/fullscreen.js", () => ({
+vi.mock("../../../../src/utils/fullscreen.js", () => ({
   isMouseClicksDisabled: () => true,
 }));
-vi.mock("../../../utils/log.js", () => ({
+vi.mock("../../../../src/utils/log.js", () => ({
   logError: () => {},
 }));
 

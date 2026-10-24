@@ -3,10 +3,10 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, realpath, chmod, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash, generateKeyPairSync, randomUUID, sign } from "node:crypto";
-import { createHttpMCPConnection } from "./http.js";
-import { verifyDesktopAuthority } from "../desktop-authority.js";
-import * as authority from "../desktop-authority.js";
-import { withDesktopMcpDispatchGuard, DesktopMcpPreflightRefusal, withLocalMcpAccess, hasLocalMcpAccess } from "../local-control.js";
+import { createHttpMCPConnection } from "../../../src/mcp-client/transports/http.js";
+import { verifyDesktopAuthority } from "../../../src/mcp-client/desktop-authority.js";
+import * as authority from "../../../src/mcp-client/desktop-authority.js";
+import { withDesktopMcpDispatchGuard, DesktopMcpPreflightRefusal, withLocalMcpAccess, hasLocalMcpAccess } from "../../../src/mcp-client/local-control.js";
 
 const roots: string[] = [];
 const servers: Server[] = [];

@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { sourcePath } from "../helpers/source-path.ts";
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
-import { MCPManager } from "./manager.js";
-import type { MCPServerConfig } from "./types.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
+import { MCPManager } from "../../src/mcp-client/manager.js";
+import type { MCPServerConfig } from "../../src/mcp-client/types.js";
 
 const FIXTURE_PATH = sourcePath("mcp-client/test-fixtures/stdio-pid-server.cjs");
 

@@ -2,14 +2,14 @@ import React from 'react'
 import { inflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 
-import { renderToAnsiString, renderToString } from '../../../utils/staticRender.js'
-import { Box, Text } from '../../ink.js'
-import { QueuedMessageProvider } from '../../context/QueuedMessageContext.js'
-import { stringWidth } from '../../ink/stringWidth.js'
+import { renderToAnsiString, renderToString } from '../../../../src/utils/staticRender.js'
+import { Box, Text } from '../../../../src/tui/ink.js'
+import { QueuedMessageProvider } from '../../../../src/tui/context/QueuedMessageContext.js'
+import { stringWidth } from '../../../../src/tui/ink/stringWidth.js'
 import {
   AGENC_LOGO_RASTER_SIZE,
   AGENC_LOGO_RGBA_ZLIB_BASE64,
-} from './agencLogoGraphics.generated.js'
+} from '../../../../src/tui/components/v2/agencLogoGraphics.generated.js'
 import {
   AGENC_LOGO_MARK_COMPACT_LINES,
   AGENC_LOGO_MARK_LINES,
@@ -25,7 +25,7 @@ import {
   TerminalFrame,
   Tool,
   WelcomeColdPanel,
-} from './primitives.js'
+} from '../../../../src/tui/components/v2/primitives.js'
 
 describe('v2 primitives', () => {
   it('renders the runtime-bound mode switcher state with the current mode selected', async () => {

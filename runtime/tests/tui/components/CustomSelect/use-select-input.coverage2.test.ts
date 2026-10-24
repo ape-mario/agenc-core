@@ -3,10 +3,10 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../../ink/root.js'
-import type { OptionWithDescription } from './select.js'
-import { useSelectInput } from './use-select-input.js'
-import type { SelectState } from './use-select-state.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import type { OptionWithDescription } from '../../../../src/tui/components/CustomSelect/select.js'
+import { useSelectInput } from '../../../../src/tui/components/CustomSelect/use-select-input.js'
+import type { SelectState } from '../../../../src/tui/components/CustomSelect/use-select-state.js'
 
 type InputKey = Partial<{
   ctrl: boolean
@@ -34,12 +34,12 @@ const overlayMock = vi.hoisted(() => ({
   useRegisterOverlay: vi.fn(),
 }))
 
-vi.mock('../../context/overlayContext.js', () => ({
+vi.mock('../../../../src/tui/context/overlayContext.js', () => ({
   useRegisterOverlay: overlayMock.useRegisterOverlay,
 }))
 
-vi.mock('../../ink.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../ink.js')>()
+vi.mock('../../../../src/tui/ink.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../src/tui/ink.js')>()
   return {
     ...actual,
     useInput: (
@@ -51,7 +51,7 @@ vi.mock('../../ink.js', async importOriginal => {
   }
 })
 
-vi.mock('../../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybindings: vi.fn(),
 }))
 

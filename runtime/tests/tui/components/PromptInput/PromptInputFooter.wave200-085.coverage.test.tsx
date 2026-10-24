@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from '../../remoteAuthSessionContext.fixture.js'
 
 const harness = vi.hoisted(() => ({
@@ -31,17 +31,17 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../context/overlayContext.js', () => ({
+vi.mock('../../../../src/tui/context/overlayContext.js', () => ({
   useIsModalOverlayActive: () => harness.modalOverlayActive,
 }))
 
-vi.mock('../../context/promptOverlayContext.js', () => ({
+vi.mock('../../../../src/tui/context/promptOverlayContext.js', () => ({
   useSetPromptOverlay: (data: unknown) => {
     harness.overlays.push(data)
   },
 }))
 
-vi.mock('../../hooks/useSettings.js', () => ({
+vi.mock('../../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     tui: {},
     statusLine: harness.statusLineEnabled
@@ -52,34 +52,34 @@ vi.mock('../../hooks/useSettings.js', () => ({
   }),
 }))
 
-vi.mock('../../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({
     columns: harness.columns,
     rows: harness.rows,
   }),
 }))
 
-vi.mock('../../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => harness.fullscreen,
 }))
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
 }))
 
-vi.mock('../CoordinatorAgentStatus.js', async () => {
+vi.mock('../../../../src/tui/components/CoordinatorAgentStatus.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
 
   return {
     useCoordinatorTaskCount: () => harness.coordinatorTaskCount,
   }
 })
 
-vi.mock('../../startup/StatusLine.js', async () => {
+vi.mock('../../../../src/tui/startup/StatusLine.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
 
   return {
     getLastAssistantMessageId: (messages: Array<{ uuid?: string }>) =>
@@ -91,9 +91,9 @@ vi.mock('../../startup/StatusLine.js', async () => {
   }
 })
 
-vi.mock('./Notifications.js', async () => {
+vi.mock('../../../../src/tui/components/PromptInput/Notifications.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
 
   return {
     Notifications: (props: {
@@ -109,9 +109,9 @@ vi.mock('./Notifications.js', async () => {
   }
 })
 
-vi.mock('./PromptInputFooterLeftSide.js', async () => {
+vi.mock('../../../../src/tui/components/PromptInput/PromptInputFooterLeftSide.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
 
   return {
     PromptInputFooterLeftSide: (props: {
@@ -128,9 +128,9 @@ vi.mock('./PromptInputFooterLeftSide.js', async () => {
   }
 })
 
-vi.mock('./PromptInputFooterSuggestions.js', async () => {
+vi.mock('../../../../src/tui/components/PromptInput/PromptInputFooterSuggestions.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
 
   return {
     PromptInputFooterSuggestions: (props: {
@@ -145,9 +145,9 @@ vi.mock('./PromptInputFooterSuggestions.js', async () => {
   }
 })
 
-vi.mock('./PromptInputHelpMenu.js', async () => {
+vi.mock('../../../../src/tui/components/PromptInput/PromptInputHelpMenu.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
 
   return {
     PromptInputHelpMenu: (props: {
@@ -163,7 +163,7 @@ vi.mock('./PromptInputHelpMenu.js', async () => {
   }
 })
 
-import PromptInputFooter from './PromptInputFooter.js'
+import PromptInputFooter from '../../../../src/tui/components/PromptInput/PromptInputFooter.js'
 
 type FooterProps = React.ComponentProps<typeof PromptInputFooter>
 

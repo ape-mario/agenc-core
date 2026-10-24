@@ -67,7 +67,7 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => harness.features.has(name),
 }))
 
-vi.mock('../../../bootstrap/state.js', () => ({
+vi.mock('../../../../src/bootstrap/state.js', () => ({
   flushInteractionTime: vi.fn(),
   getCurrentTurnTokenBudget: () => harness.turnTokenBudget,
   getKairosActive: () => false,
@@ -75,7 +75,7 @@ vi.mock('../../../bootstrap/state.js', () => ({
   getUserMsgOptIn: () => false,
 }))
 
-vi.mock('../../../utils/envUtils.js', () => ({
+vi.mock('../../../../src/utils/envUtils.js', () => ({
   isEnvTruthy: (value: string | undefined) => value === '1' || value === 'true',
 }))
 
@@ -83,15 +83,15 @@ vi.mock('lodash-es/sample.js', () => ({
   default: (items: readonly string[]) => items[0],
 }))
 
-vi.mock('../../../utils/activityManager.js', () => ({
+vi.mock('../../../../src/utils/activityManager.js', () => ({
   activityManager: harness.activity,
 }))
 
-vi.mock('../../../constants/spinnerVerbs.js', () => ({
+vi.mock('../../../../src/constants/spinnerVerbs.js', () => ({
   getSpinnerVerbs: () => ['Working'],
 }))
 
-vi.mock('../MessageResponse.js', async () => {
+vi.mock('../../../../src/tui/components/MessageResponse.js', async () => {
   const ReactModule = await import('react')
   return {
     MessageResponse: ({ children }: { readonly children?: React.ReactNode }) =>
@@ -99,60 +99,60 @@ vi.mock('../MessageResponse.js', async () => {
   }
 })
 
-vi.mock('../TaskListV2.js', async () => {
+vi.mock('../../../../src/tui/components/TaskListV2.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     TaskListV2: ({ tasks }: { readonly tasks: readonly { subject: string }[] }) =>
       ReactModule.createElement(Text, null, `TaskList:${tasks.map(task => task.subject).join(',')}`),
   }
 })
 
-vi.mock('../../hooks/useTasksV2.js', () => ({
+vi.mock('../../../../src/tui/hooks/useTasksV2.js', () => ({
   useTasksV2: () => harness.tasksV2,
 }))
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
 }))
 
-vi.mock('../../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 80, rows: 24 }),
 }))
 
-vi.mock('../../hooks/useSettings.js', () => ({
+vi.mock('../../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => harness.settings,
 }))
 
-vi.mock('../../../tasks/InProcessTeammateTask/types.js', () => ({
+vi.mock('../../../../src/tasks/InProcessTeammateTask/types.js', () => ({
   isInProcessTeammateTask: (task: { readonly type?: string }) =>
     task.type === 'in_process_teammate',
 }))
 
-vi.mock('../../../tasks/types.js', () => ({
+vi.mock('../../../../src/tasks/types.js', () => ({
   isBackgroundTask: (task: { readonly type?: string }) => task.type === 'background',
 }))
 
-vi.mock('../../../tasks/InProcessTeammateTask/InProcessTeammateTask.js', () => ({
+vi.mock('../../../../src/tasks/InProcessTeammateTask/InProcessTeammateTask.js', () => ({
   getAllInProcessTeammateTasks: () => harness.teammateTasks,
 }))
 
-vi.mock('../../../utils/effort.js', () => ({
+vi.mock('../../../../src/utils/effort.js', () => ({
   getEffortSuffixForContext: () => ' - effort',
 }))
 
-vi.mock('../../hooks/useMainLoopModel.js', () => ({
+vi.mock('../../../../src/tui/hooks/useMainLoopModel.js', () => ({
   useMainLoopModel: () => 'grok-4.3',
 }))
 
-vi.mock('../../state/selectors.js', () => ({
+vi.mock('../../../../src/tui/state/selectors.js', () => ({
   getViewedTeammateTask: () => harness.viewedTeammate,
 }))
 
-vi.mock('./SpinnerAnimationRow.js', async () => {
+vi.mock('../../../../src/tui/components/spinner/SpinnerAnimationRow.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     SpinnerAnimationRow: (props: Record<string, unknown>) =>
       ReactModule.createElement(
@@ -170,23 +170,23 @@ vi.mock('./SpinnerAnimationRow.js', async () => {
   }
 })
 
-vi.mock('./TeammateSpinnerTree.js', async () => {
+vi.mock('../../../../src/tui/components/spinner/TeammateSpinnerTree.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     TeammateSpinnerTree: (props: Record<string, unknown>) =>
       ReactModule.createElement(Text, null, `Tree:${String(props.leaderVerb ?? 'none')}`),
   }
 })
 
-vi.mock('./agentActivity.js', () => ({
+vi.mock('../../../../src/tui/components/spinner/agentActivity.js', () => ({
   formatRunningAgentSummary: (agents: readonly { readonly name: string }[]) =>
     agents.map(agent => agent.name).join(', '),
   getActiveLocalAgentTasks: () => [],
 }))
 
-import { createRoot } from '../../ink/root.js'
-import { SpinnerWithVerb } from './Spinner.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { SpinnerWithVerb } from '../../../../src/tui/components/spinner/Spinner.js'
 
 function createStreams(): {
   stdout: PassThrough

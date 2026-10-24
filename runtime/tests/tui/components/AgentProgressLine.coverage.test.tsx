@@ -4,9 +4,9 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { Box } from "../ink.js";
-import { createRoot } from "../ink/root.js";
-import { AgentProgressLine } from "./AgentProgressLine.js";
+import { Box } from "../../../src/tui/ink.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { AgentProgressLine } from "../../../src/tui/components/AgentProgressLine.js";
 
 type AgentProgressLineProps = React.ComponentProps<typeof AgentProgressLine>;
 

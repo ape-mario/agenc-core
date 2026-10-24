@@ -3,19 +3,19 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import Text from "../ink/components/Text.js";
-import { createRoot } from "../ink/root.js";
-import type { Key } from "../ink.js";
+import Text from "../../../src/tui/ink/components/Text.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import type { Key } from "../../../src/tui/ink.js";
 import {
   KeybindingProvider,
   useKeybindingContext,
   useRegisterKeybindingContext,
-} from "../keybindings/KeybindingContext.js";
-import { parseBindings } from "../keybindings/parser.js";
+} from "../../../src/tui/keybindings/KeybindingContext.js";
+import { parseBindings } from "../../../src/tui/keybindings/parser.js";
 import type {
   KeybindingContextName,
   ParsedKeystroke,
-} from "../keybindings/types.js";
+} from "../../../src/tui/keybindings/types.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

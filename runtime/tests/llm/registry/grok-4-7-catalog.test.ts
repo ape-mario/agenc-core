@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { deriveFlatCatalog, resolveRegisteredModelCatalogEntry } from "../registry/model-catalog.js";
-import { BUILT_IN_PROVIDER_MODEL_CATALOG, BUILT_IN_PROVIDER_DEFAULT_MODELS } from "../registry/provider-info.js";
-import { getContextWindowForModel } from "../../utils/context.js";
-import { resolveContextWindowProfile } from "../_deps/context-window.js";
-import { getProviderNativeToolDefinitions } from "../provider-native-search.js";
+import { deriveFlatCatalog, resolveRegisteredModelCatalogEntry } from "../../../src/llm/registry/model-catalog.js";
+import { BUILT_IN_PROVIDER_MODEL_CATALOG, BUILT_IN_PROVIDER_DEFAULT_MODELS } from "../../../src/llm/registry/provider-info.js";
+import { getContextWindowForModel } from "../../../src/utils/context.js";
+import { resolveContextWindowProfile } from "../../../src/llm/_deps/context-window.js";
+import { getProviderNativeToolDefinitions } from "../../../src/llm/provider-native-search.js";
 
 describe("Grok 4.7 documented catalog", () => {
   it("resolves its own entry, context and effort without changing the default", async () => {

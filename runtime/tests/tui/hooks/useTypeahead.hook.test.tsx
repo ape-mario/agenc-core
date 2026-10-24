@@ -3,11 +3,11 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { ConfigStore } from "../../config/store.js";
+import { ConfigStore } from "../../../src/config/store.js";
 import {
   type CanonicalSettingsAuthority,
   getCanonicalSettingsAuthority,
-} from "../../utils/settings/canonicalAuthority.js";
+} from "../../../src/utils/settings/canonicalAuthority.js";
 
 const harness = vi.hoisted(() => ({
   addNotification: vi.fn(),
@@ -86,20 +86,20 @@ vi.mock("usehooks-ts", async () => {
   };
 });
 
-vi.mock("../context/notifications.js", () => ({
+vi.mock("../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({ addNotification: harness.addNotification }),
 }));
 
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: harness.logError,
 }));
 
-vi.mock("../context/overlayContext", () => ({
+vi.mock("../../../src/tui/context/overlayContext.js", () => ({
   useIsModalOverlayActive: () => false,
   useRegisterOverlay: vi.fn(),
 }));
 
-vi.mock("../ink.js", async () => {
+vi.mock("../../../src/tui/ink.js", async () => {
   const ReactModule = await import("react");
   return {
     Text: ({ children }: { readonly children?: React.ReactNode }) =>
@@ -108,36 +108,36 @@ vi.mock("../ink.js", async () => {
   };
 });
 
-vi.mock("../keybindings/KeybindingContext.js", () => ({
+vi.mock("../../../src/tui/keybindings/KeybindingContext.js", () => ({
   useOptionalKeybindingContext: () => ({ pendingChord: null }),
   useRegisterKeybindingContext: vi.fn(),
 }));
 
-vi.mock("../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybindings: (handlers: Record<string, () => unknown>) => {
     Object.assign(harness.keybindings, handlers);
   },
 }));
 
-vi.mock("../keybindings/useShortcutDisplay.js", () => ({
+vi.mock("../../../src/tui/keybindings/useShortcutDisplay.js", () => ({
   useShortcutDisplay: () => "alt+t",
 }));
 
-vi.mock("../state/AppState.js", () => ({
+vi.mock("../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
   useAppStateStore: () => ({ getState: () => harness.appState }),
 }));
 
-vi.mock("../../utils/agentSwarmsEnabled", () => ({
+vi.mock("../../../src/utils/agentSwarmsEnabled.js", () => ({
   isAgentSwarmsEnabled: () => Boolean(harness.appState.teamContext),
 }));
 
-vi.mock("../../utils/bash/shellCompletion.js", () => ({
+vi.mock("../../../src/utils/bash/shellCompletion.js", () => ({
   getShellCompletions: vi.fn(async () => harness.shellCompletions),
 }));
 
-vi.mock("../../utils/sessionStorage.js", () => ({
+vi.mock("../../../src/utils/sessionStorage.js", () => ({
   getSessionIdFromLog: (log: { readonly sessionId?: string }) =>
     log.sessionId ?? "session-1",
   searchSessionsByCustomTitle: vi.fn(async (query: string) => {
@@ -149,7 +149,7 @@ vi.mock("../../utils/sessionStorage.js", () => ({
   writeAgentMetadata: vi.fn(async () => undefined),
 }));
 
-vi.mock("../../utils/suggestions/directoryCompletion.js", () => ({
+vi.mock("../../../src/utils/suggestions/directoryCompletion.js", () => ({
   getPathCompletions: vi.fn(async (query: string) => {
     if (harness.directoryCompletionResponses.has(query)) {
       return await harness.directoryCompletionResponses.get(query);
@@ -160,20 +160,20 @@ vi.mock("../../utils/suggestions/directoryCompletion.js", () => ({
     token.startsWith("/") || token.startsWith("./") || token.startsWith("~/"),
 }));
 
-vi.mock("../../utils/suggestions/shellHistoryCompletion.js", () => ({
+vi.mock("../../../src/utils/suggestions/shellHistoryCompletion.js", () => ({
   getShellHistoryCompletion: vi.fn(async () => harness.shellHistoryCompletion),
 }));
 
-vi.mock("../../utils/suggestions/slackChannelSuggestions.js", () => ({
+vi.mock("../../../src/utils/suggestions/slackChannelSuggestions.js", () => ({
   getSlackChannelSuggestions: vi.fn(async () => harness.slackSuggestions),
   hasSlackMcpServer: () => harness.appState.mcp.clients.length > 0,
 }));
 
-vi.mock("../../utils/swarm/constants.js", () => ({
+vi.mock("../../../src/utils/swarm/constants.js", () => ({
   TEAM_LEAD_NAME: "team-lead",
 }));
 
-vi.mock("./fileSuggestions", () => ({
+vi.mock("../../../src/tui/hooks/fileSuggestions.js", () => ({
   applyFileSuggestion: (
     replacementValue: string,
     input: string,
@@ -203,22 +203,22 @@ vi.mock("./fileSuggestions", () => ({
   startBackgroundCacheRefresh: vi.fn(),
 }));
 
-vi.mock("./unifiedSuggestions", () => ({
+vi.mock("../../../src/tui/hooks/unifiedSuggestions.js", () => ({
   generateUnifiedSuggestions: vi.fn(async () => harness.unifiedSuggestions),
 }));
 
-import { createRoot } from "../ink/root.js";
-import { KeyboardEvent } from "../ink/events/keyboard-event.js";
-import type { SuggestionItem } from "../components/PromptInput/PromptInputFooterSuggestions.js";
-import type { PromptInputMode } from "../../types/textInputTypes.js";
-import { useTypeahead } from "./useTypeahead.js";
-import { startBackgroundCacheRefresh } from "./fileSuggestions";
-import { generateUnifiedSuggestions } from "./unifiedSuggestions";
-import { getShellCompletions } from "../../utils/bash/shellCompletion.js";
-import { getPathCompletions } from "../../utils/suggestions/directoryCompletion.js";
-import { getShellHistoryCompletion } from "../../utils/suggestions/shellHistoryCompletion.js";
-import { getSlackChannelSuggestions } from "../../utils/suggestions/slackChannelSuggestions.js";
-import { searchSessionsByCustomTitle } from "../../utils/sessionStorage.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { KeyboardEvent } from "../../../src/tui/ink/events/keyboard-event.js";
+import type { SuggestionItem } from "../../../src/tui/components/PromptInput/PromptInputFooterSuggestions.js";
+import type { PromptInputMode } from "../../../src/types/textInputTypes.js";
+import { useTypeahead } from "../../../src/tui/hooks/useTypeahead.js";
+import { startBackgroundCacheRefresh } from "../../../src/tui/hooks/fileSuggestions.js";
+import { generateUnifiedSuggestions } from "../../../src/tui/hooks/unifiedSuggestions.js";
+import { getShellCompletions } from "../../../src/utils/bash/shellCompletion.js";
+import { getPathCompletions } from "../../../src/utils/suggestions/directoryCompletion.js";
+import { getShellHistoryCompletion } from "../../../src/utils/suggestions/shellHistoryCompletion.js";
+import { getSlackChannelSuggestions } from "../../../src/utils/suggestions/slackChannelSuggestions.js";
+import { searchSessionsByCustomTitle } from "../../../src/utils/sessionStorage.js";
 
 type SuggestionsState = {
   commandArgumentHint?: string;

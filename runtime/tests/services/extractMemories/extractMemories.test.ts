@@ -2,31 +2,31 @@ import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LLMMessage } from "../../llm/types.js";
-import type { Session } from "../../session/session.js";
-import type { TurnContext } from "../../session/turn-context.js";
-import type { CompletedToolResultRecord } from "../../session/turn-state.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
+import type { Session } from "../../../src/session/session.js";
+import type { TurnContext } from "../../../src/session/turn-context.js";
+import type { CompletedToolResultRecord } from "../../../src/session/turn-state.js";
 import {
   createAutoMemoryToolPolicy,
   drainPendingExtraction,
   executeExtractMemories,
   initExtractMemories,
   type ExtractMemoriesChildRequest,
-} from "./extractMemories.js";
+} from "../../../src/services/extractMemories/extractMemories.js";
 import {
   resolveAutoMemoryDirectory,
   sanitizePathForProjectKey,
   validateAutoMemoryDirectoryPath,
-} from "./memory-paths.js";
-import { formatMemoryManifest, scanMemoryFiles } from "../../memory/index.js";
-import { resolveAgentRuntimeOptions } from "../../session/runtime-options.js";
+} from "../../../src/services/extractMemories/memory-paths.js";
+import { formatMemoryManifest, scanMemoryFiles } from "../../../src/memory/index.js";
+import { resolveAgentRuntimeOptions } from "../../../src/session/runtime-options.js";
 import { createControlledPromise } from "../../helpers/controlled-async.js";
-import { AsyncLock } from "../../utils/async-lock.js";
-import type { RolloutItem } from "../../session/rollout-item.js";
-import { recordInitialHistoryOnResume } from "../../session/agent-task-lifecycle.js";
+import { AsyncLock } from "../../../src/utils/async-lock.js";
+import type { RolloutItem } from "../../../src/session/rollout-item.js";
+import { recordInitialHistoryOnResume } from "../../../src/session/agent-task-lifecycle.js";
 
 vi.mock("bun:bundle", () => ({ feature: () => false }));
-vi.mock("../../tools.js", () => ({}));
+vi.mock("../../../src/tools.js", () => ({}));
 vi.mock("src/tools.js", () => ({}));
 
 const defaultRuntimeOptions = resolveAgentRuntimeOptions({});

@@ -8,7 +8,7 @@ import {
   builtinLspServerConfigs,
   resolveCommandOnPath,
   typescriptServerFallback,
-} from "./builtinServers.js";
+} from "../../../src/services/lsp/builtinServers.js";
 
 describe("built-in language server profiles", () => {
   const dirs: string[] = [];

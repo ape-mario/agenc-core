@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("./ink.js", () => {
+vi.mock("../../src/tui/ink.js", () => {
   function Box(_props: { readonly children?: unknown }) {
     return null;
   }
@@ -10,7 +10,7 @@ vi.mock("./ink.js", () => {
   return { Box, Text };
 });
 
-import { createTuiTool } from "./tool-rendering.js";
+import { createTuiTool } from "../../src/tui/tool-rendering.js";
 
 describe("TUI Skill tool rendering coverage", () => {
   test("Skill tool cards parse nested JSON input and omit null args from the preview", () => {

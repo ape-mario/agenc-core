@@ -2,12 +2,12 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { StateSqliteHealthStatsReader } from "./health-stats.js";
+import { StateSqliteHealthStatsReader } from "../../src/state/health-stats.js";
 import {
   openStateDatabases,
   resolveStateDatabasePaths,
   type StateSqliteDriver,
-} from "./sqlite-driver.js";
+} from "../../src/state/sqlite-driver.js";
 
 let home = "";
 let cwd = "";

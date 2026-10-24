@@ -15,15 +15,15 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
-import type { ToolEvaluatorContext } from "../../permissions/evaluator.js";
-import { applyPermissionUpdate } from "../../permissions/permission-updates.js";
-import { createEmptyToolPermissionContext } from "../../permissions/types.js";
+import type { ToolEvaluatorContext } from "../../../src/permissions/evaluator.js";
+import { applyPermissionUpdate } from "../../../src/permissions/permission-updates.js";
+import { createEmptyToolPermissionContext } from "../../../src/permissions/types.js";
 import {
   clearFileReadListenersForTests,
   createFileReadTool as createUnboundFileReadTool,
   FILE_READ_TOOL_NAME,
   registerFileReadListener,
-} from "./file-read.js";
+} from "../../../src/tools/system/file-read.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 import { attachToolRuntimeContext } from "../../../src/tools/runtimes/context.js";
 
@@ -37,12 +37,12 @@ import {
   SESSION_ALLOWED_ROOTS_ARG,
   SESSION_AGENC_HOME_ARG,
   signSessionId,
-} from "./filesystem.js";
+} from "../../../src/tools/system/filesystem.js";
 import {
   clearAllPlanSlugs,
   getPlanFilePath,
   setPlanSlug,
-} from "../../planning/plan-files.js";
+} from "../../../src/planning/plan-files.js";
 
 describe("FileRead tool", () => {
   let root = "";

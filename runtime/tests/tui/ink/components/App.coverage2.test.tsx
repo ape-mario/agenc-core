@@ -1,9 +1,9 @@
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import App, { handleMouseEvent } from "./App.js";
-import type { ParsedMouse } from "../parse-keypress.js";
-import { createSelectionState } from "../selection.js";
+import App, { handleMouseEvent } from "../../../../src/tui/ink/components/App.js";
+import type { ParsedMouse } from "../../../../src/tui/ink/parse-keypress.js";
+import { createSelectionState } from "../../../../src/tui/ink/selection.js";
 
 function stream() {
   const s = new PassThrough() as NodeJS.WriteStream & NodeJS.ReadStream;

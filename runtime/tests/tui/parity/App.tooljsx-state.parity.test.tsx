@@ -6,7 +6,7 @@ import {
   applyToolJSXUpdate,
   type ToolJSXArgs,
   type ToolJSXState,
-} from "../tool-jsx-state.js";
+} from "../../../src/tui/tool-jsx-state.js";
 
 const APP_SOURCE_PATH = sourcePath("tui/components/App.tsx");
 

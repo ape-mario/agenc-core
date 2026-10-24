@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { HighlightedCode } from './HighlightedCode.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { HighlightedCode } from '../../../../src/tui/components/markdown/HighlightedCode.js'
 
 const harness = vi.hoisted(() => ({
   renderCalls: [] as Array<{
@@ -19,17 +19,17 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => true,
 }))
 
-vi.mock('../../hooks/useSettings.js', () => ({
+vi.mock('../../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: false,
   }),
 }))
 
-vi.mock('../diff/StructuredDiff/colorDiff.js', () => ({
+vi.mock('../../../../src/tui/components/diff/StructuredDiff/colorDiff.js', () => ({
   expectColorFile: () =>
     class {
       render(theme: unknown, width: number, dim: boolean): string[] {

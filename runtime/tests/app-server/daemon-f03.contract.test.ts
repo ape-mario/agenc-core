@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createTempWorkspaceFixture } from "../helpers/temp-workspace.js";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
-import { AgenCDaemonHealthService } from "./health.js";
-import { AGENC_DAEMON_METHODS } from "./protocol/index.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
-import type { JsonObject } from "./protocol/index.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
+import { AgenCDaemonHealthService } from "../../src/app-server/health.js";
+import { AGENC_DAEMON_METHODS } from "../../src/app-server/protocol/index.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
+import type { JsonObject } from "../../src/app-server/protocol/index.js";
 
 const workspaces = createTempWorkspaceFixture("agenc-daemon-f03-workspace-");
 

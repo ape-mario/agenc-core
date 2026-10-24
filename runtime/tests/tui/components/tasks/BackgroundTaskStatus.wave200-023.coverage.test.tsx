@@ -3,9 +3,9 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import type { DOMElement, DOMNode } from '../../ink/dom.js'
-import instances from '../../ink/instances.js'
-import { createRoot } from '../../ink/root.js'
+import type { DOMElement, DOMNode } from '../../../../src/tui/ink/dom.js'
+import instances from '../../../../src/tui/ink/instances.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
 
 const appStateMock = vi.hoisted(() => ({
   state: {
@@ -25,17 +25,17 @@ const teammateViewMock = vi.hoisted(() => ({
   exitTeammateView: vi.fn(),
 }))
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof appStateMock.state) => unknown) =>
     selector(appStateMock.state),
   useSetAppState: () => appStateMock.setAppState,
 }))
 
-vi.mock('../../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => terminalSizeMock.size,
 }))
 
-vi.mock('../../state/teammateViewHelpers.js', () => teammateViewMock)
+vi.mock('../../../../src/tui/state/teammateViewHelpers.js', () => teammateViewMock)
 
 type TestStdin = PassThrough & {
   isTTY: boolean
@@ -211,7 +211,7 @@ describe('BackgroundTaskStatus wave 200 coverage', () => {
   })
 
   test('wires hover and click handlers for teammate and summary pills', async () => {
-    const { BackgroundTaskStatus } = await import('./BackgroundTaskStatus.js')
+    const { BackgroundTaskStatus } = await import('../../../../src/tui/components/tasks/BackgroundTaskStatus.js')
     const { stdin, stdout } = createStreams()
     const root = await createRoot({
       patchConsole: false,

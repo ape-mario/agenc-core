@@ -17,53 +17,53 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../utils/cwd.js', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => tempCwd,
   pwd: () => tempCwd,
   runWithCwdOverride: <T,>(_cwd: string, fn: () => T) => fn(),
 }))
 
-vi.mock('../../utils/settings/settings.js', () => ({
+vi.mock('../../../src/utils/settings/settings.js', () => ({
   getExecutionAuthoritySettings: () => ({}),
   getInitialSettings: () => ({}),
   getSettingsForSource: () => undefined,
 }))
 
-vi.mock('../../utils/config.js', () => ({
+vi.mock('../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({}),
   checkHasTrustDialogAccepted: () => true,
 }))
 
-vi.mock('../../utils/hooks.js', () => ({
+vi.mock('../../../src/utils/hooks.js', () => ({
   createBaseHookInput: () => ({ base: true }),
   executeFileSuggestionCommand: async () => [],
 }))
 
-vi.mock('../../utils/markdownConfigLoader.js', () => ({
+vi.mock('../../../src/utils/markdownConfigLoader.js', () => ({
   AGENC_CONFIG_DIRECTORIES: ['commands'],
   loadMarkdownFilesForSubdir: async () => [
     { filePath: `.agenc${sep}commands${sep}context.md` },
   ],
 }))
 
-vi.mock('../../utils/git', () => ({
+vi.mock('../../../src/utils/git.js', () => ({
   findGitRoot: () => tempRepoRoot,
   gitExe: () => 'git',
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-vi.mock('../../utils/path.js', () => ({
+vi.mock('../../../src/utils/path.js', () => ({
   expandPath: (value: string) => value,
 }))
 
-vi.mock('../../utils/ripgrep.js', () => ({
+vi.mock('../../../src/utils/ripgrep.js', () => ({
   ripGrep: vi.fn(async () => []),
 }))
 
-vi.mock('../../utils/execFileNoThrow.js', () => ({
+vi.mock('../../../src/utils/execFileNoThrow.js', () => ({
   execFileNoThrowWithCwd: vi.fn(
     async (_file: string, args: string[], options?: { cwd?: string }) => {
       harness.execCalls.push({ args, cwd: options?.cwd })
@@ -92,7 +92,7 @@ vi.mock('src/utils/debug.js', () => ({
   logForDebugging: () => {},
 }))
 
-vi.mock('../ink/native-ts/file-index/index', () => ({
+vi.mock('../../../src/tui/ink/native-ts/file-index/index.js', () => ({
   CHUNK_MS: 4,
   FileIndex: class {
     loadFromFileListAsync(paths: string[]) {
@@ -112,7 +112,7 @@ vi.mock('../ink/native-ts/file-index/index', () => ({
 import {
   clearFileSuggestionCaches,
   getPathsForSuggestions,
-} from './fileSuggestions.js'
+} from '../../../src/tui/hooks/fileSuggestions.js'
 
 async function waitForFileIndexLoads(count: number): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt++) {

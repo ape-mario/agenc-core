@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { renderPlaceholder } from './renderPlaceholder.js'
+import { renderPlaceholder } from '../../../src/tui/hooks/renderPlaceholder.js'
 
 const invert = (text: string) => `[${text}]`
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import YogaDefault, { Align, Edge, FlexDirection } from "./index.js";
+import YogaDefault, { Align, Edge, FlexDirection } from "../../../../../src/tui/ink/native-ts/yoga-layout/index.js";
 
 describe("yoga-layout TypeScript shim baseline coverage", () => {
   test("aligns row children to a nested reference baseline", () => {

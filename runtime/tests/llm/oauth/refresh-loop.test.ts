@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
   MAX_CONSECUTIVE_AUTH_FAILURES,
   retryWithOAuthRefresh,
-} from "./refresh-loop.js";
+} from "../../../src/llm/oauth/refresh-loop.js";
 
 describe("retryWithOAuthRefresh", () => {
   test("retains the upstream consecutive auth failure budget", () => {

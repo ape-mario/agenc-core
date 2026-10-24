@@ -12,7 +12,7 @@ import {
   requestPermissionProfileIsEmpty,
   requestPermissionsEventPermissionLabels,
   type RequestPermissionProfile,
-} from "./request-permissions.js";
+} from "../../../src/permissions/rpc/request-permissions.js";
 
 const cwd = path.resolve("/tmp/agenc-pe13");
 const inputPath = path.join(cwd, "input.txt");

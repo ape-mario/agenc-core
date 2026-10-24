@@ -24,35 +24,35 @@ vi.mock("signal-exit", () => ({
   onExit: harness.onExit,
 }));
 
-vi.mock("./ink.js", () => ({
+vi.mock("../../src/tui/ink.js", () => ({
   render: harness.renderInk,
 }));
 
-vi.mock("./components/App.js", () => ({
+vi.mock("../../src/tui/components/App.js", () => ({
   AgenCTuiApp: harness.app,
 }));
 
-vi.mock("./backpressure.js", () => ({
+vi.mock("../../src/tui/backpressure.js", () => ({
   recordTuiBackpressure: harness.recordTuiBackpressure,
 }));
 
 import {
   DISABLE_KITTY_KEYBOARD,
   DISABLE_MODIFY_OTHER_KEYS,
-} from "./ink/termio/csi.js";
+} from "../../src/tui/ink/termio/csi.js";
 import {
   DISABLE_MOUSE_TRACKING,
   EXIT_ALT_SCREEN,
   SHOW_CURSOR,
-} from "./ink/termio/dec.js";
-vi.mock("../utils/earlyInput.js", () => ({
+} from "../../src/tui/ink/termio/dec.js";
+vi.mock("../../src/utils/earlyInput.js", () => ({
   startCapturingEarlyInput: harness.startCapturingEarlyInput,
   isCapturingEarlyInput: harness.isCapturingEarlyInput,
 }));
 
 import { setPendingResumeSessionId, resetPendingResumeSessionIdForTestingOnly } from "../../src/tui/pending-resume.js";
-import { bootTUI, RENDER_BACKPRESSURE_THRESHOLD_MS } from "./main.js";
-import { AgenCTuiApp } from "./components/App.js";
+import { bootTUI, RENDER_BACKPRESSURE_THRESHOLD_MS } from "../../src/tui/main.js";
+import { AgenCTuiApp } from "../../src/tui/components/App.js";
 
 class TestReadStream extends EventEmitter {
   isTTY = true;

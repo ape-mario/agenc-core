@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AUTOCOMPACT_BUFFER_TOKENS,
   getAutoCompactThreshold,
-} from "./autoCompact.js";
+} from "../../../src/services/compact/autoCompact.js";
 
 /**
  * Regression for two sessions killed mid-run on grok-4.5 (catalogued 500k).

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import type { AppState } from "./AppState.js";
+import type { AppState } from "../../../src/tui/state/AppState.js";
 import {
   getActiveAgentForInput,
   getViewedTeammateTask,
-} from "./selectors.js";
+} from "../../../src/tui/state/selectors.js";
 
 function makeState(overrides: Partial<AppState> = {}): AppState {
   return {

@@ -9,7 +9,7 @@ import {
   providerCredentialEnvironmentLabel,
   resolveBuiltInProviderInfo,
   resolveBuiltInProviderRegionalEndpoint,
-} from "./provider-info.js";
+} from "../../../src/llm/registry/provider-info.js";
 
 describe("built-in provider info", () => {
   it("defines every provider field and ordered ingress alias exactly once", () => {

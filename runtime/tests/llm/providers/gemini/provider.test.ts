@@ -6,10 +6,10 @@ import {
   isLLMPreGenerationRejection,
 } from "../../../../src/llm/errors.js";
 import { ProviderHttpError } from "../../../../src/llm/client-session.js";
-import { createTokenAccountingRequest } from "../../token-accounting.js";
-import type { LLMChatOptions, LLMMessage, LLMTool } from "../../types.js";
-import { createGeminiEndpointPlan } from "./endpoint-plan.js";
-import { GeminiProvider } from "./index.js";
+import { createTokenAccountingRequest } from "../../../../src/llm/token-accounting.js";
+import type { LLMChatOptions, LLMMessage, LLMTool } from "../../../../src/llm/types.js";
+import { createGeminiEndpointPlan } from "../../../../src/llm/providers/gemini/endpoint-plan.js";
+import { GeminiProvider } from "../../../../src/llm/providers/gemini/index.js";
 import {
   llmMessageToDurableResponseItem,
   responseItemToLlmMessage,

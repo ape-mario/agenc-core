@@ -3,16 +3,16 @@ import {
   AdmissionDeniedError,
   type AdmissionAcquireInput,
   type ExecutionAdmissionClient,
-} from "../budget/admission-client.js";
-import type { AdmissionLease } from "../budget/admission-types.js";
+} from "../../src/budget/admission-client.js";
+import type { AdmissionLease } from "../../src/budget/admission-types.js";
 import {
   clearCurrentRuntimeSession,
   setCurrentRuntimeSession,
-} from "../session/current-session.js";
-import type { Session } from "../session/session.js";
+} from "../../src/session/current-session.js";
+import type { Session } from "../../src/session/session.js";
 import { createTestEffectJournal } from "../helpers/test-effect-journal.js";
-import { createPromptBridge } from "./prompts.js";
-import { McpListPaginationError } from "./list-pagination.js";
+import { createPromptBridge } from "../../src/mcp-client/prompts.js";
+import { McpListPaginationError } from "../../src/mcp-client/list-pagination.js";
 
 const UNTRUSTED_MCP_PROMPT_BOUNDARY =
   "===== AGENC UNTRUSTED MCP PROMPT CONTENT =====";

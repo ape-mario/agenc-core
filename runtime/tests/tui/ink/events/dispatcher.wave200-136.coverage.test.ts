@@ -5,8 +5,8 @@ import {
 } from 'react-reconciler/constants.js'
 import { expect, test } from 'vitest'
 
-import { Dispatcher } from './dispatcher.ts'
-import { TerminalEvent, type EventTarget } from './terminal-event.ts'
+import { Dispatcher } from '../../../../src/tui/ink/events/dispatcher.js'
+import { TerminalEvent, type EventTarget } from '../../../../src/tui/ink/events/terminal-event.js'
 
 type TestTarget = EventTarget & {
   name: string

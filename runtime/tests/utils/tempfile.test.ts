@@ -13,8 +13,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,
-} from '../session/runtime-options.js'
-import { createPrivateTempFile } from './tempfile.js'
+} from '../../src/session/runtime-options.js'
+import { createPrivateTempFile } from '../../src/utils/tempfile.js'
 
 const roots: string[] = []
 

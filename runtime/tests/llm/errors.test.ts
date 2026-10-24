@@ -6,8 +6,8 @@ import {
   LLMAuthenticationError,
   classifyLLMFailure,
   mapLLMError,
-} from "./errors.js";
-import { ProviderHttpClientSession, ProviderHttpError } from "./client-session.js";
+} from "../../src/llm/errors.js";
+import { ProviderHttpClientSession, ProviderHttpError } from "../../src/llm/client-session.js";
 
 describe("LLM error network classification", () => {
   test.each(["cause", "originalError"])("uses a fixed billing message for a refusal in %s", (causeKey) => {

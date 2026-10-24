@@ -23,7 +23,7 @@ import {
 } from "../../src/permissions/read-only-grant.js";
 import { checkReadOnlyConstraints } from "../../src/tools/BashTool/readOnlyValidation.js";
 import { checkPathConstraints } from "../../src/tools/BashTool/pathValidation.js";
-import { createEmptyToolPermissionContext } from "./types.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 /** The real gates, so this is checked against shipped behaviour. */
 const deps: ShellGateDeps = {

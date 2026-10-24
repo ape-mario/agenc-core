@@ -16,18 +16,18 @@ import {
   openInEditor,
   setPlanSlug,
   writePlan,
-} from "./plan.js";
+} from "../../src/commands/plan.js";
 import { PassThrough } from "node:stream";
 import React from "react";
 import stripAnsi from "strip-ansi";
-import { createRoot } from "../tui/ink.js";
-import { AppStateProvider, getDefaultAppState } from "../tui/state/AppState.js";
-import { createPlanDashboardSnapshot, planItemsFromText } from "./plan-menu.js";
-import type { SlashCommandContext } from "./types.js";
-import type { Session } from "../session/session.js";
-import type { Event } from "../session/event-log.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { createRoot } from "../../src/tui/ink.js";
+import { AppStateProvider, getDefaultAppState } from "../../src/tui/state/AppState.js";
+import { createPlanDashboardSnapshot, planItemsFromText } from "../../src/commands/plan-menu.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import type { Session } from "../../src/session/session.js";
+import type { Event } from "../../src/session/event-log.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 interface Harness {
   readonly ctx: SlashCommandContext;

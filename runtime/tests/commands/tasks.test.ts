@@ -4,8 +4,8 @@ import {
   collectTaskSummaryRows,
   formatTaskSummary,
   tasksCommand,
-} from "./tasks.js";
-import type { SlashCommandContext, SlashCommandResult } from "./types.js";
+} from "../../src/commands/tasks.js";
+import type { SlashCommandContext, SlashCommandResult } from "../../src/commands/types.js";
 
 function contextWithAppState(appState?: unknown): SlashCommandContext {
   return {

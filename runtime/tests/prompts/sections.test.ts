@@ -17,7 +17,7 @@ import {
   clearSystemPromptSections,
   resolveSystemPromptSections,
   systemPromptSection,
-} from "./sections.js";
+} from "../../src/prompts/sections.js";
 
 describe("systemPromptSection cache", () => {
   afterEach(() => clearSystemPromptSections());

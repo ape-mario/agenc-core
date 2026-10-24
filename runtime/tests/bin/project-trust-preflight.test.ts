@@ -9,17 +9,17 @@ import {
   main,
   oneShotCLI,
   resolveAttachTargetTrustRoot,
-} from "./agenc-main.js";
-import { runProjectTrustPreflightForTui } from "./project-trust-preflight.js";
+} from "../../src/bin/agenc-main.js";
+import { runProjectTrustPreflightForTui } from "../../src/bin/project-trust-preflight.js";
 import {
   getSessionTrustAccepted,
   setSessionTrustAccepted,
-} from "../bootstrap/state.js";
+} from "../../src/bootstrap/state.js";
 import {
   resolveProjectTrustKindSync,
   trustProjectSync,
   trustedProjectsPath,
-} from "../permissions/trust/project-trust.js";
+} from "../../src/permissions/trust/project-trust.js";
 
 /**
  * Give a workspace a repository hook, so trusting it turns something on and
@@ -1046,10 +1046,10 @@ describe("main project trust routing", () => {
       { stdinTTY: false, stdoutTTY: false },
       async ({ workspace }) => {
         await shipRepoHook(workspace);
-        const providerMod = await import("../llm/provider.js");
+        const providerMod = await import("../../src/llm/provider.js");
         const createProviderSpy = vi.spyOn(providerMod, "createProvider");
         const startMcpSpy = vi.spyOn(
-          (await import("../session/session.js")).Session.prototype,
+          (await import("../../src/session/session.js")).Session.prototype,
           "startMcpManager",
         );
         const stderr = captureStderr();

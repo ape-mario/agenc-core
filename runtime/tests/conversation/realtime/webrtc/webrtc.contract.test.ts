@@ -5,7 +5,7 @@ import {
   isRealtimeWebrtcUnsupportedPlatform,
   type RealtimeWebrtcEvent,
   type RealtimeWebrtcEventReceiver,
-} from "./lib.js";
+} from "../../../../src/conversation/realtime/webrtc/lib.js";
 import {
   audioLevelToPeak,
   localAudioLevel,
@@ -16,7 +16,7 @@ import {
   type RealtimeWebrtcSessionDescription,
   type RealtimeWebrtcTimer,
   type RealtimeWebrtcTransceiver,
-} from "./native.js";
+} from "../../../../src/conversation/realtime/webrtc/native.js";
 
 const VALID_ANSWER_SDP = "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n";
 

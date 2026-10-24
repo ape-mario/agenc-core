@@ -55,7 +55,7 @@ describe('PromptInputQueuedCommands layout', () => {
 
   it('left-aligns wrapped continuation lines of a queued body with the first line', async () => {
     queueFixture.commands = [{ value: WRAPPING_BODY, mode: 'prompt' }]
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 40)
     const leads = bodyLeadWidths(output)
@@ -75,7 +75,7 @@ describe('PromptInputQueuedCommands layout', () => {
       { value: 'second queued prompt', mode: 'prompt' },
       { value: 'third queued prompt', mode: 'prompt' },
     ]
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 60)
     const lines = output.split('\n')

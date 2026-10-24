@@ -40,7 +40,7 @@ import {
   toText,
   type MCPContentItem,
   type ToolPayload,
-} from "./context.js";
+} from "../../src/tools/context.js";
 
 const toolName = parseToolName("agenc.echo");
 const payload: ToolPayload = { kind: "function", arguments: "{}" };

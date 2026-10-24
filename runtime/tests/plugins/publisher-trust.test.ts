@@ -1,7 +1,7 @@
 import { createPublicKey, verify } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import { pluginSignaturePayloadBytes } from "./resolution.js";
+import { pluginSignaturePayloadBytes } from "../../src/plugins/resolution.js";
 import {
   OFFICIAL_PLUGIN_PUBLISHER_KEY_SHA256,
   OFFICIAL_PLUGIN_PUBLISHER_PUBLIC_KEY,
@@ -10,7 +10,7 @@ import {
   builtInPluginPublisherPublicKey,
   builtInPluginPublisherPublicKeys,
   pluginPublisherKeyFingerprint,
-} from "./publisher-trust.js";
+} from "../../src/plugins/publisher-trust.js";
 
 // Known-good llm-checker signature from tetsuo-ai/agenc-plugins at
 // d8f43d61b7448dbb59907d7d9bacb6c660642672. Keeping the manifest bytes and

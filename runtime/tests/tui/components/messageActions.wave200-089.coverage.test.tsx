@@ -7,12 +7,12 @@ const keybindingMocks = vi.hoisted(() => ({
   useKeybindings: vi.fn(),
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybindings: keybindingMocks.useKeybindings,
 }))
 
-import { createRoot, type Root } from '../ink/root.js'
-import { MessageActionsKeybindings } from './messageActions.js'
+import { createRoot, type Root } from '../../../src/tui/ink/root.js'
+import { MessageActionsKeybindings } from '../../../src/tui/components/messageActions.js'
 
 function createStreams(): {
   stdout: PassThrough

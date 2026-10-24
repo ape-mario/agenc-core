@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
-import { dateChangeProducer } from "./date-change.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+} from "../../../src/session/attachment-state.js";
+import { dateChangeProducer } from "../../../src/prompts/attachments/date-change.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 
 function makeOpts(sessionKey: object): GetAttachmentsOptions {
   return {

@@ -23,10 +23,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { AsyncQueue } from "../utils/async-queue.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { ROLLOUT_SCHEMA_VERSION } from "./event-log.js";
-import { EventLog } from "./event-log.js";
+import { ROLLOUT_SCHEMA_VERSION } from "../../src/session/event-log.js";
+import { EventLog } from "../../src/session/event-log.js";
 import {
   DEFAULT_SESSION_ROOT_MARKERS,
   findProjectRootSync,
@@ -45,17 +45,17 @@ import {
   hasSupportedFileIdentity,
   slugifyCwd,
   truncateCorruptTail,
-} from "./session-store.js";
-import { RolloutStore } from "./rollout-store.js";
-import { Session } from "./session.js";
+} from "../../src/session/session-store.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { Session } from "../../src/session/session.js";
 import {
   AGENC_TRAJECTORY_EXPORT_PATH_ENV,
   TRAJECTORY_EXPORT_SCHEMA_VERSION,
-} from "./trajectory-export.js";
+} from "../../src/session/trajectory-export.js";
 import {
   SLOW_STORE_OP_THRESHOLD_MS,
   setSlowStoreOpReporter,
-} from "../utils/slow-store-op.js";
+} from "../../src/utils/slow-store-op.js";
 
 describe("session-store", () => {
   let home = "";

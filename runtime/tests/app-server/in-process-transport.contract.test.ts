@@ -4,25 +4,25 @@ import {
   AgenCInProcessDaemonTransport as PublicAgenCInProcessDaemonTransport,
   AgenCDaemonJsonRpcDispatcher as PublicAgenCDaemonJsonRpcDispatcher,
   startAgenCInProcessDaemonTransport as publicStartAgenCInProcessDaemonTransport,
-} from "../index.js";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
-import type { AgenCCommandExec } from "./command-exec.js";
+} from "../../src/index.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
+import type { AgenCCommandExec } from "../../src/app-server/command-exec.js";
 import {
   AgenCDaemonJsonRpcDispatcher,
   TEST_ONLY_ALLOW_UNADMITTED_COMMAND_EXEC_START,
-} from "./daemon-dispatcher.js";
+} from "../../src/app-server/daemon-dispatcher.js";
 import {
   AGENC_DAEMON_PROTOCOL_VERSION,
   JSON_RPC_VERSION,
   type AgenCDaemonRequest,
   type JsonObject,
-} from "./protocol/index.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+} from "../../src/app-server/protocol/index.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 import {
   AgenCInProcessDaemonTransport,
   startAgenCInProcessDaemonTransport,
-} from "./transport/in-process.js";
+} from "../../src/app-server/transport/in-process.js";
 import {
   createAgencClient,
   type AgencTransport,

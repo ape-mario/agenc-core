@@ -14,7 +14,7 @@ import {
   renderRipgrepContentBytes,
   renderRipgrepPathBytes,
   type GrepBoundaryError,
-} from "./ripgrep-protocol.js";
+} from "../../../src/tools/system/ripgrep-protocol.js";
 
 function boundaryReason(error: unknown): string | undefined {
   return (error as GrepBoundaryError | undefined)?.reason;

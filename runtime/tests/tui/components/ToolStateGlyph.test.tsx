@@ -4,7 +4,7 @@ import {
   TOOL_STAR_FRAME_MS,
   toolStarFrames,
   toolStaticGlyph,
-} from "./ToolStateGlyph.js";
+} from "../../../src/tui/components/ToolStateGlyph.js";
 
 /**
  * The glyph beside a tool call used to be a lifecycle circle (`○ ◐ ● ✕`).

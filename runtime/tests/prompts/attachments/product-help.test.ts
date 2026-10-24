@@ -4,18 +4,18 @@
  */
 import { describe, expect, test } from "vitest";
 
-import type { LLMMessage } from "../../llm/types.js";
-import type { ToolPermissionContext } from "../../permissions/types.js";
-import { getAttachmentTrackingState } from "../../session/attachment-state.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
+import type { ToolPermissionContext } from "../../../src/permissions/types.js";
+import { getAttachmentTrackingState } from "../../../src/session/attachment-state.js";
 import {
   AGENC_INSTRUCTION_FILE,
   AGENC_UNDO_GUIDANCE,
   AGENC_UNDO_PATHS,
   LIGHT_LOADED_INSTRUCTIONS_NOTE,
-} from "../product-help.js";
-import { attachmentsToMessages } from "./messages.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
-import { asksAboutInstructionFiles, asksAboutUndo, productHelpProducer } from "./product-help.js";
+} from "../../../src/prompts/product-help.js";
+import { attachmentsToMessages } from "../../../src/prompts/attachments/messages.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
+import { asksAboutInstructionFiles, asksAboutUndo, productHelpProducer } from "../../../src/prompts/attachments/product-help.js";
 
 function makeOpts(text: string, partial?: Partial<GetAttachmentsOptions>): GetAttachmentsOptions {
   return {

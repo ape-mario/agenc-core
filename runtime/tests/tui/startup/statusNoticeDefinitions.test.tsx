@@ -1,7 +1,7 @@
 import * as React from "react";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 
-import type { StatusNoticeContext } from "./statusNoticeDefinitions.js";
+import type { StatusNoticeContext } from "../../../src/tui/startup/statusNoticeDefinitions.js";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../remoteAuthSessionContext.fixture.js";
 
 const mocks = vi.hoisted(() => ({
@@ -30,7 +30,7 @@ const mocks = vi.hoisted(() => ({
   pluginInstalled: true,
 }));
 
-vi.mock("../ink.js", async () => {
+vi.mock("../../../src/tui/ink.js", async () => {
   const React = await import("react");
   return {
     Box: ({ children }: { children?: React.ReactNode }) =>
@@ -40,15 +40,15 @@ vi.mock("../ink.js", async () => {
   };
 });
 
-vi.mock("../../utils/cwd.js", () => ({
+vi.mock("../../../src/utils/cwd.js", () => ({
   getCwd: () => "/repo",
 }));
 
-vi.mock("../../utils/format.js", () => ({
+vi.mock("../../../src/utils/format.js", () => ({
   formatNumber: (value: number) => String(value),
 }));
 
-vi.mock("../../utils/auth.js", () => ({
+vi.mock("../../../src/utils/auth.js", () => ({
   selectedProviderUsesExternalAuth: (provider: string) =>
     provider !== "anthropic" && provider !== "agenc",
   getAnthropicApiKeyWithSourceForContext: (context: unknown) => {
@@ -74,18 +74,18 @@ vi.mock("../../utils/auth.js", () => ({
   },
 }));
 
-vi.mock("../../utils/statusNoticeHelpers.js", () => ({
+vi.mock("../../../src/utils/statusNoticeHelpers.js", () => ({
   AGENT_DESCRIPTIONS_THRESHOLD: 100,
   getAgentDescriptionsTotalTokens: () => mocks.agentTokens,
 }));
 
-vi.mock("../../utils/ide.js", () => ({
+vi.mock("../../../src/utils/ide.js", () => ({
   getTerminalIdeType: () => mocks.terminalIdeType,
   isSupportedJetBrainsTerminal: () => mocks.supportedIde,
   toIDEDisplayName: (ideType: string | null) => ideType ?? "JetBrains IDE",
 }));
 
-vi.mock("../../utils/jetbrains.js", () => ({
+vi.mock("../../../src/utils/jetbrains.js", () => ({
   isJetBrainsPluginInstalledCachedSync: () => mocks.pluginInstalled,
 }));
 
@@ -133,7 +133,7 @@ describe("startup status notice definitions", () => {
       hasToken: true,
     };
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
     const ids = getActiveNotices(baseContext()).map((notice) => notice.id);
 
     expect(ids).not.toContain("agenc-account-external-token");
@@ -159,7 +159,7 @@ describe("startup status notice definitions", () => {
       },
     };
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
     const ids = getActiveNotices(context).map((notice) => notice.id);
 
     expect(ids).not.toContain("agenc-account-external-token");
@@ -173,7 +173,7 @@ describe("startup status notice definitions", () => {
     mocks.apiKeyConfigured = true;
     mocks.apiKeySource = "ANTHROPIC_API_KEY";
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
     const ids = getActiveNotices(baseContext()).map((notice) => notice.id);
 
     expect(ids).toContain("api-key-conflict");
@@ -186,7 +186,7 @@ describe("startup status notice definitions", () => {
     mocks.throwApiKeyLookup = true;
     mocks.apiKeyConfigured = true;
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
 
     expect(() => getActiveNotices(baseContext())).not.toThrow();
     expect(getActiveNotices(baseContext()).map((notice) => notice.id)).not.toContain(
@@ -201,7 +201,7 @@ describe("startup status notice definitions", () => {
     };
     mocks.apiKeySource = "ANTHROPIC_API_KEY";
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
     const notice = getActiveNotices(baseContext()).find(
       (candidate) => candidate.id === "both-auth-methods",
     );
@@ -217,7 +217,7 @@ describe("startup status notice definitions", () => {
       memoryDiagnostics: ["Large AGENC.md will impact performance"],
     };
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
     const ids = getActiveNotices(context).map((notice) => notice.id);
 
     expect(ids).toContain("large-memory-files");
@@ -232,7 +232,7 @@ describe("startup status notice definitions", () => {
       },
     };
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
     const notice = getActiveNotices(context).find(
       (candidate) => candidate.id === "daemon-autostart-disabled",
     );
@@ -250,7 +250,7 @@ describe("startup status notice definitions", () => {
       },
     };
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
     const notice = getActiveNotices(context).find((candidate) => candidate.id === "daemon-autostart-failed");
 
     expect(collectText(notice?.render(context))).toBe(
@@ -264,7 +264,7 @@ describe("startup status notice definitions", () => {
     mocks.terminalIdeType = "IntelliJ IDEA";
     mocks.pluginInstalled = false;
 
-    const { getActiveNotices } = await import("./statusNoticeDefinitions.js");
+    const { getActiveNotices } = await import("../../../src/tui/startup/statusNoticeDefinitions.js");
     const notice = getActiveNotices(baseContext()).find(
       (candidate) => candidate.id === "jetbrains-plugin-install",
     );

@@ -7,7 +7,7 @@ import {
   getTaskStatusIcon,
   isTerminalStatus,
   shouldHideTasksFooter,
-} from './taskStatusUtils.js'
+} from '../../../../src/tui/components/tasks/taskStatusUtils.js'
 
 type TaskStatus = Parameters<typeof isTerminalStatus>[0]
 type TeammateTask = Parameters<typeof describeTeammateActivity>[0]

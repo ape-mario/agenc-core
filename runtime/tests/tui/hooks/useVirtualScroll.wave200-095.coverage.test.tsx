@@ -3,13 +3,13 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
-import type { ScrollBoxHandle } from '../ink/components/ScrollBox.js'
-import type { DOMElement } from '../ink/dom.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { ScrollBoxHandle } from '../../../src/tui/ink/components/ScrollBox.js'
+import type { DOMElement } from '../../../src/tui/ink/dom.js'
 import {
   type VirtualScrollResult,
   useVirtualScroll,
-} from './useVirtualScroll.js'
+} from '../../../src/tui/hooks/useVirtualScroll.js'
 
 type FakeScrollHandle = ScrollBoxHandle & {
   lastClamp: [number | undefined, number | undefined] | undefined

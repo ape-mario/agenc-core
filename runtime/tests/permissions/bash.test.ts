@@ -5,8 +5,8 @@ import {
   isDangerousCommand,
   matchedDangerousLabel,
   shouldUseSandbox,
-} from "./bash.js";
-import type { ToolEvaluatorContext } from "./bash.js";
+} from "../../src/permissions/bash.js";
+import type { ToolEvaluatorContext } from "../../src/permissions/bash.js";
 import {
   MAX_SUBCOMMANDS_FOR_SECURITY_CHECK,
   SAFE_ENV_VARS,
@@ -14,11 +14,11 @@ import {
   getSimpleCommandPrefix,
   parseShellCommand,
   splitCommand,
-} from "../shell-command/parser.js";
+} from "../../src/shell-command/parser.js";
 import {
   createEmptyToolPermissionContext,
   type ToolPermissionContext,
-} from "./types.js";
+} from "../../src/permissions/types.js";
 import {
   INERT_SHELL_SCRIPT_COMMANDS,
   REMOVAL_FLOOR_SHELL_CASES,

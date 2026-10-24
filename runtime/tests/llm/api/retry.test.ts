@@ -6,7 +6,7 @@ import {
   is529Error,
   parseMaxTokensContextOverflowError,
   parseOpenAIDuration,
-} from "./retry.js";
+} from "../../../src/llm/api/retry.js";
 
 describe("llm api retry", () => {
   test("computes exponential delay with donor-compatible jitter", () => {

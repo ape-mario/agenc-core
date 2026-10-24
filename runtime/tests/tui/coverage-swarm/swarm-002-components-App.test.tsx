@@ -4,9 +4,9 @@ import type {
   McpElicitationRequestEvent,
   McpPrimitiveSchemaDefinition,
   RequestUserInputEvent,
-} from "../../elicitation/types.js";
-import { isMcpUrlCompletionResponse } from "../../elicitation/url-completion.js";
-import { getCommandQueueSnapshot, resetCommandQueueForTesting } from "../../utils/messageQueueManager.js";
+} from "../../../src/elicitation/types.js";
+import { isMcpUrlCompletionResponse } from "../../../src/elicitation/url-completion.js";
+import { getCommandQueueSnapshot, resetCommandQueueForTesting } from "../../../src/utils/messageQueueManager.js";
 import {
   createElicitationQueue,
   enqueueSlashPromptResult,
@@ -16,7 +16,7 @@ import {
   type McpFormPending,
   type McpUrlPending,
   type UserPending,
-} from "../components/App.js";
+} from "../../../src/tui/components/App.js";
 
 function userRequest(questions: RequestUserInputEvent["questions"]): RequestUserInputEvent {
   return {

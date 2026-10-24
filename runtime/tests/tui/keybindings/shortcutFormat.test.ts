@@ -12,15 +12,15 @@ const mocks = vi.hoisted(() => {
   return state
 })
 
-vi.mock('./loadUserBindings.js', () => ({
+vi.mock('../../../src/tui/keybindings/loadUserBindings.js', () => ({
   loadKeybindingsSync: mocks.loadKeybindingsSync,
 }))
 
-vi.mock('./resolver.js', () => ({
+vi.mock('../../../src/tui/keybindings/resolver.js', () => ({
   getBindingDisplayText: mocks.getBindingDisplayText,
 }))
 
-import { getShortcutDisplay } from './shortcutFormat.js'
+import { getShortcutDisplay } from '../../../src/tui/keybindings/shortcutFormat.js'
 
 describe('getShortcutDisplay', () => {
   beforeEach(() => {

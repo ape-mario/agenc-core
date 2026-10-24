@@ -15,8 +15,8 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { CsvAgentJobsRepository } from "../../state/csv-agent-jobs.js";
-import { openStateDatabases } from "../../state/sqlite-driver.js";
+import { CsvAgentJobsRepository } from "../../../src/state/csv-agent-jobs.js";
+import { openStateDatabases } from "../../../src/state/sqlite-driver.js";
 import {
   recordAgentJobResult,
   resumeAgentJobsFromRepository,
@@ -24,9 +24,9 @@ import {
   type AgentJobSpawn,
   type AgentJobSpawnContext,
   type CsvIdempotencyProfile,
-} from "./job-orchestrator.js";
-import { createCsvInputRootCapability } from "./csv-reader.js";
-import { createCsvOutputRootCapability } from "./csv-output.js";
+} from "../../../src/agents/jobs/job-orchestrator.js";
+import { createCsvInputRootCapability } from "../../../src/agents/jobs/csv-reader.js";
+import { createCsvOutputRootCapability } from "../../../src/agents/jobs/csv-output.js";
 
 let workDir: string;
 

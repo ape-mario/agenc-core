@@ -16,19 +16,19 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { parseToml } from "../config/loader.js";
+import { parseToml } from "../../src/config/loader.js";
 import {
   CANONICAL_CONFIG_VERSION,
   CANONICAL_CONFIG_VERSION_KEY,
-} from "../config/repository.js";
+} from "../../src/config/repository.js";
 import {
   formatAgenCConfigCliHelpText,
   parseAgenCConfigCliArgs,
   runAgenCConfigCli,
   type AgenCConfigCliOptions,
   type AgenCConfigCliIo,
-} from "./config-cli.js";
-import { main } from "./agenc-main.js";
+} from "../../src/bin/config-cli.js";
+import { main } from "../../src/bin/agenc-main.js";
 
 function createIo(): AgenCConfigCliIo & {
   readonly stdoutText: () => string;

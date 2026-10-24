@@ -7,7 +7,7 @@ import {
   createProcessRealtimeAudioPlayer,
   pcmPeakLevel,
   type RealtimeAudioPlayerSpawn,
-} from "./audio.js";
+} from "../../../src/tui/realtime/audio.js";
 
 const MAX_OUTPUT_QUEUE_BYTES = 512 * 1024;
 const BACKPRESSURE_CHUNK_BYTES = 64 * 1024;

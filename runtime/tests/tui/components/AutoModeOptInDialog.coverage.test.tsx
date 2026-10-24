@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 import {
   AUTO_MODE_DESCRIPTION,
   AutoModeOptInDialog,
-} from "./AutoModeOptInDialog.js";
+} from "../../../src/tui/components/AutoModeOptInDialog.js";
 
 type SelectMockProps = {
   readonly onCancel: () => void;
@@ -32,14 +32,14 @@ const harness = vi.hoisted(() => ({
   recordSecurityAcknowledgement: vi.fn(),
 }));
 
-vi.mock("../../utils/settings/settings.js", () => ({
+vi.mock("../../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: () => ({}),
   updateSettingsForSource: harness.updateSettingsForSource,
 }));
 
-vi.mock("../../utils/settings/canonicalAuthority.js", async importOriginal => ({
+vi.mock("../../../src/utils/settings/canonicalAuthority.js", async importOriginal => ({
   ...(await importOriginal<
-    typeof import("../../utils/settings/canonicalAuthority.js")
+    typeof import("../../../src/utils/settings/canonicalAuthority.js")
   >()),
   // The root ThemeProvider reads the saved theme from this store and
   // follows its reloads.
@@ -50,11 +50,11 @@ vi.mock("../../utils/settings/canonicalAuthority.js", async importOriginal => ({
   }),
 }));
 
-vi.mock("../../permissions/trust/project-trust.js", () => ({
+vi.mock("../../../src/permissions/trust/project-trust.js", () => ({
   recordSecurityAcknowledgement: harness.recordSecurityAcknowledgement,
 }));
 
-vi.mock("./CustomSelect/select", async () => {
+vi.mock("../../../src/tui/components/CustomSelect/select.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
 
   return {
@@ -69,7 +69,7 @@ vi.mock("./CustomSelect/select", async () => {
   };
 });
 
-vi.mock("./design-system/Dialog", async () => {
+vi.mock("../../../src/tui/components/design-system/Dialog.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
 
   return {

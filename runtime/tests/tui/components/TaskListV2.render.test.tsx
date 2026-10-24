@@ -29,33 +29,33 @@ const harness = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../hooks/useTerminalSize.js", () => ({
+vi.mock("../../../src/tui/hooks/useTerminalSize.js", () => ({
   useTerminalSize: () => ({ columns: harness.columns, rows: harness.rows }),
 }));
 
-vi.mock("../state/AppState.js", () => ({
+vi.mock("../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
 }));
 
-vi.mock("../../utils/tasks.js", async importOriginal => {
-  const actual = await importOriginal<typeof import("../../utils/tasks.js")>();
+vi.mock("../../../src/utils/tasks.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../../src/utils/tasks.js")>();
   return {
     ...actual,
     isTodoV2Enabled: () => harness.todoEnabled,
   };
 });
 
-vi.mock("../../utils/agentSwarmsEnabled.js", () => ({
+vi.mock("../../../src/utils/agentSwarmsEnabled.js", () => ({
   isAgentSwarmsEnabled: () => harness.swarmsEnabled,
 }));
 
-vi.mock("../../tasks/InProcessTeammateTask/types.js", () => ({
+vi.mock("../../../src/tasks/InProcessTeammateTask/types.js", () => ({
   isInProcessTeammateTask: (task: { readonly type?: string }) =>
     task.type === "in_process_teammate",
 }));
 
-vi.mock("../../utils/collapseReadSearch.js", () => ({
+vi.mock("../../../src/utils/collapseReadSearch.js", () => ({
   summarizeRecentActivities: (
     activities: ReadonlyArray<{ readonly activityDescription?: string }>,
   ) => activities.map(activity => activity.activityDescription).filter(Boolean).join(" + "),
@@ -68,8 +68,8 @@ vi.mock("src/tools/AgentTool/agentColorManager.js", () => ({
   },
 }));
 
-import { createRoot } from "../ink/root.js";
-import { TaskListV2 } from "./TaskListV2.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { TaskListV2 } from "../../../src/tui/components/TaskListV2.js";
 
 type TestTask = {
   activeForm?: string;

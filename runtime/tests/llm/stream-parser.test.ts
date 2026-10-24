@@ -9,7 +9,7 @@ import {
   stripCitations,
   stripProposedPlanBlocks,
   validateToolCallsForExecution,
-} from "./stream-parser.js";
+} from "../../src/llm/stream-parser.js";
 
 describe("stream-parser", () => {
   test("stripCitations removes inline citation tags", () => {

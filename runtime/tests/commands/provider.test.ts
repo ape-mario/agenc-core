@@ -8,20 +8,20 @@ import {
   applyProviderSwitch,
   checkModelHistoryCompat,
   switchProviderModel,
-} from "./provider.js";
-import { readProviderMenuSnapshot } from "./provider-menu-snapshot.js";
-import type { Session } from "../session/session.js";
+} from "../../src/commands/provider.js";
+import { readProviderMenuSnapshot } from "../../src/commands/provider-menu-snapshot.js";
+import type { Session } from "../../src/session/session.js";
 import type {
   SlashCommandAppStateBridge,
   SlashCommandContext,
-} from "./types.js";
-import type { EnvSnapshot } from "../config/env.js";
-import type { ConfigStore } from "../config/store.js";
-import { resolveHomeContext, type HomeContext } from "../config/home.js";
-import { RemoteAuthBackend } from "../auth/backends/remote.js";
-import { LocalAuthBackend } from "../auth/backends/local.js";
-import { saveXaiOauthCredentials } from "../utils/xaiOauthCredentials.js";
-import { modelCommand } from "./model.js";
+} from "../../src/commands/types.js";
+import type { EnvSnapshot } from "../../src/config/env.js";
+import type { ConfigStore } from "../../src/config/store.js";
+import { resolveHomeContext, type HomeContext } from "../../src/config/home.js";
+import { RemoteAuthBackend } from "../../src/auth/backends/remote.js";
+import { LocalAuthBackend } from "../../src/auth/backends/local.js";
+import { saveXaiOauthCredentials } from "../../src/utils/xaiOauthCredentials.js";
+import { modelCommand } from "../../src/commands/model.js";
 
 const TEST_ENVIRONMENT: EnvSnapshot = Object.freeze({
   AGENC_HOME: "/tmp/agenc-provider-command-test",

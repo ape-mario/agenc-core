@@ -31,27 +31,27 @@ import {
   getProjectRoot,
   setOriginalCwd,
   setProjectRoot,
-} from "../bootstrap/state.js";
+} from "../../src/bootstrap/state.js";
 
 vi.mock("bun:bundle", () => ({ feature: () => false }));
-vi.mock("../tools/GrepTool/prompt.js", () => ({ GREP_TOOL_NAME: "Grep" }));
-vi.mock("../tools/REPLTool/constants.js", () => ({ isReplModeEnabled: () => false }));
-vi.mock("../utils/embeddedTools.js", () => ({ hasEmbeddedSearchTools: () => false }));
-vi.mock("../utils/sessionStorage.js", () => ({ getProjectDir: (cwd: string) => cwd }));
-vi.mock("../utils/hooks.js", () => ({
+vi.mock("../../src/tools/GrepTool/prompt.js", () => ({ GREP_TOOL_NAME: "Grep" }));
+vi.mock("../../src/tools/REPLTool/constants.js", () => ({ isReplModeEnabled: () => false }));
+vi.mock("../../src/utils/embeddedTools.js", () => ({ hasEmbeddedSearchTools: () => false }));
+vi.mock("../../src/utils/sessionStorage.js", () => ({ getProjectDir: (cwd: string) => cwd }));
+vi.mock("../../src/utils/hooks.js", () => ({
   executeInstructionsLoadedHooks: async () => undefined,
   hasInstructionsLoadedHook: () => false,
 }));
-vi.mock("../tools.js", () => ({}));
+vi.mock("../../src/tools.js", () => ({}));
 vi.mock("src/tools.js", () => ({}));
-vi.mock("../utils/settings/settings.js", () => ({
+vi.mock("../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: () => ({}),
   getInitialSettings: () => ({}),
   getSettingsForSource: () => undefined,
 }));
 
-let agencmd: typeof import("./agencmd.js");
-let persona: typeof import("./persona.js");
+let agencmd: typeof import("../../src/memory/agencmd.js");
+let persona: typeof import("../../src/memory/persona.js");
 
 let tempRoot = "";
 let repo = "";
@@ -60,8 +60,8 @@ let oldOriginalCwd = "";
 let oldAgencHome: string | undefined;
 
 beforeAll(async () => {
-  agencmd = await import("./agencmd.js");
-  persona = await import("./persona.js");
+  agencmd = await import("../../src/memory/agencmd.js");
+  persona = await import("../../src/memory/persona.js");
 }, 30_000);
 
 beforeEach(() => {

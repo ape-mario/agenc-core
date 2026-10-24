@@ -3,14 +3,14 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { createRoot } from "../../ink/root.js";
-import { Text } from "../../ink.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { Text } from "../../../../src/tui/ink.js";
 import {
   ThemeProvider,
   usePreviewTheme,
   useTheme,
   useThemeSetting,
-} from "./ThemeProvider.js";
+} from "../../../../src/tui/components/design-system/ThemeProvider.js";
 
 const mocks = vi.hoisted(() => {
   // The provider reads the saved theme from the bound settings store and
@@ -46,25 +46,25 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../../utils/settings/canonicalAuthority.js", () => ({
+vi.mock("../../../../src/utils/settings/canonicalAuthority.js", () => ({
   getCanonicalSettingsAuthority: mocks.getCanonicalSettingsAuthority,
 }));
 
-vi.mock("../../../utils/settings/settings.js", () => ({
+vi.mock("../../../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: mocks.getExecutionAuthoritySettings,
   updateSettingsForSource: mocks.updateSettingsForSource,
 }));
 
-vi.mock("../../../utils/terminalBackground.js", async (importOriginal) => ({
+vi.mock("../../../../src/utils/terminalBackground.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getTerminalBackground: mocks.getTerminalBackground,
 }));
 
-vi.mock("../../../utils/terminalBackgroundWatcher.js", () => ({
+vi.mock("../../../../src/utils/terminalBackgroundWatcher.js", () => ({
   watchTerminalBackground: mocks.watchTerminalBackground,
 }));
 
-vi.mock("../../../utils/log.js", () => ({
+vi.mock("../../../../src/utils/log.js", () => ({
   logError: mocks.logError,
 }));
 

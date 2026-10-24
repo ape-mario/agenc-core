@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createKillProcessTool } from "./system/kill-process.js";
+import { createKillProcessTool } from "../../src/tools/system/kill-process.js";
 import type {
   OwnedProcessView,
   UnifiedExecProcessManagerLike,
-} from "../unified-exec/types.js";
-import { UnifiedExecError } from "../unified-exec/types.js";
+} from "../../src/unified-exec/types.js";
+import { UnifiedExecError } from "../../src/unified-exec/types.js";
 
 function fakeManager(
   terminated: boolean,

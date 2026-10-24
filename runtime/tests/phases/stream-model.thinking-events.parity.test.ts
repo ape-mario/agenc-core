@@ -1,11 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
 
-import type { LLMStreamChunk } from "../llm/types.js";
-import type { Session } from "../session/session.js";
+import type { LLMStreamChunk } from "../../src/llm/types.js";
+import type { Session } from "../../src/session/session.js";
 import {
   emitThinkingChunkEvents,
   type ThinkingDisplayState,
-} from "./stream-model.js";
+} from "../../src/phases/stream-model.js";
 
 type EmittedEvent = {
   id: string;

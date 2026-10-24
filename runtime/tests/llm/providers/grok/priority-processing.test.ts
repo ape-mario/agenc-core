@@ -7,8 +7,8 @@
 // sign-in route, whose priority behavior xAI does not document.
 import { describe, expect, test, vi } from "vitest";
 
-import type { LLMChatOptions, LLMMessage } from "../../types.js";
-import { GrokProvider } from "./adapter.js";
+import type { LLMChatOptions, LLMMessage } from "../../../../src/llm/types.js";
+import { GrokProvider } from "../../../../src/llm/providers/grok/adapter.js";
 
 const messages: LLMMessage[] = [{ role: "user", content: "hello" }];
 

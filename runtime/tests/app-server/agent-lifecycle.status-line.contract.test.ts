@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 
 async function createOwner(runtimeAvailable = true, closed = false) {
   const sessions = new AgenCDaemonSessionManager();

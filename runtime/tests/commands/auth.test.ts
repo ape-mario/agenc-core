@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LocalAuthBackend } from "../auth/backends/local.js";
-import { resolveHomeContext } from "../config/home.js";
+import { LocalAuthBackend } from "../../src/auth/backends/local.js";
+import { resolveHomeContext } from "../../src/config/home.js";
 import {
   formatSubscriptionCommandResult,
   loginCommand,
@@ -13,9 +13,9 @@ import {
   subscriptionCommand,
   usageCommand,
   whoamiCommand,
-} from "./auth.js";
-import { buildDefaultRegistry } from "./registry.js";
-import type { SlashCommandContext } from "./types.js";
+} from "../../src/commands/auth.js";
+import { buildDefaultRegistry } from "../../src/commands/registry.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function localAuthCtx(agencHome: string): SlashCommandContext {
   const configStore = {

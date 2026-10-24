@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import Output from './output.ts'
+import Output from '../../../src/tui/ink/output.js'
 import {
   CellWidth,
   CharPool,
@@ -9,7 +9,7 @@ import {
   charInCellAt,
   createScreen,
   setCellAt,
-} from './screen.ts'
+} from '../../../src/tui/ink/screen.js'
 
 test('absolute clears prevent clean blits from restoring stale overlay rows', () => {
   const stylePool = new StylePool()

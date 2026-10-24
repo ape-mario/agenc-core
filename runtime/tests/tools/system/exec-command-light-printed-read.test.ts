@@ -4,13 +4,13 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-import { createExecCommandTool } from "./exec-command.js";
-import { createFileEditTool } from "./file-edit.js";
-import { getSessionReadSnapshot, SESSION_ID_ARG } from "./filesystem.js";
-import { resetPrintedOutputsForTest } from "./printed-read-proof.js";
+import { createExecCommandTool } from "../../../src/tools/system/exec-command.js";
+import { createFileEditTool } from "../../../src/tools/system/file-edit.js";
+import { getSessionReadSnapshot, SESSION_ID_ARG } from "../../../src/tools/system/filesystem.js";
+import { resetPrintedOutputsForTest } from "../../../src/tools/system/printed-read-proof.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
-import { UnifiedExecProcessManager } from "../../unified-exec/process-manager.js";
-import type { ExecCommandToolOutput } from "../../unified-exec/types.js";
+import { UnifiedExecProcessManager } from "../../../src/unified-exec/process-manager.js";
+import type { ExecCommandToolOutput } from "../../../src/unified-exec/types.js";
 
 let root: string;
 let session: string;

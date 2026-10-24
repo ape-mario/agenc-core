@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { getPillLabel } from "./pillLabel.js";
+import { getPillLabel } from "../../src/tasks/pillLabel.js";
 import {
   createTaskStateBase,
   type BackgroundTaskState,
   type InProcessTeammateTaskState,
   type LocalShellTaskState,
-} from "./types.js";
+} from "../../src/tasks/types.js";
 
 function shell(id: string): LocalShellTaskState {
   return {

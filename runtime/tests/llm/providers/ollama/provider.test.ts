@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { OllamaProvider } from "./adapter.js";
-import { withOllamaHealthSidecar } from "./health.js";
+import { OllamaProvider } from "../../../../src/llm/providers/ollama/adapter.js";
+import { withOllamaHealthSidecar } from "../../../../src/llm/providers/ollama/health.js";
 import { hangingStreamAfterFirstChunk } from "./ollama-test-helpers.js";
 import { isTransientProviderError } from "../../../../src/recovery/api-errors.js";
 import {
@@ -15,7 +15,7 @@ import type { LLMChatOptions, LLMMessage } from "../../../../src/llm/types.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
-} from "../../registry/provider-info.js";
+} from "../../../../src/llm/registry/provider-info.js";
 import {
   createCsvAgentInvocationEnvelope,
   materializeAgentInvocationMessages,

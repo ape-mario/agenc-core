@@ -1,12 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { DeepSeekProvider } from "./index.js";
-import { BUILT_IN_PROVIDER_BASE_URLS } from "../../registry/provider-info.js";
-import { DEEPSEEK_MODELS, DEEPSEEK_MODEL_ALIASES } from "../../registry/deepseek-models.js";
-import { ModelMetadataResolver } from "../../model-metadata.js";
-import { defaultConfig } from "../../../config/schema.js";
-import { sessionConfigurationFromAgenCConfig } from "../../../session/configuration.js";
-import type { LLMMessage } from "../../types.js";
+import { DeepSeekProvider } from "../../../../src/llm/providers/deepseek/index.js";
+import { BUILT_IN_PROVIDER_BASE_URLS } from "../../../../src/llm/registry/provider-info.js";
+import { DEEPSEEK_MODELS, DEEPSEEK_MODEL_ALIASES } from "../../../../src/llm/registry/deepseek-models.js";
+import { ModelMetadataResolver } from "../../../../src/llm/model-metadata.js";
+import { defaultConfig } from "../../../../src/config/schema.js";
+import { sessionConfigurationFromAgenCConfig } from "../../../../src/session/configuration.js";
+import type { LLMMessage } from "../../../../src/llm/types.js";
 import { bodyAt, createSuccessfulChatResponse, ECHO_TOOL, sseResponse } from "../openai-compatible-test-helpers.js";
 
 describe("DeepSeekProvider", () => {

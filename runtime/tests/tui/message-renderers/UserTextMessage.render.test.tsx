@@ -1,28 +1,28 @@
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { NO_CONTENT_MESSAGE } from '../../constants/messages.js'
+import { NO_CONTENT_MESSAGE } from '../../../src/constants/messages.js'
 import {
   COMMAND_MESSAGE_TAG,
   TASK_NOTIFICATION_TAG,
   TICK_TAG,
-} from '../../constants/xml.js'
+} from '../../../src/constants/xml.js'
 import {
   INTERRUPT_MESSAGE,
   INTERRUPT_MESSAGE_FOR_TOOL_USE,
-} from '../../utils/messages.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { UserCrossSessionMessage } from './UserCrossSessionMessage.js'
-import { UserForkBoilerplateMessage } from './UserForkBoilerplateMessage.js'
-import { UserGitHubWebhookMessage } from './UserGitHubWebhookMessage.js'
-import { UserTextMessage } from './UserTextMessage.js'
+} from '../../../src/utils/messages.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { UserCrossSessionMessage } from '../../../src/tui/message-renderers/UserCrossSessionMessage.js'
+import { UserForkBoilerplateMessage } from '../../../src/tui/message-renderers/UserForkBoilerplateMessage.js'
+import { UserGitHubWebhookMessage } from '../../../src/tui/message-renderers/UserGitHubWebhookMessage.js'
+import { UserTextMessage } from '../../../src/tui/message-renderers/UserTextMessage.js'
 
 const featureFlags = vi.hoisted(() => new Set<string>())
 
 vi.mock('bun:bundle', () => ({
   feature: (name: string) => featureFlags.has(name),
 }))
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),

@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { addLineNumbers, SPARSE_LINE_NUMBERS_ENV, sparseLineNumbersEnabled } from "./_deps/line-numbers.js";
-import { clearFileReadListenersForTests, createFileReadTool as createUnboundFileReadTool } from "./file-read.js";
-import { createFileEditTool } from "./file-edit.js";
+import { addLineNumbers, SPARSE_LINE_NUMBERS_ENV, sparseLineNumbersEnabled } from "../../../src/tools/system/_deps/line-numbers.js";
+import { clearFileReadListenersForTests, createFileReadTool as createUnboundFileReadTool } from "../../../src/tools/system/file-read.js";
+import { createFileEditTool } from "../../../src/tools/system/file-edit.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 import { buildBootstrapToolRegistry } from "../../../src/bin/bootstrap-tool-registry.js";
 import {

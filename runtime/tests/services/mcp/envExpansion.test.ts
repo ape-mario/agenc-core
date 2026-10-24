@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 
-import { parseMcpConfig } from './config.js'
-import { expandEnvVarsInString } from './envExpansion.js'
+import { parseMcpConfig } from '../../../src/services/mcp/config.js'
+import { expandEnvVarsInString } from '../../../src/services/mcp/envExpansion.js'
 
 test('MCP interpolation resolves only from the explicit environment', () => {
   assert.deepEqual(

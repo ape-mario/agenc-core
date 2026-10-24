@@ -1,7 +1,7 @@
 import { ProviderHttpError } from "../../../../src/llm/client-session.js";
 import { isLLMPreGenerationRejection } from "../../../../src/llm/errors.js";
 import { describe, expect, test, vi } from "vitest";
-import { AnthropicProvider } from "./adapter.js";
+import { AnthropicProvider } from "../../../../src/llm/providers/anthropic/adapter.js";
 import {
   createAnthropicFallbackProvider,
   sseResponse,

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("./ink.js", () => {
+vi.mock("../../src/tui/ink.js", () => {
   function Box(_props: { readonly children?: unknown }) {
     return null;
   }
@@ -10,7 +10,7 @@ vi.mock("./ink.js", () => {
   return { Box, Text };
 });
 
-import { createTuiTool, ToolErrorView } from "./tool-rendering.js";
+import { createTuiTool, ToolErrorView } from "../../src/tui/tool-rendering.js";
 
 describe("TUI dynamic tool fallback coverage", () => {
   test("dynamic tools expose the baseline TUI tool contract", async () => {

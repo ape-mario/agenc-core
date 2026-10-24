@@ -4,7 +4,7 @@ import { join, relative, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, expect, it } from "vitest";
 import { resolveSpawnExecutable } from "../../src/sandbox/execution-broker.js";
-import { assertPluginSnapshotLaunchSafe } from "./plugin-launch.js";
+import { assertPluginSnapshotLaunchSafe } from "../../src/mcp-client/plugin-launch.js";
 
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });

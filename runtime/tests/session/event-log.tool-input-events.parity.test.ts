@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import type { EventMsg } from "./event-log.js";
-import { KNOWN_EVENT_TYPES, isKnownEventType } from "./event-log.js";
+import type { EventMsg } from "../../src/session/event-log.js";
+import { KNOWN_EVENT_TYPES, isKnownEventType } from "../../src/session/event-log.js";
 
 describe("R6 event-log registers tool_input_block_start and tool_input_delta variants", () => {
   test("isKnownEventType returns true for tool_input_block_start", () => {

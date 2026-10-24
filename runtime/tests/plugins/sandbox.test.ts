@@ -4,11 +4,11 @@ import path from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import type { McpServerConfig } from "../config/schema.js";
+import type { McpServerConfig } from "../../src/config/schema.js";
 import {
   pathInsideOrEqual,
   resolvePluginMcpSandboxedServer,
-} from "./sandbox.js";
+} from "../../src/plugins/sandbox.js";
 
 describe("plugin MCP sandboxing", () => {
   test("isolates stdio child processes with reserved env precedence and metadata", async () => {

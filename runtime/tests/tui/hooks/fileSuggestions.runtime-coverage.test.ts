@@ -14,7 +14,7 @@ let initialSettings: Record<string, any> = {}
 let commandResults: string[] = []
 let commandInputs: unknown[] = []
 
-vi.mock('../../utils/cwd.js', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => tempCwd,
   pwd: () => tempCwd,
   runWithCwdOverride: <T,>(_cwd: string, fn: () => T) => fn(),
@@ -22,13 +22,13 @@ vi.mock('../../utils/cwd.js', () => ({
 
 // Stable settings: file suggestions use the in-process index path, not the
 // configurable hook command.
-vi.mock('../../utils/settings/settings.js', () => ({
+vi.mock('../../../src/utils/settings/settings.js', () => ({
   getExecutionAuthoritySettings: () => initialSettings,
   getInitialSettings: () => initialSettings,
   getSettingsForSource: () => undefined,
 }))
 
-vi.mock('../../utils/config.js', () => ({
+vi.mock('../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({}),
   checkHasTrustDialogAccepted: () => true,
 }))
@@ -37,7 +37,7 @@ vi.mock('../../utils/config.js', () => ({
 // shell prefix providers, etc) that aren't reachable from the tested code
 // paths. Stub the few helpers fileSuggestions.ts imports so the module graph
 // stays small.
-vi.mock('../../utils/hooks.js', () => ({
+vi.mock('../../../src/utils/hooks.js', () => ({
   createBaseHookInput: () => ({ cwd: tempCwd }),
   executeFileSuggestionCommand: async (input: unknown) => {
     commandInputs.push(input)
@@ -45,7 +45,7 @@ vi.mock('../../utils/hooks.js', () => ({
   },
 }))
 
-vi.mock('../../utils/markdownConfigLoader.js', () => ({
+vi.mock('../../../src/utils/markdownConfigLoader.js', () => ({
   AGENC_CONFIG_DIRECTORIES: [],
   loadMarkdownFilesForSubdir: async () => [],
 }))
@@ -53,7 +53,7 @@ vi.mock('../../utils/markdownConfigLoader.js', () => ({
 // FileIndex is a Rust-backed native module the empty-query path does not need
 // directly, but it sits in the same module graph. Provide a no-op stand-in so
 // the import resolves without a build step.
-vi.mock('../ink/native-ts/file-index/index', () => ({
+vi.mock('../../../src/tui/ink/native-ts/file-index/index.js', () => ({
   CHUNK_MS: 4,
   FileIndex: class {
     loadFromFileListAsync() {
@@ -79,7 +79,7 @@ import {
   getDirectoryNamesAsync,
   getHiddenTopLevelMatches,
   pathListSignature,
-} from './fileSuggestions.js'
+} from '../../../src/tui/hooks/fileSuggestions.js'
 
 describe('fileSuggestions hidden-file visibility', () => {
   beforeEach(() => {

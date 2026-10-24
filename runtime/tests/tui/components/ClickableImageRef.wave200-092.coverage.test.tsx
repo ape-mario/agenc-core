@@ -4,15 +4,15 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToAnsiString } from '../../utils/staticRender.js'
-import { Box } from '../ink.js'
-import { ClickableImageRef } from './ClickableImageRef.js'
+import { renderToAnsiString } from '../../../src/utils/staticRender.js'
+import { Box } from '../../../src/tui/ink.js'
+import { ClickableImageRef } from '../../../src/tui/components/ClickableImageRef.js'
 
 const imageStoreMock = vi.hoisted(() => ({
   pathById: new Map<number, string>(),
 }))
 
-vi.mock('../../utils/imageStore.js', () => ({
+vi.mock('../../../src/utils/imageStore.js', () => ({
   getStoredImagePath: (imageId: number) =>
     imageStoreMock.pathById.get(imageId) ?? null,
 }))

@@ -7,12 +7,12 @@ import {
   hasRemoteAuthSessionSync,
   remoteAuthSessionSubscriptionTierSync,
   remoteAuthSessionTokenSync,
-} from "./session-state.js";
-import { getSecureStorage } from "../utils/secureStorage/index.js";
+} from "../../src/auth/session-state.js";
+import { getSecureStorage } from "../../src/utils/secureStorage/index.js";
 import {
   captureSecureStorageIngress,
   resolveSecureStorageHome,
-} from "../utils/secureStorage/home.js";
+} from "../../src/utils/secureStorage/home.js";
 
 const CREATED_AT = "2026-08-24T00:00:00.000Z";
 

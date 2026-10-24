@@ -2,14 +2,14 @@ import React from 'react'
 import { marked, type Tokens } from 'marked'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { ContentWidthProvider } from '../../context/contentWidthContext.js'
-import { Box } from '../../ink.js'
-import { stringWidth } from '../../ink/stringWidth.js'
-import { HighlightedCode } from './HighlightedCode.js'
-import { HighlightedCodeFallback } from './HighlightedCodeFallback.js'
-import { Markdown } from './Markdown.js'
-import { MarkdownTable } from './MarkdownTable.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { ContentWidthProvider } from '../../../../src/tui/context/contentWidthContext.js'
+import { Box } from '../../../../src/tui/ink.js'
+import { stringWidth } from '../../../../src/tui/ink/stringWidth.js'
+import { HighlightedCode } from '../../../../src/tui/components/markdown/HighlightedCode.js'
+import { HighlightedCodeFallback } from '../../../../src/tui/components/markdown/HighlightedCodeFallback.js'
+import { Markdown } from '../../../../src/tui/components/markdown/Markdown.js'
+import { MarkdownTable } from '../../../../src/tui/components/markdown/MarkdownTable.js'
 
 const settingsMock = vi.hoisted(() => ({
   syntaxHighlightingDisabled: true,
@@ -38,18 +38,18 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../hooks/useSettings.js', () => ({
+vi.mock('../../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: settingsMock.syntaxHighlightingDisabled,
   }),
 }))
 
-vi.mock('../../../utils/messages.js', () => ({
+vi.mock('../../../../src/utils/messages.js', () => ({
   stripPromptXMLTags: (input: string) =>
     input.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, ''),
 }))
 
-vi.mock('../diff/StructuredDiff/colorDiff.js', () => ({
+vi.mock('../../../../src/tui/components/diff/StructuredDiff/colorDiff.js', () => ({
   expectColorFile: () => colorFileMock.ColorFile,
 }))
 

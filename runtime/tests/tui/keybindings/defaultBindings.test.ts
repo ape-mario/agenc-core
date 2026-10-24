@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { DEFAULT_BINDINGS } from "./defaultBindings.js";
-import { isKeybindingCustomizationEnabled } from "./loadUserBindings.js";
+import { DEFAULT_BINDINGS } from "../../../src/tui/keybindings/defaultBindings.js";
+import { isKeybindingCustomizationEnabled } from "../../../src/tui/keybindings/loadUserBindings.js";
 
 function bindingsFor(context: string): Record<string, string | null> {
   const block = DEFAULT_BINDINGS.find((entry) => entry.context === context);

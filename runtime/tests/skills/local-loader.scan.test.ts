@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadLocalSkillsSnapshot } from "./local-loader.js";
+import { loadLocalSkillsSnapshot } from "../../src/skills/local-loader.js";
 
 function tmpRoot(label: string): string {
   return mkdtempSync(join(tmpdir(), `agenc-${label}-`));

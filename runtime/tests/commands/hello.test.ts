@@ -4,9 +4,9 @@ import {
   collectHelloSnapshot,
   formatHelloCard,
   helloCommand,
-} from "./hello.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "./types.js";
+} from "../../src/commands/hello.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function mkctx(session: Session, cwd = "/ws"): SlashCommandContext {
   return {

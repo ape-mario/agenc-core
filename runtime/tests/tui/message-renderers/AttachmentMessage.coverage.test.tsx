@@ -1,8 +1,8 @@
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { AttachmentMessage } from "./AttachmentMessage.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { AttachmentMessage } from "../../../src/tui/message-renderers/AttachmentMessage.js";
 
 const featureMock = vi.hoisted(() => ({
   experimentalSkillSearch: false,
@@ -14,7 +14,7 @@ vi.mock("bun:bundle", () => ({
     featureMock.experimentalSkillSearch,
 }));
 
-vi.mock("../../utils/agentSwarmsEnabled.js", () => ({
+vi.mock("../../../src/utils/agentSwarmsEnabled.js", () => ({
   isAgentSwarmsEnabled: () => false,
 }));
 

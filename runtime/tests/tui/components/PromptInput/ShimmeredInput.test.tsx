@@ -1,11 +1,11 @@
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../../utils/staticRender.js";
-import { Text } from "../../ink.js";
-import { HighlightedInput } from "./ShimmeredInput.js";
+import { renderToString } from "../../../../src/utils/staticRender.js";
+import { Text } from "../../../../src/tui/ink.js";
+import { HighlightedInput } from "../../../../src/tui/components/PromptInput/ShimmeredInput.js";
 
-vi.mock("../spinner/ShimmerChar.js", () => ({
+vi.mock("../../../../src/tui/components/spinner/ShimmerChar.js", () => ({
   ShimmerChar: ({
     char,
     glimmerIndex,

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import type { ResponseItem } from "../../session/rollout-item.js";
+import type { ResponseItem } from "../../../src/session/rollout-item.js";
 import {
   REALTIME_CONVERSATION_CLOSE_TAG,
   REALTIME_CONVERSATION_OPEN_TAG,
-} from "./instructions/markers.js";
+} from "../../../src/conversation/realtime/instructions/markers.js";
 import {
   buildCurrentThreadSection,
   buildRealtimeStartupContext,
@@ -11,7 +11,7 @@ import {
   truncateRealtimeTextToTokenBudget,
   type RealtimeRecentThread,
   type RealtimeWorkspaceEntry,
-} from "./context.js";
+} from "../../../src/conversation/realtime/context.js";
 
 function msg(role: ResponseItem["role"], content: ResponseItem["content"]): ResponseItem {
   return { role, content };

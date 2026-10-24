@@ -4,12 +4,12 @@ import stripAnsi from "strip-ansi";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../../remoteAuthSessionContext.fixture.js";
 
-import { createRoot } from "../../ink/root.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
 import {
   BriefIdleStatus,
   Spinner,
   SpinnerWithVerb,
-} from "./Spinner.js";
+} from "../../../../src/tui/components/spinner/Spinner.js";
 
 const spinnerMock = vi.hoisted(() => ({
   activity: {
@@ -45,7 +45,7 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => spinnerMock.featureFlags.has(name),
 }));
 
-vi.mock("../../../bootstrap/state.js", () => ({
+vi.mock("../../../../src/bootstrap/state.js", () => ({
   flushInteractionTime: () => {},
   getCurrentTurnTokenBudget: () => spinnerMock.currentTurnTokenBudget,
   getKairosActive: () => spinnerMock.getKairosActive,
@@ -53,7 +53,7 @@ vi.mock("../../../bootstrap/state.js", () => ({
   getUserMsgOptIn: () => spinnerMock.getUserMsgOptIn,
 }));
 
-vi.mock("../../../utils/activityManager.js", () => ({
+vi.mock("../../../../src/utils/activityManager.js", () => ({
   activityManager: {
     endCLIActivity: (id: string) => {
       spinnerMock.activity.ended.push(id);
@@ -64,74 +64,74 @@ vi.mock("../../../utils/activityManager.js", () => ({
   },
 }));
 
-vi.mock("../../../constants/spinnerVerbs.js", () => ({
+vi.mock("../../../../src/constants/spinnerVerbs.js", () => ({
   getSpinnerVerbs: () => ["Working"],
 }));
 
-vi.mock("../MessageResponse.js", async () => {
+vi.mock("../../../../src/tui/components/MessageResponse.js", async () => {
   const React = await import("react");
-  const { Box } = await vi.importActual<typeof import("../../ink.js")>("../../ink.js");
+  const { Box } = await vi.importActual<typeof import("../../../../src/tui/ink.js")>("../../../../src/tui/ink.js");
   return {
     MessageResponse: ({ children }: { children: React.ReactNode }) =>
       React.createElement(Box, { flexDirection: "column" }, children),
   };
 });
 
-vi.mock("../TaskListV2.js", async () => {
+vi.mock("../../../../src/tui/components/TaskListV2.js", async () => {
   const React = await import("react");
-  const { Text } = await vi.importActual<typeof import("../../ink.js")>("../../ink.js");
+  const { Text } = await vi.importActual<typeof import("../../../../src/tui/ink.js")>("../../../../src/tui/ink.js");
   return {
     TaskListV2: ({ tasks }: { tasks: unknown[] }) =>
       React.createElement(Text, null, `TASKS:${tasks.length}`),
   };
 });
 
-vi.mock("../../hooks/useTasksV2.js", () => ({
+vi.mock("../../../../src/tui/hooks/useTasksV2.js", () => ({
   useTasksV2: () => spinnerMock.tasksV2,
 }));
 
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof spinnerMock.appState) => unknown) =>
     selector(spinnerMock.appState),
 }));
 
-vi.mock("../../hooks/useTerminalSize.js", () => ({
+vi.mock("../../../../src/tui/hooks/useTerminalSize.js", () => ({
   useTerminalSize: () => ({ columns: spinnerMock.terminalColumns, rows: 24 }),
 }));
 
-vi.mock("../../hooks/useSettings.js", () => ({
+vi.mock("../../../../src/tui/hooks/useSettings.js", () => ({
   useSettings: () => spinnerMock.settings,
 }));
 
-vi.mock("../../../tasks/InProcessTeammateTask/types.js", () => ({
+vi.mock("../../../../src/tasks/InProcessTeammateTask/types.js", () => ({
   isInProcessTeammateTask: (task: any) => task?.type === "in_process_teammate",
 }));
 
-vi.mock("../../../tasks/types.js", () => ({
+vi.mock("../../../../src/tasks/types.js", () => ({
   isBackgroundTask: (task: any) => task?.type === "background_task",
 }));
 
-vi.mock("../../../tasks/InProcessTeammateTask/InProcessTeammateTask.js", () => ({
+vi.mock("../../../../src/tasks/InProcessTeammateTask/InProcessTeammateTask.js", () => ({
   getAllInProcessTeammateTasks: (tasks: Record<string, any>) =>
     Object.values(tasks ?? {}).filter(task => task?.type === "in_process_teammate"),
 }));
 
-vi.mock("../../../utils/effort.js", () => ({
+vi.mock("../../../../src/utils/effort.js", () => ({
   getEffortSuffixForContext: (_model: string, effort: string) => `:${effort}`,
 }));
 
-vi.mock("../../hooks/useMainLoopModel.js", () => ({
+vi.mock("../../../../src/tui/hooks/useMainLoopModel.js", () => ({
   useMainLoopModel: () => "gpt-test",
 }));
 
-vi.mock("../../state/selectors.js", () => ({
+vi.mock("../../../../src/tui/state/selectors.js", () => ({
   getViewedTeammateTask: ({ viewingAgentTaskId, tasks }: any) =>
     viewingAgentTaskId ? tasks?.[viewingAgentTaskId] : undefined,
 }));
 
-vi.mock("./SpinnerAnimationRow.js", async () => {
+vi.mock("../../../../src/tui/components/spinner/SpinnerAnimationRow.js", async () => {
   const React = await import("react");
-  const { Text } = await vi.importActual<typeof import("../../ink.js")>("../../ink.js");
+  const { Text } = await vi.importActual<typeof import("../../../../src/tui/ink.js")>("../../../../src/tui/ink.js");
   return {
     SpinnerAnimationRow: (props: any) =>
       React.createElement(
@@ -151,9 +151,9 @@ vi.mock("./SpinnerAnimationRow.js", async () => {
   };
 });
 
-vi.mock("./TeammateSpinnerTree.js", async () => {
+vi.mock("../../../../src/tui/components/spinner/TeammateSpinnerTree.js", async () => {
   const React = await import("react");
-  const { Text } = await vi.importActual<typeof import("../../ink.js")>("../../ink.js");
+  const { Text } = await vi.importActual<typeof import("../../../../src/tui/ink.js")>("../../../../src/tui/ink.js");
   return {
     TeammateSpinnerTree: (props: any) =>
       React.createElement(
@@ -164,7 +164,7 @@ vi.mock("./TeammateSpinnerTree.js", async () => {
   };
 });
 
-vi.mock("./agentActivity.js", () => ({
+vi.mock("../../../../src/tui/components/spinner/agentActivity.js", () => ({
   formatRunningAgentSummary: (agents: Array<{ summary: string }>) =>
     agents.map(agent => agent.summary).join(", "),
   getActiveLocalAgentTasks: () => spinnerMock.localAgents,

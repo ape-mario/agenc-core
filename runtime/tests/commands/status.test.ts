@@ -5,11 +5,11 @@ import {
   formatStatus,
   summarizeGitStatus,
   zeroDataRetentionStatusLine,
-} from "./status.js";
-import { createStatusDashboardSnapshot } from "./status-menu.js";
-import type { Session } from "../session/session.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+} from "../../src/commands/status.js";
+import { createStatusDashboardSnapshot } from "../../src/commands/status-menu.js";
+import type { Session } from "../../src/session/session.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 interface StubBudget {
   emitted: number;

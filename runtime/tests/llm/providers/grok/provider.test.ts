@@ -1,10 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { LLMProviderError } from "../../errors.js";
-import { createProvider } from "../../provider.js";
-import type { LLMTool } from "../../types.js";
-import { resolveBuiltInProviderInfo } from "../../registry/provider-info.js";
-import { GrokProvider } from "./adapter.js";
+import { LLMProviderError } from "../../../../src/llm/errors.js";
+import { createProvider } from "../../../../src/llm/provider.js";
+import type { LLMTool } from "../../../../src/llm/types.js";
+import { resolveBuiltInProviderInfo } from "../../../../src/llm/registry/provider-info.js";
+import { GrokProvider } from "../../../../src/llm/providers/grok/adapter.js";
 
 const TEST_TOOL: LLMTool = {
   type: "function",

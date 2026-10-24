@@ -18,10 +18,10 @@ import { describe, expect, test } from "vitest";
   NATIVE_PACKAGE_URL: undefined,
 };
 
-import { normalizeSessionToolPolicy } from "../../permissions/session-tool-policy.js";
-import { getAttachmentTrackingState } from "../../session/attachment-state.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
-import { skillListingProducer } from "./skill-listing.js";
+import { normalizeSessionToolPolicy } from "../../../src/permissions/session-tool-policy.js";
+import { getAttachmentTrackingState } from "../../../src/session/attachment-state.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
+import { skillListingProducer } from "../../../src/prompts/attachments/skill-listing.js";
 
 function makeOpts(
   availableSkills: ReadonlyArray<{

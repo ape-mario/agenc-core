@@ -9,12 +9,12 @@ import {
   isAgentExitedSentinel,
   readMailboxMetadata,
   type InterAgentCommunication,
-} from "./mailbox.js";
+} from "../../src/agents/mailbox.js";
 import {
   MailboxMetadataAbortedError,
   MAX_MAILBOX_METADATA_DEPTH,
   MAX_MAILBOX_METADATA_UTF8_BYTES,
-} from "./mailbox-metadata.js";
+} from "../../src/agents/mailbox-metadata.js";
 
 type MakeMsgOverrides = {
   readonly [K in keyof Omit<InterAgentCommunication, "seq">]?: Omit<

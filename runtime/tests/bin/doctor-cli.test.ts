@@ -8,7 +8,7 @@ import {
   formatAgenCDoctorCliHelpText,
   parseAgenCDoctorCliArgs,
   runAgenCDoctorCli,
-} from "./doctor-cli.js";
+} from "../../src/bin/doctor-cli.js";
 import {
   enterCanonicalSettingsAuthority,
   getCanonicalSettingsAuthority,

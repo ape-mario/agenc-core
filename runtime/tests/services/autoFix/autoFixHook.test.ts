@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
-import type { PostToolUseHook } from "../../tools/hooks.js";
+import type { PostToolUseHook } from "../../../src/tools/hooks.js";
 import {
   autoFixPostToolHookIsInactive,
   buildAutoFixContext,
   createAutoFixPostToolHook,
   shouldRunAutoFix,
-} from "./autoFixHook.js";
-import type { AutoFixConfig } from "./autoFixConfig.js";
-import { createHookExecutionAuthority } from "../../hooks/execution-authority.js";
+} from "../../../src/services/autoFix/autoFixHook.js";
+import type { AutoFixConfig } from "../../../src/services/autoFix/autoFixConfig.js";
+import { createHookExecutionAuthority } from "../../../src/hooks/execution-authority.js";
 
 const CONFIG: AutoFixConfig = {
   enabled: true,

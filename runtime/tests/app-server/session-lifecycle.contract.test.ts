@@ -4,21 +4,21 @@ import { join } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTempWorkspaceFixture } from "../helpers/temp-workspace.js";
-import { RolloutStore } from "../session/rollout-store.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
 import {
   FileThreadStore,
   ThreadStoreInvalidRequestError,
-} from "../thread-store/store.js";
+} from "../../src/thread-store/store.js";
 import type {
   ListThreadsParams,
   StoredThread,
   ThreadStore,
-} from "../thread-store/store.js";
+} from "../../src/thread-store/store.js";
 import {
   AgenCDaemonSessionManager,
   AgenCSessionLifecycleError,
   DEFAULT_AGENC_DAEMON_AGENT_ID,
-} from "./session-lifecycle.js";
+} from "../../src/app-server/session-lifecycle.js";
 
 const workspaces = createTempWorkspaceFixture(
   "agenc-session-lifecycle-workspace-",

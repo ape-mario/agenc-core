@@ -4,7 +4,7 @@ import {
   buildSkillListingWithinBudget,
   rankSkillsForRequest,
   type SkillListingEntry,
-} from "./local-loader.js";
+} from "../../src/skills/local-loader.js";
 
 const skill = (name: string, description: string): SkillListingEntry => ({
   name,

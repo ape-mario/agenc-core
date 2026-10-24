@@ -8,10 +8,10 @@ import {
   unrestrictedFileSystemPolicy,
   type SandboxExecRequest,
   type SandboxTransformRequest,
-} from "../sandbox/engine/index.js";
-import { permissionProfileForSandboxMode } from "../tools/runtimes/sandboxing.js";
-import { withWritableGoBuildCache } from "./go-build-cache.js";
-import { UnifiedExecProcessManager } from "./process-manager.js";
+} from "../../src/sandbox/engine/index.js";
+import { permissionProfileForSandboxMode } from "../../src/tools/runtimes/sandboxing.js";
+import { withWritableGoBuildCache } from "../../src/unified-exec/go-build-cache.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
 
 let workspace: string;
 let temp: string;

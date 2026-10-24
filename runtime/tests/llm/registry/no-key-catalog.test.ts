@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { BUILT_IN_PROVIDER_DEFAULT_MODELS, BUILT_IN_PROVIDER_MODEL_CATALOG } from "./provider-info.js";
-import { resolveRegisteredModelCatalogEntry } from "./model-catalog.js";
-import { BEDROCK_CONVERSE_MODELS } from "./bedrock-converse-models.js";
-import { resolveProviderCapabilityEntry } from "../capabilities.js";
-import { DEFAULT_MODEL_COSTS, resolveModelCostEntry } from "../../session/cost.js";
+import { BUILT_IN_PROVIDER_DEFAULT_MODELS, BUILT_IN_PROVIDER_MODEL_CATALOG } from "../../../src/llm/registry/provider-info.js";
+import { resolveRegisteredModelCatalogEntry } from "../../../src/llm/registry/model-catalog.js";
+import { BEDROCK_CONVERSE_MODELS } from "../../../src/llm/registry/bedrock-converse-models.js";
+import { resolveProviderCapabilityEntry } from "../../../src/llm/capabilities.js";
+import { DEFAULT_MODEL_COSTS, resolveModelCostEntry } from "../../../src/session/cost.js";
 
 describe("documented providers without live credentials", () => {
   test("uses a current shared Groq default and provider-specific rates", () => {

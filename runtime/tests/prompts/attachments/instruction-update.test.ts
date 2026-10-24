@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { getAttachmentTrackingState } from "../../session/attachment-state.js";
-import { stabilizeInstructionHead } from "../instruction-head.js";
-import { attachmentsToMessages, INSTRUCTION_UPDATE_MEMORY_HEADER, INSTRUCTION_UPDATE_WORKSPACE_HEADER } from "./messages.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
-import { instructionUpdateProducer } from "./instruction-update.js";
+import { getAttachmentTrackingState } from "../../../src/session/attachment-state.js";
+import { stabilizeInstructionHead } from "../../../src/prompts/instruction-head.js";
+import { attachmentsToMessages, INSTRUCTION_UPDATE_MEMORY_HEADER, INSTRUCTION_UPDATE_WORKSPACE_HEADER } from "../../../src/prompts/attachments/messages.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
+import { instructionUpdateProducer } from "../../../src/prompts/attachments/instruction-update.js";
 
 function makeOpts(partial?: Partial<GetAttachmentsOptions>): GetAttachmentsOptions {
   return {

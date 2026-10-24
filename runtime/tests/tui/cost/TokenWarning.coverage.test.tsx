@@ -15,7 +15,7 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../../services/compact/autoCompact.js", () => ({
+vi.mock("../../../src/services/compact/autoCompact.js", () => ({
   calculateTokenWarningStateForEnvironment: () => ({
     isAboveAutoCompactThreshold: false,
     isAboveErrorThreshold: false,
@@ -27,23 +27,23 @@ vi.mock("../../services/compact/autoCompact.js", () => ({
   isAutoCompactEnabledForEnvironment: () => harness.autoCompactEnabled,
 }));
 
-vi.mock("../../services/compact/compactWarningHook.js", () => ({
+vi.mock("../../../src/services/compact/compactWarningHook.js", () => ({
   useCompactWarningSuppression: () => harness.suppressWarning,
 }));
 
-vi.mock("../../services/contextCollapse/index.js", () => ({
+vi.mock("../../../src/services/contextCollapse/index.js", () => ({
   isContextCollapseEnabled: () => false,
 }));
 
-vi.mock("../../llm/context-window-upgrade.js", () => ({
+vi.mock("../../../src/llm/context-window-upgrade.js", () => ({
   getUpgradeMessage: () => harness.upgradeMessage,
 }));
 
-import { renderToString } from "../../utils/staticRender.js";
-import { createRoot } from "../ink.js";
-import { getInkInstance } from "../ink/instances.js";
-import { cellAt } from "../ink/screen.js";
-import { TokenWarning } from "./TokenWarning.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { createRoot } from "../../../src/tui/ink.js";
+import { getInkInstance } from "../../../src/tui/ink/instances.js";
+import { cellAt } from "../../../src/tui/ink/screen.js";
+import { TokenWarning } from "../../../src/tui/cost/TokenWarning.js";
 
 describe("TokenWarning coverage", () => {
   test("renders the manual compact warning with upgrade guidance", async () => {

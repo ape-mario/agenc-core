@@ -22,7 +22,7 @@ const harness = vi.hoisted(() => ({
   unregisters: [] as Array<ReturnType<typeof vi.fn>>,
 }))
 
-vi.mock('../ink.js', () => ({
+vi.mock('../../../src/tui/ink.js', () => ({
   useInput: (handler: unknown, options: unknown) => {
     harness.inputHandlers.push({
       handler: handler as (input: string, key: unknown, event: unknown) => void,
@@ -31,14 +31,14 @@ vi.mock('../ink.js', () => ({
   },
 }))
 
-vi.mock('./KeybindingContext.js', () => ({
+vi.mock('../../../src/tui/keybindings/KeybindingContext.js', () => ({
   useOptionalKeybindingContext: () => harness.context,
 }))
 
-import { createRoot } from '../ink/root.js'
-import type { Key } from '../ink.js'
-import type { InputEvent } from '../ink/events/input-event.js'
-import { useKeybinding, useKeybindings } from './useKeybinding.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { Key } from '../../../src/tui/ink.js'
+import type { InputEvent } from '../../../src/tui/ink/events/input-event.js'
+import { useKeybinding, useKeybindings } from '../../../src/tui/keybindings/useKeybinding.js'
 
 const BASE_KEY: Key = {
   backspace: false,

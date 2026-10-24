@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   AGENC_DAEMON_METHODS,
   AGENC_DAEMON_NOTIFICATION_METHODS,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import {
   AGENC_SDK_DAEMON_METHODS,
   AGENC_SDK_DAEMON_NOTIFICATION_METHODS,

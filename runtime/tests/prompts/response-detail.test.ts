@@ -10,11 +10,11 @@ import { describe, expect, test } from "vitest";
 import {
   getResponseDetailSection,
   withResponseDetailSystemPrompt,
-} from "./response-detail.js";
+} from "../../src/prompts/response-detail.js";
 import {
   SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
   SYSTEM_PROMPT_VOLATILE_BOUNDARY,
-} from "./system-prompt-boundary.js";
+} from "../../src/prompts/system-prompt-boundary.js";
 
 const REPORTING_CONTRACT =
   "If you ran checks or tests, still report their results. Always report errors, blockers, and approval requests.";

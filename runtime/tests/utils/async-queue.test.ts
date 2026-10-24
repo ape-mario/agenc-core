@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { AsyncQueue } from "./async-queue.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 
 describe("AsyncQueue", () => {
   test("happy path: send + recv FIFO", async () => {

@@ -33,7 +33,7 @@ import {
   createLocalSkillsServices,
   loadLocalSkillsSnapshot,
   skillFileParseCountForTest,
-} from "./local-loader.js";
+} from "../../src/skills/local-loader.js";
 
 function tmpRoot(label: string): string {
   return mkdtempSync(join(tmpdir(), `agenc-${label}-`));

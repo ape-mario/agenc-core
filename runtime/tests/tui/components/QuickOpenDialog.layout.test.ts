@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { computeQuickOpenLayout } from './QuickOpenDialog.js'
+import { computeQuickOpenLayout } from '../../../src/tui/components/QuickOpenDialog.js'
 
 describe('computeQuickOpenLayout', () => {
   it('keeps all computed dimensions usable on tiny terminals', () => {

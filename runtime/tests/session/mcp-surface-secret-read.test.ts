@@ -3,14 +3,14 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const readNativeSecureStorage = vi.hoisted(() => vi.fn());
-vi.mock("../utils/secureStorage/native.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../utils/secureStorage/native.js")>()),
+vi.mock("../../src/utils/secureStorage/native.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/utils/secureStorage/native.js")>()),
   readNativeSecureStorage,
 }));
 
-import { createLazySavedPluginSecretRedactor } from "../plugins/secret-redaction.js";
-import { createSessionMcpService } from "./mcp-startup.js";
-import type { MCPManager } from "../mcp-client/manager.js";
+import { createLazySavedPluginSecretRedactor } from "../../src/plugins/secret-redaction.js";
+import { createSessionMcpService } from "../../src/session/mcp-startup.js";
+import type { MCPManager } from "../../src/mcp-client/manager.js";
 
 const SAVED_SECRET = "saved-plugin-token-4817";
 const HOME = { path: join(tmpdir(), "agenc-lazy-secret-home") };

@@ -4,16 +4,16 @@ import {
   AgenCDelegateBackgroundAgentRunner,
   type AgenCBootstrapFunction,
   type AgenCEnsureAgentControlFunction,
-} from "./background-agent-runner.js";
-import type { AgentStatus } from "../agents/status.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
+} from "../../src/app-server/background-agent-runner.js";
+import type { AgentStatus } from "../../src/agents/status.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
 import {
   sandboxExecutionBrokerAuthorityFromSessionAuthority,
   sessionConfigurationFromAgenCConfig,
   sessionExecutionAuthorityFromAgenCConfig,
-} from "../session/configuration.js";
+} from "../../src/session/configuration.js";
 
 // Mirrors the harness in background-agent-runner.contract.test.ts; trimmed to
 // the surface these regression tests exercise (status pushes + attach).

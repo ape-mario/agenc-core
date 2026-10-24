@@ -9,7 +9,7 @@ import {
   isTaskType,
   isTerminalTaskStatus,
   type LocalShellTaskState,
-} from "./types.js";
+} from "../../src/tasks/types.js";
 
 function shellTask(
   overrides: Partial<LocalShellTaskState> = {},

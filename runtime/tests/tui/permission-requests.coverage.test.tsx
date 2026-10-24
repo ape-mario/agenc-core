@@ -4,16 +4,16 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { describe, expect, test, vi } from "vitest";
 
-import type { ReviewDecision } from "../permissions/review-decision.js";
+import type { ReviewDecision } from "../../src/permissions/review-decision.js";
 import {
   APPROVED,
   APPROVED_FOR_SESSION,
   DENIED,
-} from "../permissions/review-decision.js";
-import type { ApprovalCtx } from "../tools/orchestrator.js";
-import { createRoot } from "./ink.js";
-import type { PendingRequest } from "./permission-requests.js";
-import { AgenCPermissionOverlay } from "./permission-requests.js";
+} from "../../src/permissions/review-decision.js";
+import type { ApprovalCtx } from "../../src/tools/orchestrator.js";
+import { createRoot } from "../../src/tui/ink.js";
+import type { PendingRequest } from "../../src/tui/permission-requests.js";
+import { AgenCPermissionOverlay } from "../../src/tui/permission-requests.js";
 
 const SYNC_START = "\x1B[?2026h";
 const SYNC_END = "\x1B[?2026l";

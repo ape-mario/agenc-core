@@ -18,13 +18,13 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("../../services/lsp/fileNotifications.js", () => ({
+vi.mock("../../../src/services/lsp/fileNotifications.js", () => ({
   notifyLspFileChanged: vi.fn(),
   collectEditFeedback: vi.fn(async () => ""),
 }));
 
-import { createFileWriteTool } from "./file-write.js";
-import { clearSessionReadState } from "./filesystem.js";
+import { createFileWriteTool } from "../../../src/tools/system/file-write.js";
+import { clearSessionReadState } from "../../../src/tools/system/filesystem.js";
 
 describe("Write tool — session-guard hardening (no session id)", () => {
   let root = "";

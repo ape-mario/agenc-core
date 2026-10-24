@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { createCodeModeTools } from "./tools.js";
-import { QuickJsCodeModeService } from "./service.js";
-import type { Tool } from "../types.js";
+import { createCodeModeTools } from "../../../src/tools/code-mode/tools.js";
+import { QuickJsCodeModeService } from "../../../src/tools/code-mode/service.js";
+import type { Tool } from "../../../src/tools/types.js";
 
 describe("code-mode tools", () => {
   test("exec and wait tool adapters expose running cell lifecycle", async () => {

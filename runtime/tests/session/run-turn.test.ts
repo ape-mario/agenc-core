@@ -43,7 +43,7 @@ vi.mock("axios", () => {
     isAxiosError: () => false,
   };
 });
-vi.mock("../memory/session/sessionMemory.js", () => ({
+vi.mock("../../src/memory/session/sessionMemory.js", () => ({
   runSessionMemoryPostSamplingHook: async (context: unknown) => {
     sessionMemoryPostSamplingMockState.calls.push(context);
     if (sessionMemoryPostSamplingMockState.error) {
@@ -51,28 +51,28 @@ vi.mock("../memory/session/sessionMemory.js", () => ({
     }
   },
 }));
-import { AsyncQueue } from "../utils/async-queue.js";
-import { markWorkflowApprovalSession, WorkflowApprovalFailure } from "../permissions/approval-failure.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { markWorkflowApprovalSession, WorkflowApprovalFailure } from "../../src/permissions/approval-failure.js";
 import {
   getAllowedSettingSources,
   setAllowedSettingSources,
-} from "../bootstrap/state.js";
+} from "../../src/bootstrap/state.js";
 import {
   enqueue as enqueueCommand,
   getCommandQueueSnapshot,
   resetCommandQueueForTesting,
-} from "../utils/messageQueueManager.js";
-import type { QueuedCommand } from "../types/textInputTypes.js";
-import { createToolResultIntegrity } from "./tool-result-integrity.js";
+} from "../../src/utils/messageQueueManager.js";
+import type { QueuedCommand } from "../../src/types/textInputTypes.js";
+import { createToolResultIntegrity } from "../../src/session/tool-result-integrity.js";
 import { withCheckpointProjectionCache } from "../../src/session/checkpoint-projection-cache.js";
 import { llmMessageToCheckpointResponseItem } from "../../src/session/message-history-conversion.js";
-import { buildInitialTurnState } from "./turn-state.js";
-import { RolloutStore } from "./rollout-store.js";
-import { reconstructFromRollout } from "./rollout-reconstruction.js";
-import { resumeTurnFromCheckpoint } from "../conversation/thread-manager.js";
-import { ExecutionAdmissionKernel } from "../budget/execution-admission-kernel.js";
-import { bindExecutionAdmissionJournal } from "./execution-admission-journal.js";
-import { shutdownSessionLifecycle } from "./lifecycle.js";
+import { buildInitialTurnState } from "../../src/session/turn-state.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { reconstructFromRollout } from "../../src/session/rollout-reconstruction.js";
+import { resumeTurnFromCheckpoint } from "../../src/conversation/thread-manager.js";
+import { ExecutionAdmissionKernel } from "../../src/budget/execution-admission-kernel.js";
+import { bindExecutionAdmissionJournal } from "../../src/session/execution-admission-journal.js";
+import { shutdownSessionLifecycle } from "../../src/session/lifecycle.js";
 
 function enqueue(command: QueuedCommand): void {
   enqueueCommand({
@@ -88,27 +88,27 @@ import {
   runTurn,
   setAutoCompactImplForTests,
   type AutoCompactImpl,
-} from "./run-turn.js";
+} from "../../src/session/run-turn.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
+} from "../../src/session/session.js";
 import {
   bindingFromProvider,
   SessionProviderService,
-} from "./provider-service.js";
-import { resolveProviderRuntimeRequest } from "../llm/provider-request.js";
-import { createProvider } from "../llm/provider.js";
+} from "../../src/session/provider-service.js";
+import { resolveProviderRuntimeRequest } from "../../src/llm/provider-request.js";
+import { createProvider } from "../../src/llm/provider.js";
 import type {
   Config,
   ManagedFeatures,
   ModelInfo,
   SessionConfiguration,
   TurnContext,
-} from "./turn-context.js";
-import { TurnTimingState } from "./turn-context.js";
+} from "../../src/session/turn-context.js";
+import { TurnTimingState } from "../../src/session/turn-context.js";
 import {
   LLMAuthenticationError,
   LLMCaptivePortalError,
@@ -116,8 +116,8 @@ import {
   LLMProviderError,
   LLMServerError,
   LLMStreamTruncatedError,
-} from "../llm/errors.js";
-import { FallbackTriggeredError } from "../recovery/api-errors.js";
+} from "../../src/llm/errors.js";
+import { FallbackTriggeredError } from "../../src/recovery/api-errors.js";
 import type {
   LLMContentPart,
   LLMMessage,
@@ -127,55 +127,55 @@ import type {
   LLMToolChoice,
   LLMToolCall,
   StreamProgressCallback,
-} from "../llm/types.js";
-import { findToolTurnValidationIssue } from "../llm/tool-turn-validator.js";
-import type { AgentId } from "../types/ids.js";
-import { StreamingToolExecutor as LiveStreamingToolExecutor } from "../phases/_deps/tool-runtime.js";
-import type { PhaseEvent } from "../phases/events.js";
-import { SHARED_READ } from "../tools/concurrency.js";
-import { createModelFacingTools } from "../bin/model-facing-tools.js";
-import { __installDaemonTurnDriverHooksForTest } from "../app-server/background-agent-runner.js";
-import { startSessionCronScheduler } from "./session-cron-scheduler.js";
-import { resetCronSchedulerForTests } from "../utils/cronScheduler.js";
-import { addCronTask, listAllCronTasks, readCronTasks } from "../utils/cronTasks.js";
+} from "../../src/llm/types.js";
+import { findToolTurnValidationIssue } from "../../src/llm/tool-turn-validator.js";
+import type { AgentId } from "../../src/types/ids.js";
+import { StreamingToolExecutor as LiveStreamingToolExecutor } from "../../src/phases/_deps/tool-runtime.js";
+import type { PhaseEvent } from "../../src/phases/events.js";
+import { SHARED_READ } from "../../src/tools/concurrency.js";
+import { createModelFacingTools } from "../../src/bin/model-facing-tools.js";
+import { __installDaemonTurnDriverHooksForTest } from "../../src/app-server/background-agent-runner.js";
+import { startSessionCronScheduler } from "../../src/session/session-cron-scheduler.js";
+import { resetCronSchedulerForTests } from "../../src/utils/cronScheduler.js";
+import { addCronTask, listAllCronTasks, readCronTasks } from "../../src/utils/cronTasks.js";
 import { withConfinedDirectory } from "../../src/fs/descriptor-confined-io.js";
-import { getSessionCronTasks, resetStateForTests, setScheduledTasksEnabled } from "../bootstrap/state.js";
-import { StreamModelError } from "../phases/stream-model.js";
-import type { ToolRegistry } from "../tool-registry.js";
-import type { PostToolUseHook } from "../tools/hooks.js";
-import type { Tool } from "../tools/types.js";
-import { BudgetTracker } from "../conversation/token-budget.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
+import { getSessionCronTasks, resetStateForTests, setScheduledTasksEnabled } from "../../src/bootstrap/state.js";
+import { StreamModelError } from "../../src/phases/stream-model.js";
+import type { ToolRegistry } from "../../src/tool-registry.js";
+import type { PostToolUseHook } from "../../src/tools/hooks.js";
+import type { Tool } from "../../src/tools/types.js";
+import { BudgetTracker } from "../../src/conversation/token-budget.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionMode,
-} from "../permissions/types.js";
+} from "../../src/permissions/types.js";
 import {
   registerMagicDoc,
   resetMagicDocsForTests,
   runMagicDocsPostSamplingHook,
   setMagicDocsAgentRunnerForTests,
-} from "../services/MagicDocs/magicDocs.js";
-import { REALTIME_CONVERSATION_OPEN_TAG } from "../conversation/realtime/instructions/markers.js";
+} from "../../src/services/MagicDocs/magicDocs.js";
+import { REALTIME_CONVERSATION_OPEN_TAG } from "../../src/conversation/realtime/instructions/markers.js";
 import {
   BASE_INSTRUCTIONS_PLACEHOLDER,
   PERSONALITY_PLACEHOLDER,
   PERSONALITY_SPEC_START_MARKER,
   type ModelMessages,
-} from "../context/personality-spec-instructions.js";
+} from "../../src/context/personality-spec-instructions.js";
 import {
   canonicalizePath,
   clearSessionReadState,
   getSessionReadSnapshot,
-} from "../tools/system/filesystem.js";
-import { getAttachmentTrackingState } from "./attachment-state.js";
+} from "../../src/tools/system/filesystem.js";
+import { getAttachmentTrackingState } from "../../src/session/attachment-state.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
-import { ConfigStore } from "../config/store.js";
-import type { AgenCConfig } from "../config/schema.js";
+import { ConfigStore } from "../../src/config/store.js";
+import type { AgenCConfig } from "../../src/config/schema.js";
 import {
   resolveAgentRuntimeOptions,
   type AgentRuntimeOptions,
-} from "./runtime-options.js";
+} from "../../src/session/runtime-options.js";
 
 const generatedConfigHomes = new Set<string>();
 
@@ -1203,7 +1203,7 @@ describe("daemon-owned scheduled turns", () => {
       const attempt = vi.fn(async () => {});
       session.installTurnDriverHooks({ submit: attempt });
       await add(session, { durable: true });
-      const cronTasks = await import("../utils/cronTasks.js");
+      const cronTasks = await import("../../src/utils/cronTasks.js");
       const mutate = cronTasks.mutateCronFile;
       const claim = vi.spyOn(cronTasks, "mutateCronFile").mockImplementation(async (directory, update) => {
         const result = await mutate(directory, update);
@@ -5581,7 +5581,7 @@ describe("runTurn — D1 isRetryableStreamError type-based discrimination", () =
 
   test("LP-07 suppresses streamed tool history when reconnect cap is exhausted", async () => {
     let reservationAttempts = 0;
-    const recovery = await import("../recovery/fallback-ladder.js");
+    const recovery = await import("../../src/recovery/fallback-ladder.js");
     const reserveRecoveryReentry = recovery.reserveRecoveryReentry;
     const reservationSpy = vi
       .spyOn(recovery, "reserveRecoveryReentry")
@@ -8027,7 +8027,7 @@ describe("provider outage wait (#2212)", () => {
 
   /** Spend the fast ladder at once so each slow retry is one provider call. */
   async function spentLadder(): Promise<() => void> {
-    const recovery = await import("../recovery/fallback-ladder.js");
+    const recovery = await import("../../src/recovery/fallback-ladder.js");
     const reserveRecoveryReentry = recovery.reserveRecoveryReentry;
     const spy = vi
       .spyOn(recovery, "reserveRecoveryReentry")

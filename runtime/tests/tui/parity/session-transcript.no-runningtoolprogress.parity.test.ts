@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { runtimeSourceRootPath, sourcePath } from "../../helpers/source-path.ts";
 
-import { adaptTranscriptEvents } from "../session-transcript.js";
+import { adaptTranscriptEvents } from "../../../src/tui/session-transcript.js";
 
 const SESSION_TRANSCRIPT_PATH = sourcePath("tui/session-transcript.ts");
 const TUI_PARITY_DIR = path.resolve(import.meta.dirname);

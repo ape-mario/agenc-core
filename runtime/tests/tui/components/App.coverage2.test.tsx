@@ -4,7 +4,7 @@ import {
   createElicitationQueue,
   type McpFormPending,
   type McpUrlPending,
-} from "./App.js";
+} from "../../../src/tui/components/App.js";
 
 describe("App elicitation queue coverage", () => {
   test("completes queued MCP URL requests without replacing the active prompt", () => {

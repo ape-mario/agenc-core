@@ -12,10 +12,10 @@ import {
   restrictedFileSystemPolicy,
   unrestrictedFileSystemPolicy,
   type PermissionProfile,
-} from "./index.js";
+} from "../../../src/sandbox/engine/index.js";
 import {
   procVersionIndicatesWsl1,
-} from "./bwrap.js";
+} from "../../../src/sandbox/engine/bwrap.js";
 import { resolveAgentRuntimeOptions } from "../../../src/session/runtime-options.js";
 
 const TEST_SESSION_TEMP_ROOT = "/tmp/agenc-linux-engine-session-root";

@@ -15,8 +15,8 @@ import {
   recordInFlightToolCallProgress,
   recordInFlightToolCallStart,
   resolveToolOutputLogPath,
-} from "./tool-output-rotation.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+} from "../../src/state/tool-output-rotation.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 
 let home = "";
 let cwd = "";

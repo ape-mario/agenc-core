@@ -10,7 +10,7 @@ vi.mock("../../../src/tui/ink/hooks/use-input.js", () => ({
 }));
 
 import { TerminalSizeContext } from "../../../src/tui/ink/components/TerminalSizeContext.js";
-import { TrustDialog, formatTrustPath } from "./TrustDialog.js";
+import { TrustDialog, formatTrustPath } from "../../../src/permissions/trust/TrustDialog.js";
 import { renderToString } from "../../../src/utils/staticRender.js";
 
 // A realistic deep project path — the exact shape that hard-wrapped mid-segment

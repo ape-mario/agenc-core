@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { BashModeProgress } from './BashModeProgress.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { BashModeProgress } from '../../../src/tui/components/BashModeProgress.js'
 
 describe('BashModeProgress wave200-138 coverage', () => {
   test('renders shell input with pending, compact, and verbose progress states', async () => {

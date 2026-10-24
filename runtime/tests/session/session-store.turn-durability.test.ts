@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Event } from "./event-log.js";
-import { SessionStore } from "./session-store.js";
+import type { Event } from "../../src/session/event-log.js";
+import { SessionStore } from "../../src/session/session-store.js";
 import {
   DEFERRED_SYNC_INTERVAL_MS,
   resetTurnDurabilityForTest,
   turnDurabilityOpen,
-} from "../durability/turn-durability.js";
+} from "../../src/durability/turn-durability.js";
 
 // Turn-scoped durability: between a turn's steps a durable record is written
 // in order (it survives the process dying) without waiting on fsync. The

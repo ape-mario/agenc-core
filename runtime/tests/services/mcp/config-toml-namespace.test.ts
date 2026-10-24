@@ -3,12 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
-import { ConfigStore } from "../../config/store.js";
+import { ConfigStore } from "../../../src/config/store.js";
 import {
   isProjectTrustedSync,
   trustProjectSync,
-} from "../../permissions/trust/project-trust.js";
-import { resolveSessionMcpConfig } from "../../session/mcp-startup.js";
+} from "../../../src/permissions/trust/project-trust.js";
+import { resolveSessionMcpConfig } from "../../../src/session/mcp-startup.js";
 import {
   addMcpConfig,
   getMcpConfigByName,
@@ -16,12 +16,12 @@ import {
   hasManagedMcpAuthority,
   isMcpServerDisabled,
   removeMcpConfig,
-} from "./config.js";
+} from "../../../src/services/mcp/config.js";
 import {
   addUserMcpServerToToml,
   getUserMcpConfigsFromToml,
   removeUserMcpServerFromToml,
-} from "./user-config-toml.js";
+} from "../../../src/services/mcp/user-config-toml.js";
 
 const originalEnv = {
   AGENC_HOME: process.env.AGENC_HOME,

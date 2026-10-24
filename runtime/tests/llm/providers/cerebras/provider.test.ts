@@ -2,22 +2,22 @@ import { Buffer } from "node:buffer";
 
 import { describe, expect, test, vi } from "vitest";
 
-import { resolveProviderCapabilityEntry } from "../../capabilities.js";
-import { createProvider, readProviderIdentity } from "../../provider.js";
-import { resolveProviderCredentialAuthority } from "../../provider-options.js";
+import { resolveProviderCapabilityEntry } from "../../../../src/llm/capabilities.js";
+import { createProvider, readProviderIdentity } from "../../../../src/llm/provider.js";
+import { resolveProviderCredentialAuthority } from "../../../../src/llm/provider-options.js";
 import {
   resolveModelCatalogMetadata,
   resolveRegisteredModelCatalogEntry,
-} from "../../registry/model-catalog.js";
+} from "../../../../src/llm/registry/model-catalog.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
-} from "../../registry/provider-info.js";
-import type { LLMContentPart, LLMMessage, LLMTool } from "../../types.js";
-import { chatCompletionsCapabilityHintsForProvider } from "../../wire/capability-gating.js";
-import { buildChatCompletionsRequest } from "../../wire/chat-completions.js";
-import { CerebrasProvider } from "./index.js";
+} from "../../../../src/llm/registry/provider-info.js";
+import type { LLMContentPart, LLMMessage, LLMTool } from "../../../../src/llm/types.js";
+import { chatCompletionsCapabilityHintsForProvider } from "../../../../src/llm/wire/capability-gating.js";
+import { buildChatCompletionsRequest } from "../../../../src/llm/wire/chat-completions.js";
+import { CerebrasProvider } from "../../../../src/llm/providers/cerebras/index.js";
 
 function successfulChat(
   model: string,

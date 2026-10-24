@@ -42,7 +42,7 @@ vi.mock('../../src/plugins/loader.js', async importOriginal => {
     return actual.loadPlugins(...args)
   } }
 })
-vi.mock('../utils/secureStorage/native.js', async importOriginal => {
+vi.mock('../../src/utils/secureStorage/native.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../../src/utils/secureStorage/native.js')>()
   return {
     ...actual,

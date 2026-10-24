@@ -4,9 +4,9 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { Text } from '../ink.js'
-import { createRoot } from '../ink/root.js'
-import { useHistorySearch } from './useHistorySearch.js'
+import { Text } from '../../../src/tui/ink.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { useHistorySearch } from '../../../src/tui/hooks/useHistorySearch.js'
 
 type Entry = {
   display: string
@@ -36,7 +36,7 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => historyFixture.featureFlags.has(name),
 }))
 
-vi.mock('../history/history.js', () => ({
+vi.mock('../../../src/tui/history/history.js', () => ({
   makeHistoryReader: () => {
     let index = 0
     const reader = {
@@ -57,7 +57,7 @@ vi.mock('../history/history.js', () => ({
   },
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybinding: (
     action: string,
     handler: () => void,
@@ -73,8 +73,8 @@ vi.mock('../keybindings/useKeybinding.js', () => ({
   },
 }))
 
-vi.mock('../ink.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('../ink.js')>()
+vi.mock('../../../src/tui/ink.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../src/tui/ink.js')>()
   return {
     ...actual,
     useInput: (

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { networkPolicyAmendment } from "../permissions/review-decision.js";
+import { networkPolicyAmendment } from "../../src/permissions/review-decision.js";
 import {
   allowNetworkDecision,
   askNetworkDecision,
@@ -21,7 +21,7 @@ import {
   type NetworkPolicyDecider,
   type NetworkPolicyRequest,
   type NetworkPolicyRequestProtocol,
-} from "./network-policy.js";
+} from "../../src/sandbox/network-policy.js";
 
 describe("network policy decision payloads", () => {
   test("approval context requires ask decisions from the decider", () => {

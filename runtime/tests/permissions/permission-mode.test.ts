@@ -23,13 +23,13 @@ import {
   transitionPlanAutoMode,
   transitionPermissionMode,
   shouldPlanUseAutoMode,
-} from "./permission-mode.js";
-import type { PermissionMode, ToolPermissionContext } from "./types.js";
-import { permissionGrantsFromToolPermissionContext } from "./permission-grants.js";
+} from "../../src/permissions/permission-mode.js";
+import type { PermissionMode, ToolPermissionContext } from "../../src/permissions/types.js";
+import { permissionGrantsFromToolPermissionContext } from "../../src/permissions/permission-grants.js";
 import {
   executionAuthorityForPermissionContext,
   type SessionExecutionAuthority,
-} from "../session/configuration.js";
+} from "../../src/session/configuration.js";
 
 const AUTO_MODE_ENV_KEYS = [
   "XAI_API_KEY",

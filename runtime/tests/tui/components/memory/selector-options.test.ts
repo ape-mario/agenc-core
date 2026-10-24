@@ -6,7 +6,7 @@ import {
   OPEN_FOLDER_PREFIX,
   type AgentMemoryDefinitionForSelector,
   type MemorySelectorFileInfo,
-} from './selector-options.js'
+} from '../../../../src/tui/components/memory/selector-options.js'
 
 const userMemoryPath = '/home/user/.agenc/AGENC.md'
 const projectMemoryPath = '/repo/AGENC.md'

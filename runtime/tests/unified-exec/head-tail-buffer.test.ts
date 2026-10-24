@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   maxCharsForTokens,
   truncateHeadTailTogether,
-} from "./head-tail-buffer.js";
+} from "../../src/unified-exec/head-tail-buffer.js";
 
 const OMITTED_MARKER = /\n\[\.\.\. omitted \d+ chars \.\.\.\]\n/;
 

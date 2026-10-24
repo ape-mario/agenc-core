@@ -5,7 +5,7 @@ import {
   resolveProviderCapabilityEntry,
   resolveProviderModelCapabilities,
   shouldProbeCapabilityEntry,
-} from "./capabilities.js";
+} from "../../src/llm/capabilities.js";
 
 describe("resolveProviderModelCapabilities", () => {
   it("rejects retired selector spellings at capability selection", () => {

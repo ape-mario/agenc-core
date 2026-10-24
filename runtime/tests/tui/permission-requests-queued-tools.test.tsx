@@ -1,13 +1,13 @@
 import { describe, expect, test, vi } from "vitest";
 
-import type { ApprovalCtx } from "../tools/orchestrator.js";
-import { APPROVED } from "../permissions/review-decision.js";
+import type { ApprovalCtx } from "../../src/tools/orchestrator.js";
+import { APPROVED } from "../../src/permissions/review-decision.js";
 import {
   buildToolUseConfirmQueue,
   collectPermissionToolNames,
   type PendingRequest,
-} from "./permission-requests.js";
-import { createTuiTools } from "./tool-rendering.js";
+} from "../../src/tui/permission-requests.js";
+import { createTuiTools } from "../../src/tui/tool-rendering.js";
 
 describe("queued child tool approvals", () => {
   test("keeps unobserved child tools pending behind a parent approval", () => {

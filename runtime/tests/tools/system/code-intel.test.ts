@@ -28,7 +28,7 @@ import {
   CodeIntelManager,
   collectWorkspaceLanguages,
   toRelativeWorkspacePath,
-} from "./code-intel.js";
+} from "../../../src/tools/system/code-intel.js";
 
 describe("CodeIntelManager", () => {
   let workspace: string;

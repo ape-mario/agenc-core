@@ -12,31 +12,31 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import Database from "better-sqlite3";
-import { runAdmittedToolCall } from "../budget/admitted-tool-call.js";
-import { shutdownSessionLifecycle } from "./lifecycle.js";
-import { validateCanonicalJournalBytes } from "../state/recovery-journal-contract.js";
-import { attachPendingPhysicalSettlement } from "../tools/physical-settlement.js";
-import type { Tool } from "../tools/types.js";
+import { runAdmittedToolCall } from "../../src/budget/admitted-tool-call.js";
+import { shutdownSessionLifecycle } from "../../src/session/lifecycle.js";
+import { validateCanonicalJournalBytes } from "../../src/state/recovery-journal-contract.js";
+import { attachPendingPhysicalSettlement } from "../../src/tools/physical-settlement.js";
+import type { Tool } from "../../src/tools/types.js";
 import { mkSession } from "../fixtures.js";
 import {
   clearCurrentRuntimeSession,
   getCurrentRuntimeSession,
   setCurrentRuntimeSession,
-} from "./current-session.js";
-import type { Session } from "./session.js";
-import type { AgentMetadata } from "../agents/registry.js";
-import { upsertAgentRun } from "../state/agent-runs.js";
-import { createOperatorEffectReviewResolution, resolveLiveDurableEffectReview } from "../state/effect-review.js";
+} from "../../src/session/current-session.js";
+import type { Session } from "../../src/session/session.js";
+import type { AgentMetadata } from "../../src/agents/registry.js";
+import { upsertAgentRun } from "../../src/state/agent-runs.js";
+import { createOperatorEffectReviewResolution, resolveLiveDurableEffectReview } from "../../src/state/effect-review.js";
 import { StateRunDurabilityRepository } from "../../src/state/run-durability.js";
-import { recordInFlightToolCallUnknownOutcome } from "../state/tool-output-rotation.js";
-import { resolveUnknownOutcomeEffect } from "../state/unknown-outcome-gate.js";
+import { recordInFlightToolCallUnknownOutcome } from "../../src/state/tool-output-rotation.js";
+import { resolveUnknownOutcomeEffect } from "../../src/state/unknown-outcome-gate.js";
 import {
   openStateDatabases,
   resolveStateDatabasePaths,
-} from "../state/sqlite-driver.js";
-import type { Event } from "./event-log.js";
-import { RolloutStore } from "./rollout-store.js";
-import { getProjectDir, getSessionDir } from "./session-store.js";
+} from "../../src/state/sqlite-driver.js";
+import type { Event } from "../../src/session/event-log.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { getProjectDir, getSessionDir } from "../../src/session/session-store.js";
 
 const TEST_RUN_TIMESTAMP = "2026-08-03T00:00:00.000Z";
 /**

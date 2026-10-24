@@ -8,11 +8,11 @@ import type {
   ConfigScope,
   McpServerConfig,
   ScopedMcpServerConfig,
-} from '../../services/mcp/types.js'
-import { createRoot } from '../ink/root.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { MCPServerDesktopImportDialog } from './MCPServerDesktopImportDialog.js'
-import type { CanonicalSettingsAuthority } from '../../utils/settings/canonicalAuthority.js'
+} from '../../../src/services/mcp/types.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { MCPServerDesktopImportDialog } from '../../../src/tui/components/MCPServerDesktopImportDialog.js'
+import type { CanonicalSettingsAuthority } from '../../../src/utils/settings/canonicalAuthority.js'
 
 type SelectOption = {
   label: string
@@ -46,16 +46,16 @@ const harness = vi.hoisted(() => ({
   writeToStdout: vi.fn(),
 }))
 
-vi.mock('../../services/mcp/config.js', () => ({
+vi.mock('../../../src/services/mcp/config.js', () => ({
   addMcpConfig: harness.addMcpConfig,
   getAllMcpConfigs: harness.getAllMcpConfigs,
 }))
 
-vi.mock('../../utils/gracefulShutdown.js', () => ({
+vi.mock('../../../src/utils/gracefulShutdown.js', () => ({
   gracefulShutdown: harness.gracefulShutdown,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
@@ -63,7 +63,7 @@ vi.mock('src/utils/process.js', () => ({
   writeToStdout: harness.writeToStdout,
 }))
 
-vi.mock('./design-system/Dialog.js', async () => {
+vi.mock('../../../src/tui/components/design-system/Dialog.js', async () => {
   const ReactActual = await vi.importActual<typeof import('react')>('react')
   return {
     Dialog: (props: CapturedDialogProps) => {
@@ -81,7 +81,7 @@ vi.mock('./design-system/Dialog.js', async () => {
   }
 })
 
-vi.mock('./CustomSelect/SelectMulti.js', async () => {
+vi.mock('../../../src/tui/components/CustomSelect/SelectMulti.js', async () => {
   const ReactActual = await vi.importActual<typeof import('react')>('react')
   return {
     SelectMulti: (props: CapturedSelectMultiProps) => {

@@ -7,7 +7,7 @@ import {
   type ParsedInput,
   type ParsedKey,
   type ParsedResponse,
-} from './parse-keypress.ts'
+} from '../../../src/tui/ink/parse-keypress.js'
 
 function parseOne(input: Buffer | string): ParsedInput {
   const [items] = parseMultipleKeypresses(INITIAL_STATE, input)

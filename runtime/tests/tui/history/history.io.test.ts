@@ -36,29 +36,29 @@ vi.mock('fs/promises', () => ({
   writeFile: harness.writeFile,
 }))
 
-vi.mock('../../bootstrap/state.js', () => ({
+vi.mock('../../../src/bootstrap/state.js', () => ({
   getProjectRoot: () => harness.projectRoot,
   getSessionId: () => harness.sessionId,
 }))
 
-vi.mock('../../utils/cleanupRegistry.js', () => ({
+vi.mock('../../../src/utils/cleanupRegistry.js', () => ({
   registerCleanup: harness.registerCleanup,
 }))
 
-vi.mock('../../utils/debug.js', () => ({
+vi.mock('../../../src/utils/debug.js', () => ({
   logForDebugging: harness.debug,
 }))
 
-vi.mock('../../utils/envUtils.js', () => ({
+vi.mock('../../../src/utils/envUtils.js', () => ({
   getAgenCHomeDir: () => harness.configHome,
   isEnvTruthy: () => harness.skipHistory,
 }))
 
-vi.mock('../../utils/errors.js', () => ({
+vi.mock('../../../src/utils/errors.js', () => ({
   getErrnoCode: (error: NodeJS.ErrnoException) => error.code,
 }))
 
-vi.mock('../../utils/fsOperations.js', () => ({
+vi.mock('../../../src/utils/fsOperations.js', () => ({
   readLinesReverse: async function* (path: string) {
     harness.readPath = path
     if (harness.readError) throw harness.readError
@@ -68,21 +68,21 @@ vi.mock('../../utils/fsOperations.js', () => ({
   },
 }))
 
-vi.mock('../../utils/lockfile.js', () => ({
+vi.mock('../../../src/utils/lockfile.js', () => ({
   lock: harness.lock,
 }))
 
-vi.mock('../../utils/pasteStore.js', () => ({
+vi.mock('../../../src/utils/pasteStore.js', () => ({
   hashPastedText: harness.hashPastedText,
   retrievePastedText: harness.retrievePastedText,
   storePastedText: harness.storePastedText,
 }))
 
-vi.mock('../../utils/sleep.js', () => ({
+vi.mock('../../../src/utils/sleep.js', () => ({
   sleep: harness.sleep,
 }))
 
-vi.mock('../../utils/slowOperations.js', () => ({
+vi.mock('../../../src/utils/slowOperations.js', () => ({
   jsonParse: JSON.parse,
   jsonStringify: JSON.stringify,
 }))
@@ -98,9 +98,9 @@ function entry(overrides: Partial<LogEntryLike>): LogEntryLike {
   }
 }
 
-async function loadHistoryModule(): Promise<typeof import('./history.js')> {
+async function loadHistoryModule(): Promise<typeof import('../../../src/tui/history/history.js')> {
   vi.resetModules()
-  return import('./history.js')
+  return import('../../../src/tui/history/history.js')
 }
 
 async function waitFor(

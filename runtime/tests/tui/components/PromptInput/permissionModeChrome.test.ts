@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   permissionModeFooterChrome,
   promptGlyphForPermissionMode,
-} from './permissionModeChrome.js'
+} from '../../../../src/tui/components/PromptInput/permissionModeChrome.js'
 
 describe('permission mode chrome', () => {
   test('renders bypass permissions as an explicit YOLO footer chip', () => {

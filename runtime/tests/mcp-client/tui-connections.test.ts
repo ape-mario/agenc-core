@@ -4,8 +4,8 @@ import {
   type McpConnectionProjection,
   type McpManagerLike,
   projectMcpManagerToConnections,
-} from "./tui-connections.js";
-import type { MCPServerConnection } from "../services/mcp/types.js";
+} from "../../src/mcp-client/tui-connections.js";
+import type { MCPServerConnection } from "../../src/services/mcp/types.js";
 
 function fakeManager(
   servers: ReadonlyArray<{ name: string; connected: boolean }>,

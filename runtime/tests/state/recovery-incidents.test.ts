@@ -15,13 +15,13 @@ import {
   CanonicalJournalIntegrityError,
   MAX_RECOVERY_QUARANTINE_INCIDENTS_PER_RUN,
   MAX_RECOVERY_QUARANTINE_OBSERVATIONS_PER_INCIDENT,
-} from "./recovery-contract.js";
+} from "../../src/state/recovery-contract.js";
 import {
   RecoveryCursorError,
   RecoveryHistoryLimitError,
   StateRecoveryIncidentRepository,
-} from "./recovery-incidents.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+} from "../../src/state/recovery-incidents.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 
 let root = "";
 let driver: StateSqliteDriver;

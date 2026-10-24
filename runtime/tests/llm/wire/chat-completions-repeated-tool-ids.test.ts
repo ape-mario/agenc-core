@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { parseChatCompletionsResponse } from "./chat-completions.js";
-import type { LLMMessage } from "../types.js";
+import { parseChatCompletionsResponse } from "../../../src/llm/wire/chat-completions.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
 
 const fileRead = { type: "function" as const, function: { name: "FileRead", description: "Read", parameters: { type: "object" } } };
 

@@ -1,11 +1,11 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 import {
   getTaskAssignmentSummary,
   tryRenderTaskAssignmentMessage,
-} from './TaskAssignmentMessage.js'
+} from '../../../src/tui/message-renderers/TaskAssignmentMessage.js'
 
 describe('TaskAssignmentMessage coverage', () => {
   test('renders parsed task assignment details and ignores non-assignment content', async () => {

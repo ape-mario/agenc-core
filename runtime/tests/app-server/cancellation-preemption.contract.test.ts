@@ -3,17 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it, vi } from "vitest";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import type { AgenCBackgroundAgentRunner } from "./background-agent-runner.js";
-import { AgenCCommandExecService } from "./command-exec.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import type { AgenCBackgroundAgentRunner } from "../../src/app-server/background-agent-runner.js";
+import { AgenCCommandExecService } from "../../src/app-server/command-exec.js";
 import {
   AgenCDaemonJsonRpcDispatcher,
   TEST_ONLY_ALLOW_UNADMITTED_COMMAND_EXEC_START,
-} from "./daemon-dispatcher.js";
-import type { AgenCFuzzyFileSearch } from "./fuzzy-file-search.js";
-import { JSON_RPC_VERSION } from "./protocol/index.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+} from "../../src/app-server/daemon-dispatcher.js";
+import type { AgenCFuzzyFileSearch } from "../../src/app-server/fuzzy-file-search.js";
+import { JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 
 const TEST_RUNTIME_OPTIONS = resolveAgentRuntimeOptions({});
 

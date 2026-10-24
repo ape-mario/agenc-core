@@ -4,8 +4,8 @@
 // "fast" for GPT-6, "default" when a Fast request was downgraded; fast-mode
 // guide, read 2026-09-23).
 import { describe, expect, test } from "vitest";
-import type { LLMMessage } from "../types.js";
-import { parseOpenAIResponsesResponse } from "./responses-openai.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
+import { parseOpenAIResponsesResponse } from "../../../src/llm/wire/responses-openai.js";
 
 const request = { model: "gpt-6-sol", messages: [] as LLMMessage[], tools: [] };
 

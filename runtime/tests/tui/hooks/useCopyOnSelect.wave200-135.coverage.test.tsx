@@ -27,26 +27,26 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../components/design-system/ThemeProvider', () => ({
+vi.mock('../../../src/tui/components/design-system/ThemeProvider.js', () => ({
   useTheme: () => [harness.themeName, vi.fn()],
 }))
 
-vi.mock('../../utils/config.js', () => ({
+vi.mock('../../../src/utils/config.js', () => ({
   getRuntimeState: () => harness.config,
 }))
 
-vi.mock('./useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     tui: { copyOnSelect: harness.config.copyOnSelect },
   }),
 }))
 
-vi.mock('../../utils/theme.js', () => ({
+vi.mock('../../../src/utils/theme.js', () => ({
   getTheme: (name: string) => ({ selectionBg: `${name}-selection` }),
 }))
 
-import { createRoot } from '../ink/root.js'
-import { useCopyOnSelect, useSelectionBgColor } from './useCopyOnSelect.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { useCopyOnSelect, useSelectionBgColor } from '../../../src/tui/hooks/useCopyOnSelect.js'
 
 type TestStdin = PassThrough & {
   isTTY: boolean

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseAnthropicMessagesResponse } from "./messages-anthropic.js";
+import { parseAnthropicMessagesResponse } from "../../../src/llm/wire/messages-anthropic.js";
 
 const MODEL = "claude-sonnet-4.5";
 

@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { LLMMessage } from "../llm/types.js";
-import type { Message } from "../types/message.js";
-import type { CacheSafeParams } from "../services/PromptSuggestion/runtime.js";
+import type { LLMMessage } from "../../src/llm/types.js";
+import type { Message } from "../../src/types/message.js";
+import type { CacheSafeParams } from "../../src/services/PromptSuggestion/runtime.js";
 import {
   startAgentSummarization,
   type AgentSummaryRunForkedAgentParams,
-} from "../services/AgentSummary/agentSummary.js";
-import { registerAgentThreadTask } from "../tasks/agent-thread.js";
-import { BackgroundTaskLifecycle } from "../tasks/lifecycle.js";
-import type { Session } from "../session/session.js";
-import { frameUntrustedToolResultContent } from "../tools/untrusted-tool-result-framing.js";
-import { AgentThread } from "./thread.js";
-import type { LiveAgent } from "./control.js";
-import { forkSubagent } from "./fork-context.js";
-import { AgentStatusTracker } from "./status.js";
-import { createAgentRoleWorkspace, resolveAgentRole } from "./role.js";
-import { Mailbox } from "./mailbox.js";
+} from "../../src/services/AgentSummary/agentSummary.js";
+import { registerAgentThreadTask } from "../../src/tasks/agent-thread.js";
+import { BackgroundTaskLifecycle } from "../../src/tasks/lifecycle.js";
+import type { Session } from "../../src/session/session.js";
+import { frameUntrustedToolResultContent } from "../../src/tools/untrusted-tool-result-framing.js";
+import { AgentThread } from "../../src/agents/thread.js";
+import type { LiveAgent } from "../../src/agents/control.js";
+import { forkSubagent } from "../../src/agents/fork-context.js";
+import { AgentStatusTracker } from "../../src/agents/status.js";
+import { createAgentRoleWorkspace, resolveAgentRole } from "../../src/agents/role.js";
+import { Mailbox } from "../../src/agents/mailbox.js";
 
 const ROLE_WORKSPACE = createAgentRoleWorkspace(process.cwd());
 const UNTRUSTED_BOUNDARY = "===== AGENC UNTRUSTED TOOL RESULT DATA =====";

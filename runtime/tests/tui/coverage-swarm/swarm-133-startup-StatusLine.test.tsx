@@ -3,7 +3,7 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from '../remoteAuthSessionContext.fixture.js'
 
 const harness = vi.hoisted(() => ({

@@ -8,12 +8,12 @@ import { describe, expect, test } from "vitest";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
+} from "../../../src/session/attachment-state.js";
 import {
   __INTERNAL,
   type GetAttachmentsOptions,
   getAttachments,
-} from "./orchestrator.js";
+} from "../../../src/prompts/attachments/orchestrator.js";
 
 function makeOpts(
   partial?: Partial<GetAttachmentsOptions>,

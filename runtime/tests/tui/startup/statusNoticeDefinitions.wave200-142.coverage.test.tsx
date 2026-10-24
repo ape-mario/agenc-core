@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type {
   StatusNoticeContext,
   StatusNoticeDefinition,
-} from './statusNoticeDefinitions.js'
+} from '../../../src/tui/startup/statusNoticeDefinitions.js'
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from '../remoteAuthSessionContext.fixture.js'
 
 type AuthSource =
@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
   terminalIdeType: null as string | null,
 }))
 
-vi.mock('../ink.js', async () => {
+vi.mock('../../../src/tui/ink.js', async () => {
   const React = await import('react')
   return {
     Box: ({ children }: { readonly children?: React.ReactNode }) =>
@@ -43,7 +43,7 @@ vi.mock('../ink.js', async () => {
   }
 })
 
-vi.mock('../../utils/auth.js', () => ({
+vi.mock('../../../src/utils/auth.js', () => ({
   selectedProviderUsesExternalAuth: (provider: string) =>
     provider !== 'anthropic' && provider !== 'agenc',
   getPrimaryApiKeyFromSecureStorage: () =>
@@ -58,21 +58,21 @@ vi.mock('../../utils/auth.js', () => ({
   isAgenCAISubscriberForContext: () => mocks.subscriber,
 }))
 
-vi.mock('../../utils/format.js', () => ({
+vi.mock('../../../src/utils/format.js', () => ({
   formatNumber: (value: number) => String(value),
 }))
 
-vi.mock('../../utils/ide.js', () => ({
+vi.mock('../../../src/utils/ide.js', () => ({
   getTerminalIdeType: () => mocks.terminalIdeType,
   isSupportedJetBrainsTerminal: () => mocks.supportedIde,
   toIDEDisplayName: (ideType: string | null) => ideType ?? 'JetBrains IDE',
 }))
 
-vi.mock('../../utils/jetbrains.js', () => ({
+vi.mock('../../../src/utils/jetbrains.js', () => ({
   isJetBrainsPluginInstalledCachedSync: () => mocks.pluginInstalled,
 }))
 
-vi.mock('../../utils/statusNoticeHelpers.js', () => ({
+vi.mock('../../../src/utils/statusNoticeHelpers.js', () => ({
   AGENT_DESCRIPTIONS_THRESHOLD: 100,
   getAgentDescriptionsTotalTokens: () => mocks.agentTokens,
 }))
@@ -127,7 +127,7 @@ describe('statusNoticeDefinitions wave200-142 coverage', () => {
 
   test('renders fallback notice guidance for diagnostics, auth, and IDE setup', async () => {
     const { getActiveNotices, statusNoticeDefinitions } = await import(
-      './statusNoticeDefinitions.js'
+      '../../../src/tui/startup/statusNoticeDefinitions.js'
     )
 
     mocks.agentTokens = 101

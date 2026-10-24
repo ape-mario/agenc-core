@@ -1,31 +1,31 @@
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("../ink.js", () => ({
+vi.mock("../../../src/tui/ink.js", () => ({
   useInput: () => {},
 }));
 
-vi.mock("../context/notifications.js", () => ({
+vi.mock("../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({
     addNotification: () => {},
     removeNotification: () => {},
   }),
 }));
 
-vi.mock("../../utils/debug.js", () => ({
+vi.mock("../../../src/utils/debug.js", () => ({
   logForDebugging: () => {},
 }));
 
-import type { Key } from "../ink.js";
+import type { Key } from "../../../src/tui/ink.js";
 import {
   createChordInputHandler,
   formatKeybindingWarningNotification,
   formatKeybindingWarningSummary,
-} from "../keybindings/KeybindingProviderSetup.js";
-import { parseBindings } from "../keybindings/parser.js";
+} from "../../../src/tui/keybindings/KeybindingProviderSetup.js";
+import { parseBindings } from "../../../src/tui/keybindings/parser.js";
 import type {
   KeybindingContextName,
   ParsedKeystroke,
-} from "../keybindings/types.js";
+} from "../../../src/tui/keybindings/types.js";
 
 type HandlerRegistration = {
   action: string;

@@ -3,12 +3,12 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { expect, test, vi } from 'vitest'
 
-import type { DOMElement, ElementNames } from './dom.ts'
-import { LayoutDisplay } from './layout/node.ts'
-import { createRoot, type Root } from './root.ts'
-import instances from './instances.ts'
+import type { DOMElement, ElementNames } from '../../../src/tui/ink/dom.js'
+import { LayoutDisplay } from '../../../src/tui/ink/layout/node.js'
+import { createRoot, type Root } from '../../../src/tui/ink/root.js'
+import instances from '../../../src/tui/ink/instances.js'
 
-vi.mock('../../utils/fullscreen.js', () => ({
+vi.mock('../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => false,
 }))
 

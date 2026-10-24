@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
-import { summarizeFileEditError } from '../../tools/FileEditTool/UI.js'
-import { FILE_NOT_FOUND_CWD_NOTE } from '../../utils/file.js'
+import { summarizeFileEditError } from '../../../src/tools/FileEditTool/UI.js'
+import { FILE_NOT_FOUND_CWD_NOTE } from '../../../src/utils/file.js'
 
 describe('summarizeFileEditError - surfaces the concrete reason', () => {
   test('returns a friendly message for the intended "not read yet" case', () => {

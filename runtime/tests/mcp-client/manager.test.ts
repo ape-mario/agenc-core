@@ -1,39 +1,39 @@
 import { resolve } from "node:path";
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MCPManager } from "./manager.js";
-import type { MCPServerConfig } from "./types.js";
-import type { MCPToolBridgePermissionOptions } from "./tools.js";
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
+import { MCPManager } from "../../src/mcp-client/manager.js";
+import type { MCPServerConfig } from "../../src/mcp-client/types.js";
+import type { MCPToolBridgePermissionOptions } from "../../src/mcp-client/tools.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
 import {
   registerSandboxExecutionLifecycleParticipant,
   transitionSandboxExecutionBroker,
-} from "../sandbox/execution-lifecycle.js";
-import { MCPTransportCleanupError } from "./transports/connect-with-cleanup.js";
-import { McpAuthenticationError } from "../services/mcp/auth-errors.js";
+} from "../../src/sandbox/execution-lifecycle.js";
+import { MCPTransportCleanupError } from "../../src/mcp-client/transports/connect-with-cleanup.js";
+import { McpAuthenticationError } from "../../src/services/mcp/auth-errors.js";
 
 // Mock the connection and tools modules
-vi.mock("./connection.js", () => ({
+vi.mock("../../src/mcp-client/connection.js", () => ({
   createMCPConnection: vi.fn(),
 }));
-vi.mock("./tools.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./tools.js")>();
+vi.mock("../../src/mcp-client/tools.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/mcp-client/tools.js")>();
   return {
     ...actual,
     createToolBridge: vi.fn(),
   };
 });
-vi.mock("./resources.js", () => ({
+vi.mock("../../src/mcp-client/resources.js", () => ({
   createResourceBridge: vi.fn(),
 }));
-vi.mock("./prompts.js", () => ({
+vi.mock("../../src/mcp-client/prompts.js", () => ({
   createPromptBridge: vi.fn(),
 }));
 
-import { createMCPConnection } from "./connection.js";
-import { createToolBridge } from "./tools.js";
-import { createResourceBridge } from "./resources.js";
-import { createPromptBridge } from "./prompts.js";
+import { createMCPConnection } from "../../src/mcp-client/connection.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
+import { createResourceBridge } from "../../src/mcp-client/resources.js";
+import { createPromptBridge } from "../../src/mcp-client/prompts.js";
 import {
   installEmptyCompanionBridgeDefaults,
   makeConfig,
@@ -41,12 +41,12 @@ import {
   makeMockPromptBridge,
   makeMockResourceBridge,
 } from "./manager-test-fixtures.js";
-import { projectMcpManagerToConnections } from "./tui-connections.js";
-import { mcpInstructionsDeltaProducer } from "../prompts/attachments/mcp-delta.js";
+import { projectMcpManagerToConnections } from "../../src/mcp-client/tui-connections.js";
+import { mcpInstructionsDeltaProducer } from "../../src/prompts/attachments/mcp-delta.js";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../session/attachment-state.js";
+} from "../../src/session/attachment-state.js";
 
 const mockCreateMCPConnection = vi.mocked(createMCPConnection);
 const mockCreateToolBridge = vi.mocked(createToolBridge);

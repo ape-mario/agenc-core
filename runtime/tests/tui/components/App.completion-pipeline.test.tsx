@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { shouldShowPromptInputState } from "./App.js";
+import { shouldShowPromptInputState } from "../../../src/tui/components/App.js";
 
 describe("App completion pipeline prompt ownership", () => {
   test("hides prompt input while the completion pipeline owns the terminal", () => {

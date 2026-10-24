@@ -6,7 +6,7 @@ import YogaDefault, {
   Justify,
   PositionType,
   Wrap,
-} from "./index.js";
+} from "../../../../../src/tui/ink/native-ts/yoga-layout/index.js";
 
 describe("yoga-layout absolute fallback placement", () => {
   test("positions inset-free absolute children from parent flex alignment", () => {

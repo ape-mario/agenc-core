@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createConnection, createServer, type Socket } from "node:net";
 import { describe, expect, it, vi } from "vitest";
-import { JSON_RPC_VERSION } from "./protocol/index.js";
+import { JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
 import {
   AgenCUnixSocketServer,
   agenCDaemonLocalEndpoint,
@@ -15,9 +15,9 @@ import {
   prepareAgenCUnixSocketPath,
   resolveAgenCPrivateUnixSocketOwnerUid,
   type AgenCUnixSocketMessageContext,
-} from "./transport/unix-socket.js";
-import { compileAndLoadAgenCNativePeerCredentialBinding } from "./transport/peer-credentials.js";
-import { AGENC_STDIO_DEFAULT_MAX_LINE_BYTES } from "./transport/stdio.js";
+} from "../../src/app-server/transport/unix-socket.js";
+import { compileAndLoadAgenCNativePeerCredentialBinding } from "../../src/app-server/transport/peer-credentials.js";
+import { AGENC_STDIO_DEFAULT_MAX_LINE_BYTES } from "../../src/app-server/transport/stdio.js";
 import { resolveDaemonSocketPath } from "../../../packages/agenc-sdk/src/socket.js";
 
 const itUnix = process.platform === "win32" ? it.skip : it;

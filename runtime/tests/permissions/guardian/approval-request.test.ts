@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 
-import type { ToolInvocation } from "../../tools/context.js";
-import type { ApprovalCtx } from "./arbiter.js";
+import type { ToolInvocation } from "../../../src/tools/context.js";
+import type { ApprovalCtx } from "../../../src/permissions/guardian/arbiter.js";
 import {
   buildGuardianApprovalRequest,
   compactForGuardianJson,
   guardianApprovalRequestActionText,
   guardianApprovalRequestPrettyJson,
-} from "./approval-request.js";
+} from "../../../src/permissions/guardian/approval-request.js";
 
 function invocation(payload: ToolInvocation["payload"]): ToolInvocation {
   return {

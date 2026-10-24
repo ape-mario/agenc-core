@@ -4,7 +4,7 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test } from 'vitest'
 
-import { createRoot } from '../../../ink.js'
+import { createRoot } from '../../../../../src/tui/ink.js'
 import {
   calculateWordDiffs,
   numberDiffLines,
@@ -12,7 +12,7 @@ import {
   StructuredDiffFallback,
   transformLinesToObjects,
   type LineObject,
-} from './Fallback.js'
+} from '../../../../../src/tui/components/diff/StructuredDiff/Fallback.js'
 
 function createStreams(): {
   stdout: PassThrough

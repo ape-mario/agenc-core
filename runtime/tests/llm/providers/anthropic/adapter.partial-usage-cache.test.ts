@@ -1,6 +1,6 @@
 import { taskUsageTokens } from "../../../../src/session/task-budget.js";
 import { describe, expect, test, vi } from "vitest";
-import { AnthropicProvider } from "./adapter.js";
+import { AnthropicProvider } from "../../../../src/llm/providers/anthropic/adapter.js";
 import {
   sseResponse,
   sseResponseThenError,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { LLMStreamChunk } from "../../types.js";
-import { readXaiOauthAccessToken } from "../../../utils/xaiOauthCredentials.js";
-import { GrokProvider } from "./adapter.js";
+import type { LLMStreamChunk } from "../../../../src/llm/types.js";
+import { readXaiOauthAccessToken } from "../../../../src/utils/xaiOauthCredentials.js";
+import { GrokProvider } from "../../../../src/llm/providers/grok/adapter.js";
 
 // LIVE wire probe — talks to the real xAI API with the local OAuth grant.
 // Only runs when GROK_WIRE_PROBE=1: measures inter-chunk gap distribution
@@ -29,7 +29,7 @@ interface GapStats {
 
 async function probe(
   prompt: string,
-  tools: import("../../types.js").LLMTool[] | undefined,
+  tools: import("../../../../src/llm/types.js").LLMTool[] | undefined,
 ): Promise<GapStats> {
   const provider = new GrokProvider({
     apiKey: oauthBearer(),

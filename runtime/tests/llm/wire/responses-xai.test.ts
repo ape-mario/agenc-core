@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 
-import type { LLMMessage, LLMTool } from "../types.js";
+import type { LLMMessage, LLMTool } from "../../../src/llm/types.js";
 import {
   buildXaiResponsesInputItems,
   buildXaiResponsesRequest,
   resolveXaiResponsesToolChoice,
   toXaiResponsesTools,
   XAI_ENCRYPTED_REASONING_INCLUDE,
-} from "./responses-xai.js";
+} from "../../../src/llm/wire/responses-xai.js";
 
 // Wire form of `system.echo` under the bijective MCP tool-name encoding
 // (mcp-tool-naming.ts) — xAI enforces `^[a-zA-Z0-9_-]{1,64}$` on function

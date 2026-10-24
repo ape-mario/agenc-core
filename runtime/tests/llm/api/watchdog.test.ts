@@ -3,7 +3,7 @@ import {
   STREAM_IDLE_ABORT_REASON,
   STREAM_IDLE_WARNING_REASON,
   installStreamWatchdog,
-} from "../stream-watchdog.js";
+} from "../../../src/llm/stream-watchdog.js";
 
 describe("llm api watchdog", () => {
   let nowMs = 0;

@@ -7,17 +7,17 @@ import {
   setAttribute,
   setStyle,
   type DOMElement,
-} from './dom.ts'
-import Output from './output.ts'
-import renderNodeToOutput from './render-node-to-output.ts'
+} from '../../../src/tui/ink/dom.js'
+import Output from '../../../src/tui/ink/output.js'
+import renderNodeToOutput from '../../../src/tui/ink/render-node-to-output.js'
 import {
   CharPool,
   HyperlinkPool,
   StylePool,
   charInCellAt,
   createScreen,
-} from './screen.ts'
-import applyStyles, { type Styles } from './styles.ts'
+} from '../../../src/tui/ink/screen.js'
+import applyStyles, { type Styles } from '../../../src/tui/ink/styles.js'
 
 function applyNodeStyle(node: DOMElement, style: Styles): void {
   setStyle(node, style)

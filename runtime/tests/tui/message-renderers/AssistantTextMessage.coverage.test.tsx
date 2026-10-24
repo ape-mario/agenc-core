@@ -2,11 +2,11 @@ import { homedir } from "node:os";
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { MessageActionsSelectedContext } from '../components/messageActions.js'
-import { AssistantTextMessage } from './AssistantTextMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { MessageActionsSelectedContext } from '../../../src/tui/components/messageActions.js'
+import { AssistantTextMessage } from '../../../src/tui/message-renderers/AssistantTextMessage.js'
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),

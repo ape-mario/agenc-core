@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { MCPServerConfig } from "./types.js";
+import type { MCPServerConfig } from "../../src/mcp-client/types.js";
 
 export function makeConfig(
   name: string,

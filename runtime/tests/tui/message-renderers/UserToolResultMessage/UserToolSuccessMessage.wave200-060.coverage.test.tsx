@@ -5,11 +5,11 @@ vi.mock('bun:bundle', () => ({
   feature: (flag: string) => flag === 'BASH_CLASSIFIER',
 }))
 
-import type { Tool, Tools } from '../../../tools/Tool.js'
-import { clearClassifierApprovals, setClassifierApproval } from '../../../utils/classifierApprovals.js'
-import { renderToString } from '../../../utils/staticRender.js'
-import { Text } from '../../ink.js'
-import { UserToolSuccessMessage } from './UserToolSuccessMessage.js'
+import type { Tool, Tools } from '../../../../src/tools/Tool.js'
+import { clearClassifierApprovals, setClassifierApproval } from '../../../../src/utils/classifierApprovals.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { Text } from '../../../../src/tui/ink.js'
+import { UserToolSuccessMessage } from '../../../../src/tui/message-renderers/UserToolResultMessage/UserToolSuccessMessage.js'
 
 afterEach(() => {
   clearClassifierApprovals()

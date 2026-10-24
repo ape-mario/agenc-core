@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { REDACTED_SECRET, redactSecrets, redactSecretsInValue } from "./index.js";
+import { REDACTED_SECRET, redactSecrets, redactSecretsInValue } from "../../src/secrets/index.js";
 
 // C1: redactSecrets left the four highest-value wallet secrets on
 // this product unredacted — Solana JSON-array keypairs, PEM private keys, the

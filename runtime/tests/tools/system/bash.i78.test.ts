@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createBashTool as createUnboundBashTool } from "./bash.js";
+import { createBashTool as createUnboundBashTool } from "../../../src/tools/system/bash.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 
 const createBashTool = (

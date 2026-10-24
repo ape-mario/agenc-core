@@ -4,8 +4,8 @@ import {
   _resetAgentRolesForTesting,
   createAgentRoleWorkspace,
   listAgentRoles,
-} from "./role.js";
-import { listAgentRoleDefinitions } from "./role-definitions.js";
+} from "../../src/agents/role.js";
+import { listAgentRoleDefinitions } from "../../src/agents/role-definitions.js";
 
 const DEFAULT_CWD = process.cwd();
 const DEFAULT_WORKSPACE = createAgentRoleWorkspace(DEFAULT_CWD);
@@ -66,7 +66,7 @@ describe("listAgentRoleDefinitions (TUI agent picker wiring)", () => {
 
   it("preserves an empty allowlist as tools: [] — distinct from a missing allowlist (which omits the field)", async () => {
     const { registerAgentRole, _resetAgentRolesForTesting } = await import(
-      "./role.js"
+      "../../src/agents/role.js"
     );
     _resetAgentRolesForTesting();
     registerAgentRole(DEFAULT_WORKSPACE, {

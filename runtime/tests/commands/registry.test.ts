@@ -4,8 +4,8 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-import { CommandRegistry, buildDefaultRegistry } from "./registry.js";
-import type { SlashCommand, SlashCommandResult } from "./types.js";
+import { CommandRegistry, buildDefaultRegistry } from "../../src/commands/registry.js";
+import type { SlashCommand, SlashCommandResult } from "../../src/commands/types.js";
 
 const MINIMAL_REGISTRY_NAMES = [
   "help",

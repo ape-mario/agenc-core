@@ -6,15 +6,15 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, expect, test } from "vitest";
 
-import { formatUnifiedExecToolContent } from "./exec-result-format.js";
-import { SESSION_ID_ARG } from "./filesystem.js";
+import { formatUnifiedExecToolContent } from "../../../src/tools/system/exec-result-format.js";
+import { SESSION_ID_ARG } from "../../../src/tools/system/filesystem.js";
 import {
   provePrintedRead,
   rememberPrintedOutput,
   resetPrintedOutputsForTest,
   stableWorkspaceText,
-} from "./printed-read-proof.js";
-import type { ExecCommandToolOutput } from "../../unified-exec/types.js";
+} from "../../../src/tools/system/printed-read-proof.js";
+import type { ExecCommandToolOutput } from "../../../src/unified-exec/types.js";
 
 const MONEY = "export function toCents(amount) {\n  return Math.floor(amount * 100);\n}\n";
 

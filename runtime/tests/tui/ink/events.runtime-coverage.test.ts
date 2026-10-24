@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { ClickEvent } from "./events/click-event.js";
-import { TerminalFocusEvent } from "./events/terminal-focus-event.js";
+import { ClickEvent } from "../../../src/tui/ink/events/click-event.js";
+import { TerminalFocusEvent } from "../../../src/tui/ink/events/terminal-focus-event.js";
 
 describe("Ink DOM events", () => {
   test("ClickEvent stores global and local click coordinates", () => {

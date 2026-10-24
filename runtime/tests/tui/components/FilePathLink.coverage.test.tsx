@@ -3,9 +3,9 @@ import { pathToFileURL } from "node:url";
 import React from "react";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { renderToAnsiString } from "../../utils/staticRender.js";
-import { Box } from "../ink.js";
-import { FilePathLink } from "./FilePathLink.js";
+import { renderToAnsiString } from "../../../src/utils/staticRender.js";
+import { Box } from "../../../src/tui/ink.js";
+import { FilePathLink } from "../../../src/tui/components/FilePathLink.js";
 
 const previousForceHyperlink = process.env.FORCE_HYPERLINK;
 

@@ -4,24 +4,24 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, expect, test } from "vitest";
 
-import { createExecCommandTool } from "./exec-command.js";
-import { formatUnifiedExecToolContent } from "./exec-result-format.js";
-import { createFileEditTool } from "./file-edit.js";
-import { createFileWriteTool } from "./file-write.js";
-import { createApplyPatchTool } from "../apply-patch/tool.js";
+import { createExecCommandTool } from "../../../src/tools/system/exec-command.js";
+import { formatUnifiedExecToolContent } from "../../../src/tools/system/exec-result-format.js";
+import { createFileEditTool } from "../../../src/tools/system/file-edit.js";
+import { createFileWriteTool } from "../../../src/tools/system/file-write.js";
+import { createApplyPatchTool } from "../../../src/tools/apply-patch/tool.js";
 import {
   mayProvePrintedRead,
   PRINTED_READ_MAX_VISIBLE_BYTES,
   provePrintedRead,
   rememberPrintedOutput,
   resetPrintedOutputsForTest,
-} from "./printed-read-proof.js";
-import { unreadFilePreflight } from "./read-before-write.js";
-import { getSessionReadSnapshot, hasSessionRead, SESSION_ID_ARG } from "./filesystem.js";
-import { MIN_TOOL_RESULT_BYTES } from "../execution.js";
+} from "../../../src/tools/system/printed-read-proof.js";
+import { unreadFilePreflight } from "../../../src/tools/system/read-before-write.js";
+import { getSessionReadSnapshot, hasSessionRead, SESSION_ID_ARG } from "../../../src/tools/system/filesystem.js";
+import { MIN_TOOL_RESULT_BYTES } from "../../../src/tools/execution.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
-import { UnifiedExecProcessManager } from "../../unified-exec/process-manager.js";
-import type { ExecCommandToolOutput } from "../../unified-exec/types.js";
+import { UnifiedExecProcessManager } from "../../../src/unified-exec/process-manager.js";
+import type { ExecCommandToolOutput } from "../../../src/unified-exec/types.js";
 
 // Standard sessions count a workspace file as read when a command printed its
 // exact current text, whatever shell construct printed it. In the agent race

@@ -9,9 +9,9 @@ import {
   withExplicitDangerBoundary,
 } from "../helpers/explicit-danger-boundary.js";
 
-import type { Tool, ToolUseContext } from "./Tool.js";
-import { applyToolApprovalConfigToPermissionContext } from "../permissions/tool-approval.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import type { Tool, ToolUseContext } from "../../src/tools/Tool.js";
+import { applyToolApprovalConfigToPermissionContext } from "../../src/permissions/tool-approval.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   CanonicalBashTool,
   CanonicalFileEditTool,
@@ -20,42 +20,42 @@ import {
   CanonicalGlobTool,
   CanonicalGrepTool,
   CanonicalNotebookEditTool,
-} from "./canonicalToolSurface.js";
-import { createBashTool } from "./system/bash.js";
+} from "../../src/tools/canonicalToolSurface.js";
+import { createBashTool } from "../../src/tools/system/bash.js";
 import {
   clearFileReadListenersForTests,
   registerFileReadListener,
-} from "./system/file-read.js";
+} from "../../src/tools/system/file-read.js";
 import {
   clearSessionReadState,
   SESSION_ID_ARG,
-} from "./system/filesystem.js";
-import { runWithCwdOverride } from "../utils/cwd.js";
+} from "../../src/tools/system/filesystem.js";
+import { runWithCwdOverride } from "../../src/utils/cwd.js";
 import {
   clearCurrentRuntimeSession,
   runWithCurrentRuntimeSession,
   setCurrentRuntimeSession,
-} from "../session/current-session.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
-import type { Session } from "../session/session.js";
-import { SessionProviderService } from "../session/provider-service.js";
+} from "../../src/session/current-session.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import type { Session } from "../../src/session/session.js";
+import { SessionProviderService } from "../../src/session/provider-service.js";
 import { createTestConfigStore } from "../fixtures.js";
 
 vi.mock("bun:bundle", () => ({ feature: () => false }));
-vi.mock("../tools/ScheduleCronTool/CronCreateTool.js", () => ({
+vi.mock("../../src/tools/ScheduleCronTool/CronCreateTool.js", () => ({
   CronCreateTool: { name: "schedule_cron.create" },
 }));
-vi.mock("../tools/ScheduleCronTool/CronDeleteTool.js", () => ({
+vi.mock("../../src/tools/ScheduleCronTool/CronDeleteTool.js", () => ({
   CronDeleteTool: { name: "schedule_cron.delete" },
 }));
-vi.mock("../tools/ScheduleCronTool/CronListTool.js", () => ({
+vi.mock("../../src/tools/ScheduleCronTool/CronListTool.js", () => ({
   CronListTool: { name: "schedule_cron.list" },
 }));
-vi.mock("../commands.js", () => ({
+vi.mock("../../src/commands.js", () => ({
   getSkillToolCommands: vi.fn(() => []),
   getMcpSkillCommands: vi.fn(() => []),
 }));
-vi.mock("../tools.js", () => ({
+vi.mock("../../src/tools.js", () => ({
   getTools: vi.fn(() => []),
   getAllBaseTools: vi.fn(() => []),
   assembleToolPool: vi.fn(() => []),
@@ -389,7 +389,7 @@ describe("old-stack tool surface consolidation", () => {
   });
 
   test("canonical Bash truncates large output without persisted-output recovery", async () => {
-    const { processToolResultBlock } = await import("../utils/toolResultStorage.js");
+    const { processToolResultBlock } = await import("../../src/utils/toolResultStorage.js");
     const result = await CanonicalBashTool.call(
       {
         command: `${process.execPath} -e "process.stdout.write('x'.repeat(120000))"`,
@@ -517,7 +517,7 @@ describe("old-stack tool surface consolidation", () => {
       observedReads.push(event.filePath);
     });
     try {
-      const { generateFileAttachment } = await import("../utils/attachments.js");
+      const { generateFileAttachment } = await import("../../src/utils/attachments.js");
       await writeFile(filePath, "attachment text\n", "utf8");
       const attachment = await generateFileAttachment(
         filePath,
@@ -547,7 +547,7 @@ describe("old-stack tool surface consolidation", () => {
   });
 
   test("directory attachments render through canonical Bash implementation", async () => {
-    const { normalizeAttachmentForAPI } = await import("../utils/messages.js");
+    const { normalizeAttachmentForAPI } = await import("../../src/utils/messages.js");
     const messages = normalizeAttachmentForAPI({
       type: "directory",
       path: "/tmp/example",
@@ -936,7 +936,7 @@ describe("old-stack tool surface consolidation", () => {
   });
 
   test("removed tool aliases do not resolve as agent tools", async () => {
-    const { resolveAgentTools } = await import("./AgentTool/agentToolUtils.js");
+    const { resolveAgentTools } = await import("../../src/tools/AgentTool/agentToolUtils.js");
     const availableTools = [
       CanonicalBashTool,
       CanonicalFileReadTool,
@@ -982,7 +982,7 @@ describe("old-stack tool surface consolidation", () => {
   });
 
   test("file attachments truncate after canonical FileRead size errors", async () => {
-    const { generateFileAttachment } = await import("../utils/attachments.js");
+    const { generateFileAttachment } = await import("../../src/utils/attachments.js");
     const workspace = await mkdtemp(join(tmpdir(), "agenc-attachment-size-"));
     try {
       const filePath = join(workspace, "large.txt");
@@ -1027,7 +1027,7 @@ describe("old-stack tool surface consolidation", () => {
   });
 
   test("file attachments return null after canonical FileRead non-size errors", async () => {
-    const { generateFileAttachment } = await import("../utils/attachments.js");
+    const { generateFileAttachment } = await import("../../src/utils/attachments.js");
     const workspace = await mkdtemp(join(tmpdir(), "agenc-attachment-error-"));
     try {
       const filePath = join(workspace, "denied.txt");
@@ -1057,7 +1057,7 @@ describe("old-stack tool surface consolidation", () => {
   });
 
   test("changed-file attachments stop after canonical FileRead errors", async () => {
-    const { getChangedFiles } = await import("../utils/attachments.js");
+    const { getChangedFiles } = await import("../../src/utils/attachments.js");
     const workspace = await mkdtemp(join(tmpdir(), "agenc-attachment-changed-"));
     try {
       const filePath = join(workspace, "changed.txt");
@@ -1092,7 +1092,7 @@ describe("old-stack tool surface consolidation", () => {
   });
 
   test("changed-file attachments skip canonical notebook and PDF media", async () => {
-    const { getChangedFiles } = await import("../utils/attachments.js");
+    const { getChangedFiles } = await import("../../src/utils/attachments.js");
     const workspace = await mkdtemp(join(tmpdir(), "agenc-attachment-media-"));
     try {
       const cases = [
@@ -1151,7 +1151,7 @@ describe("old-stack tool surface consolidation", () => {
   });
 
   test("changed-file attachments preserve standalone canonical image media", async () => {
-    const { getChangedFiles } = await import("../utils/attachments.js");
+    const { getChangedFiles } = await import("../../src/utils/attachments.js");
     const workspace = await mkdtemp(join(tmpdir(), "agenc-attachment-image-"));
     try {
       const filePath = join(workspace, "image.png");

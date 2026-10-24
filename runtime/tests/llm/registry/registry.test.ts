@@ -1,25 +1,25 @@
 import { OPENAI_CURRENT_MODEL_CATALOG } from "../../../src/llm/registry/openai-current-models.js";
 import { describe, expect, it } from "vitest";
 
-import { defaultConfig } from "../../config/schema.js";
+import { defaultConfig } from "../../../src/config/schema.js";
 import {
   getModelInstructions,
-} from "../../context/personality-spec-instructions.js";
-import { buildPrompt } from "../../session/run-turn.js";
-import type { TurnContext } from "../../session/turn-context.js";
-import { StaticModelsManager } from "../models-manager.js";
+} from "../../../src/context/personality-spec-instructions.js";
+import { buildPrompt } from "../../../src/session/run-turn.js";
+import type { TurnContext } from "../../../src/session/turn-context.js";
+import { StaticModelsManager } from "../../../src/llm/models-manager.js";
 import {
   listRegisteredModelCatalogEntries,
   resolveModelCapabilityHints,
   resolveModelCatalogMetadata,
   resolveRegisteredModelCatalogEntry,
-} from "./model-catalog.js";
+} from "../../../src/llm/registry/model-catalog.js";
 import {
   BUILT_IN_PROVIDER_DEFINITIONS,
   DEFAULT_BUILT_IN_PROVIDER_SELECTION,
   listBuiltInProviderInfo,
   resolveBuiltInProviderInfo,
-} from "./provider-info.js";
+} from "../../../src/llm/registry/provider-info.js";
 
 const DONOR_MODEL_IDS = Object.freeze([
   // Keep the original catalog order after the newly registered models.

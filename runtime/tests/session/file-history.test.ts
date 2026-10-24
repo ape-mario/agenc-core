@@ -20,9 +20,9 @@ import {
   fileHistoryRestoreStateFromLog,
   fileHistoryRewind,
   type FileHistorySnapshot,
-} from "./file-history.js";
+} from "../../src/session/file-history.js";
 import { applyPatchText } from "../../src/tools/apply-patch/runtime.js";
-import type { RolloutItem } from "./rollout-item.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
 import {
   acquireCanonicalCompactionLease,
   withCanonicalBackgroundWork,

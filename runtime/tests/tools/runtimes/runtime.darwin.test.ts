@@ -4,10 +4,10 @@ import { join } from "node:path";
 
 import { expect, test } from "vitest";
 
-import { SandboxManager } from "../../sandbox/engine/manager.js";
-import { safePath } from "../../tools/system/filesystem.js";
-import { UnifiedExecProcessManager } from "../../unified-exec/process-manager.js";
-import { permissionProfileForRuntimeContext } from "./sandboxing.js";
+import { SandboxManager } from "../../../src/sandbox/engine/manager.js";
+import { safePath } from "../../../src/tools/system/filesystem.js";
+import { UnifiedExecProcessManager } from "../../../src/unified-exec/process-manager.js";
+import { permissionProfileForRuntimeContext } from "../../../src/tools/runtimes/sandboxing.js";
 
 if (process.platform !== "darwin") {
   throw new Error("the native Seatbelt integration test requires macOS");

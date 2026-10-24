@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { AnthropicProvider } from "./adapter.js";
+import { AnthropicProvider } from "../../../../src/llm/providers/anthropic/adapter.js";
 import { BudgetTracker } from "src/conversation/token-budget.js";
 import { CostSidecar } from "src/session/cost.js";
 

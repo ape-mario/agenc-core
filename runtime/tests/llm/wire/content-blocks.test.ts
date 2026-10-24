@@ -9,7 +9,7 @@ import { describe, expect, test } from "vitest";
 import {
   assistantTextFromContentBlocks,
   thinkingTextFromContentBlocks,
-} from "./shared.js";
+} from "../../../src/llm/wire/shared.js";
 
 describe("assistantTextFromContentBlocks", () => {
   test("joins output_text and text string pieces with no separator", () => {

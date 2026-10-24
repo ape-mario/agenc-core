@@ -1,8 +1,8 @@
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { AttachmentMessage } from "../message-renderers/AttachmentMessage.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { AttachmentMessage } from "../../../src/tui/message-renderers/AttachmentMessage.js";
 
 const swarmsMock = vi.hoisted(() => ({
   enabled: false,
@@ -16,20 +16,20 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../../utils/agentSwarmsEnabled.js", () => ({
+vi.mock("../../../src/utils/agentSwarmsEnabled.js", () => ({
   isAgentSwarmsEnabled: () => swarmsMock.enabled,
 }));
 
-vi.mock("../state/AppState.js", () => ({
+vi.mock("../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof appStateMock) => unknown) =>
     selector(appStateMock),
 }));
 
-vi.mock("../components/messageActions", () => ({
+vi.mock("../../../src/tui/components/messageActions.js", () => ({
   useSelectedMessageBg: () => undefined,
 }));
 
-vi.mock("../components/CtrlOToExpand", async () => {
+vi.mock("../../../src/tui/components/CtrlOToExpand.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     CtrlOToExpand: () =>
@@ -37,7 +37,7 @@ vi.mock("../components/CtrlOToExpand", async () => {
   };
 });
 
-vi.mock("../components/MessageResponse", async () => {
+vi.mock("../../../src/tui/components/MessageResponse.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     MessageResponse: ({ children }: { children: React.ReactNode }) =>
@@ -45,7 +45,7 @@ vi.mock("../components/MessageResponse", async () => {
   };
 });
 
-vi.mock("../components/design-system/FullWidthRow", async () => {
+vi.mock("../../../src/tui/components/design-system/FullWidthRow.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     default: ({ children }: { children: React.ReactNode }) =>
@@ -53,7 +53,7 @@ vi.mock("../components/design-system/FullWidthRow", async () => {
   };
 });
 
-vi.mock("../message-renderers/UserTextMessage", async () => {
+vi.mock("../../../src/tui/message-renderers/UserTextMessage.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     UserTextMessage: ({ param }: { param: { text: string } }) =>
@@ -61,7 +61,7 @@ vi.mock("../message-renderers/UserTextMessage", async () => {
   };
 });
 
-vi.mock("../components/v2/messagePrimitives.js", async () => {
+vi.mock("../../../src/tui/components/v2/messagePrimitives.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     UserImageMessage: ({ imageId }: { imageId: number }) =>

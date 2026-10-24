@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
-import { isDaemonControlMessage, isDaemonPriorityMessage } from "./overload.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { isDaemonControlMessage, isDaemonPriorityMessage } from "../../src/app-server/overload.js";
 import {
   AGENC_DAEMON_PROTOCOL_VERSION,
   AGENC_DAEMON_METHOD_CAPABILITIES_KEY,
   type SessionStatusLineExecuteParams,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 const method = "session.statusLine.execute";
 const request = { jsonrpc: "2.0", id: "status-line", method, params: { sessionId: "owner" } };

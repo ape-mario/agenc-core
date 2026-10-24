@@ -4,14 +4,14 @@ import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AuthBackend } from "../../auth/backend.js";
+import type { AuthBackend } from "../../../src/auth/backend.js";
 import {
   computePolicyLimitsChecksum,
   createPolicyLimitsService,
   stablePolicyLimitsStringify,
   type PolicyLimitsService,
-} from "./index.js";
-import { parsePolicyLimitsResponse } from "./types.js";
+} from "../../../src/services/policyLimits/index.js";
+import { parsePolicyLimitsResponse } from "../../../src/services/policyLimits/types.js";
 
 function response(status: number, body?: unknown): Response {
   return new Response(body === undefined ? null : JSON.stringify(body), {

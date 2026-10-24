@@ -4,20 +4,20 @@ import chalk from 'chalk'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import type Ink from './ink.tsx'
-import { drainStdin } from './ink.tsx'
-import * as dom from './dom.ts'
-import type { DOMElement, ElementNames } from './dom.ts'
-import type { Diff, Frame } from './frame.ts'
-import instances from './instances.ts'
-import reconciler from './reconciler.ts'
-import { createRoot, type Root } from './root.ts'
-import { CURSOR_HOME, ERASE_SCREEN, cursorPosition } from './termio/csi.ts'
+import type Ink from '../../../src/tui/ink/ink.js'
+import { drainStdin } from '../../../src/tui/ink/ink.js'
+import * as dom from '../../../src/tui/ink/dom.js'
+import type { DOMElement, ElementNames } from '../../../src/tui/ink/dom.js'
+import type { Diff, Frame } from '../../../src/tui/ink/frame.js'
+import instances from '../../../src/tui/ink/instances.js'
+import reconciler from '../../../src/tui/ink/reconciler.js'
+import { createRoot, type Root } from '../../../src/tui/ink/root.js'
+import { CURSOR_HOME, ERASE_SCREEN, cursorPosition } from '../../../src/tui/ink/termio/csi.js'
 import {
   ENABLE_MOUSE_TRACKING,
   ENTER_ALT_SCREEN,
   EXIT_ALT_SCREEN,
-} from './termio/dec.ts'
+} from '../../../src/tui/ink/termio/dec.js'
 
 const fsMock = vi.hoisted(() => ({
   closeSync: vi.fn(),
@@ -63,29 +63,29 @@ vi.mock('fs', async (importOriginal) => {
   }
 })
 
-vi.mock('../../utils/debug.js', () => ({
+vi.mock('../../../src/utils/debug.js', () => ({
   logForDebugging: debugMock.logForDebugging,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: logMock.logError,
 }))
 
-vi.mock('../../utils/fullscreen.js', () => ({
+vi.mock('../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => false,
 }))
 
-vi.mock('./reconciler.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./reconciler.ts')>()
+vi.mock('../../../src/tui/ink/reconciler.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/tui/ink/reconciler.js')>()
   return {
     ...actual,
     isDebugRepaintsEnabled: () => coverageState.debugRepaints,
   }
 })
 
-vi.mock('./render-node-to-output.js', async (importOriginal) => {
+vi.mock('../../../src/tui/ink/render-node-to-output.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('./render-node-to-output.ts')>()
+    await importOriginal<typeof import('../../../src/tui/ink/render-node-to-output.js')>()
   return {
     ...actual,
     consumeFollowScroll: () => coverageState.follow,
@@ -93,16 +93,16 @@ vi.mock('./render-node-to-output.js', async (importOriginal) => {
   }
 })
 
-vi.mock('./terminal.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./terminal.ts')>()
+vi.mock('../../../src/tui/ink/terminal.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/tui/ink/terminal.js')>()
   return {
     ...actual,
     supportsExtendedKeys: () => coverageState.extendedKeys,
   }
 })
 
-vi.mock('./termio/osc.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./termio/osc.ts')>()
+vi.mock('../../../src/tui/ink/termio/osc.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/tui/ink/termio/osc.js')>()
   return {
     ...actual,
     setClipboard: vi.fn(async () => coverageState.clipboardRaw),

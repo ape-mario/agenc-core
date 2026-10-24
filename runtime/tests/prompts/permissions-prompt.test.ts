@@ -24,12 +24,12 @@ import {
   SANDBOX_MODE_READ_ONLY,
   SANDBOX_MODE_WORKSPACE_WRITE,
   getPermissionsSection,
-} from "./permissions-prompt.js";
+} from "../../src/prompts/permissions-prompt.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionMode,
   type ToolPermissionContext,
-} from "../permissions/types.js";
+} from "../../src/permissions/types.js";
 
 function ctxForMode(mode: PermissionMode): ToolPermissionContext {
   return createEmptyToolPermissionContext({ mode });

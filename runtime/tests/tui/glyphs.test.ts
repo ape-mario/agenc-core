@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   resolveAgenCTuiGlyphMode,
   selectAgenCTuiGlyphs,
-} from "./glyphs.js";
+} from "../../src/tui/glyphs.js";
 
 describe("AgenC TUI glyph selection", () => {
   test("uses unicode glyphs by default", () => {

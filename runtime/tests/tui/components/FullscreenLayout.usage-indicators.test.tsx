@@ -4,30 +4,30 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import stripAnsi from "strip-ansi";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { FullscreenLayout, statusLineUsageItems } from "./FullscreenLayout.js";
-import { ThemeProvider } from "./design-system/ThemeProvider.js";
-import { FullscreenModeProvider } from "../context/fullscreenModeContext.js";
-import { SessionUsageContext, type SessionUsageSnapshot } from "../context/sessionUsageContext.js";
+import { FullscreenLayout, statusLineUsageItems } from "../../../src/tui/components/FullscreenLayout.js";
+import { ThemeProvider } from "../../../src/tui/components/design-system/ThemeProvider.js";
+import { FullscreenModeProvider } from "../../../src/tui/context/fullscreenModeContext.js";
+import { SessionUsageContext, type SessionUsageSnapshot } from "../../../src/tui/context/sessionUsageContext.js";
 import {
   StatusContextUsageContext,
   StatusEffortContext,
   StatusOffPeakContext,
   StatusPromptCacheContext,
   StatusZdrContext,
-} from "../context/statusEffortContext.js";
-import type { ZeroDataRetentionStatus } from "../../llm/zero-data-retention.js";
-import { AppStateProvider, getDefaultAppState } from "../state/AppState.js";
-import { Text } from "../ink.js";
-import { createRoot } from "../ink/root.js";
-import { stringWidth } from "../ink/stringWidth.js";
-import { renderToAnsiString, renderToString } from "../../utils/staticRender.js";
-import { getTheme } from "../../utils/theme.js";
-import { resolveThemeSetting } from "../../utils/terminalBackground.js";
-import { TUI_THEME_SETTINGS } from "../../config/schema.js";
-import { modelDisplayString } from "../../utils/model/model.js";
-import { offPeakScheduleFor, type OffPeakSchedule } from "../../session/off-peak-pricing.js";
-import { promptCacheSharePercent } from "../../session/prompt-cache-share.js";
-import { createSessionTranscriptStateForTesting } from "../session-transcript.js";
+} from "../../../src/tui/context/statusEffortContext.js";
+import type { ZeroDataRetentionStatus } from "../../../src/llm/zero-data-retention.js";
+import { AppStateProvider, getDefaultAppState } from "../../../src/tui/state/AppState.js";
+import { Text } from "../../../src/tui/ink.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { stringWidth } from "../../../src/tui/ink/stringWidth.js";
+import { renderToAnsiString, renderToString } from "../../../src/utils/staticRender.js";
+import { getTheme } from "../../../src/utils/theme.js";
+import { resolveThemeSetting } from "../../../src/utils/terminalBackground.js";
+import { TUI_THEME_SETTINGS } from "../../../src/config/schema.js";
+import { modelDisplayString } from "../../../src/utils/model/model.js";
+import { offPeakScheduleFor, type OffPeakSchedule } from "../../../src/session/off-peak-pricing.js";
+import { promptCacheSharePercent } from "../../../src/session/prompt-cache-share.js";
+import { createSessionTranscriptStateForTesting } from "../../../src/tui/session-transcript.js";
 
 const MODEL = "qwen3-coder-480b-a35b-instruct";
 const SPEND: SessionUsageSnapshot = { costUsd: 0.0044, hasUnknownCost: false };

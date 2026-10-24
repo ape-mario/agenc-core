@@ -22,11 +22,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { protocolCommands } from "./protocol.js";
+import { protocolCommands } from "../../src/commands/protocol.js";
 import type {
   SlashCommand,
   SlashCommandContext,
-} from "./types.js";
+} from "../../src/commands/types.js";
 
 const VERBS = ["claim", "delegate", "proof", "settle", "stake"] as const;
 

@@ -22,27 +22,27 @@ import {
   resolveAgenCAgentAttachRoleWorkspace,
   runAgenCAgentCli,
   type AgenCAgentCliIo,
-} from "./agent-cli.js";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
-import { resolveAgenCDaemonSpawnStderrPath } from "./daemon-control.js";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
-import { AgenCUnixSocketServer } from "./transport/unix-socket.js";
-import { AGENC_STDIO_DEFAULT_MAX_LINE_BYTES } from "./transport/stdio.js";
+} from "../../src/app-server/agent-cli.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
+import { resolveAgenCDaemonSpawnStderrPath } from "../../src/app-server/daemon-control.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
+import { AgenCUnixSocketServer } from "../../src/app-server/transport/unix-socket.js";
+import { AGENC_STDIO_DEFAULT_MAX_LINE_BYTES } from "../../src/app-server/transport/stdio.js";
 import {
   AGENC_DAEMON_PROTOCOL_VERSION,
   type AgentCreateParams,
   type AgentLogsParams,
   type AgentStopParams,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import type {
   AgenCBackgroundAgentMessageParams,
   AgenCBackgroundAgentRunner,
   AgenCBackgroundAgentSessionEventBinding,
   AgenCBackgroundAgentStartParams,
-} from "./background-agent-runner.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+} from "../../src/app-server/background-agent-runner.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 
 const workspaces = createTempWorkspaceFixture("agenc-agent-cli-workspace-");
 const TEST_AGENT_RUNTIME_OPTIONS = resolveAgentRuntimeOptions({});

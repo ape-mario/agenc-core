@@ -29,17 +29,17 @@ vi.mock("axios", () => {
   };
 });
 
-import { drainInFlight } from "./run-turn.js";
-import { StreamingToolExecutor } from "../tools/streaming-executor.js";
-import { EXCLUSIVE } from "../tools/concurrency.js";
-import { frameUntrustedToolResultContent } from "../tools/untrusted-tool-result-framing.js";
-import { findToolTurnValidationIssue } from "../llm/tool-turn-validator.js";
-import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
-import type { LLMTool, LLMToolCall } from "../llm/types.js";
-import type { TurnState, UserMessage, AttachmentMessage } from "./turn-state.js";
-import type { LLMMessage } from "../llm/types.js";
-import type { TurnContext } from "./turn-context.js";
-import type { Session } from "./session.js";
+import { drainInFlight } from "../../src/session/run-turn.js";
+import { StreamingToolExecutor } from "../../src/tools/streaming-executor.js";
+import { EXCLUSIVE } from "../../src/tools/concurrency.js";
+import { frameUntrustedToolResultContent } from "../../src/tools/untrusted-tool-result-framing.js";
+import { findToolTurnValidationIssue } from "../../src/llm/tool-turn-validator.js";
+import type { ToolRegistry, ToolDispatchResult } from "../../src/tool-registry.js";
+import type { LLMTool, LLMToolCall } from "../../src/llm/types.js";
+import type { TurnState, UserMessage, AttachmentMessage } from "../../src/session/turn-state.js";
+import type { LLMMessage } from "../../src/llm/types.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import type { Session } from "../../src/session/session.js";
 
 function mockRegistry(
   dispatch: (call: LLMToolCall) => Promise<ToolDispatchResult>,

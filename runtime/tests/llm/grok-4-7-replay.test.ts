@@ -2,9 +2,9 @@ import { llmMessageToDurableResponseItem, responseItemToLlmMessage } from "../..
 import { redactSecretsInValue } from "../../src/secrets/sanitizer.js";
 import { encryptedItem, largeGrokReplay } from "../helpers/grok-encrypted-replay.js";
 import { expect, it, vi } from "vitest";
-import { GrokProvider } from "./providers/grok/adapter.js";
-import { buildXaiResponsesRequest, extractXaiReasoningReplay } from "./wire/responses-xai.js";
-import type { LLMMessage, LLMResponse } from "./types.js";
+import { GrokProvider } from "../../src/llm/providers/grok/adapter.js";
+import { buildXaiResponsesRequest, extractXaiReasoningReplay } from "../../src/llm/wire/responses-xai.js";
+import type { LLMMessage, LLMResponse } from "../../src/llm/types.js";
 
 const model = "grok-4.7";
 const item = { type: "reasoning", id: "reasoning-1", encrypted_content: "opaque+/==", summary: [], vendor_field: { keep: true } };

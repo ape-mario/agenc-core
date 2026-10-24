@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import React from 'react'
-import { renderToString } from '../utils/staticRender.js'
-import { PlanApprovalOverlay } from './components/PlanApprovalOverlay.js'
+import { renderToString } from '../../src/utils/staticRender.js'
+import { PlanApprovalOverlay } from '../../src/tui/components/PlanApprovalOverlay.js'
 import { AppStateProvider, getDefaultAppState } from '../../src/tui/state/AppState.js'
 
 // useInput needs a raw-mode stdin; static render has none.

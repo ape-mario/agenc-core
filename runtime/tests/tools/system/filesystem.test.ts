@@ -12,8 +12,8 @@ import {
   seedSessionReadState,
   safePath,
   isPathAllowed,
-} from "./filesystem.js";
-import type { Tool } from "../types.js";
+} from "../../../src/tools/system/filesystem.js";
+import type { Tool } from "../../../src/tools/types.js";
 import { runWithCwdOverride } from "../../../src/utils/cwd.js";
 import { runWithCurrentRuntimeSession } from "../../../src/session/current-session.js";
 import type { Session } from "../../../src/session/session.js";
@@ -965,7 +965,7 @@ describe("inferToolAccess classification via tool naming", () => {
 import {
   snapshotTopRecentReads,
   seedSessionReadState as seedRead,
-} from "./filesystem.js";
+} from "../../../src/tools/system/filesystem.js";
 
 describe("workspace read path identity", () => {
   it("retains the historical Windows NFC workspace key", () => {

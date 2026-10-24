@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { bootstrapLocalRuntimeSession } from "./bootstrap.js";
+import { bootstrapLocalRuntimeSession } from "../../src/bin/bootstrap.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();

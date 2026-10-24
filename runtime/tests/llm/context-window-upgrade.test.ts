@@ -5,13 +5,13 @@
 
 import { afterEach, describe, expect, test } from "vitest";
 
-import { getUpgradeMessage } from "./context-window-upgrade.js";
+import { getUpgradeMessage } from "../../src/llm/context-window-upgrade.js";
 import {
   clearCurrentRuntimeSession,
   runWithCurrentRuntimeSession,
 } from "../../src/session/current-session.js";
-import type { ModelInfo } from "../session/turn-context.js";
-import type { ModelsManager, Session } from "../session/session.js";
+import type { ModelInfo } from "../../src/session/turn-context.js";
+import type { ModelsManager, Session } from "../../src/session/session.js";
 
 function buildModel(slug: string, contextWindow: number | undefined): ModelInfo {
   return {

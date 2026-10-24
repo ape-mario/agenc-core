@@ -7,7 +7,7 @@ import {
   requestPinnedCronWebhook,
   type CronWebhookRequest,
   type CronWebhookRequester,
-} from "../gateway/cron-delivery.js";
+} from "../../src/gateway/cron-delivery.js";
 
 const PUBLIC_ADDRESS_A = "8.8.8.8";
 const PUBLIC_ADDRESS_B = "1.1.1.1";

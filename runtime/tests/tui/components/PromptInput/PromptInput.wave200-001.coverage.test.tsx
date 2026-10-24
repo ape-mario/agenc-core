@@ -4,19 +4,19 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../../utils/config.js', () => ({
+vi.mock('../../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({}),
   updateRuntimeState: () => {},
 }))
 
-vi.mock('../../history/history.js', () => ({
+vi.mock('../../../../src/tui/history/history.js', () => ({
   formatImageRef: () => '',
   formatPastedTextRef: () => '',
   getPastedTextRefNumLines: () => 0,
   parseReferences: () => [],
 }))
 
-import { calculatePromptMaxVisibleLines } from './PromptInput.js'
+import { calculatePromptMaxVisibleLines } from '../../../../src/tui/components/PromptInput/PromptInput.js'
 
 describe('PromptInput fullscreen sizing coverage', () => {
   test('normalizes non-finite terminal rows to the minimum fullscreen input budget', () => {

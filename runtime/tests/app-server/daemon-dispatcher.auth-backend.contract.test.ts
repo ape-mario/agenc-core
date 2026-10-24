@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   AuthBackend,
   AuthDaemonSocketIdentity,
-} from "../auth/backend.js";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
-import { JSON_RPC_VERSION } from "./protocol/index.js";
+} from "../../src/auth/backend.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
 
 function makeAuthBackend(calls: string[]): AuthBackend {
   return {

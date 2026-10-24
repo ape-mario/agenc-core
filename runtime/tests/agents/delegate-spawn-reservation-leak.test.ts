@@ -1,26 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("./fork-context.js", () => ({
+vi.mock("../../src/agents/fork-context.js", () => ({
   forkSubagent: vi.fn(async () => ({
     messages: [{ role: "user", content: "seed prompt" }],
   })),
 }));
 
-vi.mock("./run-agent.js", () => ({
+vi.mock("../../src/agents/run-agent.js", () => ({
   runAgent: vi.fn(),
 }));
 
-vi.mock("../session/event-log.js", () => ({
+vi.mock("../../src/session/event-log.js", () => ({
   emitWarning: vi.fn(),
 }));
 
-import { AgentStatusTracker } from "./status.js";
-import { Mailbox } from "./mailbox.js";
-import { createAgentRoleWorkspace, resolveAgentRole } from "./role.js";
-import { delegate } from "./delegate.js";
-import { runAgent } from "./run-agent.js";
-import type { LiveAgent } from "./control.js";
-import type { AgentMetadata } from "./registry.js";
+import { AgentStatusTracker } from "../../src/agents/status.js";
+import { Mailbox } from "../../src/agents/mailbox.js";
+import { createAgentRoleWorkspace, resolveAgentRole } from "../../src/agents/role.js";
+import { delegate } from "../../src/agents/delegate.js";
+import { runAgent } from "../../src/agents/run-agent.js";
+import type { LiveAgent } from "../../src/agents/control.js";
+import type { AgentMetadata } from "../../src/agents/registry.js";
 
 const mockRunAgent = vi.mocked(runAgent);
 const ROLE_WORKSPACE = createAgentRoleWorkspace(process.cwd());

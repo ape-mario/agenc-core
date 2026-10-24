@@ -5,8 +5,8 @@ import { describe, expect, test } from "vitest";
 import {
   MAX_MEMORY_CHARACTER_COUNT,
   type MemoryFileInfo,
-} from "../../memory/index.js";
-import { formatLargeMemoryDiagnostics } from "./memoryDiagnostics.js";
+} from "../../../src/memory/index.js";
+import { formatLargeMemoryDiagnostics } from "../../../src/tui/startup/memoryDiagnostics.js";
 
 function memoryFile(path: string, contentLength: number): MemoryFileInfo {
   return {

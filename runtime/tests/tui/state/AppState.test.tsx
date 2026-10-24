@@ -1,26 +1,26 @@
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { Text } from "../ink.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { Text } from "../../../src/tui/ink.js";
 import {
   AppStateProvider,
   getDefaultAppStateForProviderEnvironment,
   useAppState,
   type AppState,
-} from "./AppState.js";
-import { createStore } from "./store.js";
+} from "../../../src/tui/state/AppState.js";
+import { createStore } from "../../../src/tui/state/store.js";
 
 vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
-vi.mock("../context/mailbox.js", () => ({
+vi.mock("../../../src/tui/context/mailbox.js", () => ({
   MailboxProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock("../../services/PromptSuggestion/promptSuggestion.js", () => ({
+vi.mock("../../../src/services/PromptSuggestion/promptSuggestion.js", () => ({
   shouldEnablePromptSuggestion: () => false,
 }));
-vi.mock("../../tools/Tool.js", () => ({
+vi.mock("../../../src/tools/Tool.js", () => ({
   buildTool: (tool: unknown) => tool,
   getEmptyToolPermissionContext: () => ({
     mode: "default",
@@ -30,10 +30,10 @@ vi.mock("../../tools/Tool.js", () => ({
     isBypassPermissionsModeAvailable: false,
   }),
 }));
-vi.mock("../../utils/commitAttribution.js", () => ({
+vi.mock("../../../src/utils/commitAttribution.js", () => ({
   createEmptyAttributionState: () => ({}),
 }));
-vi.mock("../../permissions/settings.js", async (importOriginal) => ({
+vi.mock("../../../src/permissions/settings.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   loadPermissionRulesSnapshot: async () => ({
     rules: [],
@@ -43,15 +43,15 @@ vi.mock("../../permissions/settings.js", async (importOriginal) => ({
     disableAutoMode: false,
   }),
 }));
-vi.mock("../../utils/settings/settings.js", () => ({
+vi.mock("../../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: () => ({}),
   getInitialSettings: () => ({}),
 }));
-vi.mock("../../utils/teammate.js", () => ({
+vi.mock("../../../src/utils/teammate.js", () => ({
   isPlanModeRequired: () => false,
   isTeammate: () => false,
 }));
-vi.mock("../../utils/thinking.js", () => ({
+vi.mock("../../../src/utils/thinking.js", () => ({
   shouldEnableThinkingByDefault: () => false,
 }));
 

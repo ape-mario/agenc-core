@@ -9,64 +9,64 @@ import { z } from "zod/v4";
 import type {
   AdmissionAcquireInput,
   ExecutionAdmissionClient,
-} from "../budget/admission-client.js";
-import type { AdmissionLease } from "../budget/admission-types.js";
+} from "../../src/budget/admission-client.js";
+import type { AdmissionLease } from "../../src/budget/admission-types.js";
 import {
   createAgentRoleWorkspace,
   type AgentRoleWorkspace,
-} from "../agents/role.js";
-import { ConfigStore } from "../config/store.js";
+} from "../../src/agents/role.js";
+import { ConfigStore } from "../../src/config/store.js";
 import type {
   LLMContentPart,
   LLMMessage,
   LLMProvider,
   LLMResponse,
-} from "../llm/types.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+} from "../../src/llm/types.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   clearCurrentRuntimeSession,
   setCurrentRuntimeSession,
-} from "../session/current-session.js";
-import { Session, type SessionServices } from "../session/session.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+} from "../../src/session/current-session.js";
+import { Session, type SessionServices } from "../../src/session/session.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 import {
   setAutoCompactImplForTests,
   type AutoCompactImpl,
-} from "../session/run-turn.js";
-import { RolloutStore } from "../session/rollout-store.js";
-import { runTurnCompat } from "../session/turn-compat.js";
-import { startBackgroundSession } from "../tasks/LocalMainSessionTask.js";
+} from "../../src/session/run-turn.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { runTurnCompat } from "../../src/session/turn-compat.js";
+import { startBackgroundSession } from "../../src/tasks/LocalMainSessionTask.js";
 import {
   enqueue,
   getCommandQueueSnapshot,
   resetCommandQueueForTesting,
-} from "../utils/messageQueueManager.js";
-import { parseRuleString } from "../permissions/rules.js";
-import { FILE_READ_TOOL_NAME } from "../tools/FileReadTool/prompt.js";
+} from "../../src/utils/messageQueueManager.js";
+import { parseRuleString } from "../../src/permissions/rules.js";
+import { FILE_READ_TOOL_NAME } from "../../src/tools/FileReadTool/prompt.js";
 import {
   buildHookTranscriptFileReadGrant,
   execAgentHook,
-} from "../utils/hooks/execAgentHook.js";
-import { CanonicalFileReadTool } from "../tools/canonicalToolSurface.js";
-import * as sessionStorage from "../utils/sessionStorage.js";
-import type { Tool, ToolUseContext } from "../tools/Tool.js";
-import type { Message } from "../types/message.js";
-import { createAttachmentMessage } from "../utils/attachments.js";
+} from "../../src/utils/hooks/execAgentHook.js";
+import { CanonicalFileReadTool } from "../../src/tools/canonicalToolSurface.js";
+import * as sessionStorage from "../../src/utils/sessionStorage.js";
+import type { Tool, ToolUseContext } from "../../src/tools/Tool.js";
+import type { Message } from "../../src/types/message.js";
+import { createAttachmentMessage } from "../../src/utils/attachments.js";
 import {
   createAssistantAPIErrorMessage,
   createUserMessage,
   DONT_ASK_REJECT_MESSAGE,
-} from "../utils/messages.js";
-import { extractResultText, runForkedAgent } from "../utils/forkedAgent.js";
+} from "../../src/utils/messages.js";
+import { extractResultText, runForkedAgent } from "../../src/utils/forkedAgent.js";
 import {
   createFileStateCacheWithSizeLimit,
   READ_FILE_STATE_CACHE_SIZE,
-} from "../utils/fileStateCache.js";
-import { finalizeAgentTool } from "../tools/AgentTool/agentToolUtils.js";
-import { asSystemPrompt } from "../utils/systemPromptType.js";
-import { addFunctionHook } from "../utils/hooks/sessionHooks.js";
-import { runWithCwdOverride } from "../utils/cwd.js";
+} from "../../src/utils/fileStateCache.js";
+import { finalizeAgentTool } from "../../src/tools/AgentTool/agentToolUtils.js";
+import { asSystemPrompt } from "../../src/utils/systemPromptType.js";
+import { addFunctionHook } from "../../src/utils/hooks/sessionHooks.js";
+import { runWithCwdOverride } from "../../src/utils/cwd.js";
 
 const DEFAULT_ROLE_WORKSPACE = createAgentRoleWorkspace("/tmp");
 const testCleanup: Array<() => Promise<void> | void> = [];

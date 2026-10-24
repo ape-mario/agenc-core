@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { StreamingToolExecutor } from "./_deps/tool-runtime.js";
-import type { LLMToolCall } from "../llm/types.js";
-import type { ToolDispatchResult, ToolRegistry } from "../tool-registry.js";
-import type { PreToolUseHook } from "../tools/hooks.js";
-import type { Tool } from "../tools/types.js";
+import { StreamingToolExecutor } from "../../src/phases/_deps/tool-runtime.js";
+import type { LLMToolCall } from "../../src/llm/types.js";
+import type { ToolDispatchResult, ToolRegistry } from "../../src/tool-registry.js";
+import type { PreToolUseHook } from "../../src/tools/hooks.js";
+import type { Tool } from "../../src/tools/types.js";
 import { mkCtx, mkSession } from "../fixtures.js";
 
 describe("phase tool-runtime dependency executor", () => {

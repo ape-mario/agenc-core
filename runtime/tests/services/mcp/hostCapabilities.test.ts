@@ -4,7 +4,7 @@ import { test } from 'vitest'
 import {
   buildMcpHostClientCapabilities,
   configureMcpHostRequestHandlers,
-} from './hostCapabilities.js'
+} from '../../../src/services/mcp/hostCapabilities.js'
 
 type FakeHandler = (request?: unknown, extra?: unknown) => unknown
 

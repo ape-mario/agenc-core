@@ -2,10 +2,10 @@ import figures from 'figures'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { MessageActionsSelectedContext } from '../components/messageActions.js'
-import { QueuedMessageProvider } from '../context/QueuedMessageContext.js'
-import { HighlightedThinkingText } from './HighlightedThinkingText.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { MessageActionsSelectedContext } from '../../../src/tui/components/messageActions.js'
+import { QueuedMessageProvider } from '../../../src/tui/context/QueuedMessageContext.js'
+import { HighlightedThinkingText } from '../../../src/tui/message-renderers/HighlightedThinkingText.js'
 
 const thinkingMock = vi.hoisted(() => ({
   findThinkingTriggerPositions: vi.fn((text: string) => {
@@ -21,8 +21,8 @@ const timestampMock = vi.hoisted(() => ({
   formatBriefTimestamp: vi.fn(() => '12:34 PM'),
 }))
 
-vi.mock('../../utils/thinking.js', () => thinkingMock)
-vi.mock('../../utils/formatBriefTimestamp.js', () => timestampMock)
+vi.mock('../../../src/utils/thinking.js', () => thinkingMock)
+vi.mock('../../../src/utils/formatBriefTimestamp.js', () => timestampMock)
 
 describe('HighlightedThinkingText coverage', () => {
   test('renders pointer, thinking highlight pieces, and brief queued layout', async () => {

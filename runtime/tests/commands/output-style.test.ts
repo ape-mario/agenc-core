@@ -9,29 +9,29 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { parseToml } from "../config/loader.js";
-import { ConfigStore } from "../config/store.js";
+import { parseToml } from "../../src/config/loader.js";
+import { ConfigStore } from "../../src/config/store.js";
 import {
   DEFAULT_OUTPUT_STYLE_NAME,
   clearAllOutputStylesCache,
   getAllOutputStyles,
   getOutputStyleConfig,
-} from "../constants/outputStyles.js";
+} from "../../src/constants/outputStyles.js";
 import {
   getOriginalCwd,
   setOriginalCwd,
-} from "../bootstrap/state.js";
-import type { Session } from "../session/session.js";
-import { outputStyleCommand, outputStyleNewCommand } from "./output-style.js";
-import type { SlashCommandContext } from "./types.js";
+} from "../../src/bootstrap/state.js";
+import type { Session } from "../../src/session/session.js";
+import { outputStyleCommand, outputStyleNewCommand } from "../../src/commands/output-style.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 import {
   resetCanonicalSettingsAuthorityForTesting,
   runWithCanonicalSettingsAuthority,
-} from "../utils/settings/canonicalAuthority.js";
+} from "../../src/utils/settings/canonicalAuthority.js";
 import {
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,
-} from "../session/runtime-options.js";
+} from "../../src/session/runtime-options.js";
 
 function stubSession(): Session {
   return {

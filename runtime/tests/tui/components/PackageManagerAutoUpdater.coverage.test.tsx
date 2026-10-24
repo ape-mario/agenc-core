@@ -23,21 +23,21 @@ vi.mock("usehooks-ts", () => ({
   },
 }));
 
-vi.mock("../../utils/autoUpdater.js", () => ({
+vi.mock("../../../src/utils/autoUpdater.js", () => ({
   getLatestVersionFromGcs: harness.getLatestVersionFromGcs,
   getMaxVersion: harness.getMaxVersion,
   shouldSkipVersion: harness.shouldSkipVersion,
 }));
 
-vi.mock("../../utils/config.js", () => ({
+vi.mock("../../../src/utils/config.js", () => ({
   isAutoUpdaterDisabled: harness.isAutoUpdaterDisabled,
 }));
 
-vi.mock("../../utils/nativeInstaller/packageManagers.js", () => ({
+vi.mock("../../../src/utils/nativeInstaller/packageManagers.js", () => ({
   getPackageManager: harness.getPackageManager,
 }));
 
-vi.mock("../../utils/semver.js", () => {
+vi.mock("../../../src/utils/semver.js", () => {
   const compareVersions = (left: string, right: string): number => {
     const leftParts = left.split(".").map(Number);
     const rightParts = right.split(".").map(Number);
@@ -58,7 +58,7 @@ vi.mock("../../utils/semver.js", () => {
   };
 });
 
-vi.mock("../../utils/settings/settings.js", () => ({
+vi.mock("../../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: () => ({ autoUpdatesChannel: "stable" }),
   getInitialSettings: () => ({ autoUpdatesChannel: "stable" }),
 }));
@@ -67,12 +67,12 @@ vi.mock("src/utils/debug.js", () => ({
   logForDebugging: harness.logForDebugging,
 }));
 
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: harness.logError,
 }));
 
-import { createRoot } from "../ink/root.js";
-import { PackageManagerAutoUpdater } from "./PackageManagerAutoUpdater.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { PackageManagerAutoUpdater } from "../../../src/tui/components/PackageManagerAutoUpdater.js";
 
 const originalMacro = (globalThis as Record<string, unknown>).MACRO;
 

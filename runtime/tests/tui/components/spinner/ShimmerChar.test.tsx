@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { ShimmerChar } from './ShimmerChar.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { ShimmerChar } from '../../../../src/tui/components/spinner/ShimmerChar.js'
 
 function RerenderShimmerChar() {
   const [tick, setTick] = React.useState(0)

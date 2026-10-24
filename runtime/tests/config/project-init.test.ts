@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildProjectInstructionsFromAnalysis } from "./project-init.js";
+import { buildProjectInstructionsFromAnalysis } from "../../src/config/project-init.js";
 
 describe("project-init analysis", () => {
   const tempDirs: string[] = [];

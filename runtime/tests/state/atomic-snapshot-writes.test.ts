@@ -13,8 +13,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { stageSessionSnapshotWrite } from "./atomic-snapshot-writes.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+import { stageSessionSnapshotWrite } from "../../src/state/atomic-snapshot-writes.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 
 // Reload helpers imported by test setup so filesystem fault injection reaches them.
 vi.hoisted(() => vi.resetModules());

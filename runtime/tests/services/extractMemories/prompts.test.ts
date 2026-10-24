@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   MEMORY_FRONTMATTER_EXAMPLE,
   parseMemoryType,
-} from "../../memdir/memory-types.js";
-import { buildExtractAutoOnlyPrompt } from "./prompts.js";
+} from "../../../src/memdir/memory-types.js";
+import { buildExtractAutoOnlyPrompt } from "../../../src/services/extractMemories/prompts.js";
 
 describe("memory extraction prompt", () => {
   it("builds the source-aligned auto-memory extraction prompt", () => {

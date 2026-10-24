@@ -4,13 +4,13 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultConfig } from "../config/schema.js";
-import { ConfigStore } from "../config/store.js";
+import { defaultConfig } from "../../src/config/schema.js";
+import { ConfigStore } from "../../src/config/store.js";
 import {
   readStartupCliFlags,
   resolveCanonicalStartupSelection,
   startupConfigLayerOptions,
-} from "./startup-selection.js";
+} from "../../src/bin/startup-selection.js";
 
 describe("resolveCanonicalStartupSelection", () => {
   it("reads the canonical top-level model without provider fallback", () => {

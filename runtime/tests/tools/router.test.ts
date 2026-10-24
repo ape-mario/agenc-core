@@ -8,18 +8,18 @@ import {
   createDiffConsumer,
   ToolRouter,
   toolCallFromLLMToolCall,
-} from "./router.js";
-import type { RouterResponseItem } from "./router.js";
-import type { ToolInvocation, ToolName } from "./context.js";
-import type { Tool } from "./types.js";
+} from "../../src/tools/router.js";
+import type { RouterResponseItem } from "../../src/tools/router.js";
+import type { ToolInvocation, ToolName } from "../../src/tools/context.js";
+import type { Tool } from "../../src/tools/types.js";
 import {
   EFFECT_REVIEW_BLOCK_STOP,
   poisonLiveEffect,
-} from "../budget/effect-settlement-supervisor.js";
-import { EventLog } from "../session/event-log.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
-import type { GuardianApprovalReviewOptions } from "../permissions/guardian/reviewer.js";
-import { buildGuardianApprovalRequest } from "../permissions/guardian/approval-request.js";
+} from "../../src/budget/effect-settlement-supervisor.js";
+import { EventLog } from "../../src/session/event-log.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import type { GuardianApprovalReviewOptions } from "../../src/permissions/guardian/reviewer.js";
+import { buildGuardianApprovalRequest } from "../../src/permissions/guardian/approval-request.js";
 
 const originalAgencHome = process.env.AGENC_HOME;
 const TEST_RUNTIME_OPTIONS = resolveAgentRuntimeOptions({});

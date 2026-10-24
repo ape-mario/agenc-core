@@ -8,15 +8,15 @@ import {
   calculateFullscreenLayoutBudget,
   FullscreenLayout,
   ScrollChromeContext,
-} from "./FullscreenLayout.js";
-import { Text } from "../ink.js";
-import { createRoot } from "../ink/root.js";
+} from "../../../src/tui/components/FullscreenLayout.js";
+import { Text } from "../../../src/tui/ink.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
 import {
   useModalOrTerminalSize,
   useModalScrollRef,
-} from "../context/modalContext.js";
-import { renderToString } from "../../utils/staticRender.js";
-import { FullscreenModeProvider } from "../context/fullscreenModeContext.js";
+} from "../../../src/tui/context/modalContext.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { FullscreenModeProvider } from "../../../src/tui/context/fullscreenModeContext.js";
 
 const SYNC_START = "\x1B[?2026h";
 const SYNC_END = "\x1B[?2026l";

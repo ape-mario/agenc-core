@@ -1,10 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { LLMAuthenticationError, LLMProviderError, LLMServerError } from "../../errors.js";
-import type { LLMResponse } from "../../types.js";
-import { StreamModelError } from "../../../phases/stream-model.js";
-import { isRetryableStreamError } from "../../../session/run-turn-stream-retry.js";
-import { GrokProvider } from "./adapter.js";
+import { LLMAuthenticationError, LLMProviderError, LLMServerError } from "../../../../src/llm/errors.js";
+import type { LLMResponse } from "../../../../src/llm/types.js";
+import { StreamModelError } from "../../../../src/phases/stream-model.js";
+import { isRetryableStreamError } from "../../../../src/session/run-turn-stream-retry.js";
+import { GrokProvider } from "../../../../src/llm/providers/grok/adapter.js";
 
 // A Terminal-Bench trial lost 2 h 23 min of work when xAI ended an HTTP 200
 // stream with "Internal error during token generation": the adapter returned an

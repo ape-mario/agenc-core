@@ -7,7 +7,7 @@ import {
   reduceCompletionPipelineEvents,
   safeGateLabel,
   type CompletionPipelineEvent,
-} from "./completion-pipeline.js";
+} from "../../src/tui/completion-pipeline.js";
 
 function event(
   sequence: number,

@@ -3,7 +3,7 @@ import {
   MAX_CATALOG_JSON_BYTES,
   catalogDigestMatches,
   computeMCPToolCatalogSha256,
-} from "./supply-chain.js";
+} from "../../src/mcp-client/supply-chain.js";
 
 describe("computeMCPToolCatalogSha256", () => {
   it("is stable across re-orderings of the tool array (canonical sort)", () => {

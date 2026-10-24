@@ -1,16 +1,16 @@
 import React, { useContext } from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import AppContext, { useApp, type Props as AppContextProps } from './AppContext.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import AppContext, { useApp, type Props as AppContextProps } from '../../../../src/tui/ink/components/AppContext.js'
 import CursorDeclarationContext, {
   type CursorDeclarationSetter,
-} from './CursorDeclarationContext.js'
+} from '../../../../src/tui/ink/components/CursorDeclarationContext.js'
 import StdinContext, {
   useStdin,
   type Props as StdinContextProps,
-} from './StdinContext.js'
-import Text from './Text.js'
+} from '../../../../src/tui/ink/components/StdinContext.js'
+import Text from '../../../../src/tui/ink/components/Text.js'
 
 function getDefaultContextValue<T>(context: unknown): T {
   const value = context as { _currentValue?: T; _currentValue2?: T }

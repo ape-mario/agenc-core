@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   openStateDatabases,
   type StateSqliteDriver,
-} from "../state/sqlite-driver.js";
-import { StateThreadRepository } from "../state/threads.js";
-import type { ThreadSource } from "../thread-store/store.js";
-import { MemoryStore } from "./store.js";
+} from "../../src/state/sqlite-driver.js";
+import { StateThreadRepository } from "../../src/state/threads.js";
+import type { ThreadSource } from "../../src/thread-store/store.js";
+import { MemoryStore } from "../../src/memory/store.js";
 
 let home = "";
 let cwd = "";

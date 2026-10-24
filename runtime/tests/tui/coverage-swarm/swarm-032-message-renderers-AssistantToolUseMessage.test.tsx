@@ -1,15 +1,15 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Tool } from '../../tools/Tool.js'
-import type { AgenCToolUseBlockParam } from '../../types/message.js'
-import { renderToAnsiString, renderToString } from '../../utils/staticRender.js'
-import { Text } from '../ink.js'
-import { Tool as ToolRow, type ToolState } from '../components/v2/primitives.js'
+import type { Tool } from '../../../src/tools/Tool.js'
+import type { AgenCToolUseBlockParam } from '../../../src/types/message.js'
+import { renderToAnsiString, renderToString } from '../../../src/utils/staticRender.js'
+import { Text } from '../../../src/tui/ink.js'
+import { Tool as ToolRow, type ToolState } from '../../../src/tui/components/v2/primitives.js'
 import {
   AssistantToolUseMessage,
   getAssistantToolUsePendingText,
-} from '../message-renderers/AssistantToolUseMessage.js'
+} from '../../../src/tui/message-renderers/AssistantToolUseMessage.js'
 
 const appStateMock = vi.hoisted(() => ({
   pendingWorkerRequest: undefined as undefined | { toolUseId: string },
@@ -19,23 +19,23 @@ const appStateMock = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../utils/classifierApprovalsHook.js', () => ({
+vi.mock('../../../src/utils/classifierApprovalsHook.js', () => ({
   useIsClassifierChecking: () => false,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 96, rows: 32 }),
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppStateMaybeOutsideOfProvider: (
     selector: (state: typeof appStateMock) => unknown,
   ) => selector(appStateMock),
 }))
 
-vi.mock('../ink.js', async () => {
-  const actual = await vi.importActual<typeof import('../ink.js')>(
-    '../ink.js',
+vi.mock('../../../src/tui/ink.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/tui/ink.js')>(
+    '../../../src/tui/ink.js',
   )
   return {
     ...actual,

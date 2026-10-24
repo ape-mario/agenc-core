@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-type ClearTerminalModule = typeof import('./clearTerminal.js')
+type ClearTerminalModule = typeof import('../../../src/tui/ink/clearTerminal.js')
 
 const CLEAR_MODERN = '\x1B[2J\x1B[3J\x1B[H'
 const CLEAR_WINDOWS_CLASSIC = '\x1B[2J\x1B[0f'
@@ -54,7 +54,7 @@ async function loadClearTerminal(
   vi.resetModules()
   setPlatform(platform)
   setEnv(env)
-  return await import('./clearTerminal.js')
+  return await import('../../../src/tui/ink/clearTerminal.js')
 }
 
 afterEach(() => {

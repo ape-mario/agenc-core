@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../delegate.js", () => ({
+vi.mock("../../../src/agents/delegate.js", () => ({
   delegate: vi.fn(),
 }));
 
-import { createSpawnAgentTool } from "./spawn.js";
-import { delegate } from "../delegate.js";
-import type { MultiAgentV2Options } from "./common.js";
-import type { Session } from "../../session/session.js";
-import { createAgentRoleWorkspace } from "../role.js";
-import { AgentRoleCatalog } from "../role-catalog.js";
-import { signSessionId } from "../_deps/filesystem-args.js";
+import { createSpawnAgentTool } from "../../../src/agents/v2/spawn.js";
+import { delegate } from "../../../src/agents/delegate.js";
+import type { MultiAgentV2Options } from "../../../src/agents/v2/common.js";
+import type { Session } from "../../../src/session/session.js";
+import { createAgentRoleWorkspace } from "../../../src/agents/role.js";
+import { AgentRoleCatalog } from "../../../src/agents/role-catalog.js";
+import { signSessionId } from "../../../src/agents/_deps/filesystem-args.js";
 import { StaticModelsManager } from "../../../src/llm/models-manager.js";
 import { defaultConfig, type AgentsConfig } from "../../../src/config/schema.js";
 import { validationErrorToolResult } from "../../../src/tools/results.js";

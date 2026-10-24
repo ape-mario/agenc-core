@@ -3,15 +3,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
 import {
   AgenCDaemonSessionManager,
   type AgenCSessionLifecycleOptions,
-} from "./session-lifecycle.js";
+} from "../../src/app-server/session-lifecycle.js";
 import {
   type AgenCDaemonTuiClient,
   type AgenCTuiBridgeSession,
-} from "../tui/daemon-session.js";
+} from "../../src/tui/daemon-session.js";
 import { attachDaemonTuiSessionFixture as attachDaemonTuiSession } from "../helpers/daemon-tui-session.js";
 import type {
   AgenCDaemonMethod,
@@ -29,7 +29,7 @@ import type {
   SessionListParams,
   SessionListResult,
   SessionSummary,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 interface DaemonCoAttachExampleClient {
   createSession(params: SessionCreateParams): Promise<SessionCreateResult>;

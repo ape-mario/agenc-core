@@ -3,9 +3,9 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import Text from '../ink/components/Text.js'
-import { createRoot } from '../ink/root.js'
-import { usePrStatus, type PrStatusState } from './usePrStatus.js'
+import Text from '../../../src/tui/ink/components/Text.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { usePrStatus, type PrStatusState } from '../../../src/tui/hooks/usePrStatus.js'
 
 const harness = vi.hoisted(() => ({
   fetchPrStatus: vi.fn(),
@@ -13,7 +13,7 @@ const harness = vi.hoisted(() => ({
 }))
 const realSetImmediate = setImmediate
 
-vi.mock('../../bootstrap/state.js', () => ({
+vi.mock('../../../src/bootstrap/state.js', () => ({
   flushInteractionTime: vi.fn(),
   getActiveTimeCounter: () => 0,
   getLastInteractionTime: () => harness.interactionTime,
@@ -21,7 +21,7 @@ vi.mock('../../bootstrap/state.js', () => ({
   updateLastInteractionTime: vi.fn(),
 }))
 
-vi.mock('../../utils/ghPrStatus', () => ({
+vi.mock('../../../src/utils/ghPrStatus.js', () => ({
   fetchPrStatus: harness.fetchPrStatus,
 }))
 

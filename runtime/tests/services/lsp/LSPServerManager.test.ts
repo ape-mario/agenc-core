@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { normalizeLspServerConfig } from "./config.js";
-import { createLSPServerManager } from "./LSPServerManager.js";
-import type { LSPServerInstance } from "./LSPServerInstance.js";
-import type { ScopedLspServerConfig } from "./types.js";
+import { normalizeLspServerConfig } from "../../../src/services/lsp/config.js";
+import { createLSPServerManager } from "../../../src/services/lsp/LSPServerManager.js";
+import type { LSPServerInstance } from "../../../src/services/lsp/LSPServerInstance.js";
+import type { ScopedLspServerConfig } from "../../../src/services/lsp/types.js";
 
 function fakeServer(
   name: string,

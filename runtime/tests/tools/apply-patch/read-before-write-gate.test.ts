@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 
 import { describe, expect, test } from "vitest";
 
-import { applyPatchText } from "./runtime.js";
+import { applyPatchText } from "../../../src/tools/apply-patch/runtime.js";
 import { recordSessionRead } from "src/tools/system/filesystem.js";
 
 async function tempRoot(): Promise<string> {

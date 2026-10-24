@@ -1,11 +1,11 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 import {
   SpinnerAnimationRow,
   type SpinnerAnimationRowProps,
-} from './SpinnerAnimationRow.js'
+} from '../../../../src/tui/components/spinner/SpinnerAnimationRow.js'
 
 const NOW = new Date('2026-05-20T12:00:00.000Z').getTime()
 

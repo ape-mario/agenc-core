@@ -2,8 +2,8 @@ import fs from "node:fs";
 import { describe, expect, test } from "vitest";
 import { sourcePath } from "../../helpers/source-path.ts";
 
-import type { StreamingToolUse } from "../../llm/types.js";
-import { adaptTranscriptEvents, type AdaptedTranscript } from "../session-transcript.js";
+import type { StreamingToolUse } from "../../../src/llm/types.js";
+import { adaptTranscriptEvents, type AdaptedTranscript } from "../../../src/tui/session-transcript.js";
 
 const APP_SOURCE_PATH = sourcePath("tui/components/App.tsx");
 const MESSAGE_ADAPTER_SOURCE_PATH = sourcePath("tui/session-transcript.ts");

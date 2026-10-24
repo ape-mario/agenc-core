@@ -5,8 +5,8 @@ import {
   getMaxMcpOutputTokens,
   mcpContentNeedsTruncation,
   truncateMcpContentIfNeeded,
-} from "./mcpValidation.js";
-import type { MCPToolResult } from "./mcpValidation.js";
+} from "../../src/utils/mcpValidation.js";
+import type { MCPToolResult } from "../../src/utils/mcpValidation.js";
 
 describe("MCP accounting and truncation", () => {
   test("uses only the explicit provider environment for the token cap", () => {

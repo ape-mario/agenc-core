@@ -1,10 +1,10 @@
 import React from 'react'
-import { Box } from '../../ink.js'
+import { Box } from '../../../../src/tui/ink.js'
 import stringWidth from 'string-width'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ContentWidthProvider } from '../../../../src/tui/context/contentWidthContext.js'
-import { renderToAnsiString, renderToString } from '../../../utils/staticRender.js'
+import { renderToAnsiString, renderToString } from '../../../../src/utils/staticRender.js'
 import { WelcomeColdPanel, welcomeColdPanelLayout, AGENC_LOGO_MARK_LINES, AGENC_LOGO_MARK_COMPACT_LINES } from '../../../../src/tui/components/v2/primitives.js'
 import { escapeRegExp } from '../../../../src/utils/stringUtils.js'
 import { VERSION } from '../../../../src/version.js'

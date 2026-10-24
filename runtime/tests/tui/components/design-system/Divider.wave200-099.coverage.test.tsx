@@ -3,13 +3,13 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import type { DOMElement, DOMNode } from "../../ink/dom.js";
-import instances from "../../ink/instances.js";
-import { createRoot } from "../../ink/root.js";
-import type { TextStyles } from "../../ink/styles.js";
-import { Box } from "../../ink.js";
-import { getTheme } from "../../../utils/theme.js";
-import { Divider } from "./Divider.js";
+import type { DOMElement, DOMNode } from "../../../../src/tui/ink/dom.js";
+import instances from "../../../../src/tui/ink/instances.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import type { TextStyles } from "../../../../src/tui/ink/styles.js";
+import { Box } from "../../../../src/tui/ink.js";
+import { getTheme } from "../../../../src/utils/theme.js";
+import { Divider } from "../../../../src/tui/components/design-system/Divider.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

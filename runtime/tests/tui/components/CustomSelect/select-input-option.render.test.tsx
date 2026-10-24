@@ -3,8 +3,8 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { createRoot } from "../../ink/root.js";
-import { SelectInputOption } from "./select-input-option.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { SelectInputOption } from "../../../../src/tui/components/CustomSelect/select-input-option.js";
 
 const keybindingMock = vi.hoisted(() => ({
   single: new Map<
@@ -46,7 +46,7 @@ const inputMock = vi.hoisted(() => ({
       },
 }));
 
-vi.mock("../../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybinding: (
     action: string,
     handler: () => void | Promise<void>,
@@ -64,8 +64,8 @@ vi.mock("../../keybindings/useKeybinding.js", () => ({
   },
 }));
 
-vi.mock("../../ink.js", async importOriginal => {
-  const actual = await importOriginal<typeof import("../../ink.js")>();
+vi.mock("../../../../src/tui/ink.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../../../src/tui/ink.js")>();
   return {
     ...actual,
     useInput: (
@@ -77,7 +77,7 @@ vi.mock("../../ink.js", async importOriginal => {
   };
 });
 
-vi.mock("../TextInput.js", async () => {
+vi.mock("../../../../src/tui/components/TextInput.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     default: (props: typeof textInputMock.current) => {
@@ -91,7 +91,7 @@ vi.mock("../TextInput.js", async () => {
   };
 });
 
-vi.mock("../ClickableImageRef.js", async () => {
+vi.mock("../../../../src/tui/components/ClickableImageRef.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     ClickableImageRef: ({
@@ -109,7 +109,7 @@ vi.mock("../ClickableImageRef.js", async () => {
   };
 });
 
-vi.mock("../ConfigurableShortcutHint.js", async () => {
+vi.mock("../../../../src/tui/components/ConfigurableShortcutHint.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     ConfigurableShortcutHint: ({
@@ -122,7 +122,7 @@ vi.mock("../ConfigurableShortcutHint.js", async () => {
   };
 });
 
-vi.mock("../../../utils/imagePaste.js", () => ({
+vi.mock("../../../../src/utils/imagePaste.js", () => ({
   getImageFromClipboard: async () => ({
     base64: "image-bytes",
     dimensions: { height: 20, width: 10 },

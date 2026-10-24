@@ -2,9 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { AuthBackend } from "./backend.js";
-import { bootstrapLocalRuntimeSession } from "../bin/bootstrap.js";
-import { Session } from "../session/session.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
+import { bootstrapLocalRuntimeSession } from "../../src/bin/bootstrap.js";
+import { Session } from "../../src/session/session.js";
 
 describe("BYOK precedence", () => {
   it("uses env-var BYOK keys without vending managed keys", async () => {
@@ -34,7 +34,7 @@ describe("BYOK precedence", () => {
       },
     };
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(

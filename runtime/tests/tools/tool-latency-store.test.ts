@@ -3,7 +3,7 @@ import {
   ToolLatencyStore,
   DEFAULT_TOOL_LATENCY_CONFIG,
   type ToolLatencyConfig,
-} from "./tool-latency-store.js";
+} from "../../src/tools/tool-latency-store.js";
 
 // Reach the private per-tool stat for the ring/EWMA white-box assertions.
 interface StatLike {

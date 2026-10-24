@@ -1,7 +1,7 @@
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 
 type AppState = {
   tasks: Record<string, any>
@@ -37,7 +37,7 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: AppState) => unknown) =>
     selector(fixture.state),
   useAppStateStore: () => ({
@@ -49,28 +49,28 @@ vi.mock('../state/AppState.js', () => ({
   },
 }))
 
-vi.mock('../context/notifications', () => ({
+vi.mock('../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => ({
     addNotification: fixture.addNotification,
     removeNotification: fixture.removeNotification,
   }),
 }))
 
-vi.mock('../context/overlayContext', () => ({
+vi.mock('../../../src/tui/context/overlayContext.js', () => ({
   useIsOverlayActive: () => fixture.overlayActive,
   // the hook's Escape guard now keys off the modal-only variant
   useIsModalOverlayActive: () => fixture.overlayActive,
 }))
 
-vi.mock('./useCommandQueue', () => ({
+vi.mock('../../../src/tui/hooks/useCommandQueue.js', () => ({
   useCommandQueue: () => ({ length: fixture.queuedCommandsLength }),
 }))
 
-vi.mock('../keybindings/shortcutFormat.js', () => ({
+vi.mock('../../../src/tui/keybindings/shortcutFormat.js', () => ({
   getShortcutDisplay: () => 'ctrl+x ctrl+k',
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybinding: (
     action: string,
     handler: () => void,
@@ -88,18 +88,18 @@ vi.mock('../keybindings/useKeybinding.js', () => ({
   useInputCapture: () => {},
 }))
 
-vi.mock('../state/teammateViewHelpers', () => ({
+vi.mock('../../../src/tui/state/teammateViewHelpers.js', () => ({
   exitTeammateView: (...args: unknown[]) => fixture.exitTeammateView(...args),
 }))
 
-vi.mock('../../tasks/LocalAgentTask/LocalAgentTask', () => ({
+vi.mock('../../../src/tasks/LocalAgentTask/LocalAgentTask.js', () => ({
   killAllRunningAgentTasks: (...args: unknown[]) =>
     fixture.killAllRunningAgentTasks(...args),
   markAgentsNotified: (...args: unknown[]) =>
     fixture.markAgentsNotified(...args),
 }))
 
-vi.mock('../../utils/messageQueueManager.js', () => ({
+vi.mock('../../../src/utils/messageQueueManager.js', () => ({
   clearCommandQueue: vi.fn(),
   enqueuePendingNotification: (...args: unknown[]) =>
     fixture.enqueuePendingNotification(...args),
@@ -146,7 +146,7 @@ describe('CancelRequestHandler teammate-view interrupt coverage', () => {
 
   test('Ctrl+C from teammate view stops all agents, returns to main, and cancels the active turn', async () => {
     const abortController = new AbortController()
-    const { CancelRequestHandler } = await import('./useCancelRequest.js')
+    const { CancelRequestHandler } = await import('../../../src/tui/hooks/useCancelRequest.js')
 
     await renderToString(
       <CancelRequestHandler
@@ -197,7 +197,7 @@ describe('CancelRequestHandler teammate-view interrupt coverage', () => {
   })
 
   test('Escape defers to teammate navigation while idle; Ctrl+C still stops agents and exits', async () => {
-    const { CancelRequestHandler } = await import('./useCancelRequest.js')
+    const { CancelRequestHandler } = await import('../../../src/tui/hooks/useCancelRequest.js')
 
     // No abortSignal: AgenC is idle, so Escape is left for
     // useBackgroundTaskNavigation even though stoppable agents exist.

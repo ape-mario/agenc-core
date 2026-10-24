@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import { REDACTED_SECRET } from "../secrets/sanitizer.js";
-import { REJECT_MESSAGE } from "../utils/messages.js";
-import type { RolloutItem } from "./rollout-item.js";
+import { REDACTED_SECRET } from "../../src/secrets/sanitizer.js";
+import { REJECT_MESSAGE } from "../../src/utils/messages.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
 import {
   buildDpoPairs,
   buildSftExample,
@@ -14,8 +14,8 @@ import {
   renderTrajectoryJsonl,
   responseItemText,
   toChatMessage,
-} from "./trajectory-curate.js";
-import { TRAJECTORY_EXPORT_SCHEMA_VERSION } from "./trajectory-export.js";
+} from "../../src/session/trajectory-curate.js";
+import { TRAJECTORY_EXPORT_SCHEMA_VERSION } from "../../src/session/trajectory-export.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Fixture helpers — build the exact record shape the export sink writes

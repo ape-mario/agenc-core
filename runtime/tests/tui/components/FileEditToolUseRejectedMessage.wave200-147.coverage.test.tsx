@@ -10,17 +10,17 @@ const childMocks = vi.hoisted(() => ({
   highlighted: [] as Array<Record<string, unknown>>,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 72, rows: 24 }),
 }))
 
-vi.mock('../../utils/cwd.js', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => '/repo',
 }))
 
-vi.mock('./markdown/HighlightedCode.js', async () => {
+vi.mock('../../../src/tui/components/markdown/HighlightedCode.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../ink.js')
+  const { Text } = await import('../../../src/tui/ink.js')
 
   return {
     HighlightedCode: (props: Record<string, unknown>) => {
@@ -34,9 +34,9 @@ vi.mock('./markdown/HighlightedCode.js', async () => {
   }
 })
 
-vi.mock('./diff/StructuredDiffList.js', async () => {
+vi.mock('../../../src/tui/components/diff/StructuredDiffList.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../ink.js')
+  const { Text } = await import('../../../src/tui/ink.js')
 
   return {
     StructuredDiffList: (props: Record<string, unknown>) => {
@@ -50,8 +50,8 @@ vi.mock('./diff/StructuredDiffList.js', async () => {
   }
 })
 
-import { createRoot } from '../ink/root.js'
-import { FileEditToolUseRejectedMessage } from './FileEditToolUseRejectedMessage.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { FileEditToolUseRejectedMessage } from '../../../src/tui/components/FileEditToolUseRejectedMessage.js'
 
 function createStreams(): {
   stdout: PassThrough

@@ -12,17 +12,17 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../../utils/agentSwarmsEnabled.js', () => ({
+vi.mock('../../../../src/utils/agentSwarmsEnabled.js', () => ({
   isAgentSwarmsEnabled: () => harness.swarmsEnabled,
 }))
 
-vi.mock('../../../utils/teammate.js', () => ({
+vi.mock('../../../../src/utils/teammate.js', () => ({
   getTeammateColor: harness.getTeammateColor,
 }))
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { Box } from '../../ink.js'
-import { PromptInputModeIndicator } from './PromptInputModeIndicator.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { Box } from '../../../../src/tui/ink.js'
+import { PromptInputModeIndicator } from '../../../../src/tui/components/PromptInput/PromptInputModeIndicator.js'
 
 async function renderIndicator(
   props: React.ComponentProps<typeof PromptInputModeIndicator>,

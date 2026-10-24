@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { coerceUsage } from "./shared.js";
+import { coerceUsage } from "../../../src/llm/wire/shared.js";
 
 describe("LLM usage provenance", () => {
   test("distinguishes an authoritative reported zero from missing usage", () => {

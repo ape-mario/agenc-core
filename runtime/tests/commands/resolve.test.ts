@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { resolveCommand } from "./resolve.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "./types.js";
+import { resolveCommand } from "../../src/commands/resolve.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function mkctx(argsRaw: string, resolveDaemonToolCall: ReturnType<typeof vi.fn>): SlashCommandContext {
   return {

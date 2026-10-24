@@ -6,7 +6,7 @@ import {
   launchdProgramAgenCHome,
   type LaunchdCommandResult,
   type LaunchdDaemonJobDeps,
-} from "./daemon-launchd-service.js";
+} from "../../src/app-server/daemon-launchd-service.js";
 
 function installerWrapper(agencHome: string): string {
   const metadata = Buffer.from(

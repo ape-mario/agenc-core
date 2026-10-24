@@ -5,8 +5,8 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   measureSerializedUtf8Bytes,
   serializedUtf8BytesOrZero,
-} from "./serialization-size.js";
-import { SessionStore } from "./session-store.js";
+} from "../../src/session/serialization-size.js";
+import { SessionStore } from "../../src/session/session-store.js";
 
 describe("serialized UTF-8 size", () => {
   const temporaryDirectories: string[] = [];

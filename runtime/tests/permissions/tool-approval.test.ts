@@ -4,8 +4,8 @@ import {
   decideToolApproval,
   permissionRulesFromToolApprovalConfig,
   toolApprovalRulesFromConfig,
-} from "./tool-approval.js";
-import { createEmptyToolPermissionContext } from "./types.js";
+} from "../../src/permissions/tool-approval.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 describe("toolApprovalRulesFromConfig", () => {
   test("maps config allow/ask/deny arrays to auto/prompt/deny rules", () => {

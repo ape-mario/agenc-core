@@ -3,12 +3,12 @@ import {
   AgenCRealtimeTranscriptAccumulator,
   MAX_REALTIME_EVENT_QUEUE_DEPTH,
   MAX_REALTIME_TRANSCRIPT_ENTRIES,
-} from "./realtime-transport.js";
-import { AsyncQueue } from "../utils/async-queue.js";
+} from "../../src/app-server/realtime-transport.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import type {
   RealtimeEvent,
   RealtimeHandoffRequested,
-} from "../conversation/realtime/conversation.js";
+} from "../../src/conversation/realtime/conversation.js";
 
 /**
  * Alternating-role transcript-done events each append a fresh entry (the role

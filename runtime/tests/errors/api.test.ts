@@ -14,7 +14,7 @@ import {
   redactSensitiveAPIText,
   sanitizeAPIError,
   startsWithApiErrorPrefix,
-} from "./api.js";
+} from "../../src/errors/api.js";
 
 describe("API error UX helpers", () => {
   test("extracts and formats SSL connection failures", () => {

@@ -10,29 +10,29 @@
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { reconstructFromRollout } from "./rollout-reconstruction.js";
-import { ConversationThreadManager, interruptedToolCallResultContent, resumeTurnFromCheckpoint } from "../conversation/thread-manager.js";
-import type { Session, SessionState } from "./session.js";
-import { AsyncLock } from "../utils/async-lock.js";
-import type { RolloutItem, ResponseItem } from "./rollout-item.js";
-import { createToolResultIntegrity } from "./tool-result-integrity.js";
-import { resetBuildIdForTestingOnly } from "./durable-turns.js";
-import { createOperatorEffectReviewResolution } from "../state/effect-review.js";
+import { reconstructFromRollout } from "../../src/session/rollout-reconstruction.js";
+import { ConversationThreadManager, interruptedToolCallResultContent, resumeTurnFromCheckpoint } from "../../src/conversation/thread-manager.js";
+import type { Session, SessionState } from "../../src/session/session.js";
+import { AsyncLock } from "../../src/utils/async-lock.js";
+import type { RolloutItem, ResponseItem } from "../../src/session/rollout-item.js";
+import { createToolResultIntegrity } from "../../src/session/tool-result-integrity.js";
+import { resetBuildIdForTestingOnly } from "../../src/session/durable-turns.js";
+import { createOperatorEffectReviewResolution } from "../../src/state/effect-review.js";
 import {
   computeCheckpointPrefixHashV2,
   computeCheckpointPrefixHashV3,
-} from "./durable-checkpoint-reader.js";
+} from "../../src/session/durable-checkpoint-reader.js";
 import type {
   TurnCheckpointV2Event,
   TurnCheckpointV4Event,
-} from "./event-log.js";
+} from "../../src/session/event-log.js";
 import type {
   ToolPairIntegrityFailure,
   ToolPairOperationalDeferral,
   ToolPairProjection,
   ToolPairProjectionRecord,
   ToolPairProjectionSummary,
-} from "./tool-pair-validator.js";
+} from "../../src/session/tool-pair-validator.js";
 
 class TestToolPairProjection implements ToolPairProjection {
   private records = new Map<string, ToolPairProjectionRecord>();

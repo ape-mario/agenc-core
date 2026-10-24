@@ -5,14 +5,14 @@ import {
   da1,
   xtversion,
   type QuerierStdin,
-} from './terminal-querier.ts'
-import type { TerminalResponse } from './parse-keypress.ts'
+} from '../../../src/tui/ink/terminal-querier.js'
+import type { TerminalResponse } from '../../../src/tui/ink/parse-keypress.js'
 
 const logMock = vi.hoisted(() => ({
   logError: vi.fn(),
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: logMock.logError,
 }))
 

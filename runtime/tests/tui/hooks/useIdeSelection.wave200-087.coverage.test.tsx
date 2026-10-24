@@ -3,11 +3,11 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import {
   type IDESelection,
   useIdeSelection,
-} from './useIdeSelection.js'
+} from '../../../src/tui/hooks/useIdeSelection.js'
 
 type SelectionPoint = {
   readonly line: number
@@ -39,11 +39,11 @@ const fixture = vi.hoisted(() => ({
   logError: vi.fn(),
 }))
 
-vi.mock('../../utils/ide', () => ({
+vi.mock('../../../src/utils/ide.js', () => ({
   getConnectedIdeClient: () => fixture.ideClient,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: fixture.logError,
 }))
 

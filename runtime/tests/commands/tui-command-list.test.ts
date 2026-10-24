@@ -7,13 +7,13 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-import { buildDefaultRegistry } from "./registry.js";
+import { buildDefaultRegistry } from "../../src/commands/registry.js";
 import {
   builtInCommandNames,
   filterCommandsForRemoteMode,
   getCommandsSync,
   listTuiCommandList,
-} from "../commands.js";
+} from "../../src/commands.js";
 
 const MINIMAL_TUI_NAMES = [
   "help",

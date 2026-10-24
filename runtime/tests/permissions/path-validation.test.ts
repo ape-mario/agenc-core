@@ -13,15 +13,15 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { ConfigStore } from "../../src/config/store.js";
 import { runWithCanonicalSettingsAuthority } from "../../src/utils/settings/canonicalAuthority.js";
-import { createApplyPatchTool } from "../tools/apply-patch/tool.js";
+import { createApplyPatchTool } from "../../src/tools/apply-patch/tool.js";
 import {
   createFileEditTool,
   createFileMultiEditTool,
-} from "../tools/system/file-edit.js";
-import { createFileReadTool } from "../tools/system/file-read.js";
-import { createFileWriteTool } from "../tools/system/file-write.js";
-import { createNotebookEditTool } from "../tools/system/notebook-edit.js";
-import type { ToolEvaluatorContext } from "./evaluator.js";
+} from "../../src/tools/system/file-edit.js";
+import { createFileReadTool } from "../../src/tools/system/file-read.js";
+import { createFileWriteTool } from "../../src/tools/system/file-write.js";
+import { createNotebookEditTool } from "../../src/tools/system/notebook-edit.js";
+import type { ToolEvaluatorContext } from "../../src/permissions/evaluator.js";
 import {
   checkToolPathPermission,
   expandTilde,
@@ -29,8 +29,8 @@ import {
   getGlobBaseDirectory,
   isDangerousRemovalPath,
   validatePath,
-} from "./path-validation.js";
-import { applyPermissionUpdate } from "./permission-updates.js";
+} from "../../src/permissions/path-validation.js";
+import { applyPermissionUpdate } from "../../src/permissions/permission-updates.js";
 import {
   SESSION_ALLOWED_ROOTS_ARG,
   SESSION_ALLOWED_ROOTS_SIG_ARG,
@@ -39,7 +39,7 @@ import {
 import {
   createEmptyToolPermissionContext,
   type ToolPermissionContext,
-} from "./types.js";
+} from "../../src/permissions/types.js";
 
 describe("path-validation", () => {
   let root = "";

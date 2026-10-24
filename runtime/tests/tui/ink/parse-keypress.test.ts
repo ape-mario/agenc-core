@@ -7,9 +7,9 @@ import {
   type ParsedKey,
   type ParsedMouse,
   type ParsedResponse,
-} from './parse-keypress.ts'
-import { InputEvent } from './events/input-event.ts'
-import { PASTE_END, PASTE_START } from './termio/csi.ts'
+} from '../../../src/tui/ink/parse-keypress.js'
+import { InputEvent } from '../../../src/tui/ink/events/input-event.js'
+import { PASTE_END, PASTE_START } from '../../../src/tui/ink/termio/csi.js'
 
 function parseOne(sequence: string): ParsedInput {
   const [items] = parseMultipleKeypresses(INITIAL_STATE, sequence)

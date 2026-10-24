@@ -9,7 +9,7 @@ import {
   recordPermissionAuditEvent,
   resolvePermissionAuditLogPath,
   type PermissionAuditEventInput,
-} from "./permission-audit-log.js";
+} from "../../src/permissions/permission-audit-log.js";
 
 const baseEvent: PermissionAuditEventInput = {
   eventKind: "policy_outcome",

@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createMcpUrlCompletionResponse } from "../../elicitation/url-completion.js";
+import { createMcpUrlCompletionResponse } from "../../../src/elicitation/url-completion.js";
 import type {
   AgenCDaemonMethod,
   AgenCDaemonResultByMethod,
   JsonObject,
-} from "../../app-server/protocol/index.js";
+} from "../../../src/app-server/protocol/index.js";
 import {
   attachDaemonAgentTuiSession,
   type AgenCDaemonConnectionState,
   type AgenCDaemonTuiClient,
   type AgenCTuiBridgeSession,
-} from "../daemon-session.js";
+} from "../../../src/tui/daemon-session.js";
 import { createDaemonTuiSessionFixture as createDaemonTuiSession } from "../../helpers/daemon-tui-session.js";
 
 interface RecordedRequest {

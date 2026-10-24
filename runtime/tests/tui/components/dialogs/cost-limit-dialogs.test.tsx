@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, expect, test, vi, beforeEach } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { CostThresholdDialog } from './CostThresholdDialog.js'
-import { getUpsellMessage, RateLimitMessage } from './RateLimitMessage.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { CostThresholdDialog } from '../../../../src/tui/components/dialogs/CostThresholdDialog.js'
+import { getUpsellMessage, RateLimitMessage } from '../../../../src/tui/components/dialogs/RateLimitMessage.js'
 
 const providerMock = vi.hoisted(() => ({
   provider: 'firstParty',
@@ -21,7 +21,7 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../CustomSelect/select.js', async () => {
+vi.mock('../../../../src/tui/components/CustomSelect/select.js', async () => {
   return {
     Select: ({ options }: { options: Array<{ label: string }> }) =>
       React.createElement(
@@ -32,9 +32,9 @@ vi.mock('../CustomSelect/select.js', async () => {
   }
 })
 
-vi.mock('../design-system/Dialog.js', async () => {
-  const { Box, Text } = await vi.importActual<typeof import('../../ink.js')>(
-    '../../ink.js',
+vi.mock('../../../../src/tui/components/design-system/Dialog.js', async () => {
+  const { Box, Text } = await vi.importActual<typeof import('../../../../src/tui/ink.js')>(
+    '../../../../src/tui/ink.js',
   )
   return {
     Dialog: ({
@@ -52,28 +52,22 @@ vi.mock('../design-system/Dialog.js', async () => {
   }
 })
 
-vi.mock('../../../utils/model/providers.js', () => ({
+vi.mock('../../../../src/utils/model/providers.js', () => ({
   getAPIProvider: () => providerMock.provider,
 }))
 
-vi.mock('../../../commands/extra-usage/index.js', () => ({
-  extraUsage: {
-    isEnabled: () => rateLimitMock.extraUsageEnabled,
-  },
-}))
-
-vi.mock('../../../utils/auth.js', () => ({
+vi.mock('../../../../src/utils/auth.js', () => ({
   getSubscriptionType: () => rateLimitMock.subscriptionType,
   getRateLimitTier: () => rateLimitMock.rateLimitTier,
   isAgenCAISubscriber: () => rateLimitMock.isSubscriber,
   isOverageProvisioningAllowed: () => rateLimitMock.extraUsageEnabled,
 }))
 
-vi.mock('../../../utils/billing.js', () => ({
+vi.mock('../../../../src/utils/billing.js', () => ({
   hasAgenCAiBillingAccess: () => rateLimitMock.hasBillingAccess,
 }))
 
-vi.mock('../MessageResponse.js', () => ({
+vi.mock('../../../../src/tui/components/MessageResponse.js', () => ({
   MessageResponse: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 

@@ -2,21 +2,21 @@ import { Buffer } from "node:buffer";
 
 import { describe, expect, test, vi } from "vitest";
 
-import { resolveProviderCapabilityEntry } from "../../capabilities.js";
-import { createProvider, readProviderIdentity } from "../../provider.js";
-import { resolveProviderCredentialAuthority } from "../../provider-options.js";
+import { resolveProviderCapabilityEntry } from "../../../../src/llm/capabilities.js";
+import { createProvider, readProviderIdentity } from "../../../../src/llm/provider.js";
+import { resolveProviderCredentialAuthority } from "../../../../src/llm/provider-options.js";
 import {
   resolveModelCatalogMetadata,
   resolveRegisteredModelCatalogEntry,
-} from "../../registry/model-catalog.js";
+} from "../../../../src/llm/registry/model-catalog.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
-} from "../../registry/provider-info.js";
-import type { LLMMessage, LLMTool } from "../../types.js";
-import { chatCompletionsCapabilityHintsForProvider } from "../../wire/capability-gating.js";
-import { usesLocalToolProfile } from "../../wire/capability-gating.js";
+} from "../../../../src/llm/registry/provider-info.js";
+import type { LLMMessage, LLMTool } from "../../../../src/llm/types.js";
+import { chatCompletionsCapabilityHintsForProvider } from "../../../../src/llm/wire/capability-gating.js";
+import { usesLocalToolProfile } from "../../../../src/llm/wire/capability-gating.js";
 import {
   bodyAt,
   createSuccessfulChatResponse,
@@ -24,7 +24,7 @@ import {
   ONE_PIXEL_PNG,
   sseResponse,
 } from "../openai-compatible-test-helpers.js";
-import { KIMI_CHAT_MODELS, KimiProvider } from "./index.js";
+import { KIMI_CHAT_MODELS, KimiProvider } from "../../../../src/llm/providers/kimi/index.js";
 
 const successfulChat = createSuccessfulChatResponse("chatcmpl_kimi");
 

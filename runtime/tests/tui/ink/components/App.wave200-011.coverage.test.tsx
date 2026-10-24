@@ -1,8 +1,8 @@
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import App from "./App.js";
-import { createSelectionState } from "../selection.js";
+import App from "../../../../src/tui/ink/components/App.js";
+import { createSelectionState } from "../../../../src/tui/ink/selection.js";
 
 type TestStream = NodeJS.ReadStream & NodeJS.WriteStream;
 

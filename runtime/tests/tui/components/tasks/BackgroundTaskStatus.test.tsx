@@ -1,7 +1,7 @@
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 
 const appStateMock = vi.hoisted(() => ({
   state: {
@@ -16,13 +16,13 @@ const terminalSizeMock = vi.hoisted(() => ({
   size: { columns: 80, rows: 24 },
 }))
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof appStateMock.state) => unknown) =>
     selector(appStateMock.state),
   useSetAppState: () => appStateMock.setAppState,
 }))
 
-vi.mock('../../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => terminalSizeMock.size,
 }))
 
@@ -84,7 +84,7 @@ describe('BackgroundTaskStatus glyph rendering', () => {
       },
     }
 
-    const { BackgroundTaskStatus } = await import('./BackgroundTaskStatus.js')
+    const { BackgroundTaskStatus } = await import('../../../../src/tui/components/tasks/BackgroundTaskStatus.js')
     const output = await renderToString(
       <BackgroundTaskStatus tasksSelected={false} />,
       80,

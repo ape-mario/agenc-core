@@ -2,11 +2,11 @@ import { realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { ConfigStore } from '../config/store.js'
-import { runWithCanonicalSettingsAuthority } from '../utils/settings/canonicalAuthority.js'
+import { ConfigStore } from '../../src/config/store.js'
+import { runWithCanonicalSettingsAuthority } from '../../src/utils/settings/canonicalAuthority.js'
 
 vi.mock('bun:bundle', () => ({ feature: () => false }))
-vi.mock('../tools.js', () => ({}))
+vi.mock('../../src/tools.js', () => ({}))
 vi.mock('src/tools.js', () => ({}))
 
 import {
@@ -18,7 +18,7 @@ import {
   MEMORY_MENTION_ALIASES,
   MEMORY_MENTION_SYNTAX,
   type MemoryFileInfo,
-} from './project-memory.js'
+} from '../../src/memory/project-memory.js'
 
 function projectFile(path: string, parent?: string): MemoryFileInfo {
   return {

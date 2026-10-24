@@ -4,22 +4,22 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { AuthBackend, AuthSubscriptionTier } from "../../auth/backend.js";
-import { LocalAuthBackend } from "../../auth/backends/local.js";
-import { resolveHomeContext } from "../../config/home.js";
-import { defaultConfig } from "../../config/schema.js";
+import type { AuthBackend, AuthSubscriptionTier } from "../../../src/auth/backend.js";
+import { LocalAuthBackend } from "../../../src/auth/backends/local.js";
+import { resolveHomeContext } from "../../../src/config/home.js";
+import { defaultConfig } from "../../../src/config/schema.js";
 import {
   clearXaiOauthCredentials,
   saveXaiOauthCredentials,
-} from "../../utils/xaiOauthCredentials.js";
+} from "../../../src/utils/xaiOauthCredentials.js";
 import {
   clearOpenAiOauthCredentials,
   saveOpenAiOauthCredentials,
-} from "../../utils/openAiOauthCredentials.js";
+} from "../../../src/utils/openAiOauthCredentials.js";
 import {
   collectProviderAvailability,
   formatProviderAvailabilityReport,
-} from "./provider-discovery.js";
+} from "../../../src/llm/discovery/provider-discovery.js";
 
 type CredentialFieldRole =
   | "apiKey"

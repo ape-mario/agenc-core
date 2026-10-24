@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { MCPServerConnection } from "../../../services/mcp/types.js";
-import type { McpSurfaceServer } from "../../../session/session.js";
-import { useMcpConnectivityStatus } from "./useMcpConnectivityStatus.js";
+import type { MCPServerConnection } from "../../../../src/services/mcp/types.js";
+import type { McpSurfaceServer } from "../../../../src/session/session.js";
+import { useMcpConnectivityStatus } from "../../../../src/tui/hooks/notifs/useMcpConnectivityStatus.js";
 
 const probes = vi.hoisted(() => ({
   addNotification: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock("react", async () => {
   };
 });
 
-vi.mock("../../ink.js", async () => {
+vi.mock("../../../../src/tui/ink.js", async () => {
   const React = await vi.importActual<typeof import("react")>("react");
   return {
     Text: ({ children }: { readonly children?: React.ReactNode }) =>
@@ -32,18 +32,18 @@ vi.mock("../../ink.js", async () => {
   };
 });
 
-vi.mock("../../context/notifications.js", () => ({
+vi.mock("../../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({
     addNotification: probes.addNotification,
     removeNotification: probes.removeNotification,
   }),
 }));
 
-vi.mock("../../../bootstrap/state", () => ({
+vi.mock("../../../../src/bootstrap/state.js", () => ({
   getIsRemoteMode: () => probes.remoteMode,
 }));
 
-vi.mock("../../../utils/log.js", () => ({
+vi.mock("../../../../src/utils/log.js", () => ({
   logError: probes.logError,
 }));
 

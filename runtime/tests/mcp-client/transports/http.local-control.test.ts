@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createHttpMCPConnection } from "./http.js";
-import { withDesktopMcpDispatchGuard, DesktopMcpPreflightRefusal } from "../local-control.js";
+import { createHttpMCPConnection } from "../../../src/mcp-client/transports/http.js";
+import { withDesktopMcpDispatchGuard, DesktopMcpPreflightRefusal } from "../../../src/mcp-client/local-control.js";
 
 const observed = vi.hoisted(() => ({ options: undefined as unknown, proxy: vi.fn(() => ({ dispatcher: "direct-dispatcher" })) }));
 vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({ Client: class {} }));
 vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({ StreamableHTTPClientTransport: class {
   constructor(_url: URL, options: unknown) { observed.options = options; }
 } }));
-vi.mock("./connect-with-cleanup.js", () => ({ connectMCPClientWithCleanup: async () => {} }));
-vi.mock("../../elicitation/mcp.js", () => ({ configureMcpElicitationClient: async () => {} }));
-vi.mock("../../services/mcp/hostCapabilities.js", () => ({ buildMcpHostClientCapabilities: () => ({}), configureMcpHostRequestHandlers: () => {} }));
-vi.mock("../../utils/proxy.js", () => ({ getProxyFetchOptions: observed.proxy }));
+vi.mock("../../../src/mcp-client/transports/connect-with-cleanup.js", () => ({ connectMCPClientWithCleanup: async () => {} }));
+vi.mock("../../../src/elicitation/mcp.js", () => ({ configureMcpElicitationClient: async () => {} }));
+vi.mock("../../../src/services/mcp/hostCapabilities.js", () => ({ buildMcpHostClientCapabilities: () => ({}), configureMcpHostRequestHandlers: () => {} }));
+vi.mock("../../../src/utils/proxy.js", () => ({ getProxyFetchOptions: observed.proxy }));
 
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 

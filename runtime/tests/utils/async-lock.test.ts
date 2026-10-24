@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { AsyncLock } from "./async-lock.js";
+import { AsyncLock } from "../../src/utils/async-lock.js";
 
 describe("AsyncLock", () => {
   test("happy path: returns the function's result", async () => {

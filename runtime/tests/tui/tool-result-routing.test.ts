@@ -4,7 +4,7 @@ import {
   pickToolResultDispatch,
   resultTextForTuiTool,
   summarizeWebSearchResult,
-} from "./tool-result-routing.js";
+} from "../../src/tui/tool-result-routing.js";
 
 describe("pickToolResultDispatch — TUI tool routing", () => {
   test("system.bash with <bash-stdout> envelope routes to bash-output-view", () => {

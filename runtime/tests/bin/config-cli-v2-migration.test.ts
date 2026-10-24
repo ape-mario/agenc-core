@@ -8,7 +8,7 @@ import {
   parseAgenCConfigCliArgs,
   runAgenCConfigCli,
   type AgenCConfigCliIo,
-} from "./config-cli.js";
+} from "../../src/bin/config-cli.js";
 
 const temporaryDirectories: string[] = [];
 

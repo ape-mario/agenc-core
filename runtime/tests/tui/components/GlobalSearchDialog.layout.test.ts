@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { computeGlobalSearchLayout } from './GlobalSearchDialog.js'
+import { computeGlobalSearchLayout } from '../../../src/tui/components/GlobalSearchDialog.js'
 
 describe('computeGlobalSearchLayout', () => {
   it('keeps all computed widths usable on tiny terminals', () => {

@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { Session } from "../session/session.js";
-import { clearCommand } from "../commands/clear.js";
+import type { Session } from "../../src/session/session.js";
+import { clearCommand } from "../../src/commands/clear.js";
 import {
   emitLocalTuiEvent,
   emitLocalTuiPhaseEvent,
   emitLocalTuiSlashResult,
   type LocalTuiEventSubscriber,
-} from "./tui-local-events.js";
-import type { SlashCommandContext } from "../commands/types.js";
+} from "../../src/bin/tui-local-events.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function mkctx(session: Session): SlashCommandContext {
   return { session, argsRaw: "", cwd: "/ws", home: "/home/test" };

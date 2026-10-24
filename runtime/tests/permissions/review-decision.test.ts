@@ -10,7 +10,7 @@ import {
   reviewDecisionIsAllow,
   reviewDecisionOpaqueString,
   type ReviewDecision,
-} from "./review-decision.js";
+} from "../../src/permissions/review-decision.js";
 
 describe("ReviewDecision — 7 tagged variants", () => {
   test("constructors produce the right kinds", () => {

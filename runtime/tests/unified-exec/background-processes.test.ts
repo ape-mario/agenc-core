@@ -1,6 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
-import { ProcessOutputBuffer, UnifiedExecProcessManager } from "./process-manager.js";
+import { ProcessOutputBuffer, UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
 
 const managers: UnifiedExecProcessManager[] = [];
 function manager(): UnifiedExecProcessManager {

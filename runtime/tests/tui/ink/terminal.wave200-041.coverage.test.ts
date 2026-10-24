@@ -1,8 +1,8 @@
 import type { Writable } from 'stream'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import type { Diff } from './frame.ts'
-import type { Terminal } from './terminal.ts'
+import type { Diff } from '../../../src/tui/ink/frame.js'
+import type { Terminal } from '../../../src/tui/ink/terminal.js'
 
 type EnvOverrides = Record<string, string | undefined>
 
@@ -102,7 +102,7 @@ function setPlatform(value: NodeJS.Platform): void {
 async function importTerminal(overrides: EnvOverrides = {}) {
   vi.resetModules()
   resetTerminalEnv(overrides)
-  return import('./terminal.ts')
+  return import('../../../src/tui/ink/terminal.js')
 }
 
 function makeTerminal(writes: string[]): Terminal {

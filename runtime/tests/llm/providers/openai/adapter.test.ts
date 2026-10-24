@@ -5,13 +5,13 @@ import {
   LLMRateLimitError,
   LLMServerError,
   LLMTimeoutError,
-} from "../../errors.js";
-import { LMStudioProvider } from "../lmstudio/index.js";
-import { BUILT_IN_PROVIDER_BASE_URLS } from "../../registry/provider-info.js";
-import { OpenAIProvider } from "./adapter.js";
-import { childTerminalOutcome } from "../../../agents/child-terminal.js";
-import { StreamModelError } from "../../../phases/stream-model.js";
-import { isRetryableStreamError } from "../../../session/run-turn-stream-retry.js";
+} from "../../../../src/llm/errors.js";
+import { LMStudioProvider } from "../../../../src/llm/providers/lmstudio/index.js";
+import { BUILT_IN_PROVIDER_BASE_URLS } from "../../../../src/llm/registry/provider-info.js";
+import { OpenAIProvider } from "../../../../src/llm/providers/openai/adapter.js";
+import { childTerminalOutcome } from "../../../../src/agents/child-terminal.js";
+import { StreamModelError } from "../../../../src/phases/stream-model.js";
+import { isRetryableStreamError } from "../../../../src/session/run-turn-stream-retry.js";
 
 const PROVIDER_TEST_LABEL = "Open" + "AI";
 

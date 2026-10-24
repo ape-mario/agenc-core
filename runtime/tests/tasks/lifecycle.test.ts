@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { AgentStatus } from "../agents/status.js";
-import type { RunAgentResult } from "../agents/run-agent.js";
-import type { CacheSafeParams } from "../services/PromptSuggestion/runtime.js";
+import type { AgentStatus } from "../../src/agents/status.js";
+import type { RunAgentResult } from "../../src/agents/run-agent.js";
+import type { CacheSafeParams } from "../../src/services/PromptSuggestion/runtime.js";
 import {
   BackgroundTaskError,
   BackgroundTaskLifecycle,
   registerAgentThreadTask,
   type AgentThreadTaskHandle,
-} from "./index.js";
+} from "../../src/tasks/index.js";
 
 class FakeStatus {
   value: AgentStatus = { status: "pending_init" };

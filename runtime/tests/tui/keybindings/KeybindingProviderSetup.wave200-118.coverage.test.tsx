@@ -1,24 +1,24 @@
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("../ink.js", () => ({
+vi.mock("../../../src/tui/ink.js", () => ({
   useInput: () => {},
 }));
 
-vi.mock("../context/notifications.js", () => ({
+vi.mock("../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({
     addNotification: () => {},
     removeNotification: () => {},
   }),
 }));
 
-vi.mock("../../utils/debug.js", () => ({
+vi.mock("../../../src/utils/debug.js", () => ({
   logForDebugging: () => {},
 }));
 
-import type { Key } from "../ink.js";
-import { createChordInputHandler } from "./KeybindingProviderSetup.js";
-import { parseBindings } from "./parser.js";
-import type { ParsedKeystroke } from "./types.js";
+import type { Key } from "../../../src/tui/ink.js";
+import { createChordInputHandler } from "../../../src/tui/keybindings/KeybindingProviderSetup.js";
+import { parseBindings } from "../../../src/tui/keybindings/parser.js";
+import type { ParsedKeystroke } from "../../../src/tui/keybindings/types.js";
 
 function key(overrides: Partial<Key> = {}): Key {
   return {

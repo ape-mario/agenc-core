@@ -3,28 +3,28 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JWT } from "google-auth-library";
-import type { AuthBackend } from "../auth/backend.js";
-import { AnthropicProvider } from "./providers/anthropic/adapter.js";
-import { BedrockProvider } from "./providers/bedrock/index.js";
-import { DeepSeekProvider } from "./providers/deepseek/index.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
+import { AnthropicProvider } from "../../src/llm/providers/anthropic/adapter.js";
+import { BedrockProvider } from "../../src/llm/providers/bedrock/index.js";
+import { DeepSeekProvider } from "../../src/llm/providers/deepseek/index.js";
 import {
   GeminiProvider,
   type GeminiProviderConfig,
-} from "./providers/gemini/index.js";
-import { createGeminiEndpointPlan } from "./providers/gemini/endpoint-plan.js";
-import { GrokProvider } from "./providers/grok/adapter.js";
-import { GrokAcpProvider } from "./providers/grok/acp-adapter.js";
-import { GroqProvider } from "./providers/groq/index.js";
-import { GitHubProvider } from "./providers/github/index.js";
-import { LMStudioProvider } from "./providers/lmstudio/index.js";
-import { MiniMaxProvider } from "./providers/minimax/index.js";
-import { MistralProvider } from "./providers/mistral/index.js";
-import { NvidiaNimProvider } from "./providers/nvidia-nim/index.js";
-import { OllamaProvider } from "./providers/ollama/adapter.js";
-import { OpenAICompatibleProvider } from "./providers/openai-compatible/index.js";
-import { OpenAIProvider } from "./providers/openai/adapter.js";
-import type { OpenAIProviderConfig } from "./providers/openai/types.js";
-import { OpenRouterProvider } from "./providers/openrouter/index.js";
+} from "../../src/llm/providers/gemini/index.js";
+import { createGeminiEndpointPlan } from "../../src/llm/providers/gemini/endpoint-plan.js";
+import { GrokProvider } from "../../src/llm/providers/grok/adapter.js";
+import { GrokAcpProvider } from "../../src/llm/providers/grok/acp-adapter.js";
+import { GroqProvider } from "../../src/llm/providers/groq/index.js";
+import { GitHubProvider } from "../../src/llm/providers/github/index.js";
+import { LMStudioProvider } from "../../src/llm/providers/lmstudio/index.js";
+import { MiniMaxProvider } from "../../src/llm/providers/minimax/index.js";
+import { MistralProvider } from "../../src/llm/providers/mistral/index.js";
+import { NvidiaNimProvider } from "../../src/llm/providers/nvidia-nim/index.js";
+import { OllamaProvider } from "../../src/llm/providers/ollama/adapter.js";
+import { OpenAICompatibleProvider } from "../../src/llm/providers/openai-compatible/index.js";
+import { OpenAIProvider } from "../../src/llm/providers/openai/adapter.js";
+import type { OpenAIProviderConfig } from "../../src/llm/providers/openai/types.js";
+import { OpenRouterProvider } from "../../src/llm/providers/openrouter/index.js";
 import {
   createProvider,
   isFactoryProvider,
@@ -33,12 +33,12 @@ import {
   readProviderFactoryOptions,
   readProviderIdentity,
   type ProviderName,
-} from "./provider.js";
-import { resolveProviderFactoryOptions } from "./provider-options.js";
+} from "../../src/llm/provider.js";
+import { resolveProviderFactoryOptions } from "../../src/llm/provider-options.js";
 import {
   BUILT_IN_PROVIDER_DEFINITIONS,
   resolveBuiltInProviderInfo,
-} from "./registry/provider-info.js";
+} from "../../src/llm/registry/provider-info.js";
 
 function withEnv<T>(
   overrides: Record<string, string | undefined>,

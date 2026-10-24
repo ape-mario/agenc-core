@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { chordToDisplayString, parseChord } from './parser.js'
+import { chordToDisplayString, parseChord } from '../../../src/tui/keybindings/parser.js'
 
 describe('keybinding display glyphs', () => {
   test('uses text arrow names in ASCII glyph mode', () => {

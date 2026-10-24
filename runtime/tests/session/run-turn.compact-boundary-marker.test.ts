@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { LLMResponse } from "../llm/types.js";
+import type { LLMResponse } from "../../src/llm/types.js";
 import {
   runTurn,
   setAutoCompactImplForTests,
   type AutoCompactImpl,
-} from "./run-turn.js";
+} from "../../src/session/run-turn.js";
 import { drain, mkCtx, mkProvider, mkSession } from "../../tests/fixtures.js";
 
 afterEach(() => {

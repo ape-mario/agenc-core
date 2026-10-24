@@ -2,9 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { LogsRepository } from "./logs.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
-import { StateThreadRepository } from "./threads.js";
+import { LogsRepository } from "../../src/state/logs.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
+import { StateThreadRepository } from "../../src/state/threads.js";
 
 let home = "";
 let cwd = "";

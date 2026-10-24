@@ -5,14 +5,14 @@ vi.mock('os', async importOriginal => ({
   homedir: () => '/home/tester',
 }));
 
-vi.mock('../../../utils/cwd.js', () => ({
+vi.mock('../../../../src/utils/cwd.js', () => ({
   getCwd: () => '/home/tester/project',
 }));
 
 import {
   getRelativeMemoryPath,
   getRelativeMemoryPathForRoots,
-} from './path-format.js';
+} from '../../../../src/tui/components/memory/path-format.js';
 
 describe('memory path display formatting', () => {
   test('formats paths relative to home, cwd, or neither root', () => {

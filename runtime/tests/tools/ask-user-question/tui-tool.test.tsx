@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-vi.mock('../../tui/ink.js', () => ({
+vi.mock('../../../src/tui/ink.js', () => ({
   Box: ({ children }: { readonly children?: unknown }) => ({
     type: 'Box',
     props: { children },
@@ -11,11 +11,11 @@ vi.mock('../../tui/ink.js', () => ({
   }),
 }))
 
-import { AskUserQuestionTool } from './tui-tool.js'
+import { AskUserQuestionTool } from '../../../src/tools/ask-user-question/tui-tool.js'
 import {
   setAllowedChannels,
   setQuestionPreviewFormat,
-} from '../../bootstrap/state.js'
+} from '../../../src/bootstrap/state.js'
 
 const input = {
   questions: [

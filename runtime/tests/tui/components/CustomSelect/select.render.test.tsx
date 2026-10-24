@@ -4,28 +4,28 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../../ink/root.js'
-import { Select, type OptionWithDescription } from './select.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { Select, type OptionWithDescription } from '../../../../src/tui/components/CustomSelect/select.js'
 
-vi.mock('../../../utils/debug.js', () => ({
+vi.mock('../../../../src/utils/debug.js', () => ({
   logForDebugging: () => {},
 }))
-vi.mock('../../../bootstrap/state.js', () => ({
+vi.mock('../../../../src/bootstrap/state.js', () => ({
   flushInteractionTime: () => {},
   getActiveTimeCounter: () => 0,
   markScrollActivity: () => {},
   updateLastInteractionTime: () => {},
 }))
-vi.mock('../../../utils/earlyInput.js', () => ({
+vi.mock('../../../../src/utils/earlyInput.js', () => ({
   stopCapturingEarlyInput: () => {},
 }))
-vi.mock('../../../utils/envUtils.js', () => ({
+vi.mock('../../../../src/utils/envUtils.js', () => ({
   isEnvTruthy: () => false,
 }))
-vi.mock('../../../utils/fullscreen.js', () => ({
+vi.mock('../../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => true,
 }))
-vi.mock('../../../utils/log.js', () => ({
+vi.mock('../../../../src/utils/log.js', () => ({
   logError: () => {},
 }))
 

@@ -1,8 +1,8 @@
 /** Canonical Monitor schema, result, and unified-exec integration tests. */
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
-import { UnifiedExecProcessManager } from "../../unified-exec/process-manager.js";
-import { createMonitorTool as createUnboundMonitorTool } from "./monitor.js";
+import { UnifiedExecProcessManager } from "../../../src/unified-exec/process-manager.js";
+import { createMonitorTool as createUnboundMonitorTool } from "../../../src/tools/system/monitor.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 import { attachExecOwnerBinding } from "../../../src/unified-exec/process-ownership.js";
 

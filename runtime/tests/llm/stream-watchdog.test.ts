@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { DEFAULT_STREAM_WATCHDOG_TIMEOUT_MS } from "../config/schema.js";
+import { DEFAULT_STREAM_WATCHDOG_TIMEOUT_MS } from "../../src/config/schema.js";
 import {
   classifyStreamLiveness,
   formatStreamQuietWarning,
@@ -9,7 +9,7 @@ import {
   STREAM_IDLE_WARNING_REASON,
   STREAM_QUIET_WARNING_MS,
   streamChunkHasDelta,
-} from "./stream-watchdog.js";
+} from "../../src/llm/stream-watchdog.js";
 
 describe("stream-watchdog", () => {
   let nowMs = 0;

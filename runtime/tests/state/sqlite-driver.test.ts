@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join, toNamespacedPath } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StateSchemaMismatchError } from "./errors.js";
+import { StateSchemaMismatchError } from "../../src/state/errors.js";
 import {
   applyMigrations,
   openStateDatabases,
@@ -22,8 +22,8 @@ import {
   STATE_PRE_V17_BACKUP_FILENAME,
   STATE_PRE_V19_BACKUP_FILENAME,
   STATE_WAL_AUTOCHECKPOINT_PAGES,
-} from "./sqlite-driver.js";
-import { STATE_DB_MIGRATIONS } from "./migrations/index.js";
+} from "../../src/state/sqlite-driver.js";
+import { STATE_DB_MIGRATIONS } from "../../src/state/migrations/index.js";
 
 function openFixtureDatabase(path: string, options?: Database.Options): Database.Database {
   return new Database(toNamespacedPath(path), options);

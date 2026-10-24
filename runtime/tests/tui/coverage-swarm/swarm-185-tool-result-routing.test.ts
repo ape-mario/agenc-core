@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   pickToolResultDispatch,
   resultTextForTuiTool,
-} from "../tool-result-routing.js";
+} from "../../../src/tui/tool-result-routing.js";
 
 describe("pickToolResultDispatch coverage swarm row 185", () => {
   test("exact routed tool names without their own envelope fall through to generic", () => {

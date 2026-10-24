@@ -24,7 +24,7 @@ import {
   shiftRows,
   visibleCellAtIndex,
   type Screen,
-} from './screen.ts'
+} from '../../../src/tui/ink/screen.js'
 
 function makePools(): {
   styles: StylePool

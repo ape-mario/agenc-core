@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { LLMInvalidResponseError } from "../errors.js";
+import { LLMInvalidResponseError } from "../../../src/llm/errors.js";
 import {
   normalizeFinishReason,
   requireMappedFinishReason,
-} from "./shared.js";
+} from "../../../src/llm/wire/shared.js";
 
 describe("normalizeFinishReason", () => {
   it("maps documented provider stop reasons onto the shared finish reasons", () => {

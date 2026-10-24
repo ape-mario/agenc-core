@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { BehaviorSubject } from "./behavior-subject.js";
+import { BehaviorSubject } from "../../src/utils/behavior-subject.js";
 
 describe("BehaviorSubject", () => {
   test("happy path: subscribe replays current; next pushes updates", () => {

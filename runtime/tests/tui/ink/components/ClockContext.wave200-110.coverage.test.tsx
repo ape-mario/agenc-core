@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { createClock } from './ClockContext.js'
+import { createClock } from '../../../../src/tui/ink/components/ClockContext.js'
 
 afterEach(() => {
   vi.useRealTimers()

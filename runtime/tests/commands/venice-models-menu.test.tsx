@@ -7,20 +7,20 @@ import type { ReactNode } from "react";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { saveProviderKey } from "../auth/provider-keys.js";
-import { readLocalByokCredential } from "../auth/native-credentials.js";
-import type { EnvSnapshot } from "../config/env.js";
-import { resolveHomeContext, type HomeContext } from "../config/home.js";
-import type { ConfigStore } from "../config/store.js";
-import { VENICE_MODELS, VENICE_TOOL_CALLS_NOT_DELIVERED } from "../llm/registry/venice-models.js";
-import type { Session } from "../session/session.js";
-import { chooseProviderModel } from "./providers-hub-actions.js";
-import { openProvidersHub } from "./providers-hub.js";
-import { readProvidersHubModels } from "./providers-hub-snapshot.js";
-import type { SlashCommandContext } from "./types.js";
+import { saveProviderKey } from "../../src/auth/provider-keys.js";
+import { readLocalByokCredential } from "../../src/auth/native-credentials.js";
+import type { EnvSnapshot } from "../../src/config/env.js";
+import { resolveHomeContext, type HomeContext } from "../../src/config/home.js";
+import type { ConfigStore } from "../../src/config/store.js";
+import { VENICE_MODELS, VENICE_TOOL_CALLS_NOT_DELIVERED } from "../../src/llm/registry/venice-models.js";
+import type { Session } from "../../src/session/session.js";
+import { chooseProviderModel } from "../../src/commands/providers-hub-actions.js";
+import { openProvidersHub } from "../../src/commands/providers-hub.js";
+import { readProvidersHubModels } from "../../src/commands/providers-hub-snapshot.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 import { renderPtyRows } from "../../scripts/check-tui-e2e/harness.mjs";
-import { createRoot } from "../tui/ink.js";
-import { AppStateProvider, getDefaultAppState } from "../tui/state/AppState.js";
+import { createRoot } from "../../src/tui/ink.js";
+import { AppStateProvider, getDefaultAppState } from "../../src/tui/state/AppState.js";
 
 // Opening the providers screen probes the local runtimes (Ollama, LM Studio,
 // a local OpenAI-compatible server) on localhost. Report none running, so

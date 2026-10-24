@@ -1,12 +1,12 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { InProcessTeammateTaskState } from '../../../tasks/InProcessTeammateTask/types.js'
-import { renderToString } from '../../../utils/staticRender.js'
+import type { InProcessTeammateTaskState } from '../../../../src/tasks/InProcessTeammateTask/types.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 import {
   getMessagePreview,
   TeammateSpinnerLine,
-} from './TeammateSpinnerLine.js'
+} from '../../../../src/tui/components/spinner/TeammateSpinnerLine.js'
 
 const NOW = new Date('2026-05-20T12:00:00.000Z').getTime()
 const TEST_SPINNER_VERBS = ['Reviewing'] as const
@@ -23,11 +23,11 @@ vi.mock('lodash-es/sample.js', () => ({
   default: <T,>(items: readonly T[]) => items[0],
 }))
 
-vi.mock('../../../constants/turnCompletionVerbs.js', () => ({
+vi.mock('../../../../src/constants/turnCompletionVerbs.js', () => ({
   TURN_COMPLETION_VERBS: ['finished'],
 }))
 
-vi.mock('../../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => terminalSizeMock.size,
 }))
 

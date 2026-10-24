@@ -2,14 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createDiffMenuSnapshot,
   type DiffFileStatus,
-} from "./diff-menu.js";
+} from "../../src/commands/diff-menu.js";
 import {
   collectDiffSnapshot,
   computeDiff,
   diffCommand,
-} from "./diff.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "./types.js";
+} from "../../src/commands/diff.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 type GitMock = (args: readonly string[]) => {
   stdout: string;

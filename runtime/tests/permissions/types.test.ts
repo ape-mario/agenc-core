@@ -10,7 +10,7 @@ import {
   deepFreeze,
   isPermissionMode,
   isUserAddressablePermissionMode,
-} from "./types.js";
+} from "../../src/permissions/types.js";
 
 describe("permissions/types constants", () => {
   test("PERMISSION_RULE_SOURCES preserves AgenC priority order", () => {

@@ -5,41 +5,41 @@ import { sourceUrl } from "../../helpers/source-path.ts";
 import {
   createTokenAccountingRequest,
   estimateTokenAccountingRequest,
-} from "../../llm/token-accounting.js";
-import { getAPIContextManagement } from "./apiMicrocompact.js";
+} from "../../../src/llm/token-accounting.js";
+import { getAPIContextManagement } from "../../../src/services/compact/apiMicrocompact.js";
 import {
   createCachedMicrocompactState,
   getCachedMicrocompactState,
   isCachedMicrocompactEnabled,
   maybeRunCachedMicrocompact,
   resetCachedMicrocompactState,
-} from "./cachedMicrocompact.js";
+} from "../../../src/services/compact/cachedMicrocompact.js";
 import {
   clearCompactWarningSuppression,
   compactWarningStore,
   suppressCompactWarning,
-} from "./compactWarningState.js";
-import { runPostCompactCleanup } from "./postCompactCleanup.js";
-import { estimateMessagesTokens } from "./_deps/runtime.js";
+} from "../../../src/services/compact/compactWarningState.js";
+import { runPostCompactCleanup } from "../../../src/services/compact/postCompactCleanup.js";
+import { estimateMessagesTokens } from "../../../src/services/compact/_deps/runtime.js";
 import {
   formatCompactSummary,
   getCompactPrompt,
   getCompactUserSummaryMessage,
   getPartialCompactPrompt,
   stripAnalysisTags,
-} from "./prompt.js";
+} from "../../../src/services/compact/prompt.js";
 import {
   calculateMessagesToKeepIndex,
   preserveToolPairsFromIndex,
   shouldUseSessionMemoryCompaction,
   trySessionMemoryCompaction,
-} from "./sessionMemoryCompact.js";
-import { snipCompact } from "./snipCompact.js";
-import type { CompactContext, RuntimeMessage } from "./types.js";
+} from "../../../src/services/compact/sessionMemoryCompact.js";
+import { snipCompact } from "../../../src/services/compact/snipCompact.js";
+import type { CompactContext, RuntimeMessage } from "../../../src/services/compact/types.js";
 import {
   createCsvAgentInvocationEnvelope,
   materializeAgentInvocationMessages,
-} from "../../contracts/agent-invocation-envelope.js";
+} from "../../../src/contracts/agent-invocation-envelope.js";
 
 function invocationRuntimeMessages(): RuntimeMessage[] {
   return materializeAgentInvocationMessages(

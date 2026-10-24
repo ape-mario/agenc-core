@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { REDACTED_SECRET, redactSecrets } from "./index.js";
+import { REDACTED_SECRET, redactSecrets } from "../../src/secrets/index.js";
 
 // Revert-sensitive regression for the bare-mnemonic leak: a complete BIP39 seed
 // phrase that abuts an ordinary BIP39 word (hundreds of common English words —

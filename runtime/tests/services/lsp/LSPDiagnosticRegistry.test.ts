@@ -9,8 +9,8 @@ import {
   peekLSPDiagnosticsForFile,
   registerPendingLSPDiagnostic,
   resetAllLSPDiagnosticState,
-} from "./LSPDiagnosticRegistry.js";
-import type { DiagnosticEntry } from "./types.js";
+} from "../../../src/services/lsp/LSPDiagnosticRegistry.js";
+import type { DiagnosticEntry } from "../../../src/services/lsp/types.js";
 
 const baseDiagnostic: DiagnosticEntry = {
   message: "missing semicolon",

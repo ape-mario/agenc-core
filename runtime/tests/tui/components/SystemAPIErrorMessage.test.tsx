@@ -1,9 +1,9 @@
 import * as React from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import type { createSystemAPIErrorMessage } from "../../utils/messages.js";
-import type { AgenCSystemAPIErrorMessage } from "../../errors/api.js";
-import { SystemAPIErrorMessage } from "./SystemAPIErrorMessage.js";
+import type { createSystemAPIErrorMessage } from "../../../src/utils/messages.js";
+import type { AgenCSystemAPIErrorMessage } from "../../../src/errors/api.js";
+import { SystemAPIErrorMessage } from "../../../src/tui/components/SystemAPIErrorMessage.js";
 
 type LiveCreateSystemAPIErrorMessage =
   typeof createSystemAPIErrorMessage;
@@ -29,7 +29,7 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-vi.mock("../ink.js", async () => {
+vi.mock("../../../src/tui/ink.js", async () => {
   const React = await import("react");
   const Passthrough = ({
     children,
@@ -44,7 +44,7 @@ vi.mock("../ink.js", async () => {
   };
 });
 
-vi.mock("./design-system/Ratchet.js", async () => {
+vi.mock("../../../src/tui/components/design-system/Ratchet.js", async () => {
   const React = await import("react");
   const Passthrough = ({
     children,

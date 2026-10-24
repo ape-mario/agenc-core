@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { QueuedMessageProvider } from '../context/QueuedMessageContext.js'
-import { UserPromptMessage } from './UserPromptMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { QueuedMessageProvider } from '../../../src/tui/context/QueuedMessageContext.js'
+import { UserPromptMessage } from '../../../src/tui/message-renderers/UserPromptMessage.js'
 
 describe('UserPromptMessage coverage', () => {
   test('renders long prompts with head-tail truncation in the user message layout', async () => {

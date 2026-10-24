@@ -4,17 +4,17 @@ import {
   OPENROUTER_ZDR_OFF_HINT,
   openRouterZeroDataRetentionEnabled,
   resolveZeroDataRetentionStatus,
-} from "./zero-data-retention.js";
+} from "../../src/llm/zero-data-retention.js";
 import {
   recordOpenRouterZdrEndpoints,
   resetOpenRouterZdrEndpointsForTesting,
-} from "./registry/openrouter-zdr-endpoints.js";
+} from "../../src/llm/registry/openrouter-zdr-endpoints.js";
 import {
   BUILT_IN_PROVIDER_DEFINITIONS,
   builtInProviderIds,
-} from "./registry/provider-info.js";
-import type { VeniceModel } from "./registry/venice-models.js";
-import { KIMI_CHAT_MODELS } from "./registry/kimi-models.js";
+} from "../../src/llm/registry/provider-info.js";
+import type { VeniceModel } from "../../src/llm/registry/venice-models.js";
+import { KIMI_CHAT_MODELS } from "../../src/llm/registry/kimi-models.js";
 
 afterEach(() => resetOpenRouterZdrEndpointsForTesting());
 

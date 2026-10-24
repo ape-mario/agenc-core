@@ -111,31 +111,31 @@ async function loadMemoryHarness(options: {
   readonly kairosActive?: boolean;
   readonly loadAgencmd?: boolean;
 } = {}): Promise<{
-  agencmd?: typeof import("./agencmd.js");
-  memory: typeof import("./memdir.js");
-  paths: typeof import("./paths.js");
+  agencmd?: typeof import("../../src/memory/agencmd.js");
+  memory: typeof import("../../src/memory/memdir.js");
+  paths: typeof import("../../src/memory/paths.js");
 }> {
   vi.resetModules();
   vi.doMock("bun:bundle", () => ({
     feature: (name: string) => options.features?.includes(name) ?? false,
   }));
-  vi.doMock("../tools/GrepTool/prompt.js", () => ({ GREP_TOOL_NAME: "Grep" }));
-  vi.doMock("../tools/REPLTool/constants.js", () => ({
+  vi.doMock("../../src/tools/GrepTool/prompt.js", () => ({ GREP_TOOL_NAME: "Grep" }));
+  vi.doMock("../../src/tools/REPLTool/constants.js", () => ({
     isReplModeEnabled: () => false,
   }));
-  vi.doMock("../tools.js", () => ({}));
+  vi.doMock("../../src/tools.js", () => ({}));
   vi.doMock("src/tools.js", () => ({}));
-  vi.doMock("../utils/embeddedTools.js", () => ({
+  vi.doMock("../../src/utils/embeddedTools.js", () => ({
     hasEmbeddedSearchTools: () => false,
   }));
-  vi.doMock("../utils/sessionStorage.js", () => ({
+  vi.doMock("../../src/utils/sessionStorage.js", () => ({
     getProjectDir: (cwd: string) => cwd,
   }));
-  vi.doMock("../utils/hooks.js", () => ({
+  vi.doMock("../../src/utils/hooks.js", () => ({
     executeInstructionsLoadedHooks: async () => undefined,
     hasInstructionsLoadedHook: () => false,
   }));
-  vi.doMock("../utils/settings/settings.js", () => ({
+  vi.doMock("../../src/utils/settings/settings.js", () => ({
     getExecutionAuthoritySettings: () => ({ autoMemoryEnabled: true }),
     getInitialSettings: () => ({ autoMemoryEnabled: true }),
     getSettingsForSource: () => undefined,
@@ -144,13 +144,13 @@ async function loadMemoryHarness(options: {
   oldAgencHome = process.env.AGENC_HOME;
   process.env.AGENC_HOME = join(tempRoot, "home");
 
-  const state = await import("../bootstrap/state.js");
+  const state = await import("../../src/bootstrap/state.js");
   state.setProjectRoot(join(tempRoot, "repo"));
   state.setKairosActive(options.kairosActive ?? false);
 
-  const paths = await import("./paths.js");
+  const paths = await import("../../src/memory/paths.js");
   paths.getProjectMemoryPath.cache?.clear?.();
-  const agencmd = options.loadAgencmd ? await import("./agencmd.js") : undefined;
-  const memory = await import("./memdir.js");
+  const agencmd = options.loadAgencmd ? await import("../../src/memory/agencmd.js") : undefined;
+  const memory = await import("../../src/memory/memdir.js");
   return { agencmd, memory, paths };
 }

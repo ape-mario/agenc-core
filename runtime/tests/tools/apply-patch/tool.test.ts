@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 
 import { describe, expect, test } from "vitest";
 
-import { APPLY_PATCH_LARK_GRAMMAR, APPLY_PATCH_TOOL_NAME, createApplyPatchTool } from "./tool.js";
-import { createEmptyToolPermissionContext } from "../../permissions/types.js";
+import { APPLY_PATCH_LARK_GRAMMAR, APPLY_PATCH_TOOL_NAME, createApplyPatchTool } from "../../../src/tools/apply-patch/tool.js";
+import { createEmptyToolPermissionContext } from "../../../src/permissions/types.js";
 import { SESSION_ID_ARG } from "../../../src/tools/system/filesystem.js";
 
 async function tempRoot(): Promise<string> {

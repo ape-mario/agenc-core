@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   ProviderHttpClientSession,
   ProviderHttpError,
-} from "./client-session.js";
+} from "../../src/llm/client-session.js";
 import {
   LLMCaptivePortalError,
   LLMCertificateError,
   LLMInvalidResponseError,
-} from "./errors.js";
+} from "../../src/llm/errors.js";
 
 function streamFromChunks(
   chunks: Array<string | Uint8Array>,

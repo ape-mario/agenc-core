@@ -10,7 +10,7 @@ import {
   recordDenial,
   recordSuccess,
   shouldFallbackToPrompting,
-} from "./denial-tracking.js";
+} from "../../src/permissions/denial-tracking.js";
 
 describe("DENIAL_LIMITS", () => {
   it("matches AgenC's live values (3 consecutive, 20 total)", () => {

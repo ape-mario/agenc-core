@@ -10,7 +10,7 @@ import {
 } from "../../src/permissions/read-only-grant.js";
 import { checkReadOnlyConstraints } from "../../src/tools/BashTool/readOnlyValidation.js";
 import { checkPathConstraints } from "../../src/tools/BashTool/pathValidation.js";
-import { createEmptyToolPermissionContext } from "./types.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 const CWD = "/workspace/project";
 // No directory grants. The routine path builds an empty Map, so seeding the

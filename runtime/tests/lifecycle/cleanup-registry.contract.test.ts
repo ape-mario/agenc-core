@@ -1,12 +1,12 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { AgenCCleanupRegistry } from "./cleanup-registry.js";
+import { AgenCCleanupRegistry } from "../../src/lifecycle/cleanup-registry.js";
 import {
   exitCodeForSignal,
   installAgenCShutdownSignalHandlers,
   type AgenCShutdownSignal,
-} from "./signal-handlers.js";
-import { summarizeAgenCShutdown } from "./shutdown-message.js";
+} from "../../src/lifecycle/signal-handlers.js";
+import { summarizeAgenCShutdown } from "../../src/lifecycle/shutdown-message.js";
 
 function createSignalProcess() {
   const listeners = new Map<AgenCShutdownSignal, Set<() => void>>();

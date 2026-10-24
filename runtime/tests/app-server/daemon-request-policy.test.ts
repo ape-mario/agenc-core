@@ -3,7 +3,7 @@ import {
   AGENC_DAEMON_REQUEST_TIMEOUT_MS_ENV,
   MAX_DAEMON_REQUEST_TIMEOUT_MS,
   resolveAgenCDaemonRequestTimeoutMs,
-} from "./daemon-request-policy.js";
+} from "../../src/app-server/daemon-request-policy.js";
 
 const DAEMON_CLI_DEFAULT_MS = 2_000;
 const AGENT_CLI_DEFAULT_MS = 30_000;

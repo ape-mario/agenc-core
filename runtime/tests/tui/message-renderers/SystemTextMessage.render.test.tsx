@@ -3,11 +3,11 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import type { DOMElement, DOMNode } from '../ink/dom.js'
-import instances from '../ink/instances.js'
-import { createRoot } from '../ink/root.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { SystemTextMessage } from './SystemTextMessage.js'
+import type { DOMElement, DOMNode } from '../../../src/tui/ink/dom.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { SystemTextMessage } from '../../../src/tui/message-renderers/SystemTextMessage.js'
 
 const browserMock = vi.hoisted(() => ({
   openPath: vi.fn(),
@@ -17,13 +17,13 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({ tui: { showTurnDuration: true } }),
 }))
 
-vi.mock('../../utils/browser.js', () => browserMock)
+vi.mock('../../../src/utils/browser.js', () => browserMock)
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppStateStore: () => ({
     getState: () => ({ tasks: {} }),
   }),

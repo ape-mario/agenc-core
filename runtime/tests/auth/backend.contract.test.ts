@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AuthBackend, AuthSessionId } from "./backend.js";
+import type { AuthBackend, AuthSessionId } from "../../src/auth/backend.js";
 
 function asPromise<T>(value: T | Promise<T>): Promise<T> {
   return Promise.resolve(value);

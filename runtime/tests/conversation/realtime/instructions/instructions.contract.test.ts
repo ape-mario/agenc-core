@@ -2,11 +2,11 @@ import { describe, expect, test } from "vitest";
 
 import {
   isContextualDeveloperMessageContent,
-} from "../../../session/rollout-reconstruction.js";
+} from "../../../../src/session/rollout-reconstruction.js";
 import {
   REALTIME_CONVERSATION_CLOSE_TAG,
   REALTIME_CONVERSATION_OPEN_TAG,
-} from "./markers.js";
+} from "../../../../src/conversation/realtime/instructions/markers.js";
 import {
   realtimeEndInstructionMessage,
   realtimeStartInstructionMessage,
@@ -14,7 +14,7 @@ import {
   renderRealtimeEndInstructions,
   renderRealtimeStartInstructions,
   renderRealtimeStartWithInstructions,
-} from "./messages.js";
+} from "../../../../src/conversation/realtime/instructions/messages.js";
 
 describe("realtime instruction fragments", () => {
   test("renders default start instructions inside realtime markers", () => {

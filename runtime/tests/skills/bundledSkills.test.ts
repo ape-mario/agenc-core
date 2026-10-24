@@ -13,10 +13,10 @@ import { test } from 'vitest'
   NATIVE_PACKAGE_URL: undefined,
 }
 
-import type { ToolUseContext } from '../tools/Tool.js'
+import type { ToolUseContext } from '../../src/tools/Tool.js'
 
 test('bundled agenc-marketplace-kit-installer skill registers with the safe install runbook', async () => {
-  const { getBundledSkills } = await import('./bundledSkills.js')
+  const { getBundledSkills } = await import('../../src/skills/bundledSkills.js')
   const skill = getBundledSkills().find(
     (command) => command.name === 'agenc-marketplace-kit-installer',
   )
@@ -61,7 +61,7 @@ test('bundled agenc-marketplace-kit-installer skill registers with the safe inst
 })
 
 test('the kit installer is unlisted by default and listed once the marketplace is enabled', async () => {
-  const { isBundledSkillListed } = await import('./bundledSkills.js')
+  const { isBundledSkillListed } = await import('../../src/skills/bundledSkills.js')
   const installer = 'agenc-marketplace-kit-installer'
 
   assert.equal(isBundledSkillListed(installer, undefined), false)
@@ -77,12 +77,12 @@ test('the kit installer is unlisted by default and listed once the marketplace i
     true,
   )
   // It stays loadable by name: it is registered, only unlisted.
-  const { getBundledSkills } = await import('./bundledSkills.js')
+  const { getBundledSkills } = await import('../../src/skills/bundledSkills.js')
   assert.ok(getBundledSkills().some((command) => command.name === installer))
 })
 
 test('other bundled skills stay listed regardless of config', async () => {
-  const { isBundledSkillListed } = await import('./bundledSkills.js')
+  const { isBundledSkillListed } = await import('../../src/skills/bundledSkills.js')
 
   assert.equal(isBundledSkillListed('browser-automation', undefined), true)
   assert.equal(isBundledSkillListed('browser-automation', { protocol: { enabled: false } }), true)
@@ -91,7 +91,7 @@ test('other bundled skills stay listed regardless of config', async () => {
 
 test('registerBundledSkill honours listedByDefault: false and clearBundledSkills forgets it', async () => {
   const { registerBundledSkill, isBundledSkillListed, clearBundledSkills } = await import(
-    './bundledSkills.js'
+    '../../src/skills/bundledSkills.js'
   )
   const definition = {
     description: 'test skill',

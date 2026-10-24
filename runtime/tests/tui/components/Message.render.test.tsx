@@ -21,29 +21,29 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => harness.features.has(name),
 }))
 
-vi.mock('../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => harness.fullscreen,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 12, rows: 24 }),
 }))
 
-vi.mock('../../services/compact/snipProjection.js', () => ({
+vi.mock('../../../src/services/compact/snipProjection.js', () => ({
   isSnipBoundaryMessage: (message: { readonly subtype?: string }) =>
     message.subtype === 'snip_boundary',
 }))
 
-vi.mock('../../services/compact/snipCompact.js', () => ({
+vi.mock('../../../src/services/compact/snipCompact.js', () => ({
   isSnipMarkerMessage: (message: { readonly subtype?: string }) =>
     message.subtype === 'snip_marker',
 }))
 
-vi.mock('../message-renderers/SnipBoundaryMessage.js', async () => {
+vi.mock('../../../src/tui/message-renderers/SnipBoundaryMessage.js', async () => {
   return {
     SnipBoundaryMessage: (props: Record<string, unknown>) => {
       harness.calls.push({ name: 'SnipBoundaryMessage', props })
@@ -52,7 +52,7 @@ vi.mock('../message-renderers/SnipBoundaryMessage.js', async () => {
   }
 })
 
-vi.mock('./Message.renderers.js', async () => {
+vi.mock('../../../src/tui/components/Message.renderers.js', async () => {
   const ReactModule = await import('react')
   const renderer = (name: string) => (props: Record<string, unknown>) => {
     harness.calls.push({ name, props })
@@ -86,11 +86,11 @@ vi.mock('./Message.renderers.js', async () => {
   }
 })
 
-import { createRoot } from '../ink/root.js'
-import { Box } from '../ink.js'
-import { ContentWidthProvider } from '../context/contentWidthContext.js'
-import type { Props } from './Message.js'
-import { Message } from './Message.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { Box } from '../../../src/tui/ink.js'
+import { ContentWidthProvider } from '../../../src/tui/context/contentWidthContext.js'
+import type { Props } from '../../../src/tui/components/Message.js'
+import { Message } from '../../../src/tui/components/Message.js'
 
 function createStreams(): {
   stdout: PassThrough

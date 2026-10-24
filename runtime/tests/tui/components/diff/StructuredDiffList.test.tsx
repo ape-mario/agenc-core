@@ -2,7 +2,7 @@ import type { StructuredPatchHunk } from 'diff'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-vi.mock('../../ink.js', () => {
+vi.mock('../../../../src/tui/ink.js', () => {
   const Passthrough = ({ children }: { readonly children?: React.ReactNode }) => (
     <>{children}</>
   )
@@ -14,7 +14,7 @@ vi.mock('../../ink.js', () => {
   }
 })
 
-vi.mock('./StructuredDiff', () => ({
+vi.mock('../../../../src/tui/components/diff/StructuredDiff.js', () => ({
   StructuredDiff: ({
     dim,
     fileContent,
@@ -36,7 +36,7 @@ vi.mock('./StructuredDiff', () => ({
   ),
 }))
 
-import { StructuredDiffList } from './StructuredDiffList.js'
+import { StructuredDiffList } from '../../../../src/tui/components/diff/StructuredDiffList.js'
 
 function collectText(node: React.ReactNode): string {
   if (node === null || node === undefined || typeof node === 'boolean') {

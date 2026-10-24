@@ -9,7 +9,7 @@ import {
   type FileWatcherWatchFactory,
   isMutatingEvent,
   ThrottledWatchReceiver,
-} from "./index.js";
+} from "../../src/file-watcher/index.js";
 
 const TEST_THROTTLE_INTERVAL_MS = 30;
 const NO_EVENT_WINDOW_MS = 20;

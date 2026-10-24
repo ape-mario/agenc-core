@@ -5,14 +5,14 @@ import {
   EFFORT_LOW,
   EFFORT_MAX,
   EFFORT_MEDIUM,
-} from "../../constants/figures.js";
+} from "../../../src/constants/figures.js";
 import {
   effortLevelToSymbol,
   getEffortNotificationText,
-} from "./EffortIndicator.js";
+} from "../../../src/tui/components/EffortIndicator.js";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../remoteAuthSessionContext.fixture.js";
 
-vi.mock("../../utils/effort.js", () => ({
+vi.mock("../../../src/utils/effort.js", () => ({
   getDisplayedEffortLevelForContext: (_model: string, effortValue: string | undefined) =>
     effortValue ?? "medium",
   modelSupportsEffortForContext: (model: string) => model !== "basic-model",

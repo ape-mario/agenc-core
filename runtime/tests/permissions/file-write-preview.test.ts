@@ -3,21 +3,21 @@ import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { Event } from "../session/event-log.js";
+import type { Event } from "../../src/session/event-log.js";
 import {
   daemonEventFromUnboundSessionEvent,
   notificationFromDaemonEvent,
-} from "../app-server/background-agent-runner/daemon-events.js";
-import { isCanonicalEventPayload } from "../state/recovery-journal-schema.js";
-import type { ToolInvocation } from "../tools/context.js";
-import { createFileReadTool } from "../tools/system/file-read.js";
+} from "../../src/app-server/background-agent-runner/daemon-events.js";
+import { isCanonicalEventPayload } from "../../src/state/recovery-journal-schema.js";
+import type { ToolInvocation } from "../../src/tools/context.js";
+import { createFileReadTool } from "../../src/tools/system/file-read.js";
 import {
   clearSessionReadState,
   recordSessionRead,
-} from "../tools/system/filesystem.js";
-import { buildFileWriteApprovalPreview } from "./file-write-preview.js";
-import { requestApproval, type ApprovalCtx } from "./guardian/arbiter.js";
-import { createEmptyToolPermissionContext } from "./types.js";
+} from "../../src/tools/system/filesystem.js";
+import { buildFileWriteApprovalPreview } from "../../src/permissions/file-write-preview.js";
+import { requestApproval, type ApprovalCtx } from "../../src/permissions/guardian/arbiter.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 describe("file write approval preview", () => {
   let root: string;

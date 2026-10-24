@@ -9,7 +9,7 @@ import {
   getToolResultMessageWidth,
   hasThinkingContent,
   type Props,
-} from './Message.js'
+} from '../../../src/tui/components/Message.js'
 
 describe('Message tool-result width behavior', () => {
   it('clamps tool-result content width for tiny terminals', () => {

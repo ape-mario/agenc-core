@@ -7,9 +7,9 @@ const timeoutPolicy = vi.hoisted(() => ({
   resolve: vi.fn(),
 }));
 
-vi.mock("./daemon-request-policy.js", async (importOriginal) => {
+vi.mock("../../src/app-server/daemon-request-policy.js", async (importOriginal) => {
   const actual = await importOriginal<
-    typeof import("./daemon-request-policy.js")
+    typeof import("../../src/app-server/daemon-request-policy.js")
   >();
   timeoutPolicy.resolve.mockImplementation(
     actual.resolveAgenCDaemonRequestTimeoutMs,
@@ -20,12 +20,12 @@ vi.mock("./daemon-request-policy.js", async (importOriginal) => {
   };
 });
 
-import { createAgenCJsonLineDaemonRequestClient } from "./agent-cli.js";
+import { createAgenCJsonLineDaemonRequestClient } from "../../src/app-server/agent-cli.js";
 import {
   requestAgenCDaemonInstanceIdentity,
   resolveAgenCDaemonCookiePath,
   type AgenCDaemonCliHost,
-} from "./daemon-cli.js";
+} from "../../src/app-server/daemon-cli.js";
 
 const roots: string[] = [];
 

@@ -2,31 +2,31 @@ import { describe, expect, test, vi } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AsyncLock } from "../utils/async-lock.js";
-import type { LLMContentPart } from "../llm/types.js";
-import type { RolloutItem } from "../session/rollout-item.js";
+import { AsyncLock } from "../../src/utils/async-lock.js";
+import type { LLMContentPart } from "../../src/llm/types.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
 import type {
   ProviderSwitchTransactionOutcome,
   Session,
   SessionState,
-} from "../session/session.js";
-import { SessionStartupPrewarmStore } from "../session/startup-prewarm.js";
-import { computeCheckpointPrefixHashV2 } from "../session/durable-checkpoint-reader.js";
+} from "../../src/session/session.js";
+import { SessionStartupPrewarmStore } from "../../src/session/startup-prewarm.js";
+import { computeCheckpointPrefixHashV2 } from "../../src/session/durable-checkpoint-reader.js";
 import type {
   ToolPairIntegrityFailure,
   ToolPairOperationalDeferral,
   ToolPairProjection,
   ToolPairProjectionRecord,
   ToolPairProjectionSummary,
-} from "../session/tool-pair-validator.js";
-import { AgentControl, type LiveAgent } from "../agents/control.js";
-import { AgenCThread } from "../agents/thread-manager.js";
-import { Mailbox, readMailboxMetadata } from "../agents/mailbox.js";
-import { drainChildMailboxForTesting } from "../agents/run-agent.js";
-import { AgentRegistry, type AgentMetadata } from "../agents/registry.js";
-import { createAgentRoleWorkspace, resolveAgentRole } from "../agents/role.js";
-import { AgentStatusTracker } from "../agents/status.js";
-import { ConversationThreadManager } from "./thread-manager.js";
+} from "../../src/session/tool-pair-validator.js";
+import { AgentControl, type LiveAgent } from "../../src/agents/control.js";
+import { AgenCThread } from "../../src/agents/thread-manager.js";
+import { Mailbox, readMailboxMetadata } from "../../src/agents/mailbox.js";
+import { drainChildMailboxForTesting } from "../../src/agents/run-agent.js";
+import { AgentRegistry, type AgentMetadata } from "../../src/agents/registry.js";
+import { createAgentRoleWorkspace, resolveAgentRole } from "../../src/agents/role.js";
+import { AgentStatusTracker } from "../../src/agents/status.js";
+import { ConversationThreadManager } from "../../src/conversation/thread-manager.js";
 
 const ROLE_WORKSPACE = createAgentRoleWorkspace(process.cwd());
 

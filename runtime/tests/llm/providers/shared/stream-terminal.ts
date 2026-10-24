@@ -3,13 +3,13 @@ import { describe, expect, test, vi } from "vitest";
 import {
   LLMInvalidResponseError,
   LLMStreamTruncatedError,
-} from "../../errors.js";
+} from "../../../../src/llm/errors.js";
 import type {
   LLMChatOptions,
   LLMProvider,
   LLMResponse,
   LLMUsage,
-} from "../../types.js";
+} from "../../../../src/llm/types.js";
 import { sseResponse } from "../openai-compatible-test-helpers.js";
 
 export const BEDROCK_EVENTSTREAM_CONTENT_TYPE =

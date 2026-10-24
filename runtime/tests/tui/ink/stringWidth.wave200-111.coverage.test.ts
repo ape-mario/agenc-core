@@ -1,10 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
-type StringWidthModule = typeof import('./stringWidth.js')
+type StringWidthModule = typeof import('../../../src/tui/ink/stringWidth.js')
 
 async function loadStringWidth(): Promise<StringWidthModule> {
   vi.resetModules()
-  return import('./stringWidth.js')
+  return import('../../../src/tui/ink/stringWidth.js')
 }
 
 afterEach(() => {

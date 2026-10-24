@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import type { LLMStreamChunk } from "../../types.js";
-import { AnthropicProvider } from "./adapter.js";
+import type { LLMStreamChunk } from "../../../../src/llm/types.js";
+import { AnthropicProvider } from "../../../../src/llm/providers/anthropic/adapter.js";
 
 function sseResponse(frames: string[]): Response {
   const encoder = new TextEncoder();

@@ -3,9 +3,9 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { createRoot } from "../../ink/root.js";
-import { Box, Text } from "../../ink.js";
-import { Tab, Tabs, useTabHeaderFocus, useTabsWidth } from "./Tabs.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { Box, Text } from "../../../../src/tui/ink.js";
+import { Tab, Tabs, useTabHeaderFocus, useTabsWidth } from "../../../../src/tui/components/design-system/Tabs.js";
 
 const keybindingMock = vi.hoisted(() => ({
   registrations: [] as Array<{
@@ -14,7 +14,7 @@ const keybindingMock = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("../../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybindings: (
     handlers: Record<string, () => void>,
     options: { isActive?: boolean },

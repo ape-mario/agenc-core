@@ -6,7 +6,7 @@ import {
   createSessionTranscriptStateForTesting,
   makeToolResultMessage,
   type SessionTranscriptEvent,
-} from "../session-transcript.js";
+} from "../../../src/tui/session-transcript.js";
 
 // Keep these in lockstep with the constants in session-transcript.ts. They are
 // intentionally private to the module; the assertions below only depend on the

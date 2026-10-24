@@ -11,31 +11,31 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../services/lsp/fileNotifications.js", () => ({
+vi.mock("../../../src/services/lsp/fileNotifications.js", () => ({
   notifyLspFileChanged: vi.fn(),
   collectEditFeedback: vi.fn(async () => ""),
 }));
 
-import { getProjectRoot, setProjectRoot } from "../../bootstrap/state.js";
-import { ConfigStore } from "../../config/store.js";
+import { getProjectRoot, setProjectRoot } from "../../../src/bootstrap/state.js";
+import { ConfigStore } from "../../../src/config/store.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 import {
   getGlobalMemoryEntrypoint,
   getGlobalMemoryPath,
   getProjectMemoryEntrypoint,
   getProjectMemoryPath,
-} from "../../memory/paths.js";
-import { projectStorageKey } from "../../utils/project-storage-key.js";
+} from "../../../src/memory/paths.js";
+import { projectStorageKey } from "../../../src/utils/project-storage-key.js";
 import {
   enterCanonicalSettingsAuthority,
   resetCanonicalSettingsAuthorityForTesting,
-} from "../../utils/settings/canonicalAuthority.js";
-import { createFileEditTool, createFileMultiEditTool } from "./file-edit.js";
-import { createFileReadTool as createUnboundFileReadTool } from "./file-read.js";
-import { createFileWriteTool } from "./file-write.js";
-import { resolveToolAllowedPaths } from "./filesystem.js";
-import { createGlobTool as createUnboundGlobTool } from "./glob.js";
-import { createGrepTool as createUnboundGrepTool } from "./grep.js";
+} from "../../../src/utils/settings/canonicalAuthority.js";
+import { createFileEditTool, createFileMultiEditTool } from "../../../src/tools/system/file-edit.js";
+import { createFileReadTool as createUnboundFileReadTool } from "../../../src/tools/system/file-read.js";
+import { createFileWriteTool } from "../../../src/tools/system/file-write.js";
+import { resolveToolAllowedPaths } from "../../../src/tools/system/filesystem.js";
+import { createGlobTool as createUnboundGlobTool } from "../../../src/tools/system/glob.js";
+import { createGrepTool as createUnboundGrepTool } from "../../../src/tools/system/grep.js";
 
 const createFileReadTool = (
   ...args: Parameters<typeof createUnboundFileReadTool>

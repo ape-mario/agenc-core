@@ -64,7 +64,7 @@ vi.mock("src/tools/AgentTool/agentColorManager.js", () => ({
   },
 }));
 
-import { renderToString } from "../../utils/staticRender.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 import {
   getTaskListTextWidth,
   TaskListV2,

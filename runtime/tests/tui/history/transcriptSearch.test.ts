@@ -4,9 +4,9 @@ import {
   renderableSearchText,
   toolResultSearchText,
   toolUseSearchText,
-} from './transcriptSearch.js'
+} from '../../../src/tui/history/transcriptSearch.js'
 
-vi.mock('../../utils/messages.js', () => ({
+vi.mock('../../../src/utils/messages.js', () => ({
   INTERRUPT_MESSAGE: '[Request interrupted by user]',
   INTERRUPT_MESSAGE_FOR_TOOL_USE: '[Request interrupted by user for tool use]',
 }))

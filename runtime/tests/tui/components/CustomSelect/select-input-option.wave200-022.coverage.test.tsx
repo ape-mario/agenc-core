@@ -3,8 +3,8 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../../ink/root.js'
-import { SelectInputOption } from './select-input-option.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { SelectInputOption } from '../../../../src/tui/components/CustomSelect/select-input-option.js'
 
 const textInputMock = vi.hoisted(() => ({
   current: undefined as
@@ -20,12 +20,12 @@ const textInputMock = vi.hoisted(() => ({
       },
 }))
 
-vi.mock('../../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybinding: () => {},
   useKeybindings: () => {},
 }))
 
-vi.mock('../TextInput.js', async () => {
+vi.mock('../../../../src/tui/components/TextInput.js', async () => {
   const ReactActual = await vi.importActual<typeof import('react')>('react')
 
   return {

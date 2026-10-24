@@ -9,7 +9,7 @@ import {
   parseAgenCTrajectoriesCliArgs,
   runAgenCTrajectoriesCli,
   type AgenCTrajectoriesCliIo,
-} from "./trajectories-cli.js";
+} from "../../src/bin/trajectories-cli.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Fixtures — the exact JSONL shape the export sink writes

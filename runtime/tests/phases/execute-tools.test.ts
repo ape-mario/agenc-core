@@ -13,44 +13,44 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { EventLog } from "../session/event-log.js";
-import { runWithCurrentRuntimeSession } from "../session/current-session.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
-import { resolveHomeContext } from "../config/home.js";
-import type { Session } from "../session/session.js";
-import type { TurnContext } from "../session/turn-context.js";
-import type { TurnState } from "../session/turn-state.js";
-import type { Tool } from "../tools/types.js";
-import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
-import { buildToolRegistry } from "../tool-registry.js";
-import { builtTools } from "../session/run-turn-sampling-request.js";
-import type { LLMProvider, LLMTool, LLMToolCall } from "../llm/types.js";
-import type { PostToolUseHook, PreToolUseHook } from "../tools/hooks.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
+import { EventLog } from "../../src/session/event-log.js";
+import { runWithCurrentRuntimeSession } from "../../src/session/current-session.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import { resolveHomeContext } from "../../src/config/home.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import type { TurnState } from "../../src/session/turn-state.js";
+import type { Tool } from "../../src/tools/types.js";
+import type { ToolRegistry, ToolDispatchResult } from "../../src/tool-registry.js";
+import { buildToolRegistry } from "../../src/tool-registry.js";
+import { builtTools } from "../../src/session/run-turn-sampling-request.js";
+import type { LLMProvider, LLMTool, LLMToolCall } from "../../src/llm/types.js";
+import type { PostToolUseHook, PreToolUseHook } from "../../src/tools/hooks.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
 import {
   createEmptyToolPermissionContext,
   type ToolPermissionContext,
-} from "../permissions/types.js";
-import { freshDenialTracking } from "../permissions/denial-tracking.js";
+} from "../../src/permissions/types.js";
+import { freshDenialTracking } from "../../src/permissions/denial-tracking.js";
 import {
   clearAllPlanSlugs,
   getPlanFilePath,
   setPlanSlug,
   writePlanSync,
-} from "../planning/plan-files.js";
-import { createFileWriteTool } from "../tools/system/file-write.js";
+} from "../../src/planning/plan-files.js";
+import { createFileWriteTool } from "../../src/tools/system/file-write.js";
 import {
   ensureStreamingToolExecutor,
   executeTools,
   queueStreamingToolCall,
-} from "./execute-tools.js";
-import { commit } from "./commit.js";
-import { StreamingToolExecutor } from "../tools/streaming-executor.js";
-import { SHARED_READ, ToolCallRuntime } from "../tools/concurrency.js";
-import { routerFromRegistry } from "../tools/router.js";
-import { readToolRuntimeContext } from "../tools/runtimes/context.js";
-import { SESSION_ALLOWED_ROOTS_ARG } from "../tools/system/filesystem.js";
-import { verifyToolResultIntegrity } from "../session/tool-result-integrity.js";
+} from "../../src/phases/execute-tools.js";
+import { commit } from "../../src/phases/commit.js";
+import { StreamingToolExecutor } from "../../src/tools/streaming-executor.js";
+import { SHARED_READ, ToolCallRuntime } from "../../src/tools/concurrency.js";
+import { routerFromRegistry } from "../../src/tools/router.js";
+import { readToolRuntimeContext } from "../../src/tools/runtimes/context.js";
+import { SESSION_ALLOWED_ROOTS_ARG } from "../../src/tools/system/filesystem.js";
+import { verifyToolResultIntegrity } from "../../src/session/tool-result-integrity.js";
 
 const UNTRUSTED_TOOL_RESULT_BOUNDARY =
   "===== AGENC UNTRUSTED TOOL RESULT DATA =====";

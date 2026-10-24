@@ -14,13 +14,13 @@ import {
   LIGHT_DEFAULT_EXEC_YIELD_TIME_MS,
   createExecCommandTool as createUnboundExecCommandTool,
   runtimeSandboxForExec,
-} from "./exec-command.js";
-import { RESIDUAL_PROCESSES_NOTE } from "./exec-result-format.js";
+} from "../../../src/tools/system/exec-command.js";
+import { RESIDUAL_PROCESSES_NOTE } from "../../../src/tools/system/exec-result-format.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
-import { createWriteStdinTool as createUnboundWriteStdinTool } from "./write-stdin.js";
-import { UnifiedExecProcessManager } from "../../unified-exec/process-manager.js";
-import type { ExecCommandToolOutput, UnifiedExecProcessManagerLike } from "../../unified-exec/types.js";
-import { attachToolRuntimeContext } from "../runtimes/context.js";
+import { createWriteStdinTool as createUnboundWriteStdinTool } from "../../../src/tools/system/write-stdin.js";
+import { UnifiedExecProcessManager } from "../../../src/unified-exec/process-manager.js";
+import type { ExecCommandToolOutput, UnifiedExecProcessManagerLike } from "../../../src/unified-exec/types.js";
+import { attachToolRuntimeContext } from "../../../src/tools/runtimes/context.js";
 import {
   attachReadOnlyInspectionInvocation,
   attachReadOnlyShellInvocation,
@@ -28,14 +28,14 @@ import {
   inspectReadOnlyShellCommand,
   prepareReadOnlyInspectionInvocation,
   prepareReadOnlyShellInvocation,
-} from "../../permissions/readonly-inspection.js";
-import { READ_ONLY_COMMAND_NOTICE } from "./exec-read-only-notice.js";
-import { restrictedFileSystemPolicy } from "../../sandbox/engine/index.js";
-import { buildFilteredRegistry, mergeRoleDisallowlist } from "../../agents/run-agent.js";
-import { BUILTIN_READONLY_DISALLOWLIST } from "../../agents/built-in-prompts.js";
-import { buildToolRegistry, type ToolRegistry } from "../../tool-registry.js";
-import { createWorkspaceOperationLifetime, runWithWorkspaceOperationLifetime } from "../../workspace/tool-operation-lifetime.js";
-import type { UnifiedExecRuntimeSandbox } from "../../unified-exec/types.js";
+} from "../../../src/permissions/readonly-inspection.js";
+import { READ_ONLY_COMMAND_NOTICE } from "../../../src/tools/system/exec-read-only-notice.js";
+import { restrictedFileSystemPolicy } from "../../../src/sandbox/engine/index.js";
+import { buildFilteredRegistry, mergeRoleDisallowlist } from "../../../src/agents/run-agent.js";
+import { BUILTIN_READONLY_DISALLOWLIST } from "../../../src/agents/built-in-prompts.js";
+import { buildToolRegistry, type ToolRegistry } from "../../../src/tool-registry.js";
+import { createWorkspaceOperationLifetime, runWithWorkspaceOperationLifetime } from "../../../src/workspace/tool-operation-lifetime.js";
+import type { UnifiedExecRuntimeSandbox } from "../../../src/unified-exec/types.js";
 
 const createExecCommandTool = (
   config: Parameters<typeof createUnboundExecCommandTool>[0],

@@ -3,15 +3,15 @@ import { createTempWorkspaceFixture } from "../helpers/temp-workspace.js";
 import {
   AgenCClientMultiplexerError,
   AgenCDaemonClientMultiplexer,
-} from "./client-multiplexer.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+} from "../../src/app-server/client-multiplexer.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 import {
   AGENC_CROSS_PROVIDER_CONSENT_CAPABILITY,
   AGENC_PORTAL_MOBILE_STATUS_PUSH_CAPABILITY,
   JSON_RPC_VERSION,
   type AgenCDaemonSessionNotification,
   type JsonObject,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 const workspaces = createTempWorkspaceFixture(
   "agenc-client-multiplexer-workspace-",

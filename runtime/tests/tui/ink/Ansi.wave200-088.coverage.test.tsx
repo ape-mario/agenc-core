@@ -3,13 +3,13 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { Ansi } from './Ansi.js'
-import type { DOMElement } from './dom.ts'
-import instances from './instances.ts'
-import { createRoot } from './root.ts'
-import { squashTextNodesToSegments } from './squash-text-nodes.js'
+import { Ansi } from '../../../src/tui/ink/Ansi.js'
+import type { DOMElement } from '../../../src/tui/ink/dom.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { squashTextNodesToSegments } from '../../../src/tui/ink/squash-text-nodes.js'
 
-vi.mock('../../utils/fullscreen.js', () => ({
+vi.mock('../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => false,
 }))
 

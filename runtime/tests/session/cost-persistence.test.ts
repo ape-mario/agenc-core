@@ -17,9 +17,9 @@ import {
   atomicWriteJson,
   type CostTotalsFile,
   type SessionCostRecord,
-} from "./cost.js";
-import { EventLog } from "./event-log.js";
-import { SidecarManager } from "./sidecar.js";
+} from "../../src/session/cost.js";
+import { EventLog } from "../../src/session/event-log.js";
+import { SidecarManager } from "../../src/session/sidecar.js";
 
 function makeProjectDir(): string {
   return mkdtempSync(join(tmpdir(), "agenc-cost-persistence-"));

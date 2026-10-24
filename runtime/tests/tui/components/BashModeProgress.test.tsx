@@ -1,10 +1,10 @@
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { FullscreenModeProvider } from "../context/fullscreenModeContext.js";
-import { Text } from "../ink.js";
-import { BashModeProgress } from "./BashModeProgress.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { FullscreenModeProvider } from "../../../src/tui/context/fullscreenModeContext.js";
+import { Text } from "../../../src/tui/ink.js";
+import { BashModeProgress } from "../../../src/tui/components/BashModeProgress.js";
 
 const bashToolMock = vi.hoisted(() => ({
   BashTool: {} as {
@@ -16,11 +16,11 @@ const bashToolMock = vi.hoisted(() => ({
   renderFallback: vi.fn(),
 }));
 
-vi.mock("../../tools/BashTool/BashTool", () => ({
+vi.mock("../../../src/tools/BashTool/BashTool.js", () => ({
   BashTool: bashToolMock.BashTool,
 }));
 
-vi.mock("./v2/messagePrimitives.js", () => ({
+vi.mock("../../../src/tui/components/v2/messagePrimitives.js", () => ({
   ShellInputMessage: ({
     param,
   }: {
@@ -30,7 +30,7 @@ vi.mock("./v2/messagePrimitives.js", () => ({
   }) => <Text>{`input:${param.text}`}</Text>,
 }));
 
-vi.mock("./shell/ShellProgressMessage", () => ({
+vi.mock("../../../src/tui/components/shell/ShellProgressMessage.js", () => ({
   ShellProgressMessage: ({
     elapsedTimeSeconds,
     fullOutput,

@@ -1,10 +1,10 @@
 import React from 'react'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import Text from '../components/Text.js'
-import { TerminalWriteProvider } from '../useTerminalNotification.js'
-import { useTerminalTitle } from './use-terminal-title.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import Text from '../../../../src/tui/ink/components/Text.js'
+import { TerminalWriteProvider } from '../../../../src/tui/ink/useTerminalNotification.js'
+import { useTerminalTitle } from '../../../../src/tui/ink/hooks/use-terminal-title.js'
 
 const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
 const originalTitle = process.title

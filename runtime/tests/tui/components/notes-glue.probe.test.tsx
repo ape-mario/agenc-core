@@ -1,15 +1,15 @@
 import React from 'react'
 import { describe, it, vi } from 'vitest'
 
-import type { Command } from '../../commands.js'
-import type { Tools } from '../../tools/Tool.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { Messages } from './Messages.js'
+import type { Command } from '../../../src/commands.js'
+import type { Tools } from '../../../src/tools/Tool.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { Messages } from '../../../src/tui/components/Messages.js'
 import { makeAssistantTextMessage } from '../../../src/tui/session-transcript.js'
 
 vi.mock('bun:bundle', () => ({ feature: () => false }))
-vi.mock('../startup/StatusNotices.js', () => ({ StatusNotices: () => null }))
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/startup/StatusNotices.js', () => ({ StatusNotices: () => null }))
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({ syntaxHighlightingDisabled: true }),
 }))
 

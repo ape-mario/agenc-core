@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { formatOrphanToolResultContent } from "./UserToolResultMessage.js";
-import { getToolResultFallbackContent, isToolUseResultMissing } from "./UserToolSuccessMessage.js";
+import { formatOrphanToolResultContent } from "../../../../src/tui/message-renderers/UserToolResultMessage/UserToolResultMessage.js";
+import { getToolResultFallbackContent, isToolUseResultMissing } from "../../../../src/tui/message-renderers/UserToolResultMessage/UserToolSuccessMessage.js";
 
 describe("UserToolResultMessage orphan fallback", () => {
   test("formats string orphan results for visible recovery output", () => {

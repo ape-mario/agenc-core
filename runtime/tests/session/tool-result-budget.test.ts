@@ -7,9 +7,9 @@ import {
   shrinkToolResultContent,
   type ContentReplacementState,
   type ToolResultBudgetMessage,
-} from "./_deps/tool-result-storage.js";
-import { roughTokenCountEstimationForMessages } from "../llm/token-estimation.js";
-import type { LLMMessage } from "../llm/types.js";
+} from "../../src/session/_deps/tool-result-storage.js";
+import { roughTokenCountEstimationForMessages } from "../../src/llm/token-estimation.js";
+import type { LLMMessage } from "../../src/llm/types.js";
 
 function toolMsg(id: string, content: string): ToolResultBudgetMessage {
   return {

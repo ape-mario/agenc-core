@@ -3,9 +3,9 @@ import { describe, expect, test } from "vitest";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
-import { criticalReminderProducer } from "./critical-reminder.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+} from "../../../src/session/attachment-state.js";
+import { criticalReminderProducer } from "../../../src/prompts/attachments/critical-reminder.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 
 function makeOpts(sessionKey: object): GetAttachmentsOptions {
   return {

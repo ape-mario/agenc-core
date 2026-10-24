@@ -1,8 +1,8 @@
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { SnipBoundaryMessage } from "./SnipBoundaryMessage.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { SnipBoundaryMessage } from "../../../src/tui/message-renderers/SnipBoundaryMessage.js";
 
 describe("SnipBoundaryMessage rendering", () => {
   test("renders the compacted-conversation boundary independently of message payload", async () => {

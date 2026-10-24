@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { getOwnerChain } from './reconciler.ts'
+import { getOwnerChain } from '../../../src/tui/ink/reconciler.js'
 
 type ComponentFn = (() => null) & {
   displayName?: string

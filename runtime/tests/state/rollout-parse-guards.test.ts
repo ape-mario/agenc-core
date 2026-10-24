@@ -21,14 +21,14 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ROLLOUT_SCHEMA_VERSION } from "../session/event-log.js";
-import { serializeRolloutItem } from "../session/rollout-item.js";
-import { RolloutStore } from "../session/rollout-store.js";
-import { FileThreadStore } from "../thread-store/store.js";
-import { readRolloutHistory } from "../agents/thread-manager.js";
-import { backfillProjectRollouts, backfillRolloutFile } from "./backfill.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
-import { StateThreadRepository } from "./threads.js";
+import { ROLLOUT_SCHEMA_VERSION } from "../../src/session/event-log.js";
+import { serializeRolloutItem } from "../../src/session/rollout-item.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { FileThreadStore } from "../../src/thread-store/store.js";
+import { readRolloutHistory } from "../../src/agents/thread-manager.js";
+import { backfillProjectRollouts, backfillRolloutFile } from "../../src/state/backfill.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
+import { StateThreadRepository } from "../../src/state/threads.js";
 
 let home = "";
 let cwd = "";

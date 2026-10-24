@@ -2,8 +2,8 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { DiagnosticsDisplay } from './DiagnosticsDisplay.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { DiagnosticsDisplay } from '../../../src/tui/components/DiagnosticsDisplay.js'
 
 const diagnostic = {
   severity: 'Info' as const,

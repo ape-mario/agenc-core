@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import type { ToolCatalogEntry } from "../types.js";
-import { encodeMcpToolNameForWire } from "../../llm/wire/mcp-tool-naming.js";
-import { catalogSummary, createToolSearchTool } from "./tool-search.js";
-import { SESSION_ADVERTISED_TOOL_NAMES_ARG, SESSION_TOOL_CATALOG_SCOPE_ARG } from "./coding-common.js";
+import type { ToolCatalogEntry } from "../../../src/tools/types.js";
+import { encodeMcpToolNameForWire } from "../../../src/llm/wire/mcp-tool-naming.js";
+import { catalogSummary, createToolSearchTool } from "../../../src/tools/system/tool-search.js";
+import { SESSION_ADVERTISED_TOOL_NAMES_ARG, SESSION_TOOL_CATALOG_SCOPE_ARG } from "../../../src/tools/system/coding-common.js";
 
 function deferredCatalogEntry(name = "system.deepTool"): ToolCatalogEntry {
   return {

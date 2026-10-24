@@ -8,7 +8,7 @@ const fixture = vi.hoisted(() => ({
   interactionTime: 1,
 }))
 
-vi.mock('../../../src/tui/bootstrap/state.js', () => ({
+vi.mock('../../../src/bootstrap/state.js', () => ({
   getLastInteractionTime: () => fixture.interactionTime,
 }))
 

@@ -11,23 +11,23 @@ import {
   dispatchNotification,
   dispatchSessionEnd,
   dispatchSubagentStop,
-} from "./dispatcher.js";
+} from "../../../src/llm/hooks/dispatcher.js";
 import {
   registerNotificationHook,
   registerSessionEndHook,
   registerSubagentStopHook,
   resetLifecycleHookRegistry,
-} from "./registry.js";
+} from "../../../src/llm/hooks/registry.js";
 import type {
   NotificationHookInput,
   SessionEndHookInput,
   SubagentStopHookInput,
-} from "./types.js";
+} from "../../../src/llm/hooks/types.js";
 import {
   BackgroundTaskLifecycle,
   registerAgentThreadTask,
-} from "../../tasks/index.js";
-import { HOOK_EVENT_NAMES } from "../../config/schema.js";
+} from "../../../src/tasks/index.js";
+import { HOOK_EVENT_NAMES } from "../../../src/config/schema.js";
 
 afterEach(() => {
   resetLifecycleHookRegistry();

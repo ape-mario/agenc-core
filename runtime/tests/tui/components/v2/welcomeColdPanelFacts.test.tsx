@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 import { VERSION } from '../../../../src/version.js'
-import { WelcomeColdPanel } from './primitives.js'
+import { WelcomeColdPanel } from '../../../../src/tui/components/v2/primitives.js'
 
 // The welcome carries only the name, the version, one line of keys and the
 // repository address. The folder, model and mode live in the status line under

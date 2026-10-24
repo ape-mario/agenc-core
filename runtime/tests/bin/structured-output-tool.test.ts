@@ -3,7 +3,7 @@ import {
   STRUCTURED_OUTPUT_TOOL_NAME,
   createStructuredOutputTool,
   createStructuredOutputToolForSchema,
-} from "./structured-output-tool.js";
+} from "../../src/bin/structured-output-tool.js";
 
 describe("structured-output-tool", () => {
   it("registers the StructuredOutput tool name", () => {

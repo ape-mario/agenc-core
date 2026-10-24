@@ -5,14 +5,14 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),
 }))
 
-import { renderToString } from '../../utils/staticRender.js'
-import { UserTextMessage } from './UserTextMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { UserTextMessage } from '../../../src/tui/message-renderers/UserTextMessage.js'
 
 describe('UserTextMessage coverage2', () => {
   test('routes MCP polling updates through the resource update renderer', async () => {

@@ -5,15 +5,15 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),
 }))
 
-import { TEAMMATE_MESSAGE_TAG } from '../../constants/xml.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { UserTextMessage } from './UserTextMessage.js'
+import { TEAMMATE_MESSAGE_TAG } from '../../../src/constants/xml.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { UserTextMessage } from '../../../src/tui/message-renderers/UserTextMessage.js'
 
 const originalAgentTeams = process.env.AGENC_EXPERIMENTAL_AGENT_TEAMS
 

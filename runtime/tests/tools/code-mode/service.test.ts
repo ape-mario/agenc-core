@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { QuickJsCodeModeService } from "./service.js";
-import { codeModeRuntimeResponseToToolResult } from "./tools.js";
-import type { CodeModeExecuteRequest } from "./types.js";
+import { QuickJsCodeModeService } from "../../../src/tools/code-mode/service.js";
+import { codeModeRuntimeResponseToToolResult } from "../../../src/tools/code-mode/tools.js";
+import type { CodeModeExecuteRequest } from "../../../src/tools/code-mode/types.js";
 
 let services: QuickJsCodeModeService[] = [];
 

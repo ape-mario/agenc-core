@@ -12,14 +12,14 @@ import {
   isWithheldMaxOutputTokens,
   parsePromptTooLongTokenCounts,
   isResampleableStreamInterruption,
-} from "./api-errors.js";
+} from "../../src/recovery/api-errors.js";
 import {
   LLMRequestRebuiltError,
   LLMProviderError,
   LLMStreamTruncatedError,
   mapLLMError,
-} from "../llm/errors.js";
-import type { AssistantMessage, TurnState } from "../session/turn-state.js";
+} from "../../src/llm/errors.js";
+import type { AssistantMessage, TurnState } from "../../src/session/turn-state.js";
 
 function mkMsg(
   text: string,

@@ -19,7 +19,7 @@ const textInputMock = vi.hoisted(() => ({
   current: undefined as CapturedTextInputProps | undefined,
 }))
 
-vi.mock('../TextInput.js', async () => {
+vi.mock('../../../../src/tui/components/TextInput.js', async () => {
   const ReactActual = await vi.importActual<typeof import('react')>('react')
 
   return {
@@ -30,10 +30,10 @@ vi.mock('../TextInput.js', async () => {
   }
 })
 
-import { createRoot } from '../../ink/root.js'
-import type { DOMElement, DOMNode } from '../../ink/dom.js'
-import instances from '../../ink/instances.js'
-import HistorySearchInput from './HistorySearchInput.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import type { DOMElement, DOMNode } from '../../../../src/tui/ink/dom.js'
+import instances from '../../../../src/tui/ink/instances.js'
+import HistorySearchInput from '../../../../src/tui/components/PromptInput/HistorySearchInput.js'
 
 type TestRoot = Awaited<ReturnType<typeof createRoot>>
 type TestStdin = PassThrough & {

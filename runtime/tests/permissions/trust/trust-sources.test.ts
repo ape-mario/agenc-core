@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
-import { ConfigStore } from "../../config/store.js";
-import type { AgenCConfig } from "../../config/schema.js";
+import { ConfigStore } from "../../../src/config/store.js";
+import type { AgenCConfig } from "../../../src/config/schema.js";
 import {
   projectTrustReviewIsEmpty,
   reviewProjectTrust,
   summarizeProjectTrustReview,
-} from "./trust-sources.js";
+} from "../../../src/permissions/trust/trust-sources.js";
 
 function mkTmp(): string {
   return mkdtempSync(join(tmpdir(), "agenc-trust-sources-"));

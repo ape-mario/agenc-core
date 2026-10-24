@@ -4,10 +4,10 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import type { BaseInputState } from '../../types/textInputTypes.js'
-import type { TextHighlight } from '../../utils/textHighlighting.js'
-import { createRoot, Text } from '../ink.js'
-import { BaseTextInput } from '../components/BaseTextInput.js'
+import type { BaseInputState } from '../../../src/types/textInputTypes.js'
+import type { TextHighlight } from '../../../src/utils/textHighlighting.js'
+import { createRoot, Text } from '../../../src/tui/ink.js'
+import { BaseTextInput } from '../../../src/tui/components/BaseTextInput.js'
 
 const highlightedInputMock = vi.hoisted(() => ({
   calls: [] as Array<{
@@ -20,19 +20,19 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../utils/config.js', () => ({
+vi.mock('../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({ theme: 'dark' }),
   updateRuntimeState: vi.fn(),
 }))
 
-vi.mock('../../utils/terminalBackground.js', () => ({
+vi.mock('../../../src/utils/terminalBackground.js', () => ({
   getTerminalBackground: () => 'dark',
   resolveThemeSetting: () => 'dark',
 }))
 
-vi.mock('../components/PromptInput/ShimmeredInput.js', async () => {
+vi.mock('../../../src/tui/components/PromptInput/ShimmeredInput.js', async () => {
   const ReactModule = await import('react')
-  const { Text: InkText } = await import('../ink.js')
+  const { Text: InkText } = await import('../../../src/tui/ink.js')
 
   return {
     HighlightedInput: ({

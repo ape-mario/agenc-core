@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { FallbackTriggeredError } from "../../recovery/api-errors.js";
+import { FallbackTriggeredError } from "../../../src/recovery/api-errors.js";
 import {
   evaluateProviderFallback,
   normalizeFallbackRetryBudget,
   normalizeFallbackTargets,
-} from "./fallback-ladder.js";
+} from "../../../src/llm/api/fallback-ladder.js";
 
 describe("provider fallback ladder", () => {
   test("normalizes targets, skips the active model, and deduplicates", () => {

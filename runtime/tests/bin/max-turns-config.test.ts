@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig } from "../config/schema.js";
+import { defaultConfig } from "../../src/config/schema.js";
 import {
   maxBudgetUsdFromAgenCConfig,
   maxTurnsFromAgenCConfig,
-} from "./bootstrap.js";
+} from "../../src/bin/bootstrap.js";
 
 describe("maxTurnsFromAgenCConfig (todo-105)", () => {
   it("maps positive max_turns from schema/TOML config", () => {

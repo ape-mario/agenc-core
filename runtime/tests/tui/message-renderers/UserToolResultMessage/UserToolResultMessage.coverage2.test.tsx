@@ -1,8 +1,8 @@
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import { renderToString } from "../../../utils/staticRender.js";
-import { UserToolResultMessage } from "./UserToolResultMessage.js";
+import { renderToString } from "../../../../src/utils/staticRender.js";
+import { UserToolResultMessage } from "../../../../src/tui/message-renderers/UserToolResultMessage/UserToolResultMessage.js";
 
 describe("UserToolResultMessage additional coverage", () => {
   test("renders recovered orphan tool results with mixed content blocks", async () => {
@@ -39,7 +39,7 @@ describe("UserToolResultMessage additional coverage", () => {
 });
 
 test("shows interrupted admission on the call row only in compact mode", async () => {
-  const { createTuiTools } = await import("../../../tui/tool-rendering.js");
+  const { createTuiTools } = await import("../../../../src/tui/tool-rendering.js");
   const tools = createTuiTools(["exec_command"]);
   const param = { type: "tool_result" as const, tool_use_id: "cancelled", is_error: true, content: "Tool execution cancelled: interrupted." };
   const lookups = { toolUseByToolUseID: new Map([["cancelled", { type: "tool_use", id: "cancelled", name: "exec_command", input: { cmd: "echo ok" } }]]) } as never;

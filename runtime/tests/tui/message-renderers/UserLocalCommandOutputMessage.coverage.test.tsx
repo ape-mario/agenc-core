@@ -1,15 +1,15 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { DIAMOND_OPEN } from '../../constants/figures.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { UserLocalCommandOutputMessage } from './UserLocalCommandOutputMessage.js'
+import { DIAMOND_OPEN } from '../../../src/constants/figures.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { UserLocalCommandOutputMessage } from '../../../src/tui/message-renderers/UserLocalCommandOutputMessage.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),

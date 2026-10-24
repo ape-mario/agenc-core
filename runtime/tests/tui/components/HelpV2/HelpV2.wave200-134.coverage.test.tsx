@@ -4,7 +4,7 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Command } from "../../../commands.js";
+import type { Command } from "../../../../src/commands.js";
 
 const keybindingMock = vi.hoisted(() => ({
   groups: [] as Array<{
@@ -33,11 +33,11 @@ vi.mock("src/tui/hooks/useExitOnCtrlCDWithKeybindings.js", () => ({
   useExitOnCtrlCDWithKeybindings: () => exitStateMock.state,
 }));
 
-vi.mock("../../keybindings/useShortcutDisplay.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useShortcutDisplay.js", () => ({
   useShortcutDisplay: () => "esc",
 }));
 
-vi.mock("../../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybinding: (
     action: string,
     handler: () => void,
@@ -53,17 +53,17 @@ vi.mock("../../keybindings/useKeybinding.js", () => ({
   },
 }));
 
-vi.mock("../../keybindings/loadUserBindings.js", () => ({
+vi.mock("../../../../src/tui/keybindings/loadUserBindings.js", () => ({
   isKeybindingCustomizationEnabled: () => false,
 }));
 
-vi.mock("../../../utils/platform.js", () => ({
+vi.mock("../../../../src/utils/platform.js", () => ({
   getPlatform: () => "linux",
 }));
 
-import { ModalContext } from "../../context/modalContext.js";
-import { createRoot, type Root } from "../../ink.js";
-import { HelpV2 } from "./HelpV2.js";
+import { ModalContext } from "../../../../src/tui/context/modalContext.js";
+import { createRoot, type Root } from "../../../../src/tui/ink.js";
+import { HelpV2 } from "../../../../src/tui/components/HelpV2/HelpV2.js";
 
 function sleep(ms = 50): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));

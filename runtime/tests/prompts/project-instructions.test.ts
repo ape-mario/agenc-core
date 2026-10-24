@@ -18,7 +18,7 @@ import {
   loadProjectInstructions,
   PRIMARY_PROJECT_INSTRUCTION_FILE,
   resolveInstructionFile,
-} from "./project-instructions.js";
+} from "../../src/prompts/project-instructions.js";
 
 const POSIX = platform() !== "win32";
 const posixTest = POSIX ? test : test.skip;

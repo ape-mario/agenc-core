@@ -5,20 +5,20 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { ContentWidthProvider } from '../context/contentWidthContext.js'
-import { createRoot } from '../ink/root.js'
-import { FileEditToolUpdatedMessage } from './FileEditToolUpdatedMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { ContentWidthProvider } from '../../../src/tui/context/contentWidthContext.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { FileEditToolUpdatedMessage } from '../../../src/tui/components/FileEditToolUpdatedMessage.js'
 
 const structuredDiffMock = vi.hoisted(() => ({
   calls: [] as Array<Record<string, unknown>>,
 }))
 
-vi.mock('../hooks/useTerminalSize', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 72, rows: 24 }),
 }))
 
-vi.mock('./diff/StructuredDiffList', async () => {
+vi.mock('../../../src/tui/components/diff/StructuredDiffList.js', async () => {
   const ReactModule = await import('react')
   return {
     StructuredDiffList: (props: Record<string, unknown>) => {

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Fetcher, FetchResponse } from "./marketplace.js";
+import type { Fetcher, FetchResponse } from "../../../src/plugins/marketplace/marketplace.js";
 import {
   assertHttpsOrLoopbackUrl,
   fetchWithTimeout,
   isLoopbackHostname,
   readResponseTextWithLimit,
-} from "./fetchGuards.js";
+} from "../../../src/plugins/marketplace/fetchGuards.js";
 
 describe("marketplace fetch guards", () => {
   it("cancels streamed responses when a size limit is exceeded", async () => {

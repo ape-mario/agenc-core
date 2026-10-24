@@ -4,7 +4,7 @@ import {
   getAllTasks,
   getTaskByType,
   TaskRegistryError,
-} from "./registry.js";
+} from "../../src/tasks/registry.js";
 
 describe("task registry", () => {
   it("registers only live AgenC task kinds", () => {

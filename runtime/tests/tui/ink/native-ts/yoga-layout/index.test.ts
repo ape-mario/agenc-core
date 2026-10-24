@@ -17,7 +17,7 @@ import YogaDefault, {
   Wrap,
   getYogaCounters,
   loadYoga,
-} from "./index.js";
+} from "../../../../../src/tui/ink/native-ts/yoga-layout/index.js";
 
 describe("yoga-layout TypeScript shim", () => {
   test("exports the load API, node factories, and mutable config object", async () => {

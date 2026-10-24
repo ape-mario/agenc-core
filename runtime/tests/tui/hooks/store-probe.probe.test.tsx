@@ -25,7 +25,7 @@ vi.mock('../../../src/tui/state/AppState.js', async () => {
   }
 })
 
-import { renderToString } from '../../utils/staticRender.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 import { SpinnerWithVerbInner } from '../../../src/tui/components/spinner/Spinner.js'
 
 describe('spinner todo auto-show against a live board', () => {

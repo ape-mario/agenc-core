@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
 // Mirror of the AgenC ink stub used by the bash renderer test.
-vi.mock("../tui/ink.js", () => {
+vi.mock("../../src/tui/ink.js", () => {
   function Box(_props: { readonly children?: unknown }) {
     return null;
   }
@@ -11,7 +11,7 @@ vi.mock("../tui/ink.js", () => {
   return { Box, Text };
 });
 
-import { createTuiTool, EditDiffView } from "../tui/tool-rendering.js";
+import { createTuiTool, EditDiffView } from "../../src/tui/tool-rendering.js";
 
 interface ChildProps {
   readonly children?: unknown;
@@ -203,7 +203,7 @@ describe("EditDiffView — capped (+a -r) diff preview", () => {
 
 describe("formatStructuredToolResult ⇄ EditDiffView wire-shape lock", () => {
   test("the tags formatStructuredToolResult emits for Edit are the exact tags EditDiffView consumes", async () => {
-    const transcript = await import("../tui/session-transcript.js");
+    const transcript = await import("../../src/tui/session-transcript.js");
     const blocks = transcript.formatStructuredToolResult(
       "Edit",
       "tool_call_completed",

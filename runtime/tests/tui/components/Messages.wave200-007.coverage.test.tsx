@@ -4,7 +4,7 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-import { computeSliceStart, type SliceAnchor } from './Messages.js'
+import { computeSliceStart, type SliceAnchor } from '../../../src/tui/components/Messages.js'
 
 const messages = Array.from({ length: 12 }, (_, index) => ({
   uuid: `message-${index}`,

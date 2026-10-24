@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LLMMessage } from "../llm/types.js";
-import { createMailboxMetadataRecord, Mailbox } from "./mailbox.js";
-import type { LiveAgent } from "./control.js";
+import type { LLMMessage } from "../../src/llm/types.js";
+import { createMailboxMetadataRecord, Mailbox } from "../../src/agents/mailbox.js";
+import type { LiveAgent } from "../../src/agents/control.js";
 import {
   clearChildConversationHistory,
   drainChildMailboxForTesting,
-} from "./run-agent.js";
+} from "../../src/agents/run-agent.js";
 
 function liveWithInbox(): Pick<
   LiveAgent,

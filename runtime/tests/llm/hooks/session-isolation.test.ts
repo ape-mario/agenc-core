@@ -10,19 +10,19 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { dispatchSessionEnd } from "./dispatcher.js";
+import { dispatchSessionEnd } from "../../../src/llm/hooks/dispatcher.js";
 import {
   LifecycleHookRegistry,
   registerSessionEndHook,
   resetLifecycleHookRegistry,
-} from "./registry.js";
-import type { PreCompactHookInput, SessionEndHookInput } from "./types.js";
-import { createHooksService } from "../../bin/bootstrap-services.js";
+} from "../../../src/llm/hooks/registry.js";
+import type { PreCompactHookInput, SessionEndHookInput } from "../../../src/llm/hooks/types.js";
+import { createHooksService } from "../../../src/bin/bootstrap-services.js";
 import {
   clearCurrentRuntimeSession,
   runWithCurrentRuntimeSession,
-} from "../../session/current-session.js";
-import type { Session } from "../../session/session.js";
+} from "../../../src/session/current-session.js";
+import type { Session } from "../../../src/session/session.js";
 
 afterEach(() => {
   resetLifecycleHookRegistry();

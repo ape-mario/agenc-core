@@ -15,15 +15,15 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("../../services/lsp/fileNotifications.js", () => ({
+vi.mock("../../../src/services/lsp/fileNotifications.js", () => ({
   notifyLspFileChanged: vi.fn(),
   collectEditFeedback: vi.fn(async () => ""),
 }));
 
-import type { ToolResult } from "../types.js";
+import type { ToolResult } from "../../../src/tools/types.js";
 import { signedSessionPlanFileArgs } from "../../../src/agents/_deps/filesystem-args.js";
 import { planFileAuthorityFromContext } from "../../../src/planning/session-plan-authority.js";
-import { createFileWriteTool } from "./file-write.js";
+import { createFileWriteTool } from "../../../src/tools/system/file-write.js";
 import {
   clearSessionReadState,
   getSessionReadSnapshot,
@@ -31,16 +31,16 @@ import {
   seedSessionReadState,
   SESSION_AGENC_HOME_ARG,
   signSessionId,
-} from "./filesystem.js";
+} from "../../../src/tools/system/filesystem.js";
 import {
   clearAllPlanSlugs,
   getPlanFilePath,
   setPlanSlug,
-} from "../../planning/plan-files.js";
+} from "../../../src/planning/plan-files.js";
 import {
   collectEditFeedback,
   notifyLspFileChanged,
-} from "../../services/lsp/fileNotifications.js";
+} from "../../../src/services/lsp/fileNotifications.js";
 
 describe("Write tool", () => {
   let root = "";

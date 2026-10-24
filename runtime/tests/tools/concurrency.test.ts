@@ -10,7 +10,7 @@ import {
   SHARED_READ,
   sharedServer,
   ToolCallRuntime,
-} from "./concurrency.js";
+} from "../../src/tools/concurrency.js";
 
 describe("Semaphore (I-61)", () => {
   test("acquire up to capacity then queue", async () => {

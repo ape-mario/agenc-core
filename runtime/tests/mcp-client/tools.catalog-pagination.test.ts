@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   createToolBridge as createToolBridgeWithEnvironment,
-} from "./tools.js";
-import { computeMCPToolCatalogSha256 } from "./supply-chain.js";
-import { McpListPaginationError } from "./list-pagination.js";
+} from "../../src/mcp-client/tools.js";
+import { computeMCPToolCatalogSha256 } from "../../src/mcp-client/supply-chain.js";
+import { McpListPaginationError } from "../../src/mcp-client/list-pagination.js";
 
 type ToolBridgeOptions = Parameters<typeof createToolBridgeWithEnvironment>[3];
 type TestToolBridgeOptions = Omit<ToolBridgeOptions, "environment"> &

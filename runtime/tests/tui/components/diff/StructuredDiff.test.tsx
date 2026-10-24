@@ -28,12 +28,12 @@ const harness = vi.hoisted(() => ({
   theme: 'dark-theme',
 }))
 
-vi.mock('../../hooks/useSettings', () => ({
+vi.mock('../../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => harness.settings,
 }))
 
-vi.mock('../../ink.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../ink.js')>()
+vi.mock('../../../../src/tui/ink.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../src/tui/ink.js')>()
   return {
     ...actual,
     RawAnsi: ({
@@ -52,18 +52,18 @@ vi.mock('../../ink.js', async importOriginal => {
   }
 })
 
-vi.mock('../../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => harness.fullscreen,
 }))
 
-vi.mock('../../../utils/sliceAnsi.js', () => ({
+vi.mock('../../../../src/utils/sliceAnsi.js', () => ({
   default: (line: string, start: number, end?: number) => {
     harness.sliceCalls.push({ end, line, start })
     return line.slice(start, end)
   },
 }))
 
-vi.mock('./StructuredDiff/colorDiff', () => ({
+vi.mock('../../../../src/tui/components/diff/StructuredDiff/colorDiff.js', () => ({
   expectColorDiff: () => {
     if (!harness.colorDiffAvailable) return null
     return class FakeColorDiff {
@@ -89,9 +89,9 @@ vi.mock('./StructuredDiff/colorDiff', () => ({
   },
 }))
 
-vi.mock('./StructuredDiff/Fallback', async () => {
+vi.mock('../../../../src/tui/components/diff/StructuredDiff/Fallback.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     StructuredDiffFallback: ({
       dim,
@@ -110,8 +110,8 @@ vi.mock('./StructuredDiff/Fallback', async () => {
   }
 })
 
-import { createRoot } from '../../ink/root.js'
-import { StructuredDiff } from './StructuredDiff.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { StructuredDiff } from '../../../../src/tui/components/diff/StructuredDiff.js'
 
 function patch(overrides: Partial<StructuredPatchHunk> = {}): StructuredPatchHunk {
   return {

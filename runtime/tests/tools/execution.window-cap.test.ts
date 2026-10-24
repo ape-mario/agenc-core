@@ -27,10 +27,10 @@ import {
   DEFAULT_MAX_TOOL_RESULT_BYTES,
   MIN_TOOL_RESULT_BYTES,
   runToolUse,
-} from "./execution.js";
-import { getToolResultPath } from "../utils/toolResultStorage.js";
-import type { Tool } from "./types.js";
-import type { ToolInvocation } from "./context.js";
+} from "../../src/tools/execution.js";
+import { getToolResultPath } from "../../src/utils/toolResultStorage.js";
+import type { Tool } from "../../src/tools/types.js";
+import type { ToolInvocation } from "../../src/tools/context.js";
 
 const LOCAL_WINDOW = 131_072;
 const LARGE_WINDOW = 200_000;

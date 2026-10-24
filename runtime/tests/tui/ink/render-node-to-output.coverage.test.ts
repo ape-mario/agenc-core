@@ -9,8 +9,8 @@ import {
   setAttribute,
   type DOMElement,
   type DOMNode,
-} from './dom.ts'
-import Output from './output.ts'
+} from '../../../src/tui/ink/dom.js'
+import Output from '../../../src/tui/ink/output.js'
 import {
   applyStylesToWrappedText,
   buildCharToSegmentMap,
@@ -19,8 +19,8 @@ import {
   getScrollHint,
   resetScrollDrainNode,
   resetScrollHint,
-} from './render-node-to-output.ts'
-import renderNodeToOutput from './render-node-to-output.ts'
+} from '../../../src/tui/ink/render-node-to-output.js'
+import renderNodeToOutput from '../../../src/tui/ink/render-node-to-output.js'
 import {
   cellAt,
   CharPool,
@@ -28,9 +28,9 @@ import {
   createScreen,
   HyperlinkPool,
   StylePool,
-} from './screen.ts'
-import type { StyledSegment } from './squash-text-nodes.ts'
-import applyStyles, { type Styles } from './styles.ts'
+} from '../../../src/tui/ink/screen.js'
+import type { StyledSegment } from '../../../src/tui/ink/squash-text-nodes.js'
+import applyStyles, { type Styles } from '../../../src/tui/ink/styles.js'
 
 const OSC = '\u001B]'
 const BEL = '\u0007'

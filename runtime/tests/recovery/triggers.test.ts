@@ -4,11 +4,11 @@ import {
   I10_TRIGGER_ORDER,
   type TriggerActions,
   type TriggerOutcome,
-} from "./triggers.js";
-import { buildInitialTurnState, type ToolUseBlock } from "../session/turn-state.js";
+} from "../../src/recovery/triggers.js";
+import { buildInitialTurnState, type ToolUseBlock } from "../../src/session/turn-state.js";
 import { mkCtx } from "../../tests/fixtures.js";
-import { LLMContextWindowExceededError, LLMProviderError } from "../llm/errors.js";
-import type { Session } from "../session/session.js";
+import { LLMContextWindowExceededError, LLMProviderError } from "../../src/llm/errors.js";
+import type { Session } from "../../src/session/session.js";
 
 const NOOP_ACTIONS: TriggerActions = {
   async on413(): Promise<TriggerOutcome> { return { kind: "pass" }; },

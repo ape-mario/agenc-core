@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { computeSelectInputColumns } from './select-input-option.js'
+import { computeSelectInputColumns } from '../../../../src/tui/components/CustomSelect/select-input-option.js'
 
 describe('computeSelectInputColumns', () => {
   it('clamps tiny select input widths to one usable column', () => {

@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
   NATIVE_PACKAGE_URL: undefined,
 };
 
-import type { Session } from "../session/session.js";
+import type { Session } from "../../src/session/session.js";
 
 function sessionWithoutLocalSkill(): Session {
   return {
@@ -40,7 +40,7 @@ describe("Skill tool with runtime-registered bundled skills", () => {
   // `Unknown skill` for a skill the runtime demonstrably ships. It
   // derailed the turn with an error instead of loading.
   it("loads a bundled skill the local loader cannot render", async () => {
-    const { createModelFacingTools } = await import("./model-facing-tools.js");
+    const { createModelFacingTools } = await import("../../src/bin/model-facing-tools.js");
     const session = sessionWithoutLocalSkill();
     const tools = createModelFacingTools({
       workspaceRoot: process.cwd(),
@@ -55,7 +55,7 @@ describe("Skill tool with runtime-registered bundled skills", () => {
       });
 
   it("still reports genuinely unknown names, listing bundled ones as available", async () => {
-    const { createModelFacingTools } = await import("./model-facing-tools.js");
+    const { createModelFacingTools } = await import("../../src/bin/model-facing-tools.js");
     const session = sessionWithoutLocalSkill();
     const tools = createModelFacingTools({
       workspaceRoot: process.cwd(),

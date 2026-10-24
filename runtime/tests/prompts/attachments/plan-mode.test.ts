@@ -23,15 +23,15 @@
  */
 import { describe, expect, test } from "vitest";
 
-import type { LLMMessage } from "../../llm/types.js";
-import type { ToolPermissionContext } from "../../permissions/types.js";
-import { _resetAttachmentTrackingStateForTest } from "../../session/attachment-state.js";
-import { getAttachmentTrackingState } from "../../session/attachment-state.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
+import type { ToolPermissionContext } from "../../../src/permissions/types.js";
+import { _resetAttachmentTrackingStateForTest } from "../../../src/session/attachment-state.js";
+import { getAttachmentTrackingState } from "../../../src/session/attachment-state.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 import {
   PLAN_MODE_ATTACHMENT_CONFIG,
   planModeProducer,
-} from "./plan-mode.js";
+} from "../../../src/prompts/attachments/plan-mode.js";
 
 function makeOpts(
   partial?: Partial<GetAttachmentsOptions>,

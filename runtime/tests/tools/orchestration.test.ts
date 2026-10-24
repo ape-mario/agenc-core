@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
-import type { LLMTool, LLMToolCall } from "../llm/types.js";
-import type { ToolDispatchResult, ToolRegistry } from "../tool-registry.js";
-import type { ToolUseBlock } from "../session/turn-state.js";
-import type { Tool } from "./types.js";
+import type { LLMTool, LLMToolCall } from "../../src/llm/types.js";
+import type { ToolDispatchResult, ToolRegistry } from "../../src/tool-registry.js";
+import type { ToolUseBlock } from "../../src/session/turn-state.js";
+import type { Tool } from "../../src/tools/types.js";
 import {
   partitionToolCalls,
   resolveMaxToolUseConcurrency,
   runTools,
-} from "./orchestration.js";
+} from "../../src/tools/orchestration.js";
 
 function testTool(overrides: Partial<Tool> & { name: string }): Tool {
   return {

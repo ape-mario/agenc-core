@@ -3,8 +3,8 @@ import {
   AGENC_DAEMON_WEBSOCKET_DEFAULT_HOST,
   AGENC_DAEMON_WEBSOCKET_DEFAULT_PATH,
   AGENC_DAEMON_WEBSOCKET_DEFAULT_PORT,
-} from "../app-server/daemon-cli.js";
-import { AGENC_DAEMON_PROTOCOL_VERSION, isAgenCDaemonMethod } from "../app-server/protocol/index.js";
+} from "../../src/app-server/daemon-cli.js";
+import { AGENC_DAEMON_PROTOCOL_VERSION, isAgenCDaemonMethod } from "../../src/app-server/protocol/index.js";
 import {
   AGENC_PORTAL_CLIENT_CAPABILITIES,
   AGENC_PORTAL_CLIENT_CAPABILITY_FLAGS,
@@ -27,7 +27,7 @@ import {
   isAgenCPortalAuthMethod,
   isAgenCPortalMethod,
   type AgenCPortalDashboardSnapshot,
-} from "./index.js";
+} from "../../src/app-server-protocol/index.js";
 
 describe("AgenC portal protocol contract", () => {
   it("pins the workspace portal protocol version", () => {

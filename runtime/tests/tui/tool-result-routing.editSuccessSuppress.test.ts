@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { pickToolResultDispatch } from "./tool-result-routing.js";
+import { pickToolResultDispatch } from "../../src/tui/tool-result-routing.js";
 
 // GAP #3 regression: every live Edit/MultiEdit/Write SUCCESS string must route
 // to "suppress" so the raw success sentence does NOT double-render alongside

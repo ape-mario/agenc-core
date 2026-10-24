@@ -2,21 +2,21 @@ import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it, vi } from "vitest";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
 import {
   AgenCCommandExecService,
   type AgenCCommandExec,
-} from "./command-exec.js";
+} from "../../src/app-server/command-exec.js";
 import {
   AgenCDaemonJsonRpcDispatcher,
   COMMAND_EXEC_EXECUTION_ADMISSION_DIAGNOSTIC,
   TEST_ONLY_ALLOW_UNADMITTED_COMMAND_EXEC_START,
-} from "./daemon-dispatcher.js";
-import { JSON_RPC_VERSION, type JsonObject } from "./protocol/index.js";
+} from "../../src/app-server/daemon-dispatcher.js";
+import { JSON_RPC_VERSION, type JsonObject } from "../../src/app-server/protocol/index.js";
 import type {
   SandboxExecRequest,
   SandboxTransformRequest,
-} from "../sandbox/engine/index.js";
+} from "../../src/sandbox/engine/index.js";
 
 const idleScript = "setInterval(() => {}, 1000)";
 

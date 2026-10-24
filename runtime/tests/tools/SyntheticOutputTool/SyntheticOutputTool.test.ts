@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   SyntheticOutputTool,
   createSyntheticOutputTool,
-} from './SyntheticOutputTool.js'
+} from '../../../src/tools/SyntheticOutputTool/SyntheticOutputTool.js'
 
 describe('SyntheticOutputTool', () => {
   it('rejects direct calls to the unbound singleton', async () => {

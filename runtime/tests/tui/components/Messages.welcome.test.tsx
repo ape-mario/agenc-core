@@ -2,32 +2,32 @@ import { homedir } from "node:os";
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { Command } from '../../commands.js'
-import type { Tools } from '../../tools/Tool.js'
-import { renderToString } from '../../utils/staticRender.js'
+import type { Command } from '../../../src/commands.js'
+import type { Tools } from '../../../src/tools/Tool.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 import {
   getDefaultMainLoopModelSetting,
   parseUserSpecifiedModel,
-} from '../../utils/model/model.js'
-import { ContentWidthProvider } from '../context/contentWidthContext.js'
-import { stringWidth } from '../ink/stringWidth.js'
+} from '../../../src/utils/model/model.js'
+import { ContentWidthProvider } from '../../../src/tui/context/contentWidthContext.js'
+import { stringWidth } from '../../../src/tui/ink/stringWidth.js'
 import {
   TEST_REMOTE_AUTH_SESSION_CONTEXT,
   TEST_RUNTIME_STATE_REPOSITORY,
   TEST_SETTINGS_AUTHORITY,
 } from '../remoteAuthSessionContext.fixture.js'
-import { AGENC_LOGO_MARK_LINES } from './v2/primitives.js'
-import { Messages } from './Messages.js'
+import { AGENC_LOGO_MARK_LINES } from '../../../src/tui/components/v2/primitives.js'
+import { Messages } from '../../../src/tui/components/Messages.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../startup/StatusNotices.js', () => ({
+vi.mock('../../../src/tui/startup/StatusNotices.js', () => ({
   StatusNotices: () => null,
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),

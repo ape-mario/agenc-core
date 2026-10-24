@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
-import type { LLMStreamChunk } from "../../types.js";
-import { GrokProvider } from "./adapter.js";
+import type { LLMStreamChunk } from "../../../../src/llm/types.js";
+import { GrokProvider } from "../../../../src/llm/providers/grok/adapter.js";
 
 // The turn-level stream watchdog (phases/stream-model.ts) only sees
 // LLMStreamChunks: any provider event the adapter consumes without calling

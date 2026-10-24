@@ -1,22 +1,22 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { ApprovalStore } from "../approval-cache.js";
-import { APPROVED, APPROVED_FOR_SESSION } from "../review-decision.js";
-import { createEmptyToolPermissionContext } from "../types.js";
-import type { Event } from "../../session/event-log.js";
-import type { ToolInvocation } from "../../tools/context.js";
-import type { Tool } from "../../tools/types.js";
+import { ApprovalStore } from "../../../src/permissions/approval-cache.js";
+import { APPROVED, APPROVED_FOR_SESSION } from "../../../src/permissions/review-decision.js";
+import { createEmptyToolPermissionContext } from "../../../src/permissions/types.js";
+import type { Event } from "../../../src/session/event-log.js";
+import type { ToolInvocation } from "../../../src/tools/context.js";
+import type { Tool } from "../../../src/tools/types.js";
 import {
   arbitratePermissionMode,
   requestApproval,
   requestToolUserApproval,
   type ApprovalCtx,
-} from "./arbiter.js";
-import type { GuardianApprovalReviewer } from "./reviewer.js";
+} from "../../../src/permissions/guardian/arbiter.js";
+import type { GuardianApprovalReviewer } from "../../../src/permissions/guardian/reviewer.js";
 import {
   registerNotificationHook,
   resetLifecycleHookRegistry,
-} from "../../llm/hooks/registry.js";
+} from "../../../src/llm/hooks/registry.js";
 
 afterEach(() => {
   resetLifecycleHookRegistry();

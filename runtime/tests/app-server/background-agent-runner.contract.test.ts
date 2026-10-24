@@ -32,65 +32,65 @@ import {
   type AgenCBootstrapFunction,
   type AgenCEnsureAgentControlFunction,
   managedTokenUsage,
-} from "./background-agent-runner.js";
-import { collectDaemonClientEnvOverrides } from "./agent-cli.js";
+} from "../../src/app-server/background-agent-runner.js";
+import { collectDaemonClientEnvOverrides } from "../../src/app-server/agent-cli.js";
 import { createDaemonTuiSessionFixture } from "../helpers/daemon-tui-session.js";
 import { canonicalTmpdir } from "../helpers/canonical-temp-dir.js";
 import { getDefaultAppState } from "../../src/tui/state/AppStateStore.js";
 import { startDaemonWorkerTaskPolling } from "../../src/tui/state/daemonWorkerTasks.js";
 import type { NativeWorkerSnapshot } from "../../src/agents/control.js";
 import type { AgenCDaemonTuiClient } from "../../src/tui/daemon-session.js";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
-import { AgenCProjectTrustService } from "./project-trust.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
-import type { AgentStatus } from "../agents/status.js";
-import type { AuthBackend } from "../auth/backend.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { AgenCProjectTrustService } from "../../src/app-server/project-trust.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
+import type { AgentStatus } from "../../src/agents/status.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
 import type {
   AdmissionAcquireInput,
   ExecutionAdmissionClient,
-} from "../budget/admission-client.js";
-import type { AdmissionLease } from "../budget/admission-types.js";
-import type { ExecutionAdmissionKernel } from "../budget/execution-admission-kernel.js";
+} from "../../src/budget/admission-client.js";
+import type { AdmissionLease } from "../../src/budget/admission-types.js";
+import type { ExecutionAdmissionKernel } from "../../src/budget/execution-admission-kernel.js";
 import {
   createEmptyToolPermissionContext,
   type ToolPermissionContext,
-} from "../permissions/types.js";
-import type { UserPromptSubmitHook } from "../hooks/user-prompt-submit.js";
-import { AGENC_DAEMON_PROTOCOL_VERSION, JSON_RPC_VERSION } from "./protocol/index.js";
-import { UnifiedExecProcessManager } from "../unified-exec/process-manager.js";
-import { requestApproval } from "../tools/orchestrator.js";
-import { runToolUse } from "../tools/execution.js";
-import { StreamingToolExecutor } from "../tools/streaming-executor.js";
-import { queueStreamingToolCall } from "../phases/execute-tools.js";
-import { resolveRoutinePermissionGrant } from "../routines/permission-authority.js";
-import type { CsvAgentJobsRepositoryProvider } from "./csv-agent-jobs-authority.js";
-import type { RunRuntimeSettingsSnapshot } from "../contracts/run-contracts.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+} from "../../src/permissions/types.js";
+import type { UserPromptSubmitHook } from "../../src/hooks/user-prompt-submit.js";
+import { AGENC_DAEMON_PROTOCOL_VERSION, JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
+import { requestApproval } from "../../src/tools/orchestrator.js";
+import { runToolUse } from "../../src/tools/execution.js";
+import { StreamingToolExecutor } from "../../src/tools/streaming-executor.js";
+import { queueStreamingToolCall } from "../../src/phases/execute-tools.js";
+import { resolveRoutinePermissionGrant } from "../../src/routines/permission-authority.js";
+import type { CsvAgentJobsRepositoryProvider } from "../../src/app-server/csv-agent-jobs-authority.js";
+import type { RunRuntimeSettingsSnapshot } from "../../src/contracts/run-contracts.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 import type {
   PermissionContextPreparedUpdate,
   PermissionContextPublication,
   PermissionContextPublicationCoordinator,
-} from "../permissions/permission-mode.js";
+} from "../../src/permissions/permission-mode.js";
 import {
   sandboxExecutionBrokerAuthorityFromSessionAuthority,
   sessionExecutionAuthorityFromAgenCConfig,
   type SessionExecutionAuthority,
-} from "../session/configuration.js";
+} from "../../src/session/configuration.js";
 import {
   readSandboxExecutionBroker,
   readSandboxExecutionSurface,
   SandboxExecutionBroker,
-} from "../sandbox/execution-broker.js";
+} from "../../src/sandbox/execution-broker.js";
 import {
   clearCurrentRuntimeSession,
   getCurrentRuntimeSession,
   peekScopedRuntimeSession,
   runWithCurrentRuntimeSession,
   setCurrentRuntimeSession,
-} from "../session/current-session.js";
-import type { Session } from "../session/session.js";
-import type { JsonRecord } from "../config/json.js";
+} from "../../src/session/current-session.js";
+import type { Session } from "../../src/session/session.js";
+import type { JsonRecord } from "../../src/config/json.js";
 import { EventLog, type Event } from "../../src/session/event-log.js";
 import { reconstructFromRollout } from "../../src/session/rollout-reconstruction.js";
 import { computeCheckpointPrefixHashV3 } from "../../src/session/durable-checkpoint-reader.js";
@@ -107,35 +107,35 @@ import { bindLiveAgentSession } from "../../src/agents/live-session.js";
 import { assertNoLiveUnknownEffect, poisonLiveEffect } from "../../src/budget/effect-settlement-supervisor.js";
 import { registerChildApprovalSession, revokeChildApprovalSession } from "../../src/agents/child-approval-context.js";
 import type { ApprovalResolver } from "../../src/permissions/guardian/arbiter.js";
-import type { TurnContext } from "../session/turn-context.js";
-import type { Tool, ToolResult } from "../tools/types.js";
-import { readToolRuntimeContext } from "../tools/runtimes/context.js";
-import type { ToolRegistry } from "../tool-registry.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import type { Tool, ToolResult } from "../../src/tools/types.js";
+import { readToolRuntimeContext } from "../../src/tools/runtimes/context.js";
+import type { ToolRegistry } from "../../src/tool-registry.js";
 import {
   getCanonicalSettingsAuthority,
   runWithCanonicalSettingsAuthority,
   type CanonicalSettingsAuthority,
-} from "../utils/settings/canonicalAuthority.js";
+} from "../../src/utils/settings/canonicalAuthority.js";
 import {
   ConfigStore,
   COORDINATED_CONFIG_STORE_PUBLICATION,
   type CoordinatedConfigStorePublishOptions,
-} from "../config/store.js";
-import { resolveHomeContext } from "../config/home.js";
-import { RuntimeStateRepository } from "../config/runtime-state-repository.js";
-import { initializeToolPermissionContext } from "../permissions/settings.js";
-import { loadBypassPermissionsConsent } from "../permissions/bypass-consent-state.js";
+} from "../../src/config/store.js";
+import { resolveHomeContext } from "../../src/config/home.js";
+import { RuntimeStateRepository } from "../../src/config/runtime-state-repository.js";
+import { initializeToolPermissionContext } from "../../src/permissions/settings.js";
+import { loadBypassPermissionsConsent } from "../../src/permissions/bypass-consent-state.js";
 import {
   resolveProjectTrustStateSync,
   trustedProjectsPath,
-} from "../permissions/trust/project-trust.js";
+} from "../../src/permissions/trust/project-trust.js";
 import {
   registerSandboxExecutionLifecycleParticipant,
   transitionSandboxExecutionBroker,
-} from "../sandbox/execution-lifecycle.js";
+} from "../../src/sandbox/execution-lifecycle.js";
 import {
   MAX_ADDITIONAL_WORKING_DIRECTORIES,
-} from "../contracts/additional-working-directories.js";
+} from "../../src/contracts/additional-working-directories.js";
 
 const backgroundAgentRunnerSourcePath = new URL(
   "../../src/app-server/background-agent-runner.ts",

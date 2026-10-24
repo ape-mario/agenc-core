@@ -7,7 +7,7 @@ import {
   findProjectInstructionFilePathInAncestors,
   getSteps,
   isProjectOnboardingComplete,
-} from "./projectOnboardingSteps.js";
+} from "../../src/onboarding/projectOnboardingSteps.js";
 
 function withTempDir<T>(prefix: string, run: (path: string) => T): T {
   const path = mkdtempSync(join(tmpdir(), prefix));

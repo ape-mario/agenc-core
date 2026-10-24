@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { defaultConfig } from "../config/schema.js";
-import { verifyApiKey } from "./useApiKeyVerification.js";
+import { defaultConfig } from "../../src/config/schema.js";
+import { verifyApiKey } from "../../src/onboarding/useApiKeyVerification.js";
 
 describe("verifyApiKey", () => {
   test("reports missing and malformed keys before network verification", async () => {
@@ -316,7 +316,7 @@ describe("verifyApiKey", () => {
     // Live probes measured 0.8–1.6s per provider on a healthy connection;
     // the previous 1.5s default aborted OpenRouter checks on GOOD keys.
     const { DEFAULT_PROVIDER_VERIFY_TIMEOUT_MS } = await import(
-      "./useApiKeyVerification.js"
+      "../../src/onboarding/useApiKeyVerification.js"
     );
     expect(DEFAULT_PROVIDER_VERIFY_TIMEOUT_MS).toBeGreaterThanOrEqual(5_000);
   });

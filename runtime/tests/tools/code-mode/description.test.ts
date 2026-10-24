@@ -3,8 +3,8 @@ import {
   codeModeToolDefinitionsFromTools,
   normalizeCodeModeIdentifier,
   parseExecSource,
-} from "./description.js";
-import type { Tool } from "../types.js";
+} from "../../../src/tools/code-mode/description.js";
+import type { Tool } from "../../../src/tools/types.js";
 
 describe("code-mode description helpers", () => {
   test("parses upstream-style exec pragma", () => {

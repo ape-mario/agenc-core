@@ -17,7 +17,7 @@ test('bundled skills load and list without the build-time MACRO define', async (
     'precondition: this file must run without the MACRO stub',
   )
 
-  const { getBundledSkills } = await import('./bundledSkills.js')
+  const { getBundledSkills } = await import('../../src/skills/bundledSkills.js')
   const names = getBundledSkills().map((command) => command.name)
 
   assert.ok(names.includes('browser-automation'))

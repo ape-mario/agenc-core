@@ -6,36 +6,36 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MAX_CSV_JOB_REGISTRATION_HOLD_MS,
   MAX_RECOVERED_CSV_JOBS,
-} from "../../contracts/csv-job-contract.js";
+} from "../../../src/contracts/csv-job-contract.js";
 import {
   CsvAgentJobsRepository,
   type CsvJobSupervisorRegistration,
-} from "../../state/csv-agent-jobs.js";
+} from "../../../src/state/csv-agent-jobs.js";
 import {
   openStateDatabases,
   resolveStateDatabasePaths,
   type StateSqliteDriver,
-} from "../../state/sqlite-driver.js";
+} from "../../../src/state/sqlite-driver.js";
 import {
   CsvJobCompactingQueue,
   CsvJobRecoverySupervisor,
   recordAgentJobResult,
   type AgentJobSpawn,
-} from "./job-orchestrator.js";
-import { AgentRegistry } from "../registry.js";
-import type { Session } from "../../session/session.js";
+} from "../../../src/agents/jobs/job-orchestrator.js";
+import { AgentRegistry } from "../../../src/agents/registry.js";
+import type { Session } from "../../../src/session/session.js";
 import {
   _clearAgentControlCacheForTesting,
   _setAgentControlForTesting,
-} from "../../bin/delegate-tool.js";
+} from "../../../src/bin/delegate-tool.js";
 import {
   resumeInterruptedAgentJobs,
   shutdownCsvJobRecoverySupervisor,
-} from "../../bin/model-facing-tools.js";
+} from "../../../src/bin/model-facing-tools.js";
 import {
   CsvAgentJobsRepositoryAuthority,
   type CsvAgentJobsRepositoryProvider,
-} from "../../app-server/csv-agent-jobs-authority.js";
+} from "../../../src/app-server/csv-agent-jobs-authority.js";
 
 let home: string;
 let cwd: string;

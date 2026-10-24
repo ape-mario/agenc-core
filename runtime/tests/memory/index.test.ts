@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as memory from "./index.js";
+import * as memory from "../../src/memory/index.js";
 import {
   findRelevantMemories,
   filterInjectedMemoryFiles,
@@ -16,19 +16,19 @@ import {
   memoryFreshnessNote,
   scanMemoryFiles,
   type MemoryFileInfo,
-} from "./index.js";
+} from "../../src/memory/index.js";
 
 vi.mock("bun:bundle", () => ({ feature: () => false }));
-vi.mock("../utils/hooks.js", () => ({
+vi.mock("../../src/utils/hooks.js", () => ({
   executeInstructionsLoadedHooks: async () => undefined,
   hasInstructionsLoadedHook: () => false,
 }));
-vi.mock("../utils/settings/settings.js", () => ({
+vi.mock("../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: () => ({ agencMdExcludes: [] }),
   getInitialSettings: () => ({ agencMdExcludes: [] }),
   getSettingsForSource: () => ({ agencMdExcludes: [] }),
 }));
-vi.mock("../tools.js", () => ({}));
+vi.mock("../../src/tools.js", () => ({}));
 vi.mock("src/tools.js", () => ({}));
 
 let tempDir = "";
@@ -106,7 +106,7 @@ describe("memory public access surface", () => {
     // The MEMORY.md-index skip is inlined off in the open build, so the public
     // surface always returns every memory file untouched, matching the
     // canonical loader helper exactly.
-    const canonical = await import("./agencmd.js");
+    const canonical = await import("../../src/memory/agencmd.js");
 
     expect(filterInjectedMemoryFiles(files)).toBe(files);
     expect(filterInjectedMemoryFiles(files)).toEqual(

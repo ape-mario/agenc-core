@@ -3,11 +3,11 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import instances from "../../ink/instances.js";
-import type { DOMElement, DOMNode } from "../../ink/dom.js";
-import { createRoot } from "../../ink/root.js";
-import { Box, Text } from "../../ink.js";
-import { FuzzyPicker } from "./FuzzyPicker.js";
+import instances from "../../../../src/tui/ink/instances.js";
+import type { DOMElement, DOMNode } from "../../../../src/tui/ink/dom.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { Box, Text } from "../../../../src/tui/ink.js";
+import { FuzzyPicker } from "../../../../src/tui/components/design-system/FuzzyPicker.js";
 
 type PickerItem = {
   readonly id: string;

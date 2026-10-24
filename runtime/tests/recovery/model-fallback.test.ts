@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { EventLog } from "../session/event-log.js";
-import type { Session } from "../session/session.js";
-import type { TurnState, UserMessage } from "../session/turn-state.js";
-import { FallbackTriggeredError } from "./api-errors.js";
-import { runModelFallback } from "./model-fallback.js";
+import { EventLog } from "../../src/session/event-log.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnState, UserMessage } from "../../src/session/turn-state.js";
+import { FallbackTriggeredError } from "../../src/recovery/api-errors.js";
+import { runModelFallback } from "../../src/recovery/model-fallback.js";
 
 interface FakeExecutor {
   discardCount: number;

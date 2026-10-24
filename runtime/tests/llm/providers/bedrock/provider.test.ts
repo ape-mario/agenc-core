@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
-import { BEDROCK_CONVERSE_MODELS } from "../../registry/bedrock-converse-models.js";
+import { BEDROCK_CONVERSE_MODELS } from "../../../../src/llm/registry/bedrock-converse-models.js";
 import { describe, expect, it, vi } from "vitest";
 
-import { createTokenAccountingRequest } from "../../token-accounting.js";
-import { encodeMcpToolNameForWire } from "../../wire/mcp-tool-naming.js";
+import { createTokenAccountingRequest } from "../../../../src/llm/token-accounting.js";
+import { encodeMcpToolNameForWire } from "../../../../src/llm/wire/mcp-tool-naming.js";
 import { eventStreamResponse } from "../shared/stream-terminal.js";
-import { BedrockHttpError, BedrockProvider } from "./index.js";
+import { BedrockHttpError, BedrockProvider } from "../../../../src/llm/providers/bedrock/index.js";
 import { childDispatchCertainty, classifyChildFailure } from "../../../../src/agents/child-terminal.js";
 import {
   createCsvAgentInvocationEnvelope,

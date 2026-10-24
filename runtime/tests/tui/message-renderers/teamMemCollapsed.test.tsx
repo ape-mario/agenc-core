@@ -3,15 +3,15 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import type { DOMElement, DOMNode } from '../ink/dom.ts'
-import instances from '../ink/instances.js'
-import { createRoot } from '../ink/root.js'
-import { Text } from '../ink.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import type { DOMElement, DOMNode } from '../../../src/tui/ink/dom.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { Text } from '../../../src/tui/ink.js'
 import {
   TeamMemCountParts,
   checkHasTeamMemOps,
-} from './teamMemCollapsed.js'
+} from '../../../src/tui/message-renderers/teamMemCollapsed.js'
 
 type TeamMemRenderOptions = {
   readonly hasPrecedingParts?: boolean

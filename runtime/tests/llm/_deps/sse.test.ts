@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
   MAX_SSE_FRAME_BYTES,
   parseSSEFrames,
-} from "./sse.js";
-import { LLMInvalidResponseError } from "../errors.js";
+} from "../../../src/llm/_deps/sse.js";
+import { LLMInvalidResponseError } from "../../../src/llm/errors.js";
 
 describe("parseSSEFrames", () => {
   test("returns un-delimited remainder unchanged below the cap", () => {

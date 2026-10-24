@@ -7,14 +7,14 @@ import { PassThrough, Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test, vi } from "vitest";
 
-import type { LLMTool } from "../llm/types.js";
-import type { ToolDispatchResult, ToolRegistry } from "../tool-registry.js";
-import type { Tool } from "../tools/types.js";
+import type { LLMTool } from "../../src/llm/types.js";
+import type { ToolDispatchResult, ToolRegistry } from "../../src/tool-registry.js";
+import type { Tool } from "../../src/tools/types.js";
 import {
   MCP_INBOUND_TOOL_ADMISSION_REQUIRED_CODE,
   MCP_INBOUND_TOOL_ADMISSION_REQUIRED_MESSAGE,
   MCP_INBOUND_TOOL_ADMISSION_REQUIRED_REASON,
-} from "../mcp/server/start.js";
+} from "../../src/mcp/server/start.js";
 import {
   formatMcpSseServeUrl,
   formatAgenCMcpCliHelpText,
@@ -24,7 +24,7 @@ import {
   runAgenCMcpCli,
   startMcpSseServe,
   type AgenCMcpCliIo,
-} from "./mcp-cli.js";
+} from "../../src/bin/mcp-cli.js";
 
 const SAMPLE_TOOL: Tool = {
   name: "sample.echo",

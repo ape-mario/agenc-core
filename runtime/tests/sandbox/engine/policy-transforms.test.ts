@@ -9,7 +9,7 @@ import {
   mergePermissionProfiles,
   normalizeAdditionalPermissions,
   shouldRequirePlatformSandbox,
-} from "./policy-transforms.js";
+} from "../../../src/sandbox/engine/policy-transforms.js";
 import {
   canWritePathWithCwd,
   externalFileSystemPolicy,
@@ -23,7 +23,7 @@ import {
   resolveAccessWithCwd,
   resolveSpecialPath,
   unrestrictedFileSystemPolicy,
-} from "./index.js";
+} from "../../../src/sandbox/engine/index.js";
 import {
   resolveAgentRuntimeOptions,
 } from "../../../src/session/runtime-options.js";

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import type { Task } from '../../utils/tasks.js'
+import type { Task } from '../../../src/utils/tasks.js'
 
 type AppStateFixture = {
   expandedView: 'none' | 'tasks' | 'teammates'
@@ -155,13 +155,13 @@ vi.mock('fs', () => ({
   watch: fixture.watch,
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: AppStateFixture) => unknown) =>
     selector(fixture.state.appState),
   useSetAppState: () => fixture.setAppState,
 }))
 
-vi.mock('../../utils/tasks.js', () => ({
+vi.mock('../../../src/utils/tasks.js', () => ({
   getTaskListId: () => fixture.state.taskListId,
   getTasksDir: (taskListId: string) => `/tasks/${taskListId}`,
   isTodoV2Enabled: () => fixture.state.enabled,
@@ -170,11 +170,11 @@ vi.mock('../../utils/tasks.js', () => ({
   resetTaskList: fixture.resetTaskList,
 }))
 
-vi.mock('../../utils/teammate.js', () => ({
+vi.mock('../../../src/utils/teammate.js', () => ({
   isTeamLead: () => fixture.state.isLead,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: logMock.logError,
 }))
 
@@ -261,7 +261,7 @@ async function mountUseTasksV2(): Promise<{
   initial: Task[] | undefined
   record: SubscriptionRecord
 }> {
-  const { useTasksV2 } = await import('./useTasksV2.js')
+  const { useTasksV2 } = await import('../../../src/tui/hooks/useTasksV2.js')
   const initial = useTasksV2()
   const record = fixture.state.subscriptions.at(-1)
   if (!record) {
@@ -578,7 +578,7 @@ describe('useTasksV2', () => {
     fixture.state.appState = {
       expandedView: 'tasks',
     }
-    const { useTasksV2WithCollapseEffect } = await import('./useTasksV2.js')
+    const { useTasksV2WithCollapseEffect } = await import('../../../src/tui/hooks/useTasksV2.js')
 
     const tasks = useTasksV2WithCollapseEffect()
 

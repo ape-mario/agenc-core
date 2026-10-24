@@ -8,7 +8,7 @@ import {
   installAgenCDaemonExitDiagnostics,
   installAgenCDaemonLogSink,
   resolveAgenCDaemonLogPath,
-} from "./daemon-cli.js";
+} from "../../src/app-server/daemon-cli.js";
 
 describe("daemon child heap cap arg construction", () => {
   it("prepends a default --max-old-space-size ahead of the entrypoint", () => {

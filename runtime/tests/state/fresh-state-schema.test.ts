@@ -5,10 +5,10 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { applyMigrations, openStateDatabasePaths, type StateDatabasePaths } from "./sqlite-driver.js";
-import { STATE_DB_MIGRATIONS } from "./migrations/index.js";
-import { tryInitializeFreshStateSchema } from "./fresh-state-schema.js";
-import { FRESH_STATE_SCHEMA_SQL } from "./fresh-state-schema.generated.js";
+import { applyMigrations, openStateDatabasePaths, type StateDatabasePaths } from "../../src/state/sqlite-driver.js";
+import { STATE_DB_MIGRATIONS } from "../../src/state/migrations/index.js";
+import { tryInitializeFreshStateSchema } from "../../src/state/fresh-state-schema.js";
+import { FRESH_STATE_SCHEMA_SQL } from "../../src/state/fresh-state-schema.generated.js";
 
 let root: string;
 const connections: Database.Database[] = [];

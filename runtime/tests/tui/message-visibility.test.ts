@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { isNullRenderingAttachment } from './message-visibility.js'
+import { isNullRenderingAttachment } from '../../src/tui/message-visibility.js'
 
 describe('isNullRenderingAttachment', () => {
   test('recognizes attachment types that do not render a TUI row', () => {

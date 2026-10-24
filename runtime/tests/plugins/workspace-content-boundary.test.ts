@@ -4,20 +4,20 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, test } from "vitest";
 
-import { createLocalSkillsServices } from "../skills/local-loader.js";
-import { isRepositoryControlledSkillSource } from "../skills/repository-skill-boundary.js";
-import { isRepositoryControlledAgentDefinition } from "../tools/AgentTool/loadAgentsDir.js";
-import { loadPlugins } from "./loader.js";
-import { loadPluginAgents } from "./registration/load-plugin-agents.js";
+import { createLocalSkillsServices } from "../../src/skills/local-loader.js";
+import { isRepositoryControlledSkillSource } from "../../src/skills/repository-skill-boundary.js";
+import { isRepositoryControlledAgentDefinition } from "../../src/tools/AgentTool/loadAgentsDir.js";
+import { loadPlugins } from "../../src/plugins/loader.js";
+import { loadPluginAgents } from "../../src/plugins/registration/load-plugin-agents.js";
 import {
   loadPluginCommands,
   loadPluginSkills,
-} from "./registration/load-plugin-commands.js";
-import { loadPluginHooks } from "./registration/load-plugin-hooks.js";
-import { loadPluginLspServers } from "./registration/lsp-plugin-integration.js";
-import { refreshPluginRegistrations } from "./registration/manager.js";
-import { loadPluginMcpServers } from "./registration/mcp-plugin-integration.js";
-import { loadPluginOutputStyles } from "./registration/load-plugin-output-styles.js";
+} from "../../src/plugins/registration/load-plugin-commands.js";
+import { loadPluginHooks } from "../../src/plugins/registration/load-plugin-hooks.js";
+import { loadPluginLspServers } from "../../src/plugins/registration/lsp-plugin-integration.js";
+import { refreshPluginRegistrations } from "../../src/plugins/registration/manager.js";
+import { loadPluginMcpServers } from "../../src/plugins/registration/mcp-plugin-integration.js";
+import { loadPluginOutputStyles } from "../../src/plugins/registration/load-plugin-output-styles.js";
 
 const roots: string[] = [];
 

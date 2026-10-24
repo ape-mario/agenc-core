@@ -2,7 +2,7 @@ import { access, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { parseToml } from "../config/loader.js";
+import { parseToml } from "../../src/config/loader.js";
 import { validatePermissionsConfig } from "../../src/config/schema.js";
 import { parseRuleString, serializeRuleValue } from "../../src/permissions/rules.js";
 import { validatePermissionRule } from "../../src/utils/settings/permissionValidation.js";
@@ -13,7 +13,7 @@ import {
   runAgenCPermissionsCli,
   type AgenCPermissionsCliDaemonClient,
   type AgenCPermissionsCliIo,
-} from "./permission-cli.js";
+} from "../../src/permissions/permission-cli.js";
 
 function createIo(): AgenCPermissionsCliIo & {
   readonly stdoutText: () => string;

@@ -41,41 +41,41 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../utils/cwd.js', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => tempCwd,
   pwd: () => tempCwd,
   runWithCwdOverride: <T,>(_cwd: string, fn: () => T) => fn(),
 }))
 
-vi.mock('../../utils/settings/settings.js', () => ({
+vi.mock('../../../src/utils/settings/settings.js', () => ({
   getExecutionAuthoritySettings: () => harness.projectSettings,
   getInitialSettings: () => harness.projectSettings,
   getSettingsForSource: (source: string) =>
     source === 'projectSettings' ? harness.projectSettings : undefined,
 }))
 
-vi.mock('../../utils/config.js', () => ({
+vi.mock('../../../src/utils/config.js', () => ({
   checkHasTrustDialogAccepted: () => true,
   getRuntimeState: () => harness.globalConfig,
 }))
 
-vi.mock('../../utils/hooks.js', () => ({
+vi.mock('../../../src/utils/hooks.js', () => ({
   createBaseHookInput: () => ({ cwd: tempCwd }),
   executeFileSuggestionCommand: async () => [],
 }))
 
-vi.mock('../../utils/markdownConfigLoader.js', () => ({
+vi.mock('../../../src/utils/markdownConfigLoader.js', () => ({
   AGENC_CONFIG_DIRECTORIES: ['agents'],
   loadMarkdownFilesForSubdir: async () =>
     harness.markdownFiles.map(filePath => ({ filePath })),
 }))
 
-vi.mock('../../utils/git', () => ({
+vi.mock('../../../src/utils/git.js', () => ({
   findGitRoot: () => harness.gitRoot,
   gitExe: () => 'git',
 }))
 
-vi.mock('../../utils/execFileNoThrow.js', () => ({
+vi.mock('../../../src/utils/execFileNoThrow.js', () => ({
   execFileNoThrowWithCwd: async (
     _command: string,
     args: string[],
@@ -88,11 +88,11 @@ vi.mock('../../utils/execFileNoThrow.js', () => ({
   },
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-vi.mock('../../utils/ripgrep.js', () => ({
+vi.mock('../../../src/utils/ripgrep.js', () => ({
   ripGrep: harness.ripGrep,
 }))
 
@@ -100,7 +100,7 @@ vi.mock('src/utils/debug.js', () => ({
   logForDebugging: () => {},
 }))
 
-vi.mock('../ink/native-ts/file-index/index', () => ({
+vi.mock('../../../src/tui/ink/native-ts/file-index/index.js', () => ({
   CHUNK_MS: 4,
   FileIndex: class {
     loadFromFileListAsync(paths: string[]) {
@@ -120,7 +120,7 @@ import {
   getPathsForSuggestions,
   onIndexBuildComplete,
   startBackgroundCacheRefresh,
-} from '../hooks/fileSuggestions.js'
+} from '../../../src/tui/hooks/fileSuggestions.js'
 
 async function waitFor(assertion: () => void): Promise<void> {
   let lastError: unknown

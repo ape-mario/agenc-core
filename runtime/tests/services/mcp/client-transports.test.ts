@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js'
 import { afterEach, test, vi } from 'vitest'
-import type { McpSamplingHandlers } from './hostCapabilities.js'
+import type { McpSamplingHandlers } from '../../../src/services/mcp/hostCapabilities.js'
 import { resolveHomeContext } from '../../../src/config/home.js'
 import { ConfigStore } from '../../../src/config/store.js'
 
@@ -350,7 +350,6 @@ afterEach(async () => {
   vi.doUnmock('../../../src/utils/proxy.js')
   vi.doUnmock('../../../src/utils/ide.js')
 	vi.doUnmock('../../../src/utils/log.js')
-	  vi.doUnmock('../../../src/utils/mcpNodeWsClient.js')
 	  vi.doUnmock('../../../src/utils/mcpWebSocketTransport.js')
 	  vi.doUnmock('../../../src/utils/mcpValidation.js')
 	  vi.doUnmock('../../../src/utils/sleep.js')
@@ -369,7 +368,7 @@ test('connectToServer creates stdio clients with lifecycle handlers and cleanup'
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const config = {
@@ -454,7 +453,7 @@ test('connectToServer routes sampling requests through supplied handlers', async
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -534,7 +533,7 @@ test('connectToServer quotes stdio argv for the session command wrapper', async 
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer, formatMcpShellPrefixCommand } = await import('./client.js')
+  const { connectToServer, formatMcpShellPrefixCommand } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const config = {
@@ -588,7 +587,7 @@ test('connectToServer isolates stdio temp authority in env and cache identity', 
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const config = {
@@ -672,7 +671,7 @@ test('connectToServer logs successful stdio startup stderr before cleanup', asyn
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -707,7 +706,7 @@ test('connectToServer cleanup escalates stdio child process termination signals'
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -765,7 +764,7 @@ test('connectToServer cleanup handles stdio signal and client close failures', a
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -797,7 +796,7 @@ test('connectToServer cleanup logs stdio client close failures without a child p
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -838,7 +837,7 @@ test('connectToServer cleanup resolves when stdio process exits during monitorin
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -884,7 +883,7 @@ test('connectToServer cleanup resolves when stdio SIGTERM fails', async () => {
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -930,7 +929,7 @@ test('connectToServer cleanup logs stdio SIGKILL failures without rejecting', as
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -978,7 +977,7 @@ test('connectToServer cleanup resolves when stdio process exits after SIGINT gra
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const result = await connectToServer('pid-stdio-exits-after-sigint', {
@@ -1026,7 +1025,7 @@ test('connectToServer cleanup resolves when stdio process exits before SIGKILL',
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const result = await connectToServer('pid-stdio-exits-before-sigkill', {
@@ -1067,7 +1066,7 @@ test('connectToServer cleanup resolves when stdio escalation sleep throws', asyn
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const result = await connectToServer('pid-stdio-sleep-fail', {
@@ -1099,7 +1098,7 @@ test('connectToServer cleanup uses failsafe when stdio escalation never settles'
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const result = await connectToServer('pid-stdio-failsafe', {
@@ -1129,7 +1128,7 @@ test('connectToServer cleanup logs stdio pid access failures without rejecting',
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const result = await connectToServer('pid-stdio-throws-pid', {
@@ -1162,7 +1161,7 @@ test('connectToServer preserves original lifecycle handlers during remote close 
     SSEClientTransport: FakeSseTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -1208,7 +1207,7 @@ test('connectToServer forwards HTTP session expiry to the original error handler
     StreamableHTTPClientTransport: FakeHttpTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -1246,7 +1245,7 @@ test('callMCPToolWithUrlElicitationRetry returns hook-declined URL elicitations'
     ) => result,
   }))
 
-  const { callMCPToolWithUrlElicitationRetry } = await import('./client.js')
+  const { callMCPToolWithUrlElicitationRetry } = await import('../../../src/services/mcp/client.js')
   const result = await callMCPToolWithUrlElicitationRetry({
     client: {
       name: 'browser',
@@ -1300,7 +1299,7 @@ test('callMCPToolWithUrlElicitationRetry retries hook-accepted URL elicitations 
     ) => result,
   }))
 
-  const { callMCPToolWithUrlElicitationRetry } = await import('./client.js')
+  const { callMCPToolWithUrlElicitationRetry } = await import('../../../src/services/mcp/client.js')
   let calls = 0
   const result = await callMCPToolWithUrlElicitationRetry({
     client: {
@@ -1417,7 +1416,7 @@ test('connectToServer creates in-process Chrome MCP clients without spawning std
     ],
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -1482,7 +1481,7 @@ test('connectToServer cleanup logs in-process server and client close failures',
     ],
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -1543,7 +1542,7 @@ test('connectToServer times out hanging in-process Chrome connections and cleans
     ],
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -1575,7 +1574,7 @@ test('connectToServer returns failed stdio clients after connect errors and clos
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -1611,8 +1610,8 @@ test('plugin initialization failure redacts stderr, logs, connection error, and 
     logMCPError: (_name: string, value: unknown) => { logs.push(String(value)) },
     logMCPDebug: (_name: string, value: string) => { logs.push(value) },
   }))
-  const { connectToServer, clearServerCache } = await import('./client.js')
-  const { doctorServer } = await import('./doctor.js')
+  const { connectToServer, clearServerCache } = await import('../../../src/services/mcp/client.js')
+  const { doctorServer } = await import('../../../src/services/mcp/doctor.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??= { VERSION: 'test' }
   const name = 'plugin:demo:secret'
   const config = {
@@ -1659,7 +1658,7 @@ test('HTTP transport diagnostics redact a saved header credential that JSON esca
     logMCPError: (_name: string, value: unknown) => { logs.push(String(value)) },
     logMCPDebug: (_name: string, value: string) => { logs.push(value) },
   }))
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??= { VERSION: 'test' }
   await connectToServer('plugin:demo:http-secret', {
     type: 'http', url: 'https://example.test/mcp', scope: 'dynamic',
@@ -1682,7 +1681,7 @@ test('health-check stderr redaction survives a chunk boundary inside a multibyte
     logMCPError: (_name: string, value: unknown) => { logs.push(String(value)) },
     logMCPDebug: (_name: string, value: string) => { logs.push(value) },
   }))
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??= { VERSION: 'test' }
   const connection = await connectToServer('plugin:demo:split-secret', {
     type: 'stdio', command: 'split-secret-server', args: [], scope: 'dynamic',
@@ -1708,7 +1707,7 @@ test.each(['ascii', 'utf8'])(
       logMCPError: (_name: string, value: unknown) => { logs.push(String(value)) },
       logMCPDebug: (_name: string, value: string) => { logs.push(value) },
     }))
-    const { connectToServer } = await import('./client.js')
+    const { connectToServer } = await import('../../../src/services/mcp/client.js')
     ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??= { VERSION: 'test' }
     const connection = await connectToServer(`plugin:demo:success-split-${split}`, {
       type: 'stdio', command: `successful-split-secret-${split}`, args: [], scope: 'dynamic',
@@ -1745,7 +1744,7 @@ test.each([
       logMCPError: (_name: string, value: unknown) => { logs.push(String(value)) },
       logMCPDebug: (_name: string, value: string) => { logs.push(value) },
     }))
-    const { connectToServer } = await import('./client.js')
+    const { connectToServer } = await import('../../../src/services/mcp/client.js')
     ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??= { VERSION: 'test' }
     const connection = await connectToServer(`plugin:demo:${command}`, {
       type: 'stdio', command, args: [], scope: 'dynamic',
@@ -1769,7 +1768,7 @@ test('health-check stderr holds a shorter saved value while a longer one is stil
     logMCPError: (_name: string, value: unknown) => { logs.push(String(value)) },
     logMCPDebug: (_name: string, value: string) => { logs.push(value) },
   }))
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??= { VERSION: 'test' }
   const connection = await connectToServer('plugin:demo:overlap-secret', {
     type: 'stdio', command: 'successful-overlap-secret-server', args: [], scope: 'dynamic',
@@ -1794,7 +1793,7 @@ test('connectToServer returns failed stdio clients after connection timeout', as
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -1858,7 +1857,7 @@ test('connectToServer creates remote SSE, SSE-IDE, and HTTP transports without r
   }))
   installNativeFetchRecorder()
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2052,7 +2051,7 @@ test('connectToServer HTTP fetch wrapper leaves long POST requests unbounded unt
       },
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2115,7 +2114,7 @@ test('connectToServer wires proxy fetch options into SSE IDE event streams', asy
   }))
   installNativeFetchRecorder('proxied')
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2172,7 +2171,7 @@ test('connectToServer scopes SSE and Streamable HTTP custom fetch hooks', async 
   }))
   installNativeFetchRecorder('scoped')
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
   const environment = Object.freeze({
@@ -2224,7 +2223,7 @@ test('connectToServer tolerates IDE connected notification failures', async () =
     },
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2248,7 +2247,7 @@ test('connectToServer returns failed connections for unsupported direct paths', 
     Client: FakeClient,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2284,7 +2283,7 @@ test('connectToServer returns needs-auth for unauthorized SSE and HTTP connectio
   vi.doMock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
     StreamableHTTPClientTransport: FakeHttpTransport,
   }))
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2314,7 +2313,7 @@ test('connectToServer creates WebSocket and WebSocket IDE transports without rea
   mutableGlobal.Bun = {}
   mutableGlobal.WebSocket = FakeWebSocketClient
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2376,7 +2375,7 @@ test('connectToServer creates Node WebSocket transports without real sockets', a
     default: FakeWebSocketClient,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2505,7 +2504,7 @@ test('connectToServer creates agenc.tech proxy transports and retries bearer fet
     getProxyFetchOptions: () => ({ dispatcher: fakeDispatcher }),
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2617,7 +2616,7 @@ test('connectToServer truncates oversized server instructions', async () => {
     StdioClientTransport: FakeStdioTransport,
   }))
 
-  const { connectToServer } = await import('./client.js')
+  const { connectToServer } = await import('../../../src/services/mcp/client.js')
   ;(globalThis as typeof globalThis & { MACRO?: { VERSION: string } }).MACRO ??=
     { VERSION: 'test' }
 
@@ -2686,7 +2685,7 @@ test('MCP tool calls persist large non-image output and fall back when disabled'
     bindMcpConnectionAuthority,
     connectToServer,
     fetchToolsForClient,
-  } = await import('./client.js')
+  } = await import('../../../src/services/mcp/client.js')
   const config = {
     type: 'stdio',
     command: 'large-output-server',

@@ -6,8 +6,8 @@ import {
   recordResponsesContinuationResponse,
   resetResponsesContinuationState,
   validateHistoryCompatibility,
-} from "./shape-request.js";
-import type { ProviderModelCapabilities } from "./capabilities.js";
+} from "../../src/llm/shape-request.js";
+import type { ProviderModelCapabilities } from "../../src/llm/capabilities.js";
 
 describe("analyzeSessionHistoryRequirements", () => {
   it("detects image, audio, and thinking requirements recursively, and no effort requirement", () => {

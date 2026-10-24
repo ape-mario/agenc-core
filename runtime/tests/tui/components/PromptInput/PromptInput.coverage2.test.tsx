@@ -4,21 +4,21 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../../utils/config.js', () => ({
+vi.mock('../../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({}),
   updateRuntimeState: () => {},
 }))
 
-vi.mock('../../history/history.js', () => ({
+vi.mock('../../../../src/tui/history/history.js', () => ({
   formatImageRef: () => '',
   formatPastedTextRef: () => '',
   getPastedTextRefNumLines: () => 0,
   parseReferences: () => [],
 }))
 
-vi.mock('../../../utils/messageQueueManager.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../utils/messageQueueManager.js')>(
-    '../../../utils/messageQueueManager.js',
+vi.mock('../../../../src/utils/messageQueueManager.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/utils/messageQueueManager.js')>(
+    '../../../../src/utils/messageQueueManager.js',
   )
   return actual
 })
@@ -26,8 +26,8 @@ vi.mock('../../../utils/messageQueueManager.js', async () => {
 import {
   getCommandQueueSnapshot,
   resetCommandQueueForTesting,
-} from '../../../utils/messageQueueManager.js'
-import { applyBusyInputSubmissionPolicy } from './PromptInput.js'
+} from '../../../../src/utils/messageQueueManager.js'
+import { applyBusyInputSubmissionPolicy } from '../../../../src/tui/components/PromptInput/PromptInput.js'
 
 describe('PromptInput busy bash coverage', () => {
   afterEach(() => {

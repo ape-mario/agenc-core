@@ -40,22 +40,22 @@ vi.mock("../../../src/utils/supervisedProcess.js", async (importOriginal) => {
   };
 });
 
-import type { Logger } from "../../_deps/logger.js";
-import { attachmentLogger } from "../local-control.js";
+import type { Logger } from "../../../src/mcp-client/_deps/logger.js";
+import { attachmentLogger } from "../../../src/mcp-client/local-control.js";
 import {
   SandboxExecutionBroker,
   type SandboxPreparedSpawn,
   type SandboxSpawnCommand,
-} from "../../sandbox/execution-broker.js";
-import { canWritePathWithCwd } from "../../sandbox/engine/index.js";
-import { registerSandboxExecutionLifecycleParticipant } from "../../sandbox/execution-lifecycle.js";
+} from "../../../src/sandbox/execution-broker.js";
+import { canWritePathWithCwd } from "../../../src/sandbox/engine/index.js";
+import { registerSandboxExecutionLifecycleParticipant } from "../../../src/sandbox/execution-lifecycle.js";
 import {
   AGENC_MCP_STDIO_MAX_FRAME_BYTES,
   AgenCStdioClientTransport,
   DEFAULT_STDIO_ENV_VARS,
   createStdioMCPConnection,
   createStdioMCPEnvironment,
-} from "./stdio.js";
+} from "../../../src/mcp-client/transports/stdio.js";
 
 const tempDirs = new Set<string>();
 const explicitDangerBroker = new SandboxExecutionBroker({

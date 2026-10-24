@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
 import {
   AGENC_DAEMON_METHOD_CAPABILITIES_KEY,
   JSON_RPC_VERSION,
@@ -9,7 +9,7 @@ import {
   MAX_SESSION_SHELL_RESULT_TEXT_UTF8_BYTES,
   type SessionShellExecuteParams,
   type SessionShellExecuteResult,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 async function initialize(
   connection: {

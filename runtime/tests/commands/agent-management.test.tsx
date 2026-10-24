@@ -2,11 +2,11 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { agentsCommand } from "./agent-management.js";
-import type { SlashCommandContext } from "./types.js";
-import { createRoot } from "../tui/ink.js";
-import { AppStateProvider, getDefaultAppState } from "../tui/state/AppState.js";
-import type { AgentDefinition } from "../tools/AgentTool/loadAgentsDir.js";
+import { agentsCommand } from "../../src/commands/agent-management.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import { createRoot } from "../../src/tui/ink.js";
+import { AppStateProvider, getDefaultAppState } from "../../src/tui/state/AppState.js";
+import type { AgentDefinition } from "../../src/tools/AgentTool/loadAgentsDir.js";
 
 function makeCtx(
   appState?: SlashCommandContext["appState"],

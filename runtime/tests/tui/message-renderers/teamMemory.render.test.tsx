@@ -1,10 +1,10 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import type { CollapsedReadSearchGroup } from '../../types/message.js'
-import { checkHasTeamMemOps, TeamMemCountParts } from './teamMemCollapsed.js'
-import { teamMemSavedPart } from './teamMemSaved.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import type { CollapsedReadSearchGroup } from '../../../src/types/message.js'
+import { checkHasTeamMemOps, TeamMemCountParts } from '../../../src/tui/message-renderers/teamMemCollapsed.js'
+import { teamMemSavedPart } from '../../../src/tui/message-renderers/teamMemSaved.js'
 
 async function renderTeamMemParts(
   message: Partial<CollapsedReadSearchGroup>,

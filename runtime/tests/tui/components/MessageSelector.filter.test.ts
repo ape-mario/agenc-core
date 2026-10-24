@@ -6,11 +6,11 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../../utils/messages.js", () => ({
+vi.mock("../../../src/utils/messages.js", () => ({
   isSyntheticMessage: () => false,
 }));
 
-import { rewindUserMessagesFilter, selectableUserMessagesFilter } from "./message-selector-filter.js";
+import { rewindUserMessagesFilter, selectableUserMessagesFilter } from "../../../src/tui/components/message-selector-filter.js";
 
 function userMessage(content: unknown, extra: Record<string, unknown> = {}) {
   return {

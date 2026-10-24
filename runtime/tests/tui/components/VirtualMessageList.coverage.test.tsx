@@ -24,7 +24,7 @@ const virtualScroll = vi.hoisted(() => ({
   topSpacer: 0,
 }));
 
-vi.mock("../hooks/useVirtualScroll.js", () => ({
+vi.mock("../../../src/tui/hooks/useVirtualScroll.js", () => ({
   useVirtualScroll: (_scrollRef: unknown, keys: readonly string[]) => {
     virtualScroll.keys = keys;
     return {
@@ -46,14 +46,14 @@ vi.mock("../hooks/useVirtualScroll.js", () => ({
   },
 }));
 
-import instances from "../ink/instances.js";
-import type { DOMElement, DOMNode } from "../ink/dom.js";
-import { createRoot } from "../ink/root.js";
-import { Text } from "../ink.js";
-import type { ScrollBoxHandle } from "../ink/components/ScrollBox.js";
-import type { RenderableMessage } from "../../types/message.js";
-import { TextHoverColorContext } from "./design-system/ThemedText.js";
-import { VirtualMessageList } from "./VirtualMessageList.js";
+import instances from "../../../src/tui/ink/instances.js";
+import type { DOMElement, DOMNode } from "../../../src/tui/ink/dom.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { Text } from "../../../src/tui/ink.js";
+import type { ScrollBoxHandle } from "../../../src/tui/ink/components/ScrollBox.js";
+import type { RenderableMessage } from "../../../src/types/message.js";
+import { TextHoverColorContext } from "../../../src/tui/components/design-system/ThemedText.js";
+import { VirtualMessageList } from "../../../src/tui/components/VirtualMessageList.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

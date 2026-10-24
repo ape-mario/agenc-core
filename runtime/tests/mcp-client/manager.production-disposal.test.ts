@@ -2,14 +2,14 @@ import { resolve } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("./connection.js", () => ({
+vi.mock("../../src/mcp-client/connection.js", () => ({
   createMCPConnection: vi.fn(),
 }));
 
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
-import { transitionSandboxExecutionBroker } from "../sandbox/execution-lifecycle.js";
-import { createMCPConnection } from "./connection.js";
-import { MCPManager } from "./manager.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
+import { transitionSandboxExecutionBroker } from "../../src/sandbox/execution-lifecycle.js";
+import { createMCPConnection } from "../../src/mcp-client/connection.js";
+import { MCPManager } from "../../src/mcp-client/manager.js";
 
 const mockCreateMCPConnection = vi.mocked(createMCPConnection);
 

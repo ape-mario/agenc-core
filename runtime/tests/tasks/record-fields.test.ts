@@ -3,7 +3,7 @@ import {
   isTaskRecord,
   taskNumberField,
   taskStringField,
-} from "./record-fields.js";
+} from "../../src/tasks/record-fields.js";
 
 describe("task record field helpers", () => {
   it("keeps the loose task payload record guard semantics", () => {

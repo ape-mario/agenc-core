@@ -3,9 +3,9 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { ClockContext, type Clock } from '../components/ClockContext.js'
-import { createRoot, type Root } from '../root.js'
-import { useAnimationTimer, useInterval } from './use-interval.js'
+import { ClockContext, type Clock } from '../../../../src/tui/ink/components/ClockContext.js'
+import { createRoot, type Root } from '../../../../src/tui/ink/root.js'
+import { useAnimationTimer, useInterval } from '../../../../src/tui/ink/hooks/use-interval.js'
 
 type ManualSubscription = {
   active: boolean

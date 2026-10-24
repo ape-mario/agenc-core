@@ -8,11 +8,11 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("signal-exit", () => ({ onExit: harness.onExit }));
-vi.mock("./ink.js", () => ({ render: harness.renderInk }));
-vi.mock("./components/App.js", () => ({ AgenCTuiApp: vi.fn(() => null) }));
-vi.mock("./backpressure.js", () => ({ recordTuiBackpressure: vi.fn() }));
+vi.mock("../../src/tui/ink.js", () => ({ render: harness.renderInk }));
+vi.mock("../../src/tui/components/App.js", () => ({ AgenCTuiApp: vi.fn(() => null) }));
+vi.mock("../../src/tui/backpressure.js", () => ({ recordTuiBackpressure: vi.fn() }));
 
-import { bootTUI } from "./main.js";
+import { bootTUI } from "../../src/tui/main.js";
 
 // Closing a terminal window sends SIGHUP and then ends stdin. Both must reach
 // the session owner's close (it retires an unused daemon session) instead of

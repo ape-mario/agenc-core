@@ -4,8 +4,8 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { createRoot } from "../ink/root.js";
-import type { WorktreeSession } from "../../utils/worktree.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import type { WorktreeSession } from "../../../src/utils/worktree.js";
 
 const worktreeMock = vi.hoisted(() => ({
   session: null as WorktreeSession | null,
@@ -74,11 +74,11 @@ vi.mock("src/utils/debug.js", () => ({
   logForDebugging: debugMock.logForDebugging,
 }));
 
-vi.mock("../../utils/execFileNoThrow.js", () => ({
+vi.mock("../../../src/utils/execFileNoThrow.js", () => ({
   execFileNoThrow: execMock.execFileNoThrow,
 }));
 
-vi.mock("../../utils/plans.js", () => ({
+vi.mock("../../../src/utils/plans.js", () => ({
   getPlansDirectory: {
     cache: {
       clear: plansMock.clear,
@@ -86,34 +86,34 @@ vi.mock("../../utils/plans.js", () => ({
   },
 }));
 
-vi.mock("../../utils/Shell.js", () => ({
+vi.mock("../../../src/utils/Shell.js", () => ({
   setCwd: shellMock.setCwd,
 }));
 
-vi.mock("../../utils/worktree.js", () => ({
+vi.mock("../../../src/utils/worktree.js", () => ({
   cleanupWorktree: worktreeMock.cleanupWorktree,
   getCurrentWorktreeSession: worktreeMock.getCurrentWorktreeSession,
   keepWorktree: worktreeMock.keepWorktree,
   killTmuxSession: worktreeMock.killTmuxSession,
 }));
 
-vi.mock("../../utils/sessionStorage.js", () => ({
+vi.mock("../../../src/utils/sessionStorage.js", () => ({
   saveWorktreeState: sessionStorageMock.saveWorktreeState,
   writeAgentMetadata: vi.fn(async () => undefined),
 }));
 
-vi.mock("./spinner/Spinner.js", () => ({
+vi.mock("../../../src/tui/components/spinner/Spinner.js", () => ({
   Spinner: () => null,
 }));
 
-vi.mock("./CustomSelect/select", () => ({
+vi.mock("../../../src/tui/components/CustomSelect/select.js", () => ({
   Select: (props: NonNullable<typeof selectMock.props>) => {
     selectMock.props = props;
     return null;
   },
 }));
 
-vi.mock("./design-system/Dialog", () => ({
+vi.mock("../../../src/tui/components/design-system/Dialog.js", () => ({
   Dialog: (props: NonNullable<typeof dialogMock.props>) => {
     dialogMock.props = props;
     return props.children;
@@ -183,7 +183,7 @@ async function renderDialog({
   onCancel?: () => void;
   onDone?: (result?: string, options?: { display?: string }) => void;
 } = {}) {
-  const { WorktreeExitDialog } = await import("./WorktreeExitDialog.js");
+  const { WorktreeExitDialog } = await import("../../../src/tui/components/WorktreeExitDialog.js");
   const io = stdio();
   const root = await createRoot({
     stdout: io.stdout as unknown as NodeJS.WriteStream,

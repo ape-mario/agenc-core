@@ -22,14 +22,14 @@ import { execFileSync } from "node:child_process";
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AsyncQueue } from "../utils/async-queue.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import { CompletedTaskResults } from "../../src/agents/completed-task-results.js";
-import { AgentControl } from "./control.js";
-import { toListedAgentJson } from "./v2/common.js";
-import { delegate } from "./delegate.js";
-import { authorizeChildExecutionPlan, createChildExecutionPlan } from "./cross-provider.js";
-import * as childRouting from "./child-routing.js";
-import type { AgentThread } from "./thread.js";
+import { AgentControl } from "../../src/agents/control.js";
+import { toListedAgentJson } from "../../src/agents/v2/common.js";
+import { delegate } from "../../src/agents/delegate.js";
+import { authorizeChildExecutionPlan, createChildExecutionPlan } from "../../src/agents/cross-provider.js";
+import * as childRouting from "../../src/agents/child-routing.js";
+import type { AgentThread } from "../../src/agents/thread.js";
 import { buildToolRegistry as buildProductionToolRegistry } from "../../src/tool-registry.js";
 import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
 import type { UnifiedExecOwnerBinding, UnifiedExecOwnerLifetime } from "../../src/unified-exec/types.js";
@@ -37,15 +37,15 @@ import * as childRunJournal from "../../src/session/child-run-journal.js";
 import { childApprovalRevocationSignal, isApprovalSessionOwnedBy, observeChildApprovalSessions, registerChildApprovalSession } from "../../src/agents/child-approval-context.js";
 import { childTerminalOutcome } from "../../src/agents/child-terminal.js";
 import { validateCanonicalJournalText } from "../../src/state/recovery-journal-contract.js";
-import { AgentRegistry } from "./registry.js";
-import { createMultiAgentV2Tools } from "./v2/index.js";
-import { createSpawnAgentTool } from "./v2/spawn.js";
-import { createWaitAgentTool } from "./v2/wait.js";
+import { AgentRegistry } from "../../src/agents/registry.js";
+import { createMultiAgentV2Tools } from "../../src/agents/v2/index.js";
+import { createSpawnAgentTool } from "../../src/agents/v2/spawn.js";
+import { createWaitAgentTool } from "../../src/agents/v2/wait.js";
 import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../../src/tools/untrusted-tool-result-framing.js";
 import { computeEffectiveMaxResultBytes } from "../../src/tools/execution.js";
-import { AgentRoleCatalog } from "./role-catalog.js";
-import type { MultiAgentV2Options } from "./v2/common.js";
-import { bindLiveAgentSession, liveAgentSession } from "./live-session.js";
+import { AgentRoleCatalog } from "../../src/agents/role-catalog.js";
+import type { MultiAgentV2Options } from "../../src/agents/v2/common.js";
+import { bindLiveAgentSession, liveAgentSession } from "../../src/agents/live-session.js";
 import {
   buildFilteredRegistry,
   initMcpForAgent,
@@ -59,56 +59,56 @@ import {
   wrapProviderForAgentSummary,
   type RunAgentProgressEvent,
   type RunAgentResult,
-} from "./run-agent.js";
+} from "../../src/agents/run-agent.js";
 import {
   createProvider,
   readProviderFactoryOptions,
   readProviderIdentity,
-} from "../llm/provider.js";
-import { createGeminiEndpointPlan } from "../llm/providers/gemini/endpoint-plan.js";
-import { GrokProvider } from "../llm/providers/grok/adapter.js";
-import { ZaiProvider } from "../llm/providers/zai/index.js";
-import { OpenAIProvider } from "../llm/providers/openai/adapter.js";
+} from "../../src/llm/provider.js";
+import { createGeminiEndpointPlan } from "../../src/llm/providers/gemini/endpoint-plan.js";
+import { GrokProvider } from "../../src/llm/providers/grok/adapter.js";
+import { ZaiProvider } from "../../src/llm/providers/zai/index.js";
+import { OpenAIProvider } from "../../src/llm/providers/openai/adapter.js";
 import {
   _resetAgentRolesForTesting,
   _resetNicknamePoolForTesting,
   createAgentRoleWorkspace,
   listBuiltInAgentRoles,
   registerAgentRole,
-} from "./role.js";
-import { roleToAgentDefinition } from "../tools/AgentTool/loadAgentsDir.js";
-import { BUILTIN_READONLY_DISALLOWLIST } from "./built-in-prompts.js";
+} from "../../src/agents/role.js";
+import { roleToAgentDefinition } from "../../src/tools/AgentTool/loadAgentsDir.js";
+import { BUILTIN_READONLY_DISALLOWLIST } from "../../src/agents/built-in-prompts.js";
 import {
   createMailboxMetadataRecord,
   readMailboxMetadata,
   type InterAgentCommunication,
-} from "./mailbox.js";
+} from "../../src/agents/mailbox.js";
 import type {
   LLMChatOptions,
   LLMMessage,
   LLMProvider,
   LLMResponse,
   StreamProgressCallback,
-} from "../llm/types.js";
+} from "../../src/llm/types.js";
 import {
   SandboxExecutionBroker,
   readSandboxExecutionBroker,
-} from "../sandbox/execution-broker.js";
-import { canReadPathWithCwd, canWritePathWithCwd } from "../sandbox/engine/index.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import { freshDenialTracking } from "../permissions/denial-tracking.js";
-import { buildAgenCToolUseContext } from "../session/agenc-tool-use-context.js";
-import { DEFAULT_MAX_RESULT_SIZE_CHARS } from "../constants/toolLimits.js";
+} from "../../src/sandbox/execution-broker.js";
+import { canReadPathWithCwd, canWritePathWithCwd } from "../../src/sandbox/engine/index.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import { freshDenialTracking } from "../../src/permissions/denial-tracking.js";
+import { buildAgenCToolUseContext } from "../../src/session/agenc-tool-use-context.js";
+import { DEFAULT_MAX_RESULT_SIZE_CHARS } from "../../src/constants/toolLimits.js";
 import {
   disposeSandboxExecutionBroker,
   isSandboxExecutionBrokerDisposed,
-} from "../sandbox/execution-lifecycle.js";
+} from "../../src/sandbox/execution-lifecycle.js";
 import {
   createCsvAgentInvocationEnvelope,
   materializeAgentInvocationMessages,
   validateAgentInvocationMessageSequence,
-} from "../contracts/agent-invocation-envelope.js";
+} from "../../src/contracts/agent-invocation-envelope.js";
 
 const ROLE_WORKSPACE = createAgentRoleWorkspace("/tmp");
 import {
@@ -116,32 +116,32 @@ import {
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "../session/session.js";
-import { RolloutStore } from "../session/rollout-store.js";
-import { SessionStore } from "../session/session-store.js";
-import { responseItemToLlmMessage } from "../session/message-history-conversion.js";
-import type { ResponseItem } from "../session/rollout-item.js";
+} from "../../src/session/session.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { SessionStore } from "../../src/session/session-store.js";
+import { responseItemToLlmMessage } from "../../src/session/message-history-conversion.js";
+import type { ResponseItem } from "../../src/session/rollout-item.js";
 import type {
   Config,
   ManagedFeatures,
   ModelInfo,
   SessionConfiguration,
   TurnContext,
-} from "../session/turn-context.js";
-import type { ToolRegistry } from "../tool-registry.js";
+} from "../../src/session/turn-context.js";
+import type { ToolRegistry } from "../../src/tool-registry.js";
 import type {
   AdmissionAcquireInput,
   ExecutionAdmissionClient,
-} from "../budget/admission-client.js";
-import { AdmissionDeniedError } from "../budget/admission-client.js";
-import type { AdmissionLease } from "../budget/admission-types.js";
-import { ExecutionAdmissionKernel } from "../budget/execution-admission-kernel.js";
-import { bindExecutionAdmissionJournal } from "../session/execution-admission-journal.js";
-import { AgenCDaemonRunInspectionService } from "../app-server/run-inspection.js";
+} from "../../src/budget/admission-client.js";
+import { AdmissionDeniedError } from "../../src/budget/admission-client.js";
+import type { AdmissionLease } from "../../src/budget/admission-types.js";
+import { ExecutionAdmissionKernel } from "../../src/budget/execution-admission-kernel.js";
+import { bindExecutionAdmissionJournal } from "../../src/session/execution-admission-journal.js";
+import { AgenCDaemonRunInspectionService } from "../../src/app-server/run-inspection.js";
 import {
   openStateDatabases,
   resolveStateDatabasePaths,
-} from "../state/sqlite-driver.js";
+} from "../../src/state/sqlite-driver.js";
 import {
   SESSION_ALLOWED_ROOTS_ARG,
   SESSION_ALLOWED_ROOTS_SIG_ARG,
@@ -149,8 +149,8 @@ import {
   signAllowedRoots,
   verifyAllowedRoots,
   withSignedAllowedRoots,
-} from "../tools/system/filesystem.js";
-import { signSessionId } from "../agents/_deps/filesystem-args.js";
+} from "../../src/tools/system/filesystem.js";
+import { signSessionId } from "../../src/agents/_deps/filesystem-args.js";
 import { bindExplicitDangerBoundary, explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
 import { registerBuiltinTool } from "../../src/tools/builtin-provenance.js";
 import { createGlobTool } from "../../src/tools/system/glob.js";
@@ -158,27 +158,27 @@ import { createGrepTool } from "../../src/tools/system/grep.js";
 import { createFileReadTool } from "../../src/tools/system/file-read.js";
 import { createFileWriteTool } from "../../src/tools/system/file-write.js";
 import { createFileEditTool, createFileMultiEditTool } from "../../src/tools/system/file-edit.js";
-import { createApplyPatchTool } from "../tools/apply-patch/tool.js";
-import { cloneFileStateCache } from "../utils/fileStateCache.js";
-import { normalizeLspServerConfig } from "../services/lsp/config.js";
-import type { LSPServerInstance } from "../services/lsp/LSPServerInstance.js";
+import { createApplyPatchTool } from "../../src/tools/apply-patch/tool.js";
+import { cloneFileStateCache } from "../../src/utils/fileStateCache.js";
+import { normalizeLspServerConfig } from "../../src/services/lsp/config.js";
+import type { LSPServerInstance } from "../../src/services/lsp/LSPServerInstance.js";
 import {
   getLspServerManager,
   initializeLspServerManager,
   shutdownLspServerManager,
   waitForInitialization,
-} from "../services/lsp/manager.js";
-import { ConfigStore, nextConfigReadMark } from "../config/store.js";
-import { SessionProviderService } from "../session/provider-service.js";
-import { LLMFundsError, LLMServerError } from "../llm/errors.js";
+} from "../../src/services/lsp/manager.js";
+import { ConfigStore, nextConfigReadMark } from "../../src/config/store.js";
+import { SessionProviderService } from "../../src/session/provider-service.js";
+import { LLMFundsError, LLMServerError } from "../../src/llm/errors.js";
 import { superviseChildRoutingRetries } from "../../src/agents/child-routing-retries.js";
 import { StreamProgressError } from "../../src/llm/stream-progress.js";
-import { LiveApprovalBroker } from "../app-server/live-approval-broker.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+import { LiveApprovalBroker } from "../../src/app-server/live-approval-broker.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 import { createAutoMemoryToolPolicy } from "../../src/services/extractMemories/extractMemories.js";
 import { applyPermissionUpdate } from "../../src/permissions/permission-updates.js";
-import { enterCanonicalSettingsAuthority } from "../utils/settings/canonicalAuthority.js";
-import { MultiProjectFileThreadStore } from "../thread-store/multi-project-store.js";
+import { enterCanonicalSettingsAuthority } from "../../src/utils/settings/canonicalAuthority.js";
+import { MultiProjectFileThreadStore } from "../../src/thread-store/multi-project-store.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Helpers

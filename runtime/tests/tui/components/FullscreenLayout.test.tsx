@@ -13,15 +13,15 @@ import {
   shouldShowFileTreeGutter,
   statusLineSegments,
   workspacePathLabel,
-} from "./FullscreenLayout.js";
-import { AppStateProvider, AppStoreContext, getDefaultAppState } from "../state/AppState.js";
-import { createStore } from "../state/store.js";
-import { syncCollabAgentEventToAppState } from "../state/collabAgentTaskSync.js";
-import { Box, Text } from "../ink.js";
-import { createRoot } from "../ink/root.js";
-import { renderToString } from "../../utils/staticRender.js";
-import { FullscreenModeProvider } from "../context/fullscreenModeContext.js";
-import { useSetPromptOverlay } from "../context/promptOverlayContext.js";
+} from "../../../src/tui/components/FullscreenLayout.js";
+import { AppStateProvider, AppStoreContext, getDefaultAppState } from "../../../src/tui/state/AppState.js";
+import { createStore } from "../../../src/tui/state/store.js";
+import { syncCollabAgentEventToAppState } from "../../../src/tui/state/collabAgentTaskSync.js";
+import { Box, Text } from "../../../src/tui/ink.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { FullscreenModeProvider } from "../../../src/tui/context/fullscreenModeContext.js";
+import { useSetPromptOverlay } from "../../../src/tui/context/promptOverlayContext.js";
 
 function fullscreen(node: React.ReactNode): React.ReactNode {
   return <FullscreenModeProvider enabled={true}>{node}</FullscreenModeProvider>;

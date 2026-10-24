@@ -12,44 +12,44 @@ import {
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { existsSync } from "node:fs";
-import * as oneShotDurability from "../durability/one-shot-durability.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
-import { StateSqliteReader } from "../state/sqlite-driver.js";
+import * as oneShotDurability from "../../src/durability/one-shot-durability.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import { StateSqliteReader } from "../../src/state/sqlite-driver.js";
 
-import { bootstrapLocalRuntimeSession } from "./bootstrap.js";
-import { readStartupCliFlags } from "../bin/startup-selection.js";
-import { defaultConfig } from "../config/schema.js";
-import { trustProjectSync } from "../permissions/trust/project-trust.js";
-import type { AuthBackend } from "../auth/backend.js";
-import { LocalAuthBackend } from "../auth/backends/local.js";
-import type { Tool } from "../tools/types.js";
-import type { RolloutItem } from "../session/rollout-item.js";
-import { RolloutStore } from "../session/rollout-store.js";
-import { Session } from "../session/session.js";
-import { buildAgenCToolUseContext } from "../session/agenc-tool-use-context.js";
-import { ExecutionAdmissionKernel } from "../budget/execution-admission-kernel.js";
+import { bootstrapLocalRuntimeSession } from "../../src/bin/bootstrap.js";
+import { readStartupCliFlags } from "../../src/bin/startup-selection.js";
+import { defaultConfig } from "../../src/config/schema.js";
+import { trustProjectSync } from "../../src/permissions/trust/project-trust.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
+import { LocalAuthBackend } from "../../src/auth/backends/local.js";
+import type { Tool } from "../../src/tools/types.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { Session } from "../../src/session/session.js";
+import { buildAgenCToolUseContext } from "../../src/session/agenc-tool-use-context.js";
+import { ExecutionAdmissionKernel } from "../../src/budget/execution-admission-kernel.js";
 import {
   _resetAgentRolesForTesting,
   createAgentRoleWorkspace,
   registerAgentRole,
-} from "../agents/role.js";
-import { findAgentDefinitionByType } from "../tools/AgentTool/loadAgentsDir.js";
-import { SidecarManager } from "../session/sidecar.js";
-import { getCurrentRuntimeSession } from "./_deps/current-session.js";
+} from "../../src/agents/role.js";
+import { findAgentDefinitionByType } from "../../src/tools/AgentTool/loadAgentsDir.js";
+import { SidecarManager } from "../../src/session/sidecar.js";
+import { getCurrentRuntimeSession } from "../../src/bin/_deps/current-session.js";
 import {
   isSandboxExecutionBrokerDisposed,
   registerSandboxExecutionLifecycleParticipant,
   transitionSandboxExecutionBroker,
-} from "../sandbox/execution-lifecycle.js";
+} from "../../src/sandbox/execution-lifecycle.js";
 import {
   adaptTranscriptEvents,
   appendSessionTranscriptEventForTesting,
   createSessionTranscriptStateForTesting,
-} from "../tui/session-transcript.js";
-import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from "../prompts/system-prompt-boundary.js";
+} from "../../src/tui/session-transcript.js";
+import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from "../../src/prompts/system-prompt-boundary.js";
 import {
   MAX_ADDITIONAL_WORKING_DIRECTORIES,
-} from "../contracts/additional-working-directories.js";
+} from "../../src/contracts/additional-working-directories.js";
 
 function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), {
@@ -65,7 +65,7 @@ function offlineFetchFixture(): typeof fetch {
 }
 
 async function installBootstrapProviderStub() {
-  const providerModule = await import("../llm/provider.js");
+  const providerModule = await import("../../src/llm/provider.js");
   const chat = vi.fn().mockResolvedValue({
     content: "ok",
     toolCalls: [],
@@ -425,7 +425,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       { mode: 0o600 },
     );
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -526,7 +526,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       },
     });
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(() =>
@@ -629,7 +629,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       execute: async () => ({ content: "ok" }),
     };
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -777,7 +777,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
     const conversationId = "conv-conversation-manager";
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -1013,7 +1013,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const createProviderSpy = await installBootstrapProviderStub();
     vi.spyOn(Session.prototype, "startMcpManager").mockResolvedValue(undefined);
     const env = { ...process.env, AGENC_HOME: home, AGENC_WORKSPACE: workspace, HOME: home };
-    const { ensureAgentControl } = await import("./delegate-tool.js");
+    const { ensureAgentControl } = await import("../../src/bin/delegate-tool.js");
     let firstShutdown: (() => Promise<void>) | null = null;
     let resumedShutdown: (() => Promise<void>) | null = null;
     let childStore: RolloutStore | null = null;
@@ -1096,7 +1096,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const conversationId = "conv-resume-admission-catchup";
     const admissionKernel = new ExecutionAdmissionKernel({ agencHome: home });
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -1232,7 +1232,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
     const conversationId = "conv-streamed-tool-input";
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -1360,7 +1360,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const sessionTempRoot = await mkdtemp(join(tmpdir(), "agenc-bootstrap-tmp-"));
     const conversationId = "conv-mcp-tool-call-replay";
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -1494,7 +1494,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
     const conversationId = "conv-token-ledger-replay";
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -1623,7 +1623,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       chatStream: prewarmedChatStream,
       dispose: disposePrewarm,
     }));
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -1740,7 +1740,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       finishReason: "stop",
     };
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -1818,7 +1818,7 @@ describe("bootstrapLocalRuntimeSession", () => {
         }),
     );
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -1930,7 +1930,7 @@ describe("bootstrapLocalRuntimeSession", () => {
         }),
     );
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -2011,7 +2011,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const previousTraceRoot = process.env.AGENC_ROLLOUT_TRACE_ROOT;
     process.env.AGENC_ROLLOUT_TRACE_ROOT = traceRoot;
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -2131,7 +2131,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -2186,7 +2186,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const cwd = await mkdtemp(join(tmpdir(), "agenc-bootstrap-cwd-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -2235,7 +2235,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -2307,7 +2307,7 @@ describe("bootstrapLocalRuntimeSession", () => {
   it("keeps Gemini environment keys out of explicit factory precedence", async () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -2409,7 +2409,7 @@ describe("bootstrapLocalRuntimeSession", () => {
         return "free";
       },
     };
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -2674,7 +2674,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       apiKey: "saved-xai-key",
     });
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -2757,7 +2757,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       },
     };
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -2822,7 +2822,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       apiKey: "saved-default-xai-key",
     });
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -2881,7 +2881,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       provider: "gemini",
       apiKey: "saved-gemini-key",
     });
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -2969,7 +2969,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       readByokKey(provider: string): string | undefined;
     };
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(
@@ -3049,7 +3049,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       "utf8",
     );
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3103,11 +3103,11 @@ describe("bootstrapLocalRuntimeSession", () => {
   it("preserves canonical auto disablement when the classifier gate is open", async () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
-    const permissionSettings = await import("../permissions/settings.js");
+    const permissionSettings = await import("../../src/permissions/settings.js");
     const { createEmptyToolPermissionContext } = await import(
-      "../permissions/types.js"
+      "../../src/permissions/types.js"
     );
-    const classifier = await import("../permissions/classifier.js");
+    const classifier = await import("../../src/permissions/classifier.js");
     const restoreGate = classifier.__setAutoModeGateResolverForTesting(
       () => true,
     );
@@ -3121,7 +3121,7 @@ describe("bootstrapLocalRuntimeSession", () => {
       }),
       warnings: ["Auto mode was disabled by configuration"],
     });
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3175,7 +3175,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3223,7 +3223,7 @@ describe("bootstrapLocalRuntimeSession", () => {
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3285,7 +3285,7 @@ required = true
       "utf8",
     );
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3341,7 +3341,7 @@ required = true
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3390,7 +3390,7 @@ required = true
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3460,7 +3460,7 @@ required = true
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3540,7 +3540,7 @@ required = true
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3571,7 +3571,7 @@ required = true
       });
       shutdown = boot.shutdown;
 
-      const { ensureAgentControl } = await import("./delegate-tool.js");
+      const { ensureAgentControl } = await import("../../src/bin/delegate-tool.js");
       const { control } = ensureAgentControl(boot.session);
       const shutdownAllSpy = vi
         .spyOn(control, "shutdownAll")
@@ -3601,7 +3601,7 @@ required = true
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3708,7 +3708,7 @@ required = true
         );
       }
 
-      const providerMod = await import("../llm/provider.js");
+      const providerMod = await import("../../src/llm/provider.js");
       vi.spyOn(providerMod, "createProvider").mockImplementation(
         () =>
           ({
@@ -3788,7 +3788,7 @@ required = true
       "utf8",
     );
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3841,7 +3841,7 @@ required = true
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
     trustWorkspaceForTest(home, workspace);
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -3916,7 +3916,7 @@ required = true
     );
     trustWorkspaceForTest(home, workspace);
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -4042,7 +4042,7 @@ required = true
     const home = await mkdtemp(join(tmpdir(), "agenc-bootstrap-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-bootstrap-ws-"));
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -4172,7 +4172,7 @@ required = true
     );
     trustWorkspaceForTest(home, workspace);
 
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -4276,9 +4276,9 @@ describe("warm daemon auxiliary setup ceiling", () => {
     await mkdir(join(workspace, ".git"));
     trustWorkspaceForTest(home, workspace);
     await writeFile(join(home, "config.toml"), 'config_version = 2\nmodel = "deepseek-flash"\nmodel_provider = "deepseek"\n');
-    const { FileThreadStore } = await import("../thread-store/store.js");
+    const { FileThreadStore } = await import("../../src/thread-store/store.js");
     const project = vi.spyOn(FileThreadStore.prototype, "createThread");
-    const providerModule = await import("../llm/provider.js");
+    const providerModule = await import("../../src/llm/provider.js");
     let providerFetch: typeof fetch | undefined;
     vi.spyOn(providerModule, "createProvider").mockImplementation((_name, opts) => {
       providerFetch = opts?.extra?.fetchImpl as typeof fetch | undefined;
@@ -4325,9 +4325,9 @@ describe("warm daemon auxiliary setup ceiling", () => {
     await mkdir(join(workspace, ".git"));
     trustWorkspaceForTest(home, workspace);
     await writeFile(join(home, "config.toml"), 'config_version = 2\nmodel = "deepseek-flash"\nmodel_provider = "deepseek"\n');
-    const { FileThreadStore } = await import("../thread-store/store.js");
+    const { FileThreadStore } = await import("../../src/thread-store/store.js");
     const project = vi.spyOn(FileThreadStore.prototype, "createThread");
-    const providerModule = await import("../llm/provider.js");
+    const providerModule = await import("../../src/llm/provider.js");
     let providerFetch: typeof fetch | undefined;
     vi.spyOn(providerModule, "createProvider").mockImplementation((_name, opts) => {
       providerFetch = opts?.extra?.fetchImpl as typeof fetch | undefined;
@@ -4343,8 +4343,8 @@ describe("warm daemon auxiliary setup ceiling", () => {
       }
       return jsonResponse({ data: [] });
     });
-    const { CostSidecar } = await import("../session/cost.js");
-    const { getActiveCostSidecar, bindActiveCostSidecar } = await import("../cost/tracker.js");
+    const { CostSidecar } = await import("../../src/session/cost.js");
+    const { getActiveCostSidecar, bindActiveCostSidecar } = await import("../../src/cost/tracker.js");
     let releaseLoad!: () => void;
     let enteredLoad!: () => void;
     const loadGate = new Promise<void>(resolve => { releaseLoad = resolve; });
@@ -4411,9 +4411,9 @@ describe("warm daemon auxiliary setup ceiling", () => {
     await mkdir(join(workspace, ".git"));
     trustWorkspaceForTest(home, workspace);
     await writeFile(join(home, "config.toml"), 'config_version = 2\nmodel = "deepseek-flash"\nmodel_provider = "deepseek"\n');
-    const { FileThreadStore } = await import("../thread-store/store.js");
+    const { FileThreadStore } = await import("../../src/thread-store/store.js");
     const project = vi.spyOn(FileThreadStore.prototype, "createThread");
-    const providerModule = await import("../llm/provider.js");
+    const providerModule = await import("../../src/llm/provider.js");
     let providerFetch: typeof fetch | undefined;
     vi.spyOn(providerModule, "createProvider").mockImplementation((_name, opts) => {
       providerFetch = opts?.extra?.fetchImpl as typeof fetch | undefined;
@@ -4437,7 +4437,7 @@ describe("warm daemon auxiliary setup ceiling", () => {
       }
       return jsonResponse({ data: [] });
     });
-    const { getActiveCostSidecar, bindActiveCostSidecar } = await import("../cost/tracker.js");
+    const { getActiveCostSidecar, bindActiveCostSidecar } = await import("../../src/cost/tracker.js");
     const sidecarStart = vi.spyOn(SidecarManager.prototype, "start");
     let cleanupManager: SidecarManager | undefined;
     let shutdown: (() => Promise<void>) | undefined;
@@ -4492,8 +4492,8 @@ describe("bootstrap private endpoint metadata reuse", () => {
   ])("does not duplicate catalogued DeepSeek discovery at %s", async (base, count) => {
     const home = await mkdtemp(join(tmpdir(), "agenc-deepseek-metadata-home-"));
     const workspace = await mkdtemp(join(tmpdir(), "agenc-deepseek-metadata-project-"));
-    const { OpenAIProvider } = await import("../llm/providers/openai/adapter.js");
-    const { markCapabilityDrift } = await import("../llm/capabilities.js");
+    const { OpenAIProvider } = await import("../../src/llm/providers/openai/adapter.js");
+    const { markCapabilityDrift } = await import("../../src/llm/capabilities.js");
     markCapabilityDrift({ provider: "deepseek", model: "deepseek-flash" });
     const healthChecks = vi.spyOn(OpenAIProvider.prototype, "healthCheck");
     const transport = vi.fn<typeof fetch>().mockImplementation(async () => jsonResponse({
@@ -4530,7 +4530,7 @@ describe("bootstrap private endpoint metadata reuse", () => {
     const requests: string[] = [];
     // Unknown local models also issue an independent capability health probe.
     // Keep that probe real and count its GET separately from metadata reuse.
-    const { OpenAIProvider } = await import("../llm/providers/openai/adapter.js");
+    const { OpenAIProvider } = await import("../../src/llm/providers/openai/adapter.js");
     const healthChecks = vi.spyOn(OpenAIProvider.prototype, "healthCheck");
     const transport = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       requests.push(String(input));

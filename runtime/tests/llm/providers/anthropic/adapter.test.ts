@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test, vi } from "vitest";
-import { ANTHROPIC_STRUCTURED_OUTPUT_TOOL_NAME } from "../../structured-output.js";
-import { createTokenAccountingRequest } from "../../token-accounting.js";
-import { loadProjectInstructions } from "../../../prompts/project-instructions.js";
-import { assembleSystemPrompt } from "../../../prompts/system-prompt.js";
-import { AnthropicProvider } from "./adapter.js";
+import { ANTHROPIC_STRUCTURED_OUTPUT_TOOL_NAME } from "../../../../src/llm/structured-output.js";
+import { createTokenAccountingRequest } from "../../../../src/llm/token-accounting.js";
+import { loadProjectInstructions } from "../../../../src/prompts/project-instructions.js";
+import { assembleSystemPrompt } from "../../../../src/prompts/system-prompt.js";
+import { AnthropicProvider } from "../../../../src/llm/providers/anthropic/adapter.js";
 import { mkCtx, mkProvider, mkSession } from "../../../fixtures.js";
 import { stepLimitWrapup } from "../../../../src/session/step-limit-wrapup.js";
 

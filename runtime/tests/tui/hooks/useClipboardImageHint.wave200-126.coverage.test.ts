@@ -8,22 +8,22 @@ const harness = vi.hoisted(() => ({
   hasImageInClipboard: vi.fn(),
 }))
 
-vi.mock('../context/notifications.js', () => ({
+vi.mock('../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => ({
     addNotification: harness.addNotification,
   }),
 }))
 
-vi.mock('../keybindings/shortcutFormat.js', () => ({
+vi.mock('../../../src/tui/keybindings/shortcutFormat.js', () => ({
   getShortcutDisplay: () => 'Ctrl+V',
 }))
 
-vi.mock('../../utils/imagePaste.js', () => ({
+vi.mock('../../../src/utils/imagePaste.js', () => ({
   hasImageInClipboard: harness.hasImageInClipboard,
 }))
 
-import { createRoot } from '../ink/root.js'
-import { useClipboardImageHint } from './useClipboardImageHint.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { useClipboardImageHint } from '../../../src/tui/hooks/useClipboardImageHint.js'
 
 type HookProps = {
   enabled: boolean

@@ -5,7 +5,7 @@ import {
   HAS_AT_SYMBOL_RE,
   extractCompletionToken,
   extractSearchToken,
-} from '../hooks/typeaheadTokens.js'
+} from '../../../src/tui/hooks/typeaheadTokens.js'
 
 describe('typeaheadTokens coverage swarm row 191', () => {
   test('returns null for empty input and cursor-only whitespace', () => {

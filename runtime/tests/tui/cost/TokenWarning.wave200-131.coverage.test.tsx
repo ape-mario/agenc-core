@@ -15,7 +15,7 @@ vi.mock("bun:bundle", () => ({
   feature: (flag: string) => harness.enabledFeatures.has(flag),
 }));
 
-vi.mock("../../services/compact/autoCompact.js", () => ({
+vi.mock("../../../src/services/compact/autoCompact.js", () => ({
   calculateTokenWarningStateForEnvironment: () => ({
     isAboveAutoCompactThreshold: true,
     isAboveErrorThreshold: false,
@@ -27,20 +27,20 @@ vi.mock("../../services/compact/autoCompact.js", () => ({
   isAutoCompactEnabledForEnvironment: () => harness.autoCompactEnabled,
 }));
 
-vi.mock("../../services/compact/compactWarningHook.js", () => ({
+vi.mock("../../../src/services/compact/compactWarningHook.js", () => ({
   useCompactWarningSuppression: () => false,
 }));
 
-vi.mock("../../services/contextCollapse/index.js", () => ({
+vi.mock("../../../src/services/contextCollapse/index.js", () => ({
   isContextCollapseEnabled: () => harness.collapseEnabled,
 }));
 
-vi.mock("../../llm/context-window-upgrade.js", () => ({
+vi.mock("../../../src/llm/context-window-upgrade.js", () => ({
   getUpgradeMessage: () => harness.upgradeMessage,
 }));
 
-import { renderToString } from "../../utils/staticRender.js";
-import { TokenWarning } from "./TokenWarning.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { TokenWarning } from "../../../src/tui/cost/TokenWarning.js";
 
 describe("TokenWarning wave 200 worker 131 coverage", () => {
   test("recomputes the auto-compact label from collapse context mode", async () => {

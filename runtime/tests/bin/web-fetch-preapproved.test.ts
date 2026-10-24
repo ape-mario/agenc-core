@@ -3,7 +3,7 @@ import {
   isPreapprovedHost,
   isPreapprovedUrl,
   PREAPPROVED_HOSTS,
-} from "./web-fetch-preapproved.js";
+} from "../../src/bin/web-fetch-preapproved.js";
 
 describe("web-fetch-preapproved", () => {
   it("hostname-only entries match exact hosts", () => {

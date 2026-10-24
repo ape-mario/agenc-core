@@ -6,27 +6,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('bun:bundle', () => ({
   feature: (flag: string) => flag === 'TEAMMEM',
 }))
-vi.mock('../utils/settings/settings.js', () => ({
+vi.mock('../../src/utils/settings/settings.js', () => ({
   getExecutionAuthoritySettings: () => ({ autoMemoryEnabled: true }),
   getInitialSettings: () => ({ autoMemoryEnabled: true }),
   getSettingsForSource: () => undefined,
 }))
-vi.mock('../tui/message-renderers/CollapsedReadSearchContent.tsx', () => ({
+vi.mock('../../src/tui/message-renderers/CollapsedReadSearchContent.js', () => ({
   CollapsedReadSearchContent: () => null,
 }))
-vi.mock('../tui/message-renderers/SystemTextMessage.tsx', () => ({
+vi.mock('../../src/tui/message-renderers/SystemTextMessage.js', () => ({
   SystemTextMessage: () => null,
 }))
-vi.mock('../tools.js', () => ({}))
+vi.mock('../../src/tools.js', () => ({}))
 vi.mock('src/tools.js', () => ({}))
 
-import { getProjectRoot, setProjectRoot } from '../bootstrap/state.js'
-import { ConfigStore } from '../config/store.js'
-import { enterCanonicalSettingsAuthority } from '../utils/settings/canonicalAuthority.js'
+import { getProjectRoot, setProjectRoot } from '../../src/bootstrap/state.js'
+import { ConfigStore } from '../../src/config/store.js'
+import { enterCanonicalSettingsAuthority } from '../../src/utils/settings/canonicalAuthority.js'
 import {
   getGlobalMemoryPath,
   getProjectMemoryPath,
-} from './paths.js'
+} from '../../src/memory/paths.js'
 import {
   checkMemorySecrets,
   checkTeamMemSecrets,
@@ -39,8 +39,8 @@ import {
   memoryScopeForPath,
   redactSecrets,
   scanForSecrets,
-} from './privacy.js'
-import { getAgentMemoryDir } from '../tools/AgentTool/agentMemory.js'
+} from '../../src/memory/privacy.js'
+import { getAgentMemoryDir } from '../../src/tools/AgentTool/agentMemory.js'
 
 let tempRoot = ''
 let oldProjectRoot = ''

@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import type { Screen } from "../types/screen.js";
+import type { Screen } from "../../../src/tui/types/screen.js";
 
 type ExpandedView = "none" | "tasks" | "teammates";
 
@@ -40,7 +40,7 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => harness.features.has(name),
 }));
 
-vi.mock("../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybinding: (
     action: string,
     handler: () => void,
@@ -50,21 +50,21 @@ vi.mock("../keybindings/useKeybinding.js", () => ({
   },
 }));
 
-vi.mock("../state/AppState.js", () => ({
+vi.mock("../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: AppState) => unknown) =>
     selector(harness.appState),
   useSetAppState: () => harness.setAppState,
 }));
 
-vi.mock("../../utils/terminalPanel.js", () => ({
+vi.mock("../../../src/utils/terminalPanel.js", () => ({
   getTerminalPanel: () => ({
     toggle: harness.terminalToggle,
   }),
 }));
 
-import instances from "../ink/instances.js";
-import { createRoot } from "../ink/root.js";
-import { GlobalKeybindingHandlers } from "./useGlobalKeybindings.js";
+import instances from "../../../src/tui/ink/instances.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { GlobalKeybindingHandlers } from "../../../src/tui/hooks/useGlobalKeybindings.js";
 
 type TestStreams = {
   readonly stdin: PassThrough & {

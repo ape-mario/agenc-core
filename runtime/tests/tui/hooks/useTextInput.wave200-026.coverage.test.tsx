@@ -22,35 +22,35 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../context/notifications.js', () => ({
+vi.mock('../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => ({
     addNotification: harness.addNotification,
     removeNotification: harness.removeNotification,
   }),
 }))
 
-vi.mock('../../commands/terminalSetup/terminalSetup.js', () => ({
+vi.mock('../../../src/commands/terminalSetup/terminalSetup.js', () => ({
   markBackslashReturnUsed: harness.markBackslashReturnUsed,
 }))
 
-vi.mock('../history/history.js', () => ({
+vi.mock('../../../src/tui/history/history.js', () => ({
   addToHistory: harness.addToHistory,
 }))
 
-vi.mock('../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => harness.fullscreen,
 }))
 
-vi.mock('../../utils/modifiers.js', () => ({
+vi.mock('../../../src/utils/modifiers.js', () => ({
   isModifierPressed: (modifier: string) => harness.modifiers[modifier] === true,
   prewarmModifiers: harness.prewarmModifiers,
 }))
 
-import { createRoot } from '../ink/root.js'
-import type { Key } from '../ink.js'
-import { clearKillRing } from '../../utils/TextCursor.js'
-import { env } from '../../utils/env.js'
-import { useTextInput, type UseTextInputProps } from './useTextInput.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { Key } from '../../../src/tui/ink.js'
+import { clearKillRing } from '../../../src/utils/TextCursor.js'
+import { env } from '../../../src/utils/env.js'
+import { useTextInput, type UseTextInputProps } from '../../../src/tui/hooks/useTextInput.js'
 
 type HookState = ReturnType<typeof useTextInput>
 

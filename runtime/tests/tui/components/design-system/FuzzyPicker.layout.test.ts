@@ -5,7 +5,7 @@ import {
   computeFuzzyPickerVisibleCount,
   getFuzzyPickerDefaultPlaceholder,
   getFuzzyPickerNavigationShortcut,
-} from './FuzzyPicker.js'
+} from '../../../../src/tui/components/design-system/FuzzyPicker.js'
 
 describe('FuzzyPicker layout helpers', () => {
   it('drops to a single result row when terminal chrome leaves no list room', () => {

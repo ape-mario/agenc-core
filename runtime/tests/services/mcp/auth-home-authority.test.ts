@@ -10,7 +10,7 @@ const secureStorageRecords = vi.hoisted(
   () => new Map<string, SecureStorageData>(),
 )
 
-vi.mock('../../utils/secureStorage/native.js', async importOriginal => {
+vi.mock('../../../src/utils/secureStorage/native.js', async importOriginal => {
   const actual =
     await importOriginal<typeof import('../../../src/utils/secureStorage/native.js')>()
   return {

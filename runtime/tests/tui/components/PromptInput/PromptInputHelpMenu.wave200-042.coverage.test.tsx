@@ -4,13 +4,13 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../../ink/root.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../keybindings/useShortcutDisplay.js', () => ({
+vi.mock('../../../../src/tui/keybindings/useShortcutDisplay.js', () => ({
   useShortcutDisplay: (action: string, _context: string, fallback: string) => {
     const shortcuts: Record<string, string> = {
       'app:toggleTranscript': 'ctrl+shift+o',
@@ -20,11 +20,11 @@ vi.mock('../../keybindings/useShortcutDisplay.js', () => ({
   },
 }))
 
-vi.mock('../../keybindings/loadUserBindings.js', () => ({
+vi.mock('../../../../src/tui/keybindings/loadUserBindings.js', () => ({
   isKeybindingCustomizationEnabled: () => true,
 }))
 
-vi.mock('../../../utils/platform.js', () => ({
+vi.mock('../../../../src/utils/platform.js', () => ({
   getPlatform: () => 'linux',
 }))
 
@@ -62,7 +62,7 @@ async function sleep(ms = 25): Promise<void> {
 
 describe('PromptInputHelpMenu optional shortcuts coverage', () => {
   test('renders optional shortcut rows across identical TUI rerenders', async () => {
-    const { PromptInputHelpMenu } = await import('./PromptInputHelpMenu.js')
+    const { PromptInputHelpMenu } = await import('../../../../src/tui/components/PromptInput/PromptInputHelpMenu.js')
     const { stdin, stdout } = createStreams()
     let output = ''
 

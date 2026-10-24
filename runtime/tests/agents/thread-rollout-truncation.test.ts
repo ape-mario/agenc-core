@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { RolloutItem } from "../session/rollout-item.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
 import {
   forkSnapshotRollout,
   forkTurnPositionsInRollout,
   truncateRolloutBeforeNthUserMessageFromStart,
   truncateRolloutToLastNForkTurns,
   userMessagePositionsInRollout,
-} from "./thread-rollout-truncation.js";
+} from "../../src/agents/thread-rollout-truncation.js";
 
 const response = (
   role: "system" | "developer" | "user" | "assistant" | "tool",

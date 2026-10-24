@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { validateToolCallDetailed } from "./types.js";
+import { validateToolCallDetailed } from "../../src/llm/types.js";
 
 describe("validateToolCallDetailed", () => {
   test("rejects truncated spawn JSON instead of silently replacing it with an empty object", () => {

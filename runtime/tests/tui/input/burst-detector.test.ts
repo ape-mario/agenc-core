@@ -6,7 +6,7 @@ import {
   isSuspectedPaste,
   recordInputBurst,
   resetBurstDetector,
-} from './burst-detector.js'
+} from '../../../src/tui/input/burst-detector.js'
 
 describe('burst-detector (B-NEW2)', () => {
   beforeEach(() => {

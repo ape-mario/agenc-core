@@ -3,9 +3,9 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import Text from '../ink/components/Text.js'
-import { createRoot } from '../ink/root.js'
-import { useMinDisplayTime } from './useMinDisplayTime.js'
+import Text from '../../../src/tui/ink/components/Text.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { useMinDisplayTime } from '../../../src/tui/hooks/useMinDisplayTime.js'
 
 type TestStdin = PassThrough & {
   isTTY: boolean

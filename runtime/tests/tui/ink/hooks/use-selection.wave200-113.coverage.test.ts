@@ -3,14 +3,14 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../root.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
 import {
   deleteInkInstance,
   getInkInstance,
   setInkInstance,
-} from '../instances.js'
-import { createSelectionState } from '../selection.js'
-import { useHasSelection, useSelection } from './use-selection.js'
+} from '../../../../src/tui/ink/instances.js'
+import { createSelectionState } from '../../../../src/tui/ink/selection.js'
+import { useHasSelection, useSelection } from '../../../../src/tui/ink/hooks/use-selection.js'
 
 type SelectionControls = ReturnType<typeof useSelection>
 

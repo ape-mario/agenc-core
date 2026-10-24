@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 
-import type { ValidationError } from '../../../../utils/settings/validation.js'
-import { resolveHomeContext } from '../../config/home.js'
-import { ConfigStore } from '../../config/store.js'
+import type { ValidationError } from '../../../src/utils/settings/validation.js'
+import { resolveHomeContext } from '../../../src/config/home.js'
+import { ConfigStore } from '../../../src/config/store.js'
 
 import {
   buildEmptyDoctorReport,
@@ -11,7 +11,7 @@ import {
   doctorServer,
   findingsFromValidationErrors,
   type McpDoctorDependencies,
-} from './doctor.js'
+} from '../../../src/services/mcp/doctor.js'
 
 const TEST_HOME_CONTEXT = resolveHomeContext(
   { AGENC_HOME: '/tmp/agenc-mcp-doctor-test' },

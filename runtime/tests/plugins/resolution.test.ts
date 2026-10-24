@@ -20,23 +20,23 @@ import {
   verifyResolvedPluginSignature,
   verifyPluginDependencyState,
   type PluginProcessRunner,
-} from "./resolution.js";
+} from "../../src/plugins/resolution.js";
 import {
   __isPathInsideForTesting,
   installPluginOp as installPluginOpWithAuthority,
   listInstalledPlugins,
   updatePluginOp as updatePluginOpWithAuthority,
-} from "./cli/pluginOperations.js";
+} from "../../src/plugins/cli/pluginOperations.js";
 import {
   loadPlugins as loadPluginsWithAuthority,
   type LoadedPlugin,
-} from "./loader.js";
+} from "../../src/plugins/loader.js";
 import {
   OFFICIAL_PLUGIN_PUBLISHER,
   OFFICIAL_PLUGIN_PUBLISHER_KEY_SHA256,
   OFFICIAL_PLUGIN_PUBLISHER_PUBLIC_KEY,
   pluginPublisherKeyFingerprint,
-} from "./publisher-trust.js";
+} from "../../src/plugins/publisher-trust.js";
 
 const execFileAsync = promisify(execFile);
 

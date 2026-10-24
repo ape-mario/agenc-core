@@ -12,7 +12,7 @@ describe("StructuredDiff colorDiff module availability", () => {
       expectColorFile,
       getColorModuleUnavailableReason,
       getSyntaxTheme,
-    } = await import("./colorDiff.js");
+    } = await import("../../../../../src/tui/components/diff/StructuredDiff/colorDiff.js");
 
     expect(getColorModuleUnavailableReason()).toBeNull();
     expect(expectColorDiff()).not.toBeNull();
@@ -29,7 +29,7 @@ describe("StructuredDiff colorDiff module availability", () => {
       expectColorFile,
       getColorModuleUnavailableReason,
       getSyntaxTheme,
-    } = await import("./colorDiff.js");
+    } = await import("../../../../../src/tui/components/diff/StructuredDiff/colorDiff.js");
 
     expect(getColorModuleUnavailableReason()).toBe("env");
     expect(expectColorDiff()).toBeNull();

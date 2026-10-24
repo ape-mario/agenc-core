@@ -36,30 +36,30 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => fixture.state.enabledFeatures.has(name),
 }))
 
-vi.mock('../../hooks/useCommandQueue.js', () => ({
+vi.mock('../../../../src/tui/hooks/useCommandQueue.js', () => ({
   useCommandQueue: () => fixture.state.queuedCommands,
 }))
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (
     selector: (state: typeof fixture.state.appState) => unknown,
   ) => selector(fixture.state.appState),
 }))
 
-vi.mock('../../../utils/exampleCommands.js', () => ({
+vi.mock('../../../../src/utils/exampleCommands.js', () => ({
   getExampleCommandFromCache: fixture.getExampleCommandFromCache,
 }))
 
-vi.mock('../../../utils/messageQueueManager.js', () => ({
+vi.mock('../../../../src/utils/messageQueueManager.js', () => ({
   isQueuedCommandEditable: fixture.isQueuedCommandEditable,
 }))
 
-vi.mock('./proactiveAdapter.js', () => ({
+vi.mock('../../../../src/tui/components/PromptInput/proactiveAdapter.js', () => ({
   isPromptInputProactiveActive: fixture.isPromptInputProactiveActive,
 }))
 
-import { createRoot } from '../../ink/root.js'
-import { usePromptInputPlaceholder } from './usePromptInputPlaceholder.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { usePromptInputPlaceholder } from '../../../../src/tui/components/PromptInput/usePromptInputPlaceholder.js'
 
 type PlaceholderProps = Parameters<typeof usePromptInputPlaceholder>[0]
 

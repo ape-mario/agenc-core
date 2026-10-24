@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { ProviderHttpClient } from "./client.js";
+import { ProviderHttpClient } from "../../src/llm/client.js";
 
 describe("ProviderHttpClient", () => {
   test("createTurnSession preserves provider contract fields while merging overrides", () => {

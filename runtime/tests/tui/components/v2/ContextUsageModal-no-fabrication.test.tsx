@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { ContextUsageModal } from './ContextUsageModal.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { ContextUsageModal } from '../../../../src/tui/components/v2/ContextUsageModal.js'
 
 // M-TUI-3 / ContextUsageModal:187: the /context modal fabricated a
 // per-file breakdown (hardcoded lib.rs/pool.rs/math.rs split by magic ratios) even

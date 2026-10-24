@@ -4,7 +4,7 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-import { shouldRenderStatically } from './messageRenderPolicy.js'
+import { shouldRenderStatically } from '../../../src/tui/components/messageRenderPolicy.js'
 
 function lookups(
   resolvedToolUseIDs: string[] = [],

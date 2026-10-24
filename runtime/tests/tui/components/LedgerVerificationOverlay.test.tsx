@@ -8,7 +8,7 @@ import {
   resetLedgerVerificationForTests,
 } from "../../../src/services/Ledger/ledgerVerification.js";
 import { Box } from "../../../src/tui/ink.js";
-import { renderToString } from "../../utils/staticRender.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 
 const harness = vi.hoisted(() => ({
   inputHandler: undefined as
@@ -21,21 +21,21 @@ const harness = vi.hoisted(() => ({
   registerOverlay: vi.fn(),
 }));
 
-vi.mock("../context/overlayContext.js", () => ({
+vi.mock("../../../src/tui/context/overlayContext.js", () => ({
   useRegisterOverlay: harness.registerOverlay,
 }));
 
-vi.mock("../hooks/useTerminalSize.js", () => ({
+vi.mock("../../../src/tui/hooks/useTerminalSize.js", () => ({
   useTerminalSize: () => ({ columns: 100, rows: 30 }),
 }));
 
-vi.mock("./v2/primitives.js", () => ({
+vi.mock("../../../src/tui/components/v2/primitives.js", () => ({
   kittyLogoPlaceholderRows: () => [],
   supportsKittyGraphics: () => false,
 }));
 
-vi.mock("../ink.js", async () => {
-  const actual = await vi.importActual<typeof import("../ink.js")>("../ink.js");
+vi.mock("../../../src/tui/ink.js", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/tui/ink.js")>("../../../src/tui/ink.js");
   return {
     ...actual,
     useInput: (
@@ -67,7 +67,7 @@ describe("LedgerVerificationOverlay", () => {
       model: "Nano X",
     });
     const { LedgerVerificationOverlay } = await import(
-      "./LedgerVerificationOverlay.js"
+      "../../../src/tui/components/LedgerVerificationOverlay.js"
     );
     const output = await renderToString(
       <Box width={100} height={30}>
@@ -89,7 +89,7 @@ describe("LedgerVerificationOverlay", () => {
     const requestId = beginLedgerVerification({ source: "slash" });
     markLedgerVerified(requestId, { model: "Nano S Plus" });
     const { LedgerVerificationOverlay } = await import(
-      "./LedgerVerificationOverlay.js"
+      "../../../src/tui/components/LedgerVerificationOverlay.js"
     );
     const output = await renderToString(
       <Box width={100} height={30}>
@@ -107,7 +107,7 @@ describe("LedgerVerificationOverlay", () => {
   test("Esc closes the active popup before the composer handles it", async () => {
     const requestId = beginLedgerVerification({ source: "prompt" });
     const { LedgerVerificationOverlay } = await import(
-      "./LedgerVerificationOverlay.js"
+      "../../../src/tui/components/LedgerVerificationOverlay.js"
     );
     await renderToString(
       <Box width={100} height={30}>
@@ -127,7 +127,7 @@ describe("LedgerVerificationOverlay", () => {
   });
   test("does not consume letters from /exit", async () => {
     beginLedgerVerification({ source: "prompt" });
-    const { LedgerVerificationOverlay } = await import("./LedgerVerificationOverlay.js");
+    const { LedgerVerificationOverlay } = await import("../../../src/tui/components/LedgerVerificationOverlay.js");
     await renderToString(<Box width={100} height={30}><LedgerVerificationOverlay /></Box>, 100);
     for (const input of "/exit") {
       const event = { stopImmediatePropagation: vi.fn() };
@@ -139,7 +139,7 @@ describe("LedgerVerificationOverlay", () => {
 
   test("Ctrl+C dismisses the popup so subsequent interrupts reach normal exit handling", async () => {
     beginLedgerVerification({ source: "prompt" });
-    const { LedgerVerificationOverlay } = await import("./LedgerVerificationOverlay.js");
+    const { LedgerVerificationOverlay } = await import("../../../src/tui/components/LedgerVerificationOverlay.js");
     await renderToString(<Box width={100} height={30}><LedgerVerificationOverlay /></Box>, 100);
     const event = { stopImmediatePropagation: vi.fn() };
     harness.inputHandler?.("c", { ctrl: true }, event);

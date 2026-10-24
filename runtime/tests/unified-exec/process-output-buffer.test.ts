@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { ProcessOutputBuffer } from "./process-manager.js";
+import { ProcessOutputBuffer } from "../../src/unified-exec/process-manager.js";
 
 const CAP = 4096;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LLMMessage, LLMTool } from "../../types.js";
+import type { LLMMessage, LLMTool } from "../../../../src/llm/types.js";
 import {
   buildProviderTraceErrorPayload,
   cloneProviderTracePayload,
@@ -7,7 +7,7 @@ import {
   extractTraceToolNames,
   slimTools,
   toSlimTool,
-} from "./adapter-utils.js";
+} from "../../../../src/llm/providers/grok/adapter-utils.js";
 
 describe("grok adapter utils", () => {
   it("redacts provider trace secrets recursively without changing public fields", () => {

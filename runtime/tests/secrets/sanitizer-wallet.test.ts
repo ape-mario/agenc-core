@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { REDACTED_SECRET, redactSecrets, redactSecretsInValue } from "./index.js";
+import { REDACTED_SECRET, redactSecrets, redactSecretsInValue } from "../../src/secrets/index.js";
 
 // Fixtures are assembled so secret-scanning / push-protection does not flag the
 // test file, while the runtime values still match the sanitizer patterns.

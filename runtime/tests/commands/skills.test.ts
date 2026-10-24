@@ -16,8 +16,8 @@ import {
   collectSkillsSnapshot,
   createProjectSkill,
   formatSkillsSnapshot,
-} from "./skills.js";
-import type { Session } from "../session/session.js";
+} from "../../src/commands/skills.js";
+import type { Session } from "../../src/session/session.js";
 
 function tmpRoot(): string {
   return mkdtempSync(join(tmpdir(), "agenc-skills-command-"));

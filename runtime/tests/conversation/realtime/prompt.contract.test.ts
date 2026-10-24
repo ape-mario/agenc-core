@@ -7,7 +7,7 @@ import {
   REALTIME_USER_FIRST_NAME_PLACEHOLDER,
   currentRealtimeUserFirstName,
   prepareRealtimeBackendPrompt,
-} from "./prompt.js";
+} from "../../../src/conversation/realtime/prompt.js";
 
 const EXPECTED_REALTIME_BACKEND_PROMPT = `## Identity, tone, and role
 

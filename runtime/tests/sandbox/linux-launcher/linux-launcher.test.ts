@@ -8,45 +8,45 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createBwrapCommandArgs,
   insertInnerCommandArgv0,
-} from "./bwrap.js";
+} from "../../../src/sandbox/linux-launcher/bwrap.js";
 import {
   parseLinuxSandboxLauncherArgs,
   LinuxSandboxCliError,
-} from "./cli.js";
+} from "../../../src/sandbox/linux-launcher/cli.js";
 import {
   AGENC_PROXY_SOCKET_DIR_PREFIX,
   INHERITED_CWD_FD,
   INHERITED_CWD_SANDBOX_PATH,
   SECCOMP_STDIN_FD,
-} from "./config.js";
+} from "../../../src/sandbox/linux-launcher/config.js";
 import {
   createNetworkSeccompProgram,
   networkSeccompMode,
   openNetworkSeccompProgramFile,
-} from "./landlock.js";
+} from "../../../src/sandbox/linux-launcher/landlock.js";
 import {
   findSystemBubblewrapInPath,
   preferredBubblewrapLauncher,
   systemBubblewrapSupportsBindFd,
-} from "./launcher.js";
+} from "../../../src/sandbox/linux-launcher/launcher.js";
 import {
   activateProxyRoutesInNetns,
   planProxyRoutes,
   prepareHostProxyRoutes,
   prepareHostProxyRouteSpec,
   rewriteProxyEnvValue,
-} from "./proxy-routing.js";
+} from "../../../src/sandbox/linux-launcher/proxy-routing.js";
 import {
   isNativeElfExecutable,
   isProcMountFailure,
   runCommandWithSupervision,
   runLinuxSandboxMain,
-} from "./linux-run-main.js";
+} from "../../../src/sandbox/linux-launcher/linux-run-main.js";
 import {
   restrictedFileSystemPolicy,
   unrestrictedFileSystemPolicy,
   type PermissionProfile,
-} from "../engine/index.js";
+} from "../../../src/sandbox/engine/index.js";
 
 const TEST_SESSION_TEMP_ROOT = "/tmp/agenc-test-session-root";
 

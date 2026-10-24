@@ -21,7 +21,7 @@ import {
   __setRipgrepAvailabilityForTests,
   createGrepTool as createUnboundGrepTool,
   GREP_TOOL_NAME,
-} from "./grep.js";
+} from "../../../src/tools/system/grep.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 import { attachToolRuntimeContext } from "../../../src/tools/runtimes/context.js";
 import {

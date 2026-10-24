@@ -33,12 +33,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, onTestFinished, test } from "vitest";
 import { ConfigStore } from "../../src/config/store.js";
 
-import type { TurnContext } from "../session/turn-context.js";
-import type { Session } from "../session/session.js";
-import { clearSystemPromptSections } from "./sections.js";
-import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../tools/untrusted-tool-result-framing.js";
-import { DESKTOP_RICH_RENDERER_CLIENT, getClientRenderingSection } from "./client-rendering.js";
-import { snapshotProviderEnvironment } from "../llm/provider-options.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import type { Session } from "../../src/session/session.js";
+import { clearSystemPromptSections } from "../../src/prompts/sections.js";
+import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../../src/tools/untrusted-tool-result-framing.js";
+import { DESKTOP_RICH_RENDERER_CLIENT, getClientRenderingSection } from "../../src/prompts/client-rendering.js";
+import { snapshotProviderEnvironment } from "../../src/llm/provider-options.js";
 import {
   assembleBaseInstructionsForModel,
   assembleSystemPrompt,
@@ -63,13 +63,13 @@ import {
   getSimpleToneAndStyleSection,
   getUsingYourToolsSection,
   SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
-} from "./system-prompt.js";
-import { LEAN_SYSTEM_PROMPT_ENV } from "./lean-system-prompt.js";
-import { LIGHT_FINISH, LIGHT_LIMITED_FINISH } from "./light-budget-prompt.js";
-import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_PATHS } from "./product-help.js";
-import { LIGHT_LOADED_INSTRUCTIONS_NOTE } from "./live-instructions.js";
-import { LIGHT_TASK_LIMITS_ENV } from "../tools/light-profile.js";
-import { getPermissionsSection } from "./permissions-prompt.js";
+} from "../../src/prompts/system-prompt.js";
+import { LEAN_SYSTEM_PROMPT_ENV } from "../../src/prompts/lean-system-prompt.js";
+import { LIGHT_FINISH, LIGHT_LIMITED_FINISH } from "../../src/prompts/light-budget-prompt.js";
+import { AGENC_INSTRUCTION_FILE, AGENC_UNDO_PATHS } from "../../src/prompts/product-help.js";
+import { LIGHT_LOADED_INSTRUCTIONS_NOTE } from "../../src/prompts/live-instructions.js";
+import { LIGHT_TASK_LIMITS_ENV } from "../../src/tools/light-profile.js";
+import { getPermissionsSection } from "../../src/prompts/permissions-prompt.js";
 
 // Minimal TurnContext + Session stubs — only the fields the assembler reads.
 function fakeCtx(overrides?: Partial<TurnContext>): TurnContext {
@@ -1271,7 +1271,7 @@ describe("assembleSystemPrompt", () => {
 
   test("permissions use the independent effective sandbox authority", async () => {
     const { createEmptyToolPermissionContext } = await import(
-      "../permissions/types.js"
+      "../../src/permissions/types.js"
     );
     const { text, sections } = await assembleSystemPrompt({
       session: fakeSession,
@@ -1301,7 +1301,7 @@ describe("assembleSystemPrompt", () => {
   // keeps the never text even in a workspace-write sandbox.
   test("bypass is offered escalation unless the session's escalation stays confined", async () => {
     const { createEmptyToolPermissionContext } = await import(
-      "../permissions/types.js"
+      "../../src/permissions/types.js"
     );
     const render = async (services: Record<string, unknown>) => (await assembleSystemPrompt({
       session: { services } as unknown as Session,
@@ -1322,7 +1322,7 @@ describe("assembleSystemPrompt", () => {
 
   test("autonomous work section requires explicit autonomous mode", async () => {
     const { createEmptyToolPermissionContext } = await import(
-      "../permissions/types.js"
+      "../../src/permissions/types.js"
     );
     const active = await assembleSystemPrompt({
       session: fakeSession,

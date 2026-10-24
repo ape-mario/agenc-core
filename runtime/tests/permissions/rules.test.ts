@@ -21,15 +21,15 @@ import {
   setRulesForSource,
   toolAlwaysAllowedRule,
   unescapeRuleContent,
-} from "./rules.js";
+} from "../../src/permissions/rules.js";
 import {
   applyPermissionUpdate,
   applyPermissionUpdates,
-} from "./permission-updates.js";
+} from "../../src/permissions/permission-updates.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionRule,
-} from "./types.js";
+} from "../../src/permissions/types.js";
 
 // ---------------------------------------------------------------------------
 // Escape / unescape

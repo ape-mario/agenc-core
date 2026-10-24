@@ -1,8 +1,8 @@
 import { getEventListeners } from "node:events";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { LLMTimeoutError, mapLLMError } from "../../errors.js";
-import { runLocalProviderHealthSidecar } from "./local-health.js";
+import { LLMTimeoutError, mapLLMError } from "../../../../src/llm/errors.js";
+import { runLocalProviderHealthSidecar } from "../../../../src/llm/providers/shared/local-health.js";
 
 type LocalHealthSidecarParams = Parameters<
   typeof runLocalProviderHealthSidecar

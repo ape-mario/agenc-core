@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import { permissionProfileFromRuntimePermissions, unrestrictedFileSystemPolicy,
   type NetworkSandboxPolicy, type SandboxExecRequest, type SandboxTransformRequest,
-} from "../sandbox/engine/index.js";
-import { withNetworkRetryDefaults } from "./network-retry-defaults.js";
-import { UnifiedExecProcessManager } from "./process-manager.js";
+} from "../../src/sandbox/engine/index.js";
+import { withNetworkRetryDefaults } from "../../src/unified-exec/network-retry-defaults.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
 const profile = (network: NetworkSandboxPolicy) =>
   permissionProfileFromRuntimePermissions(unrestrictedFileSystemPolicy(), network);
 

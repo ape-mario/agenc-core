@@ -2,9 +2,9 @@ import { PassThrough } from 'node:stream'
 
 import { describe, expect, test, vi } from 'vitest'
 
-import type Ink from './ink.tsx'
-import instances from './instances.ts'
-import { createRoot, type Root } from './root.ts'
+import type Ink from '../../../src/tui/ink/ink.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot, type Root } from '../../../src/tui/ink/root.js'
 
 type TestStdout = PassThrough & {
   columns: number

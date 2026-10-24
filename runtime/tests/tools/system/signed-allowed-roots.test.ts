@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { resolve } from "node:path";
 
-import { resolveToolAllowedPaths } from "./filesystem.js";
+import { resolveToolAllowedPaths } from "../../../src/tools/system/filesystem.js";
 import {
   clearCurrentRuntimeSession,
   setCurrentRuntimeSession,

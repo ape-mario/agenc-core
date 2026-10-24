@@ -15,9 +15,9 @@ import {
   findDanglingToolUses,
   resetBuildIdForTestingOnly,
   resolveDurableTurnsConfig,
-} from "./durable-turns.js";
-import { isResumeReplaySafe } from "../tool-registry.js";
-import type { ResponseItem } from "./rollout-item.js";
+} from "../../src/session/durable-turns.js";
+import { isResumeReplaySafe } from "../../src/tool-registry.js";
+import type { ResponseItem } from "../../src/session/rollout-item.js";
 
 afterEach(() => {
   delete process.env.AGENC_BUILD_ID;

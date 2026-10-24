@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest";
 import {
   trustActivatedRepositoryKeys,
   type ConfigLayerSnapshot,
-} from "./repository.js";
-import type { AgenCConfig } from "./schema.js";
+} from "../../src/config/repository.js";
+import type { AgenCConfig } from "../../src/config/schema.js";
 
 function layer(
   scope: ConfigLayerSnapshot["scope"],

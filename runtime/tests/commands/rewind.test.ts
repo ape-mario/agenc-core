@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { rewindCommand } from "./rewind.js";
-import { buildDefaultRegistry } from "./registry.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "./types.js";
+import { rewindCommand } from "../../src/commands/rewind.js";
+import { buildDefaultRegistry } from "../../src/commands/registry.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function mkctx(
   session: Session,

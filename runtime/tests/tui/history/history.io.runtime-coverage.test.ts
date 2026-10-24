@@ -24,32 +24,32 @@ vi.mock('fs/promises', () => ({
   writeFile: historyFixture.writeFile,
 }))
 
-vi.mock('../../bootstrap/state.js', () => ({
+vi.mock('../../../src/bootstrap/state.js', () => ({
   getProjectRoot: () => historyFixture.projectRoot,
   getSessionId: () => historyFixture.sessionId,
 }))
 
-vi.mock('../../utils/cleanupRegistry.js', () => ({
+vi.mock('../../../src/utils/cleanupRegistry.js', () => ({
   registerCleanup: historyFixture.registerCleanup,
 }))
 
-vi.mock('../../utils/debug.js', () => ({
+vi.mock('../../../src/utils/debug.js', () => ({
   logForDebugging: historyFixture.logForDebugging,
 }))
 
-vi.mock('../../utils/envUtils.js', () => ({
+vi.mock('../../../src/utils/envUtils.js', () => ({
   getAgenCHomeDir: () => historyFixture.configHome,
   isEnvTruthy: () => historyFixture.skipHistory,
 }))
 
-vi.mock('../../utils/errors.js', () => ({
+vi.mock('../../../src/utils/errors.js', () => ({
   getErrnoCode: (error: unknown) =>
     typeof error === 'object' && error !== null && 'code' in error
       ? (error as { code?: string }).code
       : undefined,
 }))
 
-vi.mock('../../utils/fsOperations.js', () => ({
+vi.mock('../../../src/utils/fsOperations.js', () => ({
   readLinesReverse: async function* () {
     for (const line of historyFixture.readLines) {
       yield line
@@ -57,31 +57,31 @@ vi.mock('../../utils/fsOperations.js', () => ({
   },
 }))
 
-vi.mock('../../utils/lockfile.js', () => ({
+vi.mock('../../../src/utils/lockfile.js', () => ({
   lock: historyFixture.lock,
 }))
 
-vi.mock('../../utils/pasteStore.js', () => ({
+vi.mock('../../../src/utils/pasteStore.js', () => ({
   hashPastedText: (text: string) =>
     text.length > 1024 ? 'hash-large' : `hash-${text.length}`,
   retrievePastedText: historyFixture.retrievePastedText,
   storePastedText: historyFixture.storePastedText,
 }))
 
-vi.mock('../../utils/sleep.js', () => ({
+vi.mock('../../../src/utils/sleep.js', () => ({
   sleep: historyFixture.sleep,
 }))
 
-vi.mock('../../utils/slowOperations.js', () => ({
+vi.mock('../../../src/utils/slowOperations.js', () => ({
   jsonParse: JSON.parse,
   jsonStringify: JSON.stringify,
 }))
 
-type HistoryModule = typeof import('./history.js')
+type HistoryModule = typeof import('../../../src/tui/history/history.js')
 
 async function loadHistory(): Promise<HistoryModule> {
   vi.resetModules()
-  return import('./history.js')
+  return import('../../../src/tui/history/history.js')
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {

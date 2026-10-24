@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 
-import type { Tool } from '../../tools/Tool.js'
-import { GroupedToolUseContent } from './GroupedToolUseContent.js'
+import type { Tool } from '../../../src/tools/Tool.js'
+import { GroupedToolUseContent } from '../../../src/tui/message-renderers/GroupedToolUseContent.js'
 
 describe('GroupedToolUseContent', () => {
   test('forwards grouped tool use state, filtered progress, results, and animation intent', () => {

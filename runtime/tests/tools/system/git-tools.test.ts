@@ -30,7 +30,7 @@ import {
   parseStatusPorcelain,
   parseWorktreePorcelain,
 } from "src/tools/system/coding-common.js";
-import { createGitAndRepoTools } from "./git-tools.js";
+import { createGitAndRepoTools } from "../../../src/tools/system/git-tools.js";
 import type { Tool } from "../../../src/tools/types.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 

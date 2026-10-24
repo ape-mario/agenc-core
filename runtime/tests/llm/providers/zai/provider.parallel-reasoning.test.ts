@@ -1,12 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
 
-import type { LLMMessage } from "../../types.js";
+import type { LLMMessage } from "../../../../src/llm/types.js";
 import {
   bodyAt,
   createSuccessfulChatResponse,
   ECHO_TOOL,
 } from "../openai-compatible-test-helpers.js";
-import { ZaiCodingPlanProvider, ZaiProvider } from "./index.js";
+import { ZaiCodingPlanProvider, ZaiProvider } from "../../../../src/llm/providers/zai/index.js";
 
 const model = "glm-5.3-flash";
 const successfulChat = createSuccessfulChatResponse("chatcmpl_parallel_glm");

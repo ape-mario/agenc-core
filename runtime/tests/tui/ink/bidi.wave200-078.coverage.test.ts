@@ -21,7 +21,7 @@ function char(value: string, styleId: number): TestClusteredChar {
 
 async function importFreshBidiModule() {
   vi.resetModules()
-  return import('./bidi.ts')
+  return import('../../../src/tui/ink/bidi.js')
 }
 
 describe('bidi wave200-078 coverage', () => {

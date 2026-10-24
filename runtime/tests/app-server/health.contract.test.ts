@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createTempWorkspaceFixture } from "../helpers/temp-workspace.js";
-import { AgenCDaemonHealthService, toHealthMemoryStats } from "./health.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+import { AgenCDaemonHealthService, toHealthMemoryStats } from "../../src/app-server/health.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 
 const workspaces = createTempWorkspaceFixture("agenc-health-workspace-");
 

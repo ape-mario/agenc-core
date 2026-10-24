@@ -7,7 +7,7 @@ import {
   isActiveLocalAgentStatus,
   isStoppableLocalAgentStatus,
   normalizeLocalAgentStatus,
-} from "./agentActivity.js";
+} from "../../../../src/tui/components/spinner/agentActivity.js";
 
 describe("agent spinner activity helpers", () => {
   test("selects active local agents and sorts them by display name", () => {

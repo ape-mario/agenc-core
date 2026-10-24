@@ -13,7 +13,7 @@ const authMocks = vi.hoisted(() => ({
   getSessionIngressAuthHeaders: vi.fn(),
 }));
 
-vi.mock("./_deps/session-storage.js", () => ({
+vi.mock("../../src/bin/_deps/session-storage.js", () => ({
   loadTranscriptFile: vi.fn(async () => {
     const err = new Error("ENOENT");
     (err as NodeJS.ErrnoException).code = "ENOENT";
@@ -24,14 +24,14 @@ vi.mock("./_deps/session-storage.js", () => ({
   setRemoteIngressUrl: sessionStorageMocks.setRemoteIngressUrl,
 }));
 
-vi.mock("./_deps/session-ingress-auth.js", () => ({
+vi.mock("../../src/bin/_deps/session-ingress-auth.js", () => ({
   getSessionIngressAuthHeaders: authMocks.getSessionIngressAuthHeaders,
 }));
 
-import { bootstrapLocalRuntimeSession } from "./bootstrap.js";
-import { fetchStartupInternalEvents } from "./startup-internal-events.js";
-import { Session } from "../session/session.js";
-import { ConversationThreadManager } from "../conversation/thread-manager.js";
+import { bootstrapLocalRuntimeSession } from "../../src/bin/bootstrap.js";
+import { fetchStartupInternalEvents } from "../../src/bin/startup-internal-events.js";
+import { Session } from "../../src/session/session.js";
+import { ConversationThreadManager } from "../../src/conversation/thread-manager.js";
 
 type InternalEventReader = () => Promise<Array<{
   payload: Record<string, unknown>;
@@ -90,7 +90,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   });
 
   it("cancels stalled MCP startup before prewarm and rejects bootstrap", async () => {
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(() => ({
       name: "stub",
       chat: async () => ({
@@ -139,7 +139,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   });
 
   it("cancels bootstrap while startup prewarm is stuck", async () => {
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(() => ({
       name: "stub", chat: async () => ({ content: "ok", toolCalls: [],
         usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
@@ -168,7 +168,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   });
 
   it("binds Grok ACP to the scrubbed client child environment", async () => {
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     let capturedOptions:
       | Parameters<typeof providerMod.createProvider>[1]
       | undefined;
@@ -252,7 +252,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   });
 
   it("registers remote ingress plus CCR v2 reader and writer hooks during startup", async () => {
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -310,7 +310,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   it("activates restored-session startup effects once, in order, before the first ordinary submit", async () => {
     await mkdir(join(workspace, ".agenc"), { mode: 0o700 });
     await writeFile(join(workspace, ".agenc", "scheduled_tasks.json"), '{"tasks":[]}');
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -332,8 +332,8 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
       .mockImplementation(async () => {
         sequence.push("mcp");
       });
-    const cronTasks = await import("../utils/cronTasks.js");
-    const modelFacingTools = await import("./model-facing-tools.js");
+    const cronTasks = await import("../../src/utils/cronTasks.js");
+    const modelFacingTools = await import("../../src/bin/model-facing-tools.js");
     const readCronTasks = vi
       .spyOn(cronTasks, "readCronTasks")
       .mockImplementation(async () => {
@@ -411,11 +411,11 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   });
 
   it("emits a visible cron storage warning when persisted jobs cannot be restored", async () => {
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const chat = vi.fn();
     vi.spyOn(providerMod, "createProvider").mockReturnValue({ name: "stub", chat } as never);
     vi.spyOn(Session.prototype, "startMcpManager").mockResolvedValue(undefined);
-    const cronTasks = await import("../utils/cronTasks.js");
+    const cronTasks = await import("../../src/utils/cronTasks.js");
     // A DESCRIPTOR_UNSUPPORTED read is only worth a warning when a durable
     // record actually exists; a workspace that never scheduled anything has
     // nothing to restore and stays quiet. Give this one a record to lose.
@@ -428,7 +428,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
     vi.spyOn(cronTasks, "readCronTasks").mockRejectedValue(
       Object.assign(new Error("descriptor-confined I/O is unsupported on darwin"), { code: "DESCRIPTOR_UNSUPPORTED" }),
     );
-    const modelFacingTools = await import("./model-facing-tools.js");
+    const modelFacingTools = await import("../../src/bin/model-facing-tools.js");
     const startCron = vi.spyOn(modelFacingTools, "startCronSchedulerRunner").mockResolvedValue(undefined);
     vi.spyOn(modelFacingTools, "resumeInterruptedAgentJobs").mockResolvedValue(0);
     const boot = await bootstrapLocalRuntimeSession({
@@ -455,7 +455,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   });
 
   it("closes deferred startup admission synchronously through the bootstrap handle", async () => {
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -504,7 +504,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   it("does not start cron or job recovery after shutdown wins an in-flight startup read", async () => {
     await mkdir(join(workspace, ".agenc"), { mode: 0o700 });
     await writeFile(join(workspace, ".agenc", "scheduled_tasks.json"), '{"tasks":[]}');
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -521,8 +521,8 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
         }) as never,
     );
     vi.spyOn(Session.prototype, "startMcpManager").mockResolvedValue(undefined);
-    const cronTasks = await import("../utils/cronTasks.js");
-    const modelFacingTools = await import("./model-facing-tools.js");
+    const cronTasks = await import("../../src/utils/cronTasks.js");
+    const modelFacingTools = await import("../../src/bin/model-facing-tools.js");
     let releaseCronRead: (() => void) | undefined;
     let markCronReadStarted: (() => void) | undefined;
     const cronReadStarted = new Promise<void>((resolve) => {
@@ -579,7 +579,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   });
 
   it("uses the registered CCR v2 hooks against worker internal-event endpoints", async () => {
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({
@@ -810,7 +810,7 @@ describe("bootstrapLocalRuntimeSession session-ingress startup wiring", () => {
   });
 
   it("does not install a fake CCR v2 writer when the worker epoch is missing", async () => {
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockImplementation(
       () =>
         ({

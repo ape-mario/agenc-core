@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const runAgenCForkedAgent = vi.hoisted(() => vi.fn());
 
-vi.mock("../../utils/forkedAgent.js", () => ({
+vi.mock("../../../src/utils/forkedAgent.js", () => ({
   runForkedAgent: runAgenCForkedAgent,
 }));
 
@@ -12,7 +12,7 @@ import {
   createUserMessage,
   extractReadFilesFromMessages,
   runForkedAgent,
-} from "./runtime.js";
+} from "../../../src/services/PromptSuggestion/runtime.js";
 
 const emptyUsage = {
   input_tokens: 0,

@@ -11,7 +11,7 @@ import {
   roughTokenCountEstimationForFileType,
   roughTokenCountEstimationForMessages,
   roughTokenCountEstimationForProvider,
-} from "./token-estimation.js";
+} from "../../src/llm/token-estimation.js";
 
 describe("token estimation", () => {
   test("uses UTF-8 bytes and a whole-value ceiling", () => {

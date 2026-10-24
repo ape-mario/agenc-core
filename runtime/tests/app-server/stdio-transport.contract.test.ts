@@ -1,8 +1,8 @@
 import { PassThrough } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it, vi } from "vitest";
-import { JSON_RPC_VERSION } from "./protocol/index.js";
-import { isDaemonCausalRoutineMessage } from "./overload.js";
+import { JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
+import { isDaemonCausalRoutineMessage } from "../../src/app-server/overload.js";
 import { holdAgentLifecycleLock } from "./held-agent-lifecycle-lock.js";
 import { assertAliasControlDispatch, blockedControlHandler } from "./transport-contract-helpers.js";
 import {
@@ -12,7 +12,7 @@ import {
   encodeJsonLine,
   parseJsonObjectLine,
   writeJsonLine,
-} from "./transport/stdio.js";
+} from "../../src/app-server/transport/stdio.js";
 
 function nextChunk(stream: PassThrough): Promise<string> {
   return new Promise((resolve) => {

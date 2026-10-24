@@ -49,12 +49,12 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: unknown) => unknown) =>
     selector(harness.appState),
 }))
 
-vi.mock('../../utils/fileHistory.js', () => ({
+vi.mock('../../../src/utils/fileHistory.js', () => ({
   fileHistoryCanRestore: () => harness.canRestore,
   fileHistoryEnabled: () => {
     throw new Error('MessageSelector must read file history settings from AppState')
@@ -62,7 +62,7 @@ vi.mock('../../utils/fileHistory.js', () => ({
   fileHistoryGetDiffStats: vi.fn(async () => harness.diffStats),
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
@@ -73,11 +73,11 @@ vi.mock('src/tui/hooks/useExitOnCtrlCDWithKeybindings.js', () => ({
   }),
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: harness.columns, rows: 24 }),
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybinding: (name: string, handler: () => unknown) => {
     harness.keybindings[name] = handler
   },
@@ -86,16 +86,16 @@ vi.mock('../keybindings/useKeybinding.js', () => ({
   },
 }))
 
-vi.mock('../components/spinner/Spinner.js', async () => {
-  const { Text } = await import('../ink.js')
+vi.mock('../../../src/tui/components/spinner/Spinner.js', async () => {
+  const { Text } = await import('../../../src/tui/ink.js')
 
   return {
     Spinner: () => React.createElement(Text, null, 'spin'),
   }
 })
 
-vi.mock('../components/CustomSelect/select', async () => {
-  const { Text } = await import('../ink.js')
+vi.mock('../../../src/tui/components/CustomSelect/select.js', async () => {
+  const { Text } = await import('../../../src/tui/ink.js')
 
   return {
     Select: (props: CapturedSelectProps) => {
@@ -112,14 +112,14 @@ vi.mock('../components/CustomSelect/select', async () => {
   }
 })
 
-import { createRoot } from '../ink/root.js'
-import type { Message, UserMessage } from '../../types/message.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { Message, UserMessage } from '../../../src/types/message.js'
 import {
   buildMessageSelectorFileHistoryMetadata,
   computeMessageOptionTextWidth,
   MessageSelector,
   messagesAfterAreOnlySynthetic,
-} from '../components/MessageSelector.js'
+} from '../../../src/tui/components/MessageSelector.js'
 
 function userMessage(
   uuid: string,

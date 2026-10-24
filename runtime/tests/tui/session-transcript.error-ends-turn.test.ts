@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { adaptTranscriptEvents } from "./session-transcript.js";
+import { adaptTranscriptEvents } from "../../src/tui/session-transcript.js";
 
 describe("explicit failures end the streaming turn", () => {
   const turnStart = {

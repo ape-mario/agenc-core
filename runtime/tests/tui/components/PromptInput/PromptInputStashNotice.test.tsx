@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { PromptInputStashNotice } from './PromptInputStashNotice.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { PromptInputStashNotice } from '../../../../src/tui/components/PromptInput/PromptInputStashNotice.js'
 
 function RerenderStashNotice() {
   const [tick, setTick] = React.useState(0)

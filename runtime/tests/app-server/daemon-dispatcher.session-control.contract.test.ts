@@ -1,19 +1,19 @@
-import { PermissionModeTransitionPrecommitError } from "../permissions/permission-mode.js";
+import { PermissionModeTransitionPrecommitError } from "../../src/permissions/permission-mode.js";
 import { describe, expect, it, vi } from "vitest";
 
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 import {
   AGENC_DAEMON_PROTOCOL_VERSION,
   JSON_RPC_VERSION,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import type {
   SessionApplyConfigParams,
   SessionSetModelParams,
   SessionSetPermissionModeParams,
   SessionPermissionRuleMutationParams,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 async function initialize(connection: {
   dispatch(message: Record<string, unknown>): Promise<unknown>;

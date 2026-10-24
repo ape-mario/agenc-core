@@ -5,7 +5,7 @@ import {
   normalizeLspServerConfig,
   parseLspServersConfig,
   setLspServerConfigSourceForTesting,
-} from "./config.js";
+} from "../../../src/services/lsp/config.js";
 
 describe("lsp config", () => {
   test("normalizes extensions and optional fields", () => {

@@ -3,14 +3,14 @@ import {
   SESSION_ID_ARG,
   SESSION_ID_SIG_ARG,
   signSessionId,
-} from "../_deps/filesystem-args.js";
-import type { Session } from "../../session/session.js";
+} from "../../../src/agents/_deps/filesystem-args.js";
+import type { Session } from "../../../src/session/session.js";
 import {
   currentAgentContext,
   isCurrentAgentContextError,
   strictArgs,
   type MultiAgentV2Options,
-} from "./common.js";
+} from "../../../src/agents/v2/common.js";
 
 const ROOT_SESSION_ID = "root-session";
 const CHILD_SESSION_ID = "child-session";

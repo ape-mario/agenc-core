@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'vitest'
 
-import { createSkillCommand } from './loadSkillsDir.js'
+import { createSkillCommand } from '../../src/skills/loadSkillsDir.js'
 
 test('repository skill metadata cannot grant authority or execute embedded shell', async () => {
   const root = mkdtempSync(join(tmpdir(), 'agenc-repository-skill-'))

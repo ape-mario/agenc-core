@@ -8,77 +8,77 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { UnifiedExecProcessManager } from "../unified-exec/process-manager.js";
-import { attachExecOwnerBinding } from "../unified-exec/process-ownership.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
+import { attachExecOwnerBinding } from "../../src/unified-exec/process-ownership.js";
 import { withExplicitDangerBoundary } from "../helpers/explicit-danger-boundary.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ExecutionAdmissionKernel } from "../budget/execution-admission-kernel.js";
-import { defaultConfig } from "../config/schema.js";
-import { StaticModelsManager } from "../llm/models-manager.js";
-import { runAdmittedToolCall } from "../budget/admitted-tool-call.js";
-import { EventLog, type Event } from "../session/event-log.js";
-import { resetCronSchedulerForTests } from "../utils/cronScheduler.js";
-import type { ProviderFactoryOptions } from "../llm/provider.js";
-import type { LLMProvider, LLMResponse } from "../llm/types.js";
-import type { ToolEvaluatorContext } from "../permissions/evaluator.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import type { Session } from "../session/session.js";
-import { backgroundTaskLifecycleForSession, isBackgroundTask } from "../tasks/index.js";
+import { ExecutionAdmissionKernel } from "../../src/budget/execution-admission-kernel.js";
+import { defaultConfig } from "../../src/config/schema.js";
+import { StaticModelsManager } from "../../src/llm/models-manager.js";
+import { runAdmittedToolCall } from "../../src/budget/admitted-tool-call.js";
+import { EventLog, type Event } from "../../src/session/event-log.js";
+import { resetCronSchedulerForTests } from "../../src/utils/cronScheduler.js";
+import type { ProviderFactoryOptions } from "../../src/llm/provider.js";
+import type { LLMProvider, LLMResponse } from "../../src/llm/types.js";
+import type { ToolEvaluatorContext } from "../../src/permissions/evaluator.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import type { Session } from "../../src/session/session.js";
+import { backgroundTaskLifecycleForSession, isBackgroundTask } from "../../src/tasks/index.js";
 import {
   createModelFacingTools,
   __setLiveWebFetchDnsAllLookupForTests,
-} from "./model-facing-tools.js";
-import { collectSkillsSnapshot } from "../commands/skills.js";
-import { createLocalSkillsServices } from "../skills/local-loader.js";
-import { buildBootstrapToolRegistry } from "./bootstrap-tool-registry.js";
-import { buildToolRegistry } from "../tool-registry.js";
-import { StreamingToolExecutor } from "../tools/streaming-executor.js";
+} from "../../src/bin/model-facing-tools.js";
+import { collectSkillsSnapshot } from "../../src/commands/skills.js";
+import { createLocalSkillsServices } from "../../src/skills/local-loader.js";
+import { buildBootstrapToolRegistry } from "../../src/bin/bootstrap-tool-registry.js";
+import { buildToolRegistry } from "../../src/tool-registry.js";
+import { StreamingToolExecutor } from "../../src/tools/streaming-executor.js";
 import {
   _clearAgentControlCacheForTesting,
   _setAgentControlForTesting,
-} from "./delegate-tool.js";
-import { AgentControl } from "../agents/control.js";
-import type { LiveAgent } from "../agents/control.js";
-import { bindLiveAgentSession } from "../agents/live-session.js";
-import { AgentRegistry } from "../agents/registry.js";
+} from "../../src/bin/delegate-tool.js";
+import { AgentControl } from "../../src/agents/control.js";
+import type { LiveAgent } from "../../src/agents/control.js";
+import { bindLiveAgentSession } from "../../src/agents/live-session.js";
+import { AgentRegistry } from "../../src/agents/registry.js";
 import {
   checkForLSPDiagnostics,
   registerPendingLSPDiagnostic,
   resetAllLSPDiagnosticState,
-} from "../services/lsp/LSPDiagnosticRegistry.js";
-import { normalizeLspServerConfig } from "../services/lsp/config.js";
+} from "../../src/services/lsp/LSPDiagnosticRegistry.js";
+import { normalizeLspServerConfig } from "../../src/services/lsp/config.js";
 import {
   _resetLspManagerForTesting,
   initializeLspServerManager,
   shutdownLspServerManager,
   waitForInitialization,
-} from "../services/lsp/manager.js";
-import type { LSPServerInstance } from "../services/lsp/LSPServerInstance.js";
+} from "../../src/services/lsp/manager.js";
+import type { LSPServerInstance } from "../../src/services/lsp/LSPServerInstance.js";
 import {
   SandboxExecutionBroker,
   type SandboxExecutionBrokerLike,
-} from "../sandbox/execution-broker.js";
+} from "../../src/sandbox/execution-broker.js";
 import {
   CsvAgentJobsRepositoryAuthority,
   type CsvAgentJobsRepositoryProvider,
-} from "../app-server/csv-agent-jobs-authority.js";
+} from "../../src/app-server/csv-agent-jobs-authority.js";
 import {
   clearSessionReadState,
   getSessionReadSnapshot,
   SESSION_ID_ARG,
   SESSION_ID_SIG_ARG,
   signSessionId,
-} from "../tools/system/filesystem.js";
+} from "../../src/tools/system/filesystem.js";
 import {
   _resetAgentRolesForTesting,
   createAgentRoleWorkspace,
   listBuiltInAgentRoles,
   registerAgentRole,
-} from "../agents/role.js";
+} from "../../src/agents/role.js";
 import {
   roleToAgentDefinition,
   type AgentDefinition,
-} from "../tools/AgentTool/loadAgentsDir.js";
+} from "../../src/tools/AgentTool/loadAgentsDir.js";
 
 const DEFAULT_ROLE_WORKSPACE = createAgentRoleWorkspace(process.cwd());
 const UNUSED_CSV_AGENT_JOBS_REPOSITORIES: CsvAgentJobsRepositoryProvider = {
@@ -92,12 +92,12 @@ const { delegateMock, persistBinaryContentMock } = vi.hoisted(() => ({
   persistBinaryContentMock: vi.fn(),
 }));
 
-vi.mock("../agents/delegate.js", () => ({
+vi.mock("../../src/agents/delegate.js", () => ({
   delegate: delegateMock,
 }));
 
-vi.mock("../utils/mcpOutputStorage.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../utils/mcpOutputStorage.js")>()),
+vi.mock("../../src/utils/mcpOutputStorage.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/utils/mcpOutputStorage.js")>()),
   persistBinaryContent: persistBinaryContentMock,
 }));
 

@@ -13,24 +13,24 @@ import { join } from "node:path";
 import React, { type SetStateAction } from "react";
 import stripAnsi from "strip-ansi";
 import { beforeAll, describe, expect, test, vi } from "vitest";
-import type { ToolPermissionContext } from "../../permissions/types.js";
+import type { ToolPermissionContext } from "../../../src/permissions/types.js";
 import type {
   McpElicitationRequestEvent,
   McpPrimitiveSchemaDefinition,
   RequestUserInputEvent,
-} from "../../elicitation/types.js";
-import type { AgenCBridgeSession } from "../session-types.js";
-import type { McpSurfaceSnapshot } from "../../session/session.js";
-import type { AgenCRealtimeTuiControls } from "../realtime/controller.js";
+} from "../../../src/elicitation/types.js";
+import type { AgenCBridgeSession } from "../../../src/tui/session-types.js";
+import type { McpSurfaceSnapshot } from "../../../src/session/session.js";
+import type { AgenCRealtimeTuiControls } from "../../../src/tui/realtime/controller.js";
 import type {
   McpFormPending,
   McpUrlPending,
   PendingElicitation,
-} from "./App.js";
+} from "../../../src/tui/components/App.js";
 import {
   dismissLedgerVerification,
   getLedgerVerificationSnapshot,
-} from "../../services/Ledger/ledgerVerification.js";
+} from "../../../src/services/Ledger/ledgerVerification.js";
 import { codingLedgerPrompts } from "../../services/Ledger/ledgerPromptCases.js";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../remoteAuthSessionContext.fixture.js";
 
@@ -48,8 +48,8 @@ if (process.versions.bun !== undefined) {
 
 let createRoot: any;
 let defaultConfig: any;
-let ConfigStoreClass: typeof import("../../config/store.js").ConfigStore;
-let testConfigStore: import("../../config/store.js").ConfigStore;
+let ConfigStoreClass: typeof import("../../../src/config/store.js").ConfigStore;
+let testConfigStore: import("../../../src/config/store.js").ConfigStore;
 let markFirstRunOnboardingComplete: any;
 let readOnboardingState: any;
 let mockTotalCost = 0;
@@ -160,7 +160,7 @@ vi.mock("src/utils/envUtils.js", () => ({
   isBareMode: () => false,
 }));
 
-vi.mock("../context/fpsMetrics.js", async () => {
+vi.mock("../../../src/tui/context/fpsMetrics.js", async () => {
   const React = await import("react");
   return {
     FpsMetricsProvider: ({
@@ -177,21 +177,21 @@ vi.mock("../context/fpsMetrics.js", async () => {
   };
 });
 
-vi.mock("../../cost/hook.js", () => ({
+vi.mock("../../../src/cost/hook.js", () => ({
   useCostSummary: (getFpsMetrics: unknown) => {
     providerProbe.costSummaryGetters.push(getFpsMetrics);
   },
 }));
 
-vi.mock("../../cost/tracker.js", () => ({
+vi.mock("../../../src/cost/tracker.js", () => ({
   getTotalCost: () => mockTotalCost,
 }));
 
-vi.mock("../../utils/billing.js", () => ({
+vi.mock("../../../src/utils/billing.js", () => ({
   hasConsoleBillingAccess: () => mockHasConsoleBillingAccess,
 }));
 
-vi.mock("../../utils/config.js", () => ({
+vi.mock("../../../src/utils/config.js", () => ({
   getRuntimeState: () => mockGlobalConfig,
   updateRuntimeState: (
     updater: (current: Record<string, unknown>) => Record<string, unknown>,
@@ -200,21 +200,21 @@ vi.mock("../../utils/config.js", () => ({
   },
 }));
 
-vi.mock("../../utils/fileHistory.js", () => ({
+vi.mock("../../../src/utils/fileHistory.js", () => ({
   fileHistoryRewind: providerProbe.fileHistoryRewind,
 }));
 
-vi.mock("../../utils/worktree.js", () => ({
+vi.mock("../../../src/utils/worktree.js", () => ({
   getCurrentWorktreeSession: () => mockWorktreeSession,
 }));
 
-vi.mock("../history/history.js", () => ({
+vi.mock("../../../src/tui/history/history.js", () => ({
   addToHistory: (entry: unknown) => {
     providerProbe.historyEntries.push(entry);
   },
 }));
 
-vi.mock("../context/stats.js", async () => {
+vi.mock("../../../src/tui/context/stats.js", async () => {
   const React = await import("react");
   return {
     StatsProvider: ({
@@ -230,12 +230,12 @@ vi.mock("../context/stats.js", async () => {
   };
 });
 
-vi.mock("../state/onChangeAppState.js", () => ({
+vi.mock("../../../src/tui/state/onChangeAppState.js", () => ({
   onChangeAppState: providerProbe.onChangeAppState,
 }));
 
-vi.mock("./AskUserQuestionOverlay.js", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./AskUserQuestionOverlay.js")>();
+vi.mock("../../../src/tui/components/AskUserQuestionOverlay.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../src/tui/components/AskUserQuestionOverlay.js")>();
   return {
     ...original,
     AskUserQuestionOverlay: (props: React.ComponentProps<typeof original.AskUserQuestionOverlay>) => {
@@ -245,7 +245,7 @@ vi.mock("./AskUserQuestionOverlay.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../ink.js", async () => {
+vi.mock("../../../src/tui/ink.js", async () => {
   const React = await import("react");
   return {
     Box: ({ children }: { children?: React.ReactNode }) =>
@@ -262,7 +262,7 @@ vi.mock("../ink.js", async () => {
   };
 });
 
-vi.mock("../context/mailbox.js", async () => {
+vi.mock("../../../src/tui/context/mailbox.js", async () => {
   const React = await import("react");
   return {
     MailboxProvider: ({ children }: { children: React.ReactNode }) =>
@@ -270,7 +270,7 @@ vi.mock("../context/mailbox.js", async () => {
   };
 });
 
-vi.mock("../hooks/useApiKeyVerification.js", () => ({
+vi.mock("../../../src/tui/hooks/useApiKeyVerification.js", () => ({
   useApiKeyVerification: (context: unknown) => {
     apiKeyVerificationProbe.contexts.push(context);
     return {
@@ -281,18 +281,18 @@ vi.mock("../hooks/useApiKeyVerification.js", () => ({
   },
 }));
 
-vi.mock("../../services/PromptSuggestion/promptSuggestion.js", () => ({
+vi.mock("../../../src/services/PromptSuggestion/promptSuggestion.js", () => ({
   shouldEnablePromptSuggestion: () => false,
 }));
 
-vi.mock("../../services/Ledger/ledgerStatus.js", async (importOriginal) => ({
+vi.mock("../../../src/services/Ledger/ledgerStatus.js", async (importOriginal) => ({
   ...(await importOriginal<
-    typeof import("../../services/Ledger/ledgerStatus.js")
+    typeof import("../../../src/services/Ledger/ledgerStatus.js")
   >()),
   refreshLedgerStatus: ledgerStatusProbe.refresh,
 }));
 
-vi.mock("../../tools/Tool.js", () => ({
+vi.mock("../../../src/tools/Tool.js", () => ({
   buildTool: (tool: unknown) => tool,
   getEmptyToolPermissionContext: () => ({
     mode: "default",
@@ -304,7 +304,7 @@ vi.mock("../../tools/Tool.js", () => ({
   }),
 }));
 
-vi.mock("../../tools/ask-user-question/tui-tool.js", () => ({
+vi.mock("../../../src/tools/ask-user-question/tui-tool.js", () => ({
   AskUserQuestionTool: {
     name: "AskUserQuestion",
     aliases: [],
@@ -315,11 +315,11 @@ vi.mock("../../tools/ask-user-question/tui-tool.js", () => ({
   },
 }));
 
-vi.mock("../../utils/commitAttribution.js", () => ({
+vi.mock("../../../src/utils/commitAttribution.js", () => ({
   createEmptyAttributionState: () => ({}),
 }));
 
-vi.mock("../../permissions/settings.js", async (importOriginal) => ({
+vi.mock("../../../src/permissions/settings.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   loadPermissionRulesSnapshot: async () => ({
     rules: [],
@@ -331,45 +331,45 @@ vi.mock("../../permissions/settings.js", async (importOriginal) => ({
   parseToolRuleStringsFromCLI: (tools: string[] = []) => tools,
 }));
 
-vi.mock("../../utils/settings/settings.js", () => ({
+vi.mock("../../../src/utils/settings/settings.js", () => ({
   getInitialSettings: () => ({}),
   getSettingsForSource: () => null,
 }));
 
-vi.mock("../../utils/teammate.js", () => ({
+vi.mock("../../../src/utils/teammate.js", () => ({
   isPlanModeRequired: () => false,
   isTeammate: () => false,
 }));
 
-vi.mock("../../utils/thinking.js", () => ({
+vi.mock("../../../src/utils/thinking.js", () => ({
   shouldEnableThinkingByDefault: () => false,
 }));
 
-vi.mock("../../utils/envUtils.js", () => ({
+vi.mock("../../../src/utils/envUtils.js", () => ({
   getAgenCHomeDir: () => "/tmp/agenc-app-render-test",
   isEnvTruthy: () => false,
   isBareMode: () => false,
 }));
 
-vi.mock("../../utils/fullscreen.js", () => ({
+vi.mock("../../../src/utils/fullscreen.js", () => ({
   isFullscreenEnabledForCurrentTerminal: () => fullscreenProbe.fullscreen,
   isMouseClicksDisabled: () => true,
   isMouseTrackingEnabled: () => fullscreenProbe.mouseTracking,
 }));
 
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: () => {},
 }));
 
-vi.mock("../input/processBashCommand.js", () => ({
+vi.mock("../../../src/tui/input/processBashCommand.js", () => ({
   processBashCommand: providerProbe.processBashCommand,
 }));
 
-vi.mock("../input/shell-paste-confirmation.js", () => ({
+vi.mock("../../../src/tui/input/shell-paste-confirmation.js", () => ({
   confirmSuspectedShellPaste: providerProbe.confirmSuspectedShellPaste,
 }));
 
-vi.mock("../state/AppState.js", async () => {
+vi.mock("../../../src/tui/state/AppState.js", async () => {
   const React = await import("react");
   const defaultPermissionContext = {
     mode: "default",
@@ -488,7 +488,7 @@ vi.mock("../state/AppState.js", async () => {
   };
 });
 
-vi.mock("../../commands.js", () => ({
+vi.mock("../../../src/commands.js", () => ({
   findCommand: (
     name: string,
     commands: Array<Record<string, any>> = mockTuiCommandList,
@@ -503,11 +503,11 @@ vi.mock("../../commands.js", () => ({
   listTuiCommandList: () => mockTuiCommandList,
 }));
 
-vi.mock("../../agents/role-definitions.js", () => ({
+vi.mock("../../../src/agents/role-definitions.js", () => ({
   listAgentRoleDefinitions: roleDefinitionProbe,
 }));
 
-vi.mock("../keybindings/KeybindingProviderSetup.js", async () => {
+vi.mock("../../../src/tui/keybindings/KeybindingProviderSetup.js", async () => {
   const React = await import("react");
   return {
     KeybindingSetup: ({ children }: { children: React.ReactNode }) =>
@@ -515,7 +515,7 @@ vi.mock("../keybindings/KeybindingProviderSetup.js", async () => {
   };
 });
 
-vi.mock("../hooks/useGlobalKeybindings.js", async () => {
+vi.mock("../../../src/tui/hooks/useGlobalKeybindings.js", async () => {
   const React = await import("react");
   return {
     GlobalKeybindingHandlers: (props: Record<string, unknown>) => {
@@ -525,7 +525,7 @@ vi.mock("../hooks/useGlobalKeybindings.js", async () => {
   };
 });
 
-vi.mock("../hooks/useCancelRequest.js", async () => {
+vi.mock("../../../src/tui/hooks/useCancelRequest.js", async () => {
   const React = await import("react");
   return {
     CancelRequestHandler: (props: Record<string, unknown>) => {
@@ -535,13 +535,13 @@ vi.mock("../hooks/useCancelRequest.js", async () => {
   };
 });
 
-vi.mock("../hooks/notifs/useMcpConnectivityStatus.js", () => ({
+vi.mock("../../../src/tui/hooks/notifs/useMcpConnectivityStatus.js", () => ({
   useMcpConnectivityStatus: (props: Record<string, unknown>) => {
     providerProbe.mcpConnectivityProps.push(props);
   },
 }));
 
-vi.mock("./Messages.js", async () => {
+vi.mock("../../../src/tui/components/Messages.js", async () => {
   const React = await import("react");
   return {
     Messages: (
@@ -557,7 +557,7 @@ vi.mock("./Messages.js", async () => {
   };
 });
 
-vi.mock("./MessageSelector.js", async () => {
+vi.mock("../../../src/tui/components/MessageSelector.js", async () => {
   const React = await import("react");
   const filters = await import("../../../src/tui/components/message-selector-filter.js");
   return {
@@ -575,7 +575,7 @@ vi.mock("./MessageSelector.js", async () => {
   };
 });
 
-vi.mock("./Message.js", async () => {
+vi.mock("../../../src/tui/components/Message.js", async () => {
   const React = await import("react");
   return {
     Message: (props: Record<string, unknown>) =>
@@ -587,7 +587,7 @@ vi.mock("./Message.js", async () => {
   };
 });
 
-vi.mock("./ExitFlow.js", async () => {
+vi.mock("../../../src/tui/components/ExitFlow.js", async () => {
   const React = await import("react");
   return {
     ExitFlow: (props: Record<string, unknown>) => {
@@ -597,7 +597,7 @@ vi.mock("./ExitFlow.js", async () => {
   };
 });
 
-vi.mock("./FullscreenLayout.js", async () => {
+vi.mock("../../../src/tui/components/FullscreenLayout.js", async () => {
   const React = await import("react");
   return {
     FullscreenLayout: (props: {
@@ -619,7 +619,7 @@ vi.mock("./FullscreenLayout.js", async () => {
   };
 });
 
-vi.mock("./ScrollKeybindingHandler.js", async () => {
+vi.mock("../../../src/tui/components/ScrollKeybindingHandler.js", async () => {
   const React = await import("react");
   return {
     ScrollKeybindingHandler: (props: Record<string, unknown>) => {
@@ -629,7 +629,7 @@ vi.mock("./ScrollKeybindingHandler.js", async () => {
   };
 });
 
-vi.mock("./dialogs/CostThresholdDialog.js", async () => {
+vi.mock("../../../src/tui/components/dialogs/CostThresholdDialog.js", async () => {
   const React = await import("react");
   return {
     CostThresholdDialog: (props: Record<string, unknown>) => {
@@ -639,7 +639,7 @@ vi.mock("./dialogs/CostThresholdDialog.js", async () => {
   };
 });
 
-vi.mock("./PromptInput/PromptInput.js", async () => {
+vi.mock("../../../src/tui/components/PromptInput/PromptInput.js", async () => {
   const React = await import("react");
   const { parseLocalControlCommand } = await import("../../../src/commands/local-control.js");
   return {
@@ -744,7 +744,7 @@ vi.mock("./PromptInput/PromptInput.js", async () => {
   };
 });
 
-vi.mock("./spinner/Spinner.js", async () => {
+vi.mock("../../../src/tui/components/spinner/Spinner.js", async () => {
   const React = await import("react");
   return {
     SpinnerWithVerb: (props: Record<string, unknown>) => {
@@ -891,22 +891,22 @@ const describeWithVitestMocks = supportsVitestModuleMocks
 
 beforeAll(async () => {
   if (!supportsVitestModuleMocks) return;
-  ({ createRoot } = await import("../ink/root.js"));
-  ({ defaultConfig } = await import("../../config/schema.js"));
-  ({ ConfigStore: ConfigStoreClass } = await import("../../config/store.js"));
+  ({ createRoot } = await import("../../../src/tui/ink/root.js"));
+  ({ defaultConfig } = await import("../../../src/config/schema.js"));
+  ({ ConfigStore: ConfigStoreClass } = await import("../../../src/config/store.js"));
   testConfigStore = createAppConfigStore();
   ({ markFirstRunOnboardingComplete, readOnboardingState } =
-    await import("../../onboarding/projectOnboardingState.js"));
-  const app = await import("./App.js");
+    await import("../../../src/onboarding/projectOnboardingState.js"));
+  const app = await import("../../../src/tui/components/App.js");
   installElicitationResolvers = app.installElicitationResolvers;
   settlePendingOnSubmit = app.settlePendingOnSubmit;
   visibleCancelStreamMode = app.visibleCancelStreamMode;
 }, 30_000);
 
 function createAppConfigStore(
-  config: import("../../config/schema.js").AgenCConfig = defaultConfig(),
+  config: import("../../../src/config/schema.js").AgenCConfig = defaultConfig(),
   agencHome = TEST_REMOTE_AUTH_SESSION_CONTEXT.home.path,
-): import("../../config/store.js").ConfigStore {
+): import("../../../src/config/store.js").ConfigStore {
   return new ConfigStoreClass({
     base: config,
     cwd: process.cwd(),
@@ -989,7 +989,7 @@ function createSession(
     readonly agentDefinitions?: AgenCBridgeSession["agentDefinitions"];
     readonly enqueueIdleInputBatch?: AgenCBridgeSession["enqueueIdleInputBatch"];
     readonly authBackend?: AgenCBridgeSession["services"]["authBackend"];
-    readonly configStore?: import("../../config/store.js").ConfigStore;
+    readonly configStore?: import("../../../src/config/store.js").ConfigStore;
     readonly executeShellCommand?: AgenCBridgeSession["executeShellCommand"];
     readonly localExecutionCapable?: boolean;
     readonly runtimeOptions?: AgenCBridgeSession["services"]["runtimeOptions"];
@@ -1119,7 +1119,7 @@ async function requestConcurrentAppExit(
     return;
   }
 
-  const dispatcher = await import("../../commands/dispatcher.js");
+  const dispatcher = await import("../../../src/commands/dispatcher.js");
   const dispatchSpy = vi
     .spyOn(dispatcher, "dispatchSlashCommand")
     .mockImplementationOnce(async (_parsed, context) => {
@@ -1150,7 +1150,7 @@ async function requestConcurrentAppExit(
 
 describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   test("detects a completion log recreated after the watched file is deleted", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const tempRoot = mkdtempSync(join(tmpdir(), "agenc-completion-log-watch-"));
     const eventLogPath = join(tempRoot, "events.jsonl");
     const previousEventLogPath =
@@ -1240,7 +1240,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps command discovery on session plugin authority across config reload", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const pluginStorageRoot = join(
       tmpdir(),
       "agenc-tui-session-plugin-authority",
@@ -1275,8 +1275,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("refreshes the skill picker when a project skill is created", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const { skillChangeDetector } = await import("../../skills/change-detector.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const { skillChangeDetector } = await import("../../../src/skills/change-detector.js");
     resetShellSurfaceProbe();
     commandDiscoveryProbe.mockResolvedValue([]);
     const session = createSession();
@@ -1289,7 +1289,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test.each([true, false])("loads edited skill metadata before invocation without config reload: invocable %s", async invocable => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     const previous = vi.fn(async () => [{ type: "text", text: "OLD_SKILL_BODY" }]);
     const edited = vi.fn(async () => [{ type: "text", text: "EDITED_SKILL_BODY" }]);
@@ -1312,7 +1312,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   test.each(["failure", "pending", "removed"] as const)(
     "invalidates dynamic command display and execution after a %s reload",
     async (outcome) => {
-      const { AgenCTuiApp } = await import("./App.js");
+      const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
       resetShellSurfaceProbe();
       mockTuiCommandList.push({ name: "help", type: "local", load: vi.fn() });
       const getPromptForCommand = vi.fn(async () => [
@@ -1394,7 +1394,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   test.each(["success", "failure"] as const)(
     "ignores an older command generation's late %s",
     async (outcome) => {
-      const { AgenCTuiApp } = await import("./App.js");
+      const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
       resetShellSurfaceProbe();
       const configStore = createAppConfigStore();
       const session = createSession({
@@ -1437,7 +1437,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   );
 
   test("derives TUI auth reads from the session-owned home and provider environment", async () => {
-    const { getTuiRemoteAuthSessionReadContext } = await import("./App.js");
+    const { getTuiRemoteAuthSessionReadContext } = await import("../../../src/tui/components/App.js");
     const session = createSession();
 
     const context = getTuiRemoteAuthSessionReadContext(session);
@@ -1451,7 +1451,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("terminal title prefix honors ASCII glyph mode", async () => {
-    const { animatedTerminalTitlePrefix } = await import("./App.js");
+    const { animatedTerminalTitlePrefix } = await import("../../../src/tui/components/App.js");
 
     expect(animatedTerminalTitlePrefix(false, 0, {})).toBe("✳");
     expect(animatedTerminalTitlePrefix(true, 1, {})).toBe("⠐");
@@ -1477,7 +1477,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps render health metrics out of the normal conversation", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     const metrics = vi.fn(() => ({ averageFps: 380.8, low1PctFps: 11, sampleCount: 100 }));
     await withRenderedApp(<AgenCTuiApp session={createSession()} isInteractive={false}
@@ -1493,7 +1493,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("formats render health warnings only for sustained low FPS", async () => {
-    const { formatRenderHealthWarning } = await import("./App.js");
+    const { formatRenderHealthWarning } = await import("../../../src/tui/components/App.js");
 
     expect(formatRenderHealthWarning(undefined)).toBeNull();
     expect(
@@ -1527,7 +1527,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("formats stopped-agent notifications by count and description", async () => {
-    const { formatAgentsKilledNotification } = await import("./App.js");
+    const { formatAgentsKilledNotification } = await import("../../../src/tui/components/App.js");
 
     expect(formatAgentsKilledNotification([])).toBeNull();
     expect(formatAgentsKilledNotification([{ taskId: "task-1" }])).toBe(
@@ -1551,7 +1551,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("starts Ledger verification only from the Agent prompt surface", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       submit: vi.fn(async () => {}),
@@ -1588,7 +1588,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test.each(codingLedgerPrompts)("submits coding prompt without reading Ledger status: %s", async (prompt) => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = { ...createSession(), submit: vi.fn(async () => {}) } satisfies AgenCBridgeSession;
     resetShellSurfaceProbe();
     await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
@@ -1602,7 +1602,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("parses MCP primitive field edge cases", async () => {
-    const { parseMcpField } = await import("./App.js");
+    const { parseMcpField } = await import("../../../src/tui/components/App.js");
 
     expect(parseMcpField("", { type: "number" })).toEqual({
       ok: false,
@@ -1669,7 +1669,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("renders elicitation overlays and null prompts", async () => {
-    const { ElicitationOverlay } = await import("./App.js");
+    const { ElicitationOverlay } = await import("../../../src/tui/components/App.js");
 
     expect(await renderApp(<ElicitationOverlay prompt={null} />)).not.toContain(
       "MCP:",
@@ -1694,7 +1694,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("subscribes to MCP URL completion events from session events", async () => {
-    const { subscribeToMcpUrlCompletions } = await import("./App.js");
+    const { subscribeToMcpUrlCompletions } = await import("../../../src/tui/components/App.js");
     let listener: ((event: unknown) => void) | undefined;
     const unsubscribe = vi.fn();
     const completeMcpUrl = vi.fn();
@@ -1743,7 +1743,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("App wrapper preserves provider wiring", async () => {
-    const { App } = await import("./App.js");
+    const { App } = await import("../../../src/tui/components/App.js");
     providerProbe.fpsGetters.length = 0;
     providerProbe.statsStores.length = 0;
     providerProbe.appStateProps.length = 0;
@@ -1775,7 +1775,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("mirrors the canonical daemon context without rewriting the registry", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const calls: string[] = [];
     const requestedContext = {
       ...PERMISSION_CONTEXT,
@@ -1825,7 +1825,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps a daemon policy rewrite instead of restoring the requested auto context", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const canonicalContext = {
       ...PERMISSION_CONTEXT,
       isAutoModeAvailable: true,
@@ -1883,7 +1883,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("rolls PromptInput permission mode changes back when daemon sync fails", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const warningEvents: unknown[] = [];
     const setDaemonPermissionMode = vi.fn(async () => {
       throw new Error("daemon refused mode");
@@ -1936,7 +1936,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("projects a local permission context only after registry commit", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const updatePermissionContext = vi.fn(async () => {
       throw new Error("local publication rejected");
     });
@@ -1965,7 +1965,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("mirrors the registry's frozen same-mode context into AppState", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = createSession();
     providerProbe.promptProps.length = 0;
 
@@ -1989,7 +1989,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("passes API key verification status into PromptInput and verifies on startup", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const previousStatus = apiKeyVerificationProbe.status;
     apiKeyVerificationProbe.status = "missing";
     apiKeyVerificationProbe.reverify.mockClear();
@@ -2017,7 +2017,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("hydrates the TUI app state with registered agent roles", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     providerProbe.appStateProps.length = 0;
     roleDefinitionProbe.mockClear();
     const roleWorkspaceCwd = join(tmpdir(), "agenc-tui-role-workspace-a");
@@ -2054,7 +2054,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("uses the session's canonical custom-agent catalog on the first render", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     providerProbe.appStateProps.length = 0;
     roleDefinitionProbe.mockClear();
     const roleWorkspaceCwd = join(tmpdir(), "agenc-tui-canonical-catalog");
@@ -2102,7 +2102,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("prioritizes a pending permission overlay over an elicitation overlay", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = createSession();
     resetShellSurfaceProbe();
 
@@ -2161,7 +2161,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("does not show model spinner while a local slash command error is pending", async () => {
-    const dispatcher = await import("../../commands/dispatcher.js");
+    const dispatcher = await import("../../../src/commands/dispatcher.js");
     let resolveDispatch: (outcome: any) => void = () => {};
     const dispatchPromise = new Promise<any>((resolve) => {
       resolveDispatch = resolve;
@@ -2169,7 +2169,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     const dispatchSpy = vi
       .spyOn(dispatcher, "dispatchSlashCommand")
       .mockReturnValue(dispatchPromise as never);
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       submit: vi.fn(async () => {}),
@@ -2226,7 +2226,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test.each(["edit", "session"])("does not reuse a failed submission after a composer %s change", async change => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     const session = {
       ...createSession(),
@@ -2254,7 +2254,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps every prompt visible behind effect review and sends them in order after the final review", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     fullscreenProbe.fullscreen = true;
     const subscribers = new Set<(event: unknown) => void>();
@@ -2302,7 +2302,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test.each([true, false])("queues a prompt when review becomes pending during daemon admission (event delivered: %s)", async (eventDelivered) => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     fullscreenProbe.fullscreen = true;
     const subscribers = new Set<(event: unknown) => void>();
@@ -2335,7 +2335,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps a daemon startup rejection visible and retries the restored draft", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     const failure = "Cannot start daemon session: protected directory chain permits untrusted mutation: /private/home. Fix the cause, run agenc daemon start in another shell, then press Enter to retry.";
     const session = {
@@ -2363,7 +2363,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("restores a rejected draft without resetting the cursor, also when a busy retry is refused", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     let activeTurn: { turnId: string } | null = null;
     const session = {
@@ -2394,7 +2394,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test.each(["second prompt", "/reviewer audit this", "$reviewer audit this"])("keeps the newer %s submission and its retry identity when an old response fails late", async secondInput => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     const first = Promise.withResolvers<void>();
     const second = Promise.withResolvers<void>();
@@ -2444,7 +2444,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("atomically rejects startup input batches with a visible notification", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const enqueueIdleInputBatch = vi.fn(() => {
       throw new Error(
         "Session mailbox is full; startup input was not submitted.",
@@ -2485,7 +2485,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("rolls back owned startup context when prompt submission rejects", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const enqueueIdleInputBatchOwned = vi.fn(() => ({
       token: "owned-startup",
       firstSequence: 1,
@@ -2528,7 +2528,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("rolls back owned startup context for a locally handled command", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     mockTuiCommandList.push({
       name: "help",
       type: "local",
@@ -2578,7 +2578,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
       "rollback failure",
       "commit failure",
     ])("settles %s", async (outcome) => {
-      const { AgenCTuiApp } = await import("./App.js");
+      const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
       resetShellSurfaceProbe();
       const input = `${prefix}reviewer audit this`;
       const events: string[] = [];
@@ -2744,7 +2744,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     test.each(["success", "failure"])(
       "preserves a newer draft across delayed load %s",
       async (outcome) => {
-        const { AgenCTuiApp } = await import("./App.js");
+        const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
         resetShellSurfaceProbe();
         const loaded = Promise.withResolvers<unknown[]>();
         const getPromptForCommand = vi.fn(() => loaded.promise);
@@ -2824,7 +2824,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("passes current transcript messages to dollar skill commands", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     const getPromptForCommand = vi.fn(
       async (_args: string, context: unknown) => {
@@ -2909,7 +2909,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps unknown dollar skills out of model submit", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     const session = {
       ...createSession(),
@@ -2941,7 +2941,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("shows spinner while a tool runs after buffered assistant text", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       getInitialTranscriptEvents: () => [
@@ -2993,7 +2993,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps spinner visible while assistant text is streaming", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       getInitialTranscriptEvents: () => [
@@ -3035,7 +3035,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps spinner visible while thinking and text coexist", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       getInitialTranscriptEvents: () => [
@@ -3082,7 +3082,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("uses tool-input spinner mode while provider tool input is streaming", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       getInitialTranscriptEvents: () => [
@@ -3138,7 +3138,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("pins the pending-submit spinner after a prior assistant turn", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     let resolveSubmit: () => void = () => {};
     const submitPromise = new Promise<void>((resolve) => {
       resolveSubmit = resolve;
@@ -3192,7 +3192,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps transcript command props stable while typing after a prior assistant turn", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       getInitialTranscriptEvents: () => [
@@ -3231,7 +3231,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("passes live MCP clients and tools through the App shell", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const failedClient = {
       name: "files",
       type: "failed",
@@ -3295,7 +3295,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("refreshes MCP clients and tools when same-metadata objects are replaced", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     // Real session notifications fan out to MCP, compaction and other views.
     // Keeping only the last subscriber makes unrelated new views hide updates.
     const sessionEventListeners = new Set<() => void>();
@@ -3389,7 +3389,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("uses daemon MCP status subscriptions without treating passive tools as executable", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const passiveTool = {
       serverName: "files",
       name: "mcp.files.search",
@@ -3515,7 +3515,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("mounts global keybindings against the live transcript state", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = createSession();
     providerProbe.globalKeybindingProps.length = 0;
     providerProbe.messageProps.length = 0;
@@ -3564,7 +3564,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("opens the message selector from PromptInput callbacks", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = createSession();
     providerProbe.messageProps.length = 0;
     providerProbe.messageSelectorProps.length = 0;
@@ -3620,7 +3620,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("installs compact progress controls and restores them on unmount", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = createSession() as AgenCBridgeSession & {
       setStreamMode?: (mode: "requesting" | "responding" | null) => void;
       setResponseLength?: (updater: (length: number) => number) => void;
@@ -3666,7 +3666,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("routes exit through worktree ExitFlow only for active worktree sessions", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = createSession();
     resetShellSurfaceProbe();
     mockWorktreeSession = { worktreePath: "/tmp/worktree" };
@@ -3726,8 +3726,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
       const {
         consumePendingResumeSessionId,
         resetPendingResumeSessionIdForTestingOnly,
-      } = await import("../pending-resume.js");
-      const { AgenCTuiApp } = await import("./App.js");
+      } = await import("../../../src/tui/pending-resume.js");
+      const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
       resetShellSurfaceProbe();
       resetPendingResumeSessionIdForTestingOnly();
       mockWorktreeSession = { worktreePath: "/tmp/worktree" };
@@ -3769,7 +3769,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   );
 
   test("renders and acknowledges the cost threshold dialog when billing access is available", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = createSession();
     resetShellSurfaceProbe();
     mockTotalCost = 5;
@@ -3799,7 +3799,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("marks the cost threshold as shown without rendering when billing access is unavailable", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     resetShellSurfaceProbe();
     mockTotalCost = 5;
     mockHasConsoleBillingAccess = false;
@@ -3819,7 +3819,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("wires MessageSelector code restore, conversation rewind, and partial summarize", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       clearDaemonSession: vi.fn(async () => {}),
@@ -3923,7 +3923,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("restores escaped bash transcript input as the original command text", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       rewindConversationToMessage: vi.fn(async () => ({
@@ -3971,7 +3971,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("blocks MessageSelector conversation actions while a turn is active", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = {
       ...createSession(),
       activeTurn: {
@@ -4030,7 +4030,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("renders first-run onboarding before the normal transcript when enabled", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-onboarding-app-"));
     const session = createSession({
       configStore: createAppConfigStore(defaultConfig(), agencHome),
@@ -4069,7 +4069,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("suppresses first-run onboarding in noninteractive renders", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-onboarding-app-"));
     const session = createSession({
       configStore: createAppConfigStore(defaultConfig(), agencHome),
@@ -4090,7 +4090,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test.each([false, true])("routes realtime composer commands before ordinary session submit (pasted=%s)", async (pasted) => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const realtime = createRealtimeControls();
     const submit = vi.fn(async () => {});
     const session = {
@@ -4136,10 +4136,10 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("rejects session-changing slash commands while the live session is busy", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const { getCommandQueueSnapshot, resetCommandQueueForTesting } =
-      await import("../../utils/messageQueueManager.js");
-    const dispatcher = await import("../../commands/dispatcher.js");
+      await import("../../../src/utils/messageQueueManager.js");
+    const dispatcher = await import("../../../src/commands/dispatcher.js");
     const dispatchSpy = vi.spyOn(dispatcher, "dispatchSlashCommand");
     const submit = vi.fn(async () => {});
     const session = {
@@ -4193,9 +4193,9 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     ["openai-logout", "openai-logout", "error"],
     ["openai-logout", "chatgpt-logout", "text"],
   ] as const)("keeps provider auth outcomes visible for %s via /%s (%s)", async (canonical, invocation, kind) => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const { xaiAuthCommands } = await import("../../commands/xai-auth.js");
-    const { openaiAuthCommands } = await import("../../commands/openai-auth.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const { xaiAuthCommands } = await import("../../../src/commands/xai-auth.js");
+    const { openaiAuthCommands } = await import("../../../src/commands/openai-auth.js");
     const command = [...xaiAuthCommands, ...openaiAuthCommands].find(
       (candidate) => candidate.name === canonical,
     )!;
@@ -4271,13 +4271,13 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     // memoized on that id: provisioning rebuilt the owner, its cleanup deleted
     // the prompt queued under the old one, and `/goal <objective>` on a cold
     // TUI set the goal but never started working.
-    const { AgenCTuiApp } = await import("./App.js");
-    const { goalCommand } = await import("../../commands/goal.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const { goalCommand } = await import("../../../src/commands/goal.js");
     const {
       getCommandQueueSnapshot,
       getSoleActiveCommandQueueOwnerForTesting,
       resetCommandQueueForTesting,
-    } = await import("../../utils/messageQueueManager.js");
+    } = await import("../../../src/utils/messageQueueManager.js");
     let conversationId = "agenc-tui-idle-4242";
     const execute = vi.spyOn(goalCommand, "execute").mockImplementation(async () => {
       conversationId = "conv-live-session";
@@ -4318,8 +4318,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     // A timed-out /grok-login is shown persistently (no 3s timer). The next
     // submission must clear it; before the fix the clear path returned early
     // when no timer was armed, so the error box outlived the whole session.
-    const { AgenCTuiApp } = await import("./App.js");
-    const { xaiAuthCommands } = await import("../../commands/xai-auth.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const { xaiAuthCommands } = await import("../../../src/commands/xai-auth.js");
     const command = xaiAuthCommands.find((candidate) => candidate.name === "grok-login")!;
     const execute = vi.spyOn(command, "execute").mockImplementation(async () => ({
       kind: "error",
@@ -4357,8 +4357,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps a compaction outcome visible until the next prompt", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const { compactCommand } = await import("../../commands/session-compact-commands.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const { compactCommand } = await import("../../../src/commands/session-compact-commands.js");
     const execute = vi.spyOn(compactCommand, "execute").mockImplementation(async () => ({
       kind: "error", message: "Compaction did not shrink. Compaction attempt ID: attempt-57",
     }));
@@ -4385,8 +4385,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps the canonical model menu open after a prior transient result expires", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const dispatcher = await import("../../commands/dispatcher.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const dispatcher = await import("../../../src/commands/dispatcher.js");
     function CanonicalModelMenuFixture(): React.ReactNode {
       return React.createElement("ink-text", null, "canonical model menu");
     }
@@ -4481,8 +4481,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("lets a local task modal own Escape instead of the turn cancel handler", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const dispatcher = await import("../../commands/dispatcher.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const dispatcher = await import("../../../src/commands/dispatcher.js");
     const spy = vi.spyOn(dispatcher, "dispatchSlashCommand").mockImplementationOnce(async (_parsed, ctx) => {
       ctx.appState?.setToolJSX?.({ isLocalJSXCommand: true, shouldHidePromptInput: true, jsx: React.createElement("ink-text", null, "task detail") });
       return { result: { kind: "skip" }, command: { name: "tasks" } } as never;
@@ -4496,8 +4496,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("hides the main composer while the /agents wizard owns input", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const dispatcher = await import("../../commands/dispatcher.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const dispatcher = await import("../../../src/commands/dispatcher.js");
     const dispatchSpy = vi
       .spyOn(dispatcher, "dispatchSlashCommand")
       .mockImplementation(async (_parsed, ctx) => {
@@ -4573,9 +4573,9 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("queues image-only submissions while the live session is busy", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const { getCommandQueueSnapshot, resetCommandQueueForTesting } =
-      await import("../../utils/messageQueueManager.js");
+      await import("../../../src/utils/messageQueueManager.js");
     const submit = vi.fn(async () => {});
     const session = {
       ...createSession(),
@@ -4648,8 +4648,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     { display: "Build these independent items:\n[Pasted text #2 +1 lines]\n[Pasted text #1]\nFinish with tests.", expected: "Build these independent items:\n1. a /health route\n2. a /version route\n3. documentation\nFinish with tests.", mode: "parallel" },
     { display: "[Pasted text #1] Do not delegate.", expected: "Build these independent items:\n1. a /health route\n2. a /version route\n3. documentation Do not delegate.", mode: "sequential" },
   ])("submits expanded paste text for routing while retaining compact history: $display", async ({ display, expected, mode }) => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const { routeSwarmTask } = await import("../../agents/swarm-routing.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const { routeSwarmTask } = await import("../../../src/agents/swarm-routing.js");
     const pastes = display.includes("#2") ? {
       1: { id: 1, type: "text", content: "3. documentation" },
       2: { id: 2, type: "text", content: "1. a /health route\n2. a /version route" },
@@ -4672,7 +4672,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("expands a pasted skill invocation and its arguments before command dispatch", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const getPromptForCommand = vi.fn(async () => [{ type: "text", text: "loaded skill" }]);
     mockTuiCommandList.push({ name: "reviewer", type: "prompt", loadedFrom: "skills", progressMessage: "Loading reviewer", contentLength: 1, getPromptForCommand });
     const session = { ...createSession(), submit: vi.fn(async () => {}), enqueueIdleInput: vi.fn(() => 1) };
@@ -4688,7 +4688,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("retries the expanded paste exactly once with images and restores the compact draft", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const submit = vi.fn(async (_value: string, _options?: unknown) => {
       if (submit.mock.calls.length === 1) throw new Error("response dropped");
     });
@@ -4720,8 +4720,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("expands only a queued item's captured pastes and preserves the current draft", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const { enqueue, getSoleActiveCommandQueueOwnerForTesting, resetCommandQueueForTesting } = await import("../../utils/messageQueueManager.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const { enqueue, getSoleActiveCommandQueueOwnerForTesting, resetCommandQueueForTesting } = await import("../../../src/utils/messageQueueManager.js");
     const submit = vi.fn(async () => {});
     const session = { ...createSession(), submit };
     resetCommandQueueForTesting();
@@ -4741,7 +4741,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("drops pasted attachments after a successful clear before the next model turn", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const session = { ...createSession(), clearDaemonSession: vi.fn(async () => {}) };
     const helpers = { clearBuffer: vi.fn(), resetHistory: vi.fn(), setCursorOffset: vi.fn() };
     await withRenderedApp(<AgenCTuiApp session={session} isInteractive={false} />, async () => {
@@ -4759,7 +4759,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("keeps suspected-paste confirmation in front of the daemon shell bridge", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const executeShellCommand = vi.fn();
     const emit = vi.fn();
     let nextId = 0;
@@ -4795,7 +4795,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test.each(["turn cancel", "card Escape"])("the first %s answers Stop here and dismisses the budget checkpoint", async (path) => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const cancelActiveTurn = vi.fn(async () => undefined);
     const session = { ...createSession(), activeTurn: { unsafePeek: () => ({ turnId: "budget-turn" }) }, cancelActiveTurn };
     await withRenderedApp(<AgenCTuiApp session={session as never} isInteractive={false} />, async () => {
@@ -4818,7 +4818,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("aborts an active bridged shell command on Escape without cancelling a model turn", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     let observedSignal: AbortSignal | undefined;
     const executeShellCommand = vi.fn(
       async ({ commandId, signal }: {
@@ -4881,7 +4881,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("does not cancel a model turn for direct-shell daemon tool activity", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const { createDaemonTuiSessionFixture } =
       await import("../../helpers/daemon-tui-session.js");
     const sessionEventListeners = new Set<
@@ -5008,14 +5008,14 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("drains queued bash commands without forwarding them to the model", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const {
       enqueue,
       getCommandQueueSnapshot,
       getSoleActiveCommandQueueOwnerForTesting,
       resetCommandQueueForTesting,
-    } = await import("../../utils/messageQueueManager.js");
-    const { getCwd } = await import("../../utils/cwd.js");
+    } = await import("../../../src/utils/messageQueueManager.js");
+    const { getCwd } = await import("../../../src/utils/cwd.js");
     const submit = vi.fn(async () => {});
     const emit = vi.fn();
     let id = 0;
@@ -5115,12 +5115,12 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("escapes queued bash transcript input and fallback stderr wrappers", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const {
       enqueue,
       getSoleActiveCommandQueueOwnerForTesting,
       resetCommandQueueForTesting,
-    } = await import("../../utils/messageQueueManager.js");
+    } = await import("../../../src/utils/messageQueueManager.js");
     const submit = vi.fn(async () => {});
     const emit = vi.fn();
     const session = {
@@ -5175,11 +5175,11 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("drains one queued prompt when an attached daemon turn completes", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const { createDaemonTuiSessionFixture } = await import("../../helpers/daemon-tui-session.js");
-    const { notificationFromDaemonEvent } = await import("../../app-server/background-agent-runner/daemon-events.js");
+    const { notificationFromDaemonEvent } = await import("../../../src/app-server/background-agent-runner/daemon-events.js");
     const { enqueue, getCommandQueueSnapshot, getSoleActiveCommandQueueOwnerForTesting, resetCommandQueueForTesting } =
-      await import("../../utils/messageQueueManager.js");
+      await import("../../../src/utils/messageQueueManager.js");
     const sessionId = "attached-queue-session";
     const agentId = "attached-queue-agent";
     const turnId = "attached-queue-turn";
@@ -5242,11 +5242,11 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
     ["approval denied", "turn_aborted", { reason: "approval_denied" }],
     ["compaction refused", "turn_failed", { code: "compact_failed", message: "cannot shrink" }],
   ] as const)("drains the next queued prompt after %s even when the previous stream RPC stays pending", async (_kind, terminalType, terminalPayload) => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const { createDaemonTuiSessionFixture } = await import("../../helpers/daemon-tui-session.js");
-    const { notificationFromDaemonEvent } = await import("../../app-server/background-agent-runner/daemon-events.js");
+    const { notificationFromDaemonEvent } = await import("../../../src/app-server/background-agent-runner/daemon-events.js");
     const { enqueue, getCommandQueueSnapshot, getSoleActiveCommandQueueOwnerForTesting, resetCommandQueueForTesting } =
-      await import("../../utils/messageQueueManager.js");
+      await import("../../../src/utils/messageQueueManager.js");
     const sessionId = "attached-queue-session";
     const agentId = "attached-queue-agent";
     const turnId = "attached-queue-turn";
@@ -5331,9 +5331,9 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("auto-drains only queued content and preserves the live composer draft and attachments", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const { enqueue, getSoleActiveCommandQueueOwnerForTesting, resetCommandQueueForTesting } =
-      await import("../../utils/messageQueueManager.js");
+      await import("../../../src/utils/messageQueueManager.js");
     const submit = vi.fn(async () => {});
     const admission = vi.fn(() => ({ token: "queued-admission" }));
     const session = { ...createSession(), submit, enqueueIdleInputBatchOwned: admission };
@@ -5356,9 +5356,9 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("queues slash command prompt results for next-turn drain", async () => {
-    const { enqueueSlashPromptResult } = await import("./App.js");
+    const { enqueueSlashPromptResult } = await import("../../../src/tui/components/App.js");
     const { getCommandQueueSnapshot, resetCommandQueueForTesting } =
-      await import("../../utils/messageQueueManager.js");
+      await import("../../../src/utils/messageQueueManager.js");
     const scheduleQueueDrain = vi.fn();
     resetCommandQueueForTesting();
 
@@ -5384,7 +5384,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("skips first-run onboarding after completion is persisted", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-onboarding-app-"));
     const session = createSession({
       configStore: createAppConfigStore(defaultConfig(), agencHome),
@@ -5412,7 +5412,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("lets /exit leave first-run onboarding immediately", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-onboarding-app-"));
     const session = createSession({
       configStore: createAppConfigStore(defaultConfig(), agencHome),
@@ -5449,8 +5449,8 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("routes non-onboarding slash commands while first-run onboarding is active", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
-    const dispatcher = await import("../../commands/dispatcher.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
+    const dispatcher = await import("../../../src/commands/dispatcher.js");
     const dispatchSpy = vi
       .spyOn(dispatcher, "dispatchSlashCommand")
       .mockResolvedValue({
@@ -5516,7 +5516,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("routes composer submissions through onboarding and stages provider switch on completion", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-onboarding-app-"));
     const session = {
       ...createSession({
@@ -5614,7 +5614,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   ])(
     "keeps the onboarding fallback from staging a model rejected by the $policyName managed policy",
     async ({ availableModels }) => {
-      const { AgenCTuiApp } = await import("./App.js");
+      const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
       const agencHome = mkdtempSync(join(tmpdir(), "agenc-onboarding-policy-"));
       const configStore = createAppConfigStore(
         { ...defaultConfig(), availableModels },
@@ -5689,7 +5689,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   );
 
   test("routes a checked BYOK key through the real first-run TUI submission path", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const savedKeys = new Map<string, string>();
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-onboarding-app-"));
     const session = {
@@ -5764,7 +5764,7 @@ describeWithVitestMocks("AgenCTuiApp render smoke", () => {
   });
 
   test("persists first-run BYOK provider selection for restarts", async () => {
-    const { AgenCTuiApp } = await import("./App.js");
+    const { AgenCTuiApp } = await import("../../../src/tui/components/App.js");
     const savedKeys = new Map<string, string>();
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-onboarding-persist-"));
     const session = {

@@ -2,12 +2,12 @@ import React from "react";
 import figures from "figures";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { DiagnosticsDisplay } from "./DiagnosticsDisplay.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { DiagnosticsDisplay } from "../../../src/tui/components/DiagnosticsDisplay.js";
 
 const previousGlyphMode = process.env.AGENC_TUI_GLYPHS;
 
-vi.mock("../../utils/cwd.js", () => ({
+vi.mock("../../../src/utils/cwd.js", () => ({
   getCwd: () => "/repo",
 }));
 

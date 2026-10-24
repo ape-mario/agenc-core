@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { CompactBoundaryMessage } from './CompactBoundaryMessage.js'
-import { CompactSummary } from './CompactSummary.js'
+import { CompactBoundaryMessage } from '../../../../src/tui/components/compact/CompactBoundaryMessage.js'
+import { CompactSummary } from '../../../../src/tui/components/compact/CompactSummary.js'
 
 vi.mock('react-compiler-runtime', () => ({
   c: (size: number) =>
@@ -11,7 +11,7 @@ vi.mock('react-compiler-runtime', () => ({
     ),
 }))
 
-vi.mock('../../ink.js', async () => {
+vi.mock('../../../../src/tui/ink.js', async () => {
   const ReactModule = await import('react')
   const Passthrough = ({
     children,
@@ -24,7 +24,7 @@ vi.mock('../../ink.js', async () => {
   }
 })
 
-vi.mock('../ConfigurableShortcutHint', () => ({
+vi.mock('../../../../src/tui/components/ConfigurableShortcutHint.js', () => ({
   ConfigurableShortcutHint: ({
     description,
   }: {
@@ -32,17 +32,17 @@ vi.mock('../ConfigurableShortcutHint', () => ({
   }) => <>{description}</>,
 }))
 
-vi.mock('../MessageResponse', () => ({
+vi.mock('../../../../src/tui/components/MessageResponse.js', () => ({
   MessageResponse: ({ children }: { children?: React.ReactNode }) => (
     <>{children}</>
   ),
 }))
 
-vi.mock('../../keybindings/useShortcutDisplay.js', () => ({
+vi.mock('../../../../src/tui/keybindings/useShortcutDisplay.js', () => ({
   useShortcutDisplay: () => 'ctrl+o',
 }))
 
-vi.mock('../../../utils/messages.js', () => ({
+vi.mock('../../../../src/utils/messages.js', () => ({
   getUserMessageText: (message: {
     readonly text?: string
     readonly message?: {

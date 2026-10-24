@@ -33,7 +33,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("../../services/lsp/fileNotifications.js", () => ({
+vi.mock("../../../src/services/lsp/fileNotifications.js", () => ({
   notifyLspFileChanged: vi.fn(),
   collectEditFeedback: vi.fn(async () => ""),
 }));
@@ -44,7 +44,7 @@ import {
   FILE_EDIT_TOOL_NAME,
   FILE_MULTI_EDIT_TOOL_NAME,
   findActualString,
-} from "./file-edit.js";
+} from "../../../src/tools/system/file-edit.js";
 import {
   clearSessionReadState,
   getSessionReadSnapshot,
@@ -53,18 +53,18 @@ import {
   SESSION_ID_ARG,
   SESSION_ID_SIG_ARG,
   signSessionId,
-} from "./filesystem.js";
+} from "../../../src/tools/system/filesystem.js";
 import {
   collectEditFeedback,
   notifyLspFileChanged,
-} from "../../services/lsp/fileNotifications.js";
-import { ConfigStore } from "../../config/store.js";
+} from "../../../src/services/lsp/fileNotifications.js";
+import { ConfigStore } from "../../../src/config/store.js";
 import {
   clearAllPlanSlugs,
   getPlanFilePath,
   setPlanSlug,
-} from "../../planning/plan-files.js";
-import { runWithCanonicalSettingsAuthority } from "../../utils/settings/canonicalAuthority.js";
+} from "../../../src/planning/plan-files.js";
+import { runWithCanonicalSettingsAuthority } from "../../../src/utils/settings/canonicalAuthority.js";
 
 const SESSION_ID = "edit-tool-test-session";
 

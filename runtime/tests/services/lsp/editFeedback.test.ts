@@ -6,11 +6,11 @@ import {
   registerPendingLSPDiagnostic,
   resetAllLSPDiagnosticState,
   waitForFileDiagnostics,
-} from "./LSPDiagnosticRegistry.js";
+} from "../../../src/services/lsp/LSPDiagnosticRegistry.js";
 import {
   editFeedbackTimeoutMs,
   formatEditFeedback,
-} from "./fileNotifications.js";
+} from "../../../src/services/lsp/fileNotifications.js";
 
 describe("same-turn edit feedback", () => {
   afterEach(() => {

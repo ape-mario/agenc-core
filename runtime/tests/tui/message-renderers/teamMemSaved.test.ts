@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { teamMemSavedPart } from './teamMemSaved.js'
+import { teamMemSavedPart } from '../../../src/tui/message-renderers/teamMemSaved.js'
 
 describe('teamMemSavedPart', () => {
   test('returns null when no team memory count is present', () => {

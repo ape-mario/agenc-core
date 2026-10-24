@@ -9,8 +9,8 @@ import {
   KNOWN_EVENT_TYPES,
   ROLLOUT_SCHEMA_VERSION,
   usageToTokenCountEvent,
-} from "./event-log.js";
-import type { EventMsg } from "./event-log.js";
+} from "../../src/session/event-log.js";
+import type { EventMsg } from "../../src/session/event-log.js";
 
 describe("EventLog", () => {
   test("emit assigns monotonic seq (I-27)", () => {

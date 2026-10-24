@@ -2,16 +2,16 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { trustProjectSync } from "../permissions/trust/project-trust.js";
+import { trustProjectSync } from "../../src/permissions/trust/project-trust.js";
 
 const daemonMocks = vi.hoisted(() => ({
   ensureAgenCDaemonAutostart: vi.fn(),
   resolveAgenCDaemonAutostartEnabled: vi.fn(),
 }));
 
-vi.mock("../app-server/daemon-autostart.js", async (importOriginal) => {
+vi.mock("../../src/app-server/daemon-autostart.js", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../app-server/daemon-autostart.js")>();
+    await importOriginal<typeof import("../../src/app-server/daemon-autostart.js")>();
   return {
     ...actual,
     ensureAgenCDaemonAutostart: daemonMocks.ensureAgenCDaemonAutostart,
@@ -81,7 +81,7 @@ async function withMain(args: readonly string[]): Promise<{
   });
 
   try {
-    const { main } = await import("./agenc-main.js");
+    const { main } = await import("../../src/bin/agenc-main.js");
     return {
       code: await main(),
       stderr: stderrChunks.join(""),

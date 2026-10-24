@@ -15,14 +15,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 
-import { runWithCwdOverride } from '../../../utils/cwd.js'
+import { runWithCwdOverride } from '../../../../src/utils/cwd.js'
 import {
   __setAgentFileOperationHookForTesting,
   deleteAgentFromFile,
   saveAgentToFile,
   updateAgentFile,
-} from './agentFileUtils.js'
-import { createAgentRoleWorkspace } from '../../../agents/role.js'
+} from '../../../../src/tui/components/agents/agentFileUtils.js'
+import { createAgentRoleWorkspace } from '../../../../src/agents/role.js'
 
 describe('agent file creation', () => {
   test('writes generated project agents to .agenc/agents', async () => {

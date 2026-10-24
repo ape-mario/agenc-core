@@ -16,7 +16,7 @@ import {
   setPlanSlug,
   writePlan,
   writePlanSync,
-} from "./plan-files.js";
+} from "../../src/planning/plan-files.js";
 
 describe("isSessionPlanFile", () => {
   let agencHome: string;

@@ -4,10 +4,10 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, expect, test } from "vitest";
 
-import { recordShellReads } from "./exec-command.js";
-import { createFileEditTool } from "./file-edit.js";
-import { getSessionReadSnapshot, SESSION_ID_ARG } from "./filesystem.js";
-import type { ExecCommandToolOutput } from "../../unified-exec/types.js";
+import { recordShellReads } from "../../../src/tools/system/exec-command.js";
+import { createFileEditTool } from "../../../src/tools/system/file-edit.js";
+import { getSessionReadSnapshot, SESSION_ID_ARG } from "../../../src/tools/system/filesystem.js";
+import type { ExecCommandToolOutput } from "../../../src/unified-exec/types.js";
 
 let root: string;
 let session: string;
@@ -148,7 +148,7 @@ test("a chain with any step outside the allowlist records nothing", async () => 
 });
 
 test("inherited shell startup hooks turn the shell read proof off", async () => {
-  const { UnifiedExecProcessManager } = await import("../../unified-exec/process-manager.js");
+  const { UnifiedExecProcessManager } = await import("../../../src/unified-exec/process-manager.js");
   for (const [name, value] of [["BASH_ENV", "/tmp/hook.sh"], ["BASH_FUNC_cat%%", "() { echo x; }"], ["SHELLOPTS", "errexit"], ["ENV", "/tmp/e"]]) {
     const hooked = new UnifiedExecProcessManager({ baseEnv: { PATH: "/usr/bin:/bin", [name!]: value! } } as never);
     expect(hooked.shellStartupHooksPresent(), name).toBe(true);

@@ -5,18 +5,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getProjectRoot,
   setProjectRoot,
-} from "../bootstrap/state.js";
-import { ConfigStore } from "../config/store.js";
+} from "../../src/bootstrap/state.js";
+import { ConfigStore } from "../../src/config/store.js";
 import {
   enterCanonicalSettingsAuthority,
   resetCanonicalSettingsAuthorityForTesting,
   runWithCanonicalSettingsAuthority,
-} from "../utils/settings/canonicalAuthority.js";
+} from "../../src/utils/settings/canonicalAuthority.js";
 import {
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,
-} from "../session/runtime-options.js";
-import { projectStorageKey } from "../utils/project-storage-key.js";
+} from "../../src/session/runtime-options.js";
+import { projectStorageKey } from "../../src/utils/project-storage-key.js";
 import {
   buildProjectMemoryDirectory,
   getAutoMemEntrypoint,
@@ -33,8 +33,8 @@ import {
   isDurableMemoryPath,
   isGlobalMemoryPath,
   isProjectMemoryPath,
-} from "./paths.js";
-import { checkEditableInternalPath } from "../utils/permissions/filesystem.js";
+} from "../../src/memory/paths.js";
+import { checkEditableInternalPath } from "../../src/utils/permissions/filesystem.js";
 
 let tempRoot = "";
 let oldProjectRoot = "";

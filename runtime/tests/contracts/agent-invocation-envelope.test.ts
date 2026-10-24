@@ -8,7 +8,7 @@ import {
   materializeAgentInvocationMessages,
   validateAgentInvocationMessageSequence,
   type AgentInvocationEnvelope,
-} from "./agent-invocation-envelope.js";
+} from "../../src/contracts/agent-invocation-envelope.js";
 import {
   llmMessageToResponseItem,
   llmMessageToReplacementResponseItem,

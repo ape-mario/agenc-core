@@ -12,9 +12,9 @@ import {
   forEachSessionRead,
   getSessionReadSnapshot,
   recordSessionRead,
-} from "../../tools/system/filesystem.js";
-import { changedFilesProducer } from "./changed-files.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+} from "../../../src/tools/system/filesystem.js";
+import { changedFilesProducer } from "../../../src/prompts/attachments/changed-files.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 
 let tmpDir: string;
 let sessionId: string;

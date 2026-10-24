@@ -10,8 +10,8 @@ import {
   getSystemMessageContentWidth,
   isWorkbenchChromeBookkeepingMessage,
   shouldRenderStopHookSummary,
-} from './SystemTextMessage.js'
-import { HOOK_TIMING_DISPLAY_THRESHOLD_MS } from '../../tools/hooks.js'
+} from '../../../src/tui/message-renderers/SystemTextMessage.js'
+import { HOOK_TIMING_DISPLAY_THRESHOLD_MS } from '../../../src/tools/hooks.js'
 
 function stopHookSummary(overrides = {}) {
   return {

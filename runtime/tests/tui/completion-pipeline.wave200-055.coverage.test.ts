@@ -8,7 +8,7 @@ import {
   readCompletionPipelineState,
   reduceCompletionPipelineEvents,
   type CompletionPipelineEvent,
-} from "./completion-pipeline.js";
+} from "../../src/tui/completion-pipeline.js";
 
 function pipelineEvent(
   sequence: number,

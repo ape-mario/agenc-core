@@ -6,8 +6,8 @@ import {
   AgenCWebSocketServer as PublicAgenCWebSocketServer,
   encodeJsonPayload as publicEncodeJsonPayload,
   parseJsonObjectPayload as publicParseJsonObjectPayload,
-} from "../index.js";
-import { JSON_RPC_VERSION } from "./protocol/index.js";
+} from "../../src/index.js";
+import { JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
 import { holdAgentLifecycleLock } from "./held-agent-lifecycle-lock.js";
 import { assertAliasControlDispatch, blockedControlHandler } from "./transport-contract-helpers.js";
 import {
@@ -15,7 +15,7 @@ import {
   type AgenCWebSocketMessageContext,
   encodeJsonPayload,
   parseJsonObjectPayload,
-} from "./transport/websocket.js";
+} from "../../src/app-server/transport/websocket.js";
 
 function nextMessage(socket: WebSocket): Promise<string> {
   return new Promise((resolve) => {

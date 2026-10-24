@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getDialogBodyMaxHeight } from './Dialog.js'
+import { getDialogBodyMaxHeight } from '../../../../src/tui/components/design-system/Dialog.js'
 
 describe('getDialogBodyMaxHeight', () => {
   it('keeps at least one row for the body on tiny or invalid terminals', () => {

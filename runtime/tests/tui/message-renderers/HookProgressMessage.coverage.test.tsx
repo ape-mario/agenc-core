@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import type { MessageLookups } from '../../utils/messages.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { HookProgressMessage } from './HookProgressMessage.js'
+import type { MessageLookups } from '../../../src/utils/messages.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { HookProgressMessage } from '../../../src/tui/message-renderers/HookProgressMessage.js'
 
 type HookCounts = ReadonlyArray<readonly [string, Readonly<Record<string, number>>]>
 

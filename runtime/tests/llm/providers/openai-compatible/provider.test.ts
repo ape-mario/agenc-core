@@ -1,10 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { OpenAICompatibleProvider } from "./index.js";
+import { OpenAICompatibleProvider } from "../../../../src/llm/providers/openai-compatible/index.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
-} from "../../registry/provider-info.js";
+} from "../../../../src/llm/registry/provider-info.js";
 
 describe("OpenAICompatibleProvider", () => {
   test("uses chat completions with no authorization by default", async () => {

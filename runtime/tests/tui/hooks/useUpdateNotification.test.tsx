@@ -1,13 +1,13 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import Text from '../ink/components/Text.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import Text from '../../../src/tui/ink/components/Text.js'
 import {
   getSemverPart,
   shouldShowUpdateNotification,
   useUpdateNotification,
-} from './useUpdateNotification.js'
+} from '../../../src/tui/hooks/useUpdateNotification.js'
 
 function UpdateNotificationProbe({
   initialVersion,

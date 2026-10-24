@@ -3,14 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { BackgroundTaskLifecycle } from "../../tasks/index.js";
-import { resolveTimeoutMs } from "../execution.js";
-import type { Tool, ToolResult } from "../types.js";
+import { BackgroundTaskLifecycle } from "../../../src/tasks/index.js";
+import { resolveTimeoutMs } from "../../../src/tools/execution.js";
+import type { Tool, ToolResult } from "../../../src/tools/types.js";
 import {
   createBackgroundTaskTools,
   createTaskBoardTools,
   createTaskTools,
-} from "./index.js";
+} from "../../../src/tools/tasks/index.js";
 
 function byName(tools: readonly Tool[]): Map<string, Tool> {
   return new Map(tools.map((tool) => [tool.name, tool]));

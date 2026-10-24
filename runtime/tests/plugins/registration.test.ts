@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { describe, expect, test, vi } from "vitest";
-import type { SecureStorageData } from "../utils/secureStorage/index.js";
+import type { SecureStorageData } from "../../src/utils/secureStorage/index.js";
 
 const secureStorageRecords = vi.hoisted(
   () => new Map<string, SecureStorageData>(),
 );
 
-vi.mock("../utils/secureStorage/native.js", async importOriginal => {
+vi.mock("../../src/utils/secureStorage/native.js", async importOriginal => {
   const actual =
-    await importOriginal<typeof import("../utils/secureStorage/native.js")>();
+    await importOriginal<typeof import("../../src/utils/secureStorage/native.js")>();
   return {
     ...actual,
     readNativeSecureStorage: (home: { path: string }) =>
@@ -49,53 +49,53 @@ vi.mock("../utils/secureStorage/native.js", async importOriginal => {
 });
 
 import { sourcePath } from "../helpers/source-path.ts";
-import { findCommand, type Command } from "../commands.js";
-import { MCPManager } from "../mcp-client/manager.js";
-import { mcpServerNameValidationIssue } from "../mcp-client/server-name.js";
+import { findCommand, type Command } from "../../src/commands.js";
+import { MCPManager } from "../../src/mcp-client/manager.js";
+import { mcpServerNameValidationIssue } from "../../src/mcp-client/server-name.js";
 import {
   createPluginStorageAuthority,
   pluginDataDirPath,
-} from "./directories.js";
-import { loadPlugins, type PluginLoadIssue } from "./loader.js";
-import { canonicalPluginRuntimeNamespace } from "./identifier-normalization.js";
-import { substitutePluginTemplate } from "./registration/common.js";
+} from "../../src/plugins/directories.js";
+import { loadPlugins, type PluginLoadIssue } from "../../src/plugins/loader.js";
+import { canonicalPluginRuntimeNamespace } from "../../src/plugins/identifier-normalization.js";
+import { substitutePluginTemplate } from "../../src/plugins/registration/common.js";
 import {
   loadPluginAgents,
   setActivePluginAgentSnapshot,
-} from "./registration/load-plugin-agents.js";
+} from "../../src/plugins/registration/load-plugin-agents.js";
 import {
   loadPluginCommands,
   loadPluginSkills,
   setActivePluginCommandSnapshot,
   setActivePluginSkillSnapshot,
-} from "./registration/load-plugin-commands.js";
-import { loadPluginHooks } from "./registration/load-plugin-hooks.js";
-import { loadPluginLspServers } from "./registration/lsp-plugin-integration.js";
-import { getUnconfiguredChannels, loadPluginMcpServerRegistrations, loadPluginMcpServers } from "./registration/mcp-plugin-integration.js";
+} from "../../src/plugins/registration/load-plugin-commands.js";
+import { loadPluginHooks } from "../../src/plugins/registration/load-plugin-hooks.js";
+import { loadPluginLspServers } from "../../src/plugins/registration/lsp-plugin-integration.js";
+import { getUnconfiguredChannels, loadPluginMcpServerRegistrations, loadPluginMcpServers } from "../../src/plugins/registration/mcp-plugin-integration.js";
 import {
   clearPluginRegistrationCaches,
   refreshActivePlugins,
   refreshPluginRegistrations,
-} from "./registration/manager.js";
-import { loadPluginOutputStyles } from "./registration/load-plugin-output-styles.js";
-import type { SlashCommandContext } from "../commands/types.js";
+} from "../../src/plugins/registration/manager.js";
+import { loadPluginOutputStyles } from "../../src/plugins/registration/load-plugin-output-styles.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 import {
   clearAgentDefinitionsCache,
   getAgentDefinitionsWithOverrides,
   type PluginAgentDefinition,
-} from "../tools/AgentTool/loadAgentsDir.js";
-import { FILE_EDIT_TOOL_NAME } from "../tools/system/file-edit.js";
-import { FILE_READ_TOOL_NAME } from "../tools/system/file-read.js";
-import { FILE_WRITE_TOOL_NAME } from "../tools/system/file-write.js";
-import { createAgentRoleWorkspace } from "../agents/role.js";
+} from "../../src/tools/AgentTool/loadAgentsDir.js";
+import { FILE_EDIT_TOOL_NAME } from "../../src/tools/system/file-edit.js";
+import { FILE_READ_TOOL_NAME } from "../../src/tools/system/file-read.js";
+import { FILE_WRITE_TOOL_NAME } from "../../src/tools/system/file-write.js";
+import { createAgentRoleWorkspace } from "../../src/agents/role.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
 import {
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,
-} from "../session/runtime-options.js";
-import { ConfigStore } from "../config/store.js";
-import { PlaintextPluginSecretError } from "../utils/plugins/pluginConfigAuthority.js";
-import { runWithCanonicalSettingsAuthority } from "../utils/settings/canonicalAuthority.js";
+} from "../../src/session/runtime-options.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { PlaintextPluginSecretError } from "../../src/utils/plugins/pluginConfigAuthority.js";
+import { runWithCanonicalSettingsAuthority } from "../../src/utils/settings/canonicalAuthority.js";
 
 const PLUGIN_MCP_ENV_SERVER_FIXTURE = sourcePath(
   "plugins/test-fixtures/plugin-mcp-env-server.cjs",
@@ -1936,19 +1936,19 @@ describe("plugin registration", () => {
       disabled: [],
       errors: [],
     }));
-    vi.doMock("./loader.js", async () => {
-      const actual = await vi.importActual<typeof import("./loader.js")>("./loader.js");
+    vi.doMock("../../src/plugins/loader.js", async () => {
+      const actual = await vi.importActual<typeof import("../../src/plugins/loader.js")>("../../src/plugins/loader.js");
       return {
         ...actual,
         loadPlugins: loadPluginsMock,
       };
     });
     try {
-      const commandsModule = await import("./registration/load-plugin-commands.js");
-      const commonModule = await import("./registration/common.js");
-      const { ConfigStore: IsolatedConfigStore } = await import("../config/store.js");
+      const commandsModule = await import("../../src/plugins/registration/load-plugin-commands.js");
+      const commonModule = await import("../../src/plugins/registration/common.js");
+      const { ConfigStore: IsolatedConfigStore } = await import("../../src/config/store.js");
       const { runWithCanonicalSettingsAuthority: withAuthority } = await import(
-        "../utils/settings/canonicalAuthority.js"
+        "../../src/utils/settings/canonicalAuthority.js"
       );
       commonModule.clearRuntimePluginLoadCache();
       const authority = new IsolatedConfigStore({
@@ -2007,7 +2007,7 @@ describe("plugin registration", () => {
       );
       expect(loadPluginsMock).toHaveBeenCalledTimes(2);
     } finally {
-      vi.doUnmock("./loader.js");
+      vi.doUnmock("../../src/plugins/loader.js");
       vi.resetModules();
     }
   });
@@ -2025,15 +2025,15 @@ describe("plugin registration", () => {
       disabled: [],
       errors: [issue],
     }));
-    vi.doMock("./loader.js", async () => {
+    vi.doMock("../../src/plugins/loader.js", async () => {
       const actual =
-        await vi.importActual<typeof import("./loader.js")>("./loader.js");
+        await vi.importActual<typeof import("../../src/plugins/loader.js")>("../../src/plugins/loader.js");
       return { ...actual, loadPlugins: loadPluginsMock };
     });
     try {
-      const commonModule = await import("./registration/common.js");
+      const commonModule = await import("../../src/plugins/registration/common.js");
       const mcpModule =
-        await import("./registration/mcp-plugin-integration.js");
+        await import("../../src/plugins/registration/mcp-plugin-integration.js");
       commonModule.clearRuntimePluginLoadCache();
       const errors: PluginLoadIssue[] = [];
 
@@ -2048,7 +2048,7 @@ describe("plugin registration", () => {
       expect(loadPluginsMock).toHaveBeenCalledOnce();
       expect(errors).toEqual([issue]);
     } finally {
-      vi.doUnmock("./loader.js");
+      vi.doUnmock("../../src/plugins/loader.js");
       vi.resetModules();
     }
   });

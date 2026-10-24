@@ -5,7 +5,7 @@ import {
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { beforeEach, describe, expect, it } from "vitest";
-import { AgentRegistry } from "./registry.js";
+import { AgentRegistry } from "../../src/agents/registry.js";
 import {
   _resetAgentRolesForTesting,
   agentRoleFingerprint,
@@ -24,7 +24,7 @@ import {
   requireAgentRole,
   resolveAgentRole,
   tryResolveRoleConfig,
-} from "./role.js";
+} from "../../src/agents/role.js";
 
 let registry: AgentRegistry;
 const DEFAULT_WORKSPACE = createAgentRoleWorkspace(process.cwd());

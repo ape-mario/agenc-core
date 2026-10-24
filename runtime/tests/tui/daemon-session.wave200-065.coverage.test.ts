@@ -3,13 +3,13 @@ import { describe, expect, test, vi } from "vitest";
 import {
   type AgenCDaemonTuiClient,
   type AgenCTuiBridgeSession,
-} from "./daemon-session.js";
+} from "../../src/tui/daemon-session.js";
 import { createDaemonTuiSessionFixture as createDaemonTuiSession } from "../helpers/daemon-tui-session.js";
 import type {
   AgenCDaemonMethod,
   AgenCDaemonResultByMethod,
   JsonObject,
-} from "../app-server/protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 function createBaseSession(): AgenCTuiBridgeSession {
   return {

@@ -92,32 +92,32 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../context/overlayContext.js', () => ({
+vi.mock('../../../src/tui/context/overlayContext.js', () => ({
   useRegisterOverlay: harness.registerOverlay,
 }))
 
-vi.mock('./history.js', () => ({
+vi.mock('../../../src/tui/history/history.js', () => ({
   getTimestampedHistory: harness.getTimestampedHistory,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => harness.terminal,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-vi.mock('../components/design-system/FuzzyPicker.js', () => ({
+vi.mock('../../../src/tui/components/design-system/FuzzyPicker.js', () => ({
   FuzzyPicker: (props: CapturedPickerProps) => {
     harness.pickerProps = props
     return null
   },
 }))
 
-import { createRoot } from '../ink/root.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { HistorySearchDialog } from './HistorySearchDialog.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { HistorySearchDialog } from '../../../src/tui/history/HistorySearchDialog.js'
 
 function deferred<T = void>(): Deferred<T> {
   let resolve!: (value: T) => void

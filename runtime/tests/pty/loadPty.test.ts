@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { loadPty, loadPtyFrom } from "./loadPty.js";
+import { loadPty, loadPtyFrom } from "../../src/pty/loadPty.js";
 
 describe("loadPty", () => {
   test("loads the required node-pty module", () => {

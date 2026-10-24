@@ -3,10 +3,10 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import type { DOMElement, DOMNode } from '../ink/dom.js'
-import instances from '../ink/instances.js'
-import { createRoot } from '../ink/root.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import type { DOMElement, DOMNode } from '../../../src/tui/ink/dom.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 
 const appStateMock = vi.hoisted(() => ({
   state: {
@@ -26,17 +26,17 @@ const teammateViewMock = vi.hoisted(() => ({
   exitTeammateView: vi.fn(),
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof appStateMock.state) => unknown) =>
     selector(appStateMock.state),
   useSetAppState: () => appStateMock.setAppState,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => terminalSizeMock.size,
 }))
 
-vi.mock('../state/teammateViewHelpers.js', () => teammateViewMock)
+vi.mock('../../../src/tui/state/teammateViewHelpers.js', () => teammateViewMock)
 
 type TestStdin = PassThrough & {
   isTTY: boolean
@@ -178,7 +178,7 @@ describe('BackgroundTaskStatus coverage swarm row 028', () => {
 
   test('renders nothing when no visible footer task remains', async () => {
     const { BackgroundTaskStatus } = await import(
-      '../components/tasks/BackgroundTaskStatus.js'
+      '../../../src/tui/components/tasks/BackgroundTaskStatus.js'
     )
 
     expect(
@@ -219,7 +219,7 @@ describe('BackgroundTaskStatus coverage swarm row 028', () => {
     }
 
     const { BackgroundTaskStatus } = await import(
-      '../components/tasks/BackgroundTaskStatus.js'
+      '../../../src/tui/components/tasks/BackgroundTaskStatus.js'
     )
     const output = await renderToString(
       <BackgroundTaskStatus tasksSelected={true} />,
@@ -249,7 +249,7 @@ describe('BackgroundTaskStatus coverage swarm row 028', () => {
     }
 
     const { BackgroundTaskStatus } = await import(
-      '../components/tasks/BackgroundTaskStatus.js'
+      '../../../src/tui/components/tasks/BackgroundTaskStatus.js'
     )
     const { stdin, stdout } = createStreams()
     const root = await createRoot({
@@ -314,7 +314,7 @@ describe('BackgroundTaskStatus coverage swarm row 028', () => {
     }
     const onOpenDialog = vi.fn()
     const { BackgroundTaskStatus } = await import(
-      '../components/tasks/BackgroundTaskStatus.js'
+      '../../../src/tui/components/tasks/BackgroundTaskStatus.js'
     )
     const { stdin, stdout } = createStreams()
     const root = await createRoot({

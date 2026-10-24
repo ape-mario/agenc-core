@@ -11,9 +11,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 import vm from 'node:vm'
 
-import { Box } from '../../ink.js'
-import ThemedBox from '../design-system/ThemedBox.js'
-import ThemedText from '../design-system/ThemedText.js'
+import { Box } from '../../../../src/tui/ink.js'
+import ThemedBox from '../../../../src/tui/components/design-system/ThemedBox.js'
+import ThemedText from '../../../../src/tui/components/design-system/ThemedText.js'
 import {
   AGENC_LOGO_MARK_LINES,
   ApprovalCard,
@@ -31,14 +31,14 @@ import {
   TerminalFrame,
   Tool,
   WelcomeColdPanel,
-} from './primitives.js'
+} from '../../../../src/tui/components/v2/primitives.js'
 import {
   type BrowserMarkerFixtureEntry,
   BROWSER_MARKER_FIXTURE,
-} from './designBrowserMarkerFixture.js'
-import { BROWSER_TEXT_FIXTURE } from './designBrowserTextFixture.js'
-import { renderToAnsiString, renderToString } from '../../../utils/staticRender.js'
-import { AppStateProvider, getDefaultAppState } from '../../state/AppState.js'
+} from '../../../../src/tui/components/v2/designBrowserMarkerFixture.js'
+import { BROWSER_TEXT_FIXTURE } from '../../../../src/tui/components/v2/designBrowserTextFixture.js'
+import { renderToAnsiString, renderToString } from '../../../../src/utils/staticRender.js'
+import { AppStateProvider, getDefaultAppState } from '../../../../src/tui/state/AppState.js'
 
 let activeBrowserTextFixture: Record<string, readonly BrowserMarkerFixtureEntry[]> | undefined
 

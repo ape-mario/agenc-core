@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
-import type { AppState } from "./AppState.js";
+import type { AppState } from "../../../src/tui/state/AppState.js";
 import {
   enterTeammateView,
   stopOrDismissAgent,
-} from "./teammateViewHelpers.js";
+} from "../../../src/tui/state/teammateViewHelpers.js";
 
 function makeState(overrides: Partial<AppState> = {}): AppState {
   return {

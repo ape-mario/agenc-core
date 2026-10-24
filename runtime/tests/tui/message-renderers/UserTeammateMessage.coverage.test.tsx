@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { TEAMMATE_MESSAGE_TAG } from '../../constants/xml.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { UserTeammateMessage } from './UserTeammateMessage.js'
+import { TEAMMATE_MESSAGE_TAG } from '../../../src/constants/xml.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { UserTeammateMessage } from '../../../src/tui/message-renderers/UserTeammateMessage.js'
 
 function teammateMessage({
   teammateId,

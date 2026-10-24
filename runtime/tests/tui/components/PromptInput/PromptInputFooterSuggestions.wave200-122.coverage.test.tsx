@@ -1,10 +1,10 @@
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 import {
   PromptInputFooterSuggestions,
   type SuggestionItem,
-} from './PromptInputFooterSuggestions.js'
+} from '../../../../src/tui/components/PromptInput/PromptInputFooterSuggestions.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,

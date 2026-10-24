@@ -14,13 +14,13 @@ import {
   setTextStyles,
   type DOMElement,
   type TextNode,
-} from './dom.ts'
+} from '../../../src/tui/ink/dom.js'
 import {
   consumeAbsoluteRemovedFlag,
   nodeCache,
   pendingClears,
-} from './node-cache.ts'
-import applyStyles, { type Styles } from './styles.ts'
+} from '../../../src/tui/ink/node-cache.js'
+import applyStyles, { type Styles } from '../../../src/tui/ink/styles.js'
 
 function applyNodeStyle(node: DOMElement, style: Styles): void {
   setStyle(node, style)

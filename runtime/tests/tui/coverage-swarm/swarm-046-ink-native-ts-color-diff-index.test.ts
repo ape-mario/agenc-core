@@ -2,7 +2,7 @@ import Module from 'node:module'
 import stripAnsi from 'strip-ansi'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-type ColorDiffModule = typeof import('../ink/native-ts/color-diff/index.js')
+type ColorDiffModule = typeof import('../../../src/tui/ink/native-ts/color-diff/index.js')
 
 const originalColorTerm = process.env.COLORTERM
 const moduleWithLoad = Module as typeof Module & {
@@ -19,7 +19,7 @@ function restoreColorTerm(): void {
 }
 
 async function loadColorDiff(): Promise<ColorDiffModule> {
-  return await import('../ink/native-ts/color-diff/index.js')
+  return await import('../../../src/tui/ink/native-ts/color-diff/index.js')
 }
 
 function mockHighlightJs(api: {
@@ -38,7 +38,7 @@ describe('color-diff row 046 coverage', () => {
   afterEach(() => {
     restoreColorTerm()
     moduleWithLoad._load = originalModuleLoad
-    vi.doUnmock('../../utils/log.js')
+    vi.doUnmock('../../../src/utils/log.js')
     vi.resetModules()
     vi.clearAllMocks()
   })
@@ -107,7 +107,7 @@ describe('color-diff row 046 coverage', () => {
     vi.resetModules()
 
     const logError = vi.fn()
-    vi.doMock('../../utils/log.js', () => ({ logError }))
+    vi.doMock('../../../src/utils/log.js', () => ({ logError }))
 
     const getLanguage = vi.fn(() => ({}))
     const highlight = vi.fn(() => ({ emitter: { children: [] } }))

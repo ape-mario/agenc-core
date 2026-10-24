@@ -3,7 +3,7 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from '../remoteAuthSessionContext.fixture.js'
-import { defaultConfig } from '../../config/schema.js'
+import { defaultConfig } from '../../../src/config/schema.js'
 
 const TEST_CONFIG = defaultConfig()
 
@@ -37,14 +37,14 @@ const authHarness = vi.hoisted(() => {
   }
 })
 
-vi.mock('../../onboarding/useApiKeyVerification', () => ({
+vi.mock('../../../src/onboarding/useApiKeyVerification.js', () => ({
   verifyApiKey: authHarness.verifyApiKey,
 }))
 
 // A live hosted (remote) auth session short-circuits the hook to 'valid'.
 // Pin it to absent so these tests stay hermetic against the developer's
 // real ~/.agenc/auth.json and keep exercising the anthropic key path.
-vi.mock('../../auth/session-state', async importOriginal => ({
+vi.mock('../../../src/auth/session-state.js', async importOriginal => ({
   ...(await importOriginal()),
   hasRemoteAuthSessionSync: (context: unknown) => {
     authHarness.state.remoteAuthContexts.push(context)
@@ -52,15 +52,15 @@ vi.mock('../../auth/session-state', async importOriginal => ({
   },
 }))
 
-vi.mock('../../utils/auth.js', () => ({
+vi.mock('../../../src/utils/auth.js', () => ({
   getAnthropicApiKeyWithSourceForContext:
     authHarness.getAnthropicApiKeyWithSource,
   isAgenCAISubscriberForContext: () => authHarness.state.subscriber,
   isAnthropicAuthEnabledForContext: () => authHarness.state.authEnabled,
 }))
 
-import { createRoot } from '../ink/root.js'
-import { useApiKeyVerification } from './useApiKeyVerification.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { useApiKeyVerification } from '../../../src/tui/hooks/useApiKeyVerification.js'
 
 type HookResult = ReturnType<typeof useApiKeyVerification>
 type Snapshot = {

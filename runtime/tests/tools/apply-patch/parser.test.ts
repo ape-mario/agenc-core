@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { ApplyPatchParseError } from "./types.js";
-import { parsePatch } from "./parser.js";
+import { ApplyPatchParseError } from "../../../src/tools/apply-patch/types.js";
+import { parsePatch } from "../../../src/tools/apply-patch/parser.js";
 
 function wrapPatch(body: string): string {
   return `*** Begin Patch\n${body}\n*** End Patch`;

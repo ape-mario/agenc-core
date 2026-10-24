@@ -8,23 +8,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FileWatcher,
   type FileWatcherWatchFactory,
-} from "../file-watcher/index.js";
+} from "../../src/file-watcher/index.js";
 import {
   createSkillChangeDetector,
   type SkillChangeDetector,
-} from "./change-detector.js";
+} from "../../src/skills/change-detector.js";
 
 const runtimeCacheCalls = vi.hoisted(() => ({
   calls: [] as string[],
 }));
 
-vi.mock("../commands.js", () => ({
+vi.mock("../../src/commands.js", () => ({
   clearCommandsCache: vi.fn(() => {
     runtimeCacheCalls.calls.push("commands");
   }),
 }));
 
-vi.mock("../utils/attachments.js", () => ({
+vi.mock("../../src/utils/attachments.js", () => ({
   resetSentSkillNames: vi.fn(() => {
     runtimeCacheCalls.calls.push("attachments");
   }),

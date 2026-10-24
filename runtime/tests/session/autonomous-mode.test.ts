@@ -6,7 +6,7 @@ import {
   AutonomousKeepaliveScheduler,
   createAutonomousTickMessage,
   isAutonomousModeEnabled,
-} from "./autonomous-mode.js";
+} from "../../src/session/autonomous-mode.js";
 
 describe("autonomous mode helpers", () => {
   test("requires explicit autonomous mode and suppresses plan mode", () => {

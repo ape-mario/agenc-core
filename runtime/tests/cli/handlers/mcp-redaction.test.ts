@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { resolveHomeContext } from "../../config/home.js";
-import { ConfigStore } from "../../config/store.js";
+import { resolveHomeContext } from "../../../src/config/home.js";
+import { ConfigStore } from "../../../src/config/store.js";
 import type { SecureStorageData } from "../../../src/utils/secureStorage/index.js";
 
 const TEST_HOME_CONTEXT = resolveHomeContext(
@@ -21,7 +21,7 @@ const mcpState = vi.hoisted(() => ({
 }));
 const credentials = vi.hoisted(() => new Map<string, SecureStorageData>());
 
-vi.mock("../../utils/secureStorage/native.js", () => ({
+vi.mock("../../../src/utils/secureStorage/native.js", () => ({
   readNativeSecureStorage: (home: { path: string }) => structuredClone(credentials.get(home.path) ?? {}),
   readNativeSecureStorageFresh: (home: { path: string }) => structuredClone(credentials.get(home.path) ?? {}),
   updateNativeSecureStorage: (home: { path: string }, update: (value: SecureStorageData) => SecureStorageData) => {
@@ -31,61 +31,61 @@ vi.mock("../../utils/secureStorage/native.js", () => ({
     return { previous, written };
   },
 }));
-vi.mock("../../services/mcp/auth.js", async importOriginal => ({
+vi.mock("../../../src/services/mcp/auth.js", async importOriginal => ({
   ...await importOriginal<typeof import("../../../src/services/mcp/auth.js")>(),
   readClientSecret: vi.fn(),
 }));
-vi.mock("../../services/mcp/client.js", () => ({
+vi.mock("../../../src/services/mcp/client.js", () => ({
   connectToServer: vi.fn(async () => ({ type: "failed" })),
   getMcpServerConnectionBatchSize: vi.fn(() => 1),
 }));
-vi.mock("../../services/mcp/config.js", () => ({
+vi.mock("../../../src/services/mcp/config.js", () => ({
   addMcpConfig: vi.fn(),
   getAllMcpConfigs: vi.fn(async () => ({ servers: {} })),
   getMcpConfigByName: vi.fn(() => mcpState.server),
   getMcpConfigsByScope: vi.fn(() => ({ servers: {} })),
   removeMcpConfig: vi.fn(),
 }));
-vi.mock("../../services/mcp/doctor.js", () => ({
+vi.mock("../../../src/services/mcp/doctor.js", () => ({
   doctorAllServers: vi.fn(),
   doctorServer: vi.fn(),
 }));
-vi.mock("../../services/mcp/utils.js", () => ({
+vi.mock("../../../src/services/mcp/utils.js", () => ({
   describeMcpConfigFilePath: vi.fn(() => "/tmp/agenc/config.toml"),
   ensureConfigScope: vi.fn((scope?: string) => scope ?? "user"),
   getScopeLabel: vi.fn((scope: string) => `${scope} config`),
 }));
-vi.mock("../../tui/components/MCPServerDesktopImportDialog.js", () => ({
+vi.mock("../../../src/tui/components/MCPServerDesktopImportDialog.js", () => ({
   MCPServerDesktopImportDialog: vi.fn(() => null),
 }));
-vi.mock("../../tui/ink.js", () => ({ render: vi.fn() }));
-vi.mock("../../tui/keybindings/KeybindingProviderSetup.js", () => ({
+vi.mock("../../../src/tui/ink.js", () => ({ render: vi.fn() }));
+vi.mock("../../../src/tui/keybindings/KeybindingProviderSetup.js", () => ({
   KeybindingSetup: vi.fn(({ children }) => children),
 }));
-vi.mock("../../tui/state/AppState.js", () => ({
+vi.mock("../../../src/tui/state/AppState.js", () => ({
   AppStateProvider: vi.fn(({ children }) => children),
 }));
-vi.mock("../../utils/errors.js", () => ({ isFsInaccessible: vi.fn(() => false) }));
-vi.mock("../../utils/gracefulShutdown.js", () => ({
+vi.mock("../../../src/utils/errors.js", () => ({ isFsInaccessible: vi.fn(() => false) }));
+vi.mock("../../../src/utils/gracefulShutdown.js", () => ({
   gracefulShutdown: vi.fn(async () => {}),
 }));
-vi.mock("../../utils/json.js", () => ({
+vi.mock("../../../src/utils/json.js", () => ({
   safeParseJSON: vi.fn((value: string) => JSON.parse(value)),
 }));
-vi.mock("../../utils/platform.js", () => ({ getPlatform: vi.fn(() => "linux") }));
-vi.mock("../exit.js", () => ({
+vi.mock("../../../src/utils/platform.js", () => ({ getPlatform: vi.fn(() => "linux") }));
+vi.mock("../../../src/cli/exit.js", () => ({
   cliError: vi.fn((message?: string) => {
     throw new Error(message ?? "cliError");
   }),
   cliOk: vi.fn(),
 }));
 
-import { addMcpConfig } from "../../services/mcp/config.js";
-import { ensureConfigScope } from "../../services/mcp/utils.js";
-import { AgenCAuthProvider, getServerKey, readClientSecret } from "../../services/mcp/auth.js";
+import { addMcpConfig } from "../../../src/services/mcp/config.js";
+import { ensureConfigScope } from "../../../src/services/mcp/utils.js";
+import { AgenCAuthProvider, getServerKey, readClientSecret } from "../../../src/services/mcp/auth.js";
 import { McpServerConfigSchema } from "../../../src/services/mcp/types.js";
-import { cliOk, cliError } from "../exit.js";
-import { mcpAddJsonHandler, mcpGetHandler } from "./mcp.js";
+import { cliOk, cliError } from "../../../src/cli/exit.js";
+import { mcpAddJsonHandler, mcpGetHandler } from "../../../src/cli/handlers/mcp.js";
 
 afterEach(() => {
   vi.restoreAllMocks();

@@ -29,7 +29,7 @@ vi.mock("usehooks-ts", () => ({
   },
 }));
 
-vi.mock("../hooks/useUpdateNotification.js", () => ({
+vi.mock("../../../src/tui/hooks/useUpdateNotification.js", () => ({
   useUpdateNotification: (version: string | null | undefined) =>
     version ? "available" : null,
 }));
@@ -38,27 +38,27 @@ vi.mock("src/utils/debug.js", () => ({
   logForDebugging: harness.logForDebugging,
 }));
 
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: harness.logError,
 }));
 
-vi.mock("../../utils/config.js", () => ({
+vi.mock("../../../src/utils/config.js", () => ({
   getRuntimeState: () => ({ theme: "dark" }),
   isAutoUpdaterDisabled: harness.isAutoUpdaterDisabled,
   updateRuntimeState: vi.fn(),
 }));
 
-vi.mock("../../utils/nativeInstaller/installer.js", () => ({
+vi.mock("../../../src/utils/nativeInstaller/installer.js", () => ({
   installLatest: harness.installLatest,
 }));
 
-vi.mock("../hooks/useSettings.js", () => ({
+vi.mock("../../../src/tui/hooks/useSettings.js", () => ({
   useSettings: () => harness.settings,
 }));
 
-import { createRoot } from "../ink/root.js";
-import { renderToString } from "../../utils/staticRender.js";
-import { NativeAutoUpdater } from "../components/NativeAutoUpdater.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { NativeAutoUpdater } from "../../../src/tui/components/NativeAutoUpdater.js";
 
 const originalGlyphMode = process.env.AGENC_TUI_GLYPHS;
 const originalMacro = (globalThis as Record<string, unknown>).MACRO;

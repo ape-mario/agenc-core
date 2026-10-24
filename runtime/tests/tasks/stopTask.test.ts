@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createTaskStateBase, type LocalShellTaskState } from "./types.js";
-import { StopTaskError, stopTask, type StopTaskLookupState } from "./stopTask.js";
+import { createTaskStateBase, type LocalShellTaskState } from "../../src/tasks/types.js";
+import { StopTaskError, stopTask, type StopTaskLookupState } from "../../src/tasks/stopTask.js";
 
 function shellTask(
   overrides: Partial<LocalShellTaskState> = {},

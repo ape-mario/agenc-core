@@ -33,10 +33,10 @@ import {
   type NetworkProxy,
   type SessionConfiguration,
   type SessionForTurn,
-} from "./turn-context.js";
+} from "../../src/session/turn-context.js";
 import { runtimeSandboxForExec } from "../../src/tools/system/exec-command.js";
 import { attachToolRuntimeContext } from "../../src/tools/runtimes/context.js";
-import type { LLMProvider } from "../llm/types.js";
+import type { LLMProvider } from "../../src/llm/types.js";
 import { defaultConfig, type AgenCConfig } from "../../src/config/schema.js";
 import { resolveProfile } from "../../src/config/profiles.js";
 import { sessionConfigurationFromAgenCConfig } from "../../src/session/configuration.js";

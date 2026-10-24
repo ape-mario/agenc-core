@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AsyncQueue } from "../utils/async-queue.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   ensureAgentTaskRegistered,
   lastTokenInfoFromRollout,
@@ -12,22 +12,22 @@ import {
   restorePersistedAgentTask,
   type RegisteredAgentTask,
   type SessionAgentTask,
-} from "./agent-task-lifecycle.js";
-import { readMemoryExtractionState } from "./memory-extraction-state.js";
-import type { RolloutItem } from "./rollout-item.js";
+} from "../../src/session/agent-task-lifecycle.js";
+import { readMemoryExtractionState } from "../../src/session/memory-extraction-state.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
+} from "../../src/session/session.js";
 import type {
   Config,
   ManagedFeatures,
   ModelInfo,
   SessionConfiguration,
-} from "./turn-context.js";
-import type { LLMProvider } from "../llm/types.js";
+} from "../../src/session/turn-context.js";
+import type { LLMProvider } from "../../src/llm/types.js";
 
 function mkFeatures(): ManagedFeatures {
   return {

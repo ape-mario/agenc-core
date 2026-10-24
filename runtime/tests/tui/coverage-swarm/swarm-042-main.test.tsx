@@ -22,15 +22,15 @@ vi.mock("signal-exit", () => ({
   onExit: harness.onExit,
 }));
 
-vi.mock("../ink.js", () => ({
+vi.mock("../../../src/tui/ink.js", () => ({
   render: harness.renderInk,
 }));
 
-vi.mock("../components/App.js", () => ({
+vi.mock("../../../src/tui/components/App.js", () => ({
   AgenCTuiApp: harness.app,
 }));
 
-vi.mock("../backpressure.js", () => ({
+vi.mock("../../../src/tui/backpressure.js", () => ({
   recordTuiBackpressure: harness.recordTuiBackpressure,
 }));
 
@@ -39,7 +39,7 @@ import {
   handleStdinLoss,
   STDIN_LOSS_FLUSH_FALLBACK_MS,
   type StdinLossSession,
-} from "../main.js";
+} from "../../../src/tui/main.js";
 
 type MockStdin = EventEmitter & {
   isTTY: boolean;

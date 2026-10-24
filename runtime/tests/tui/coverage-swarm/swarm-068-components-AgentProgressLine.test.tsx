@@ -1,8 +1,8 @@
 import React, { useLayoutEffect, useState } from "react";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { AgentProgressLine } from "../components/AgentProgressLine.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { AgentProgressLine } from "../../../src/tui/components/AgentProgressLine.js";
 
 type AgentProgressLineProps = React.ComponentProps<typeof AgentProgressLine>;
 

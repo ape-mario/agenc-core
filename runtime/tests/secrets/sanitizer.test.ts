@@ -13,7 +13,7 @@ import {
   redactSecrets,
   redactSecretsInValue,
   SecretName,
-} from "./index.js";
+} from "../../src/secrets/index.js";
 import { canonicalRedactionFixtures } from "./canonical-redaction-corpus.js";
 
 const tempDirs: string[] = [];

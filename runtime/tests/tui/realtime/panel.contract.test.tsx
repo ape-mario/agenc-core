@@ -1,13 +1,13 @@
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { stringWidth } from "../ink/stringWidth.js";
-import { getRealtimeStatusRenderParts, RealtimePanel } from "./RealtimePanel.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { stringWidth } from "../../../src/tui/ink/stringWidth.js";
+import { getRealtimeStatusRenderParts, RealtimePanel } from "../../../src/tui/realtime/RealtimePanel.js";
 import {
   initialRealtimeTuiState,
   reduceRealtimeTuiState,
-} from "./state.js";
+} from "../../../src/tui/realtime/state.js";
 
 describe("RealtimePanel", () => {
   test("renders lifecycle controls, meter, transcript preview, and banners", async () => {

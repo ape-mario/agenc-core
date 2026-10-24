@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveSandboxDeviceBinds } from "./linux-launcher/linux-run-main.js";
-import { createBwrapCommandArgs } from "./linux-launcher/bwrap.js";
-import { restrictedFileSystemPolicy } from "./engine/index.js";
+import { resolveSandboxDeviceBinds } from "../../src/sandbox/linux-launcher/linux-run-main.js";
+import { createBwrapCommandArgs } from "../../src/sandbox/linux-launcher/bwrap.js";
+import { restrictedFileSystemPolicy } from "../../src/sandbox/engine/index.js";
 
 const TEST_SESSION_TEMP_ROOT = "/tmp/agenc-test-session-root";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notifyPluginProcessBusy, notifyPluginProcessIdle, releasePluginProcess, reservePluginProcess } from "./plugin-process-budget.js";
+import { notifyPluginProcessBusy, notifyPluginProcessIdle, releasePluginProcess, reservePluginProcess } from "../../src/mcp-client/plugin-process-budget.js";
 
 describe("plugin process budget", () => {
   it("rechecks eviction when a declined eviction becomes idle before the waiter subscribes", async () => {

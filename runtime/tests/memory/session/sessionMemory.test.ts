@@ -11,26 +11,26 @@ import { dirname, join, sep } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RunAgentParams } from "../../agents/run-agent.js";
+import type { RunAgentParams } from "../../../src/agents/run-agent.js";
 import {
   AdmissionDeniedError,
   type AdmissionAcquireInput,
   type ExecutionAdmissionClient,
-} from "../../budget/admission-client.js";
-import type { AdmissionLease } from "../../budget/admission-types.js";
-import type { LLMMessage } from "../../llm/types.js";
-import type { Session } from "../../session/session.js";
-import { resolveAgentRuntimeOptions } from "../../session/runtime-options.js";
-import { EventLog, type Event } from "../../session/event-log.js";
+} from "../../../src/budget/admission-client.js";
+import type { AdmissionLease } from "../../../src/budget/admission-types.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
+import type { Session } from "../../../src/session/session.js";
+import { resolveAgentRuntimeOptions } from "../../../src/session/runtime-options.js";
+import { EventLog, type Event } from "../../../src/session/event-log.js";
 import {
   clearSessionReadState,
   getSessionReadSnapshot,
-} from "../../tools/system/filesystem.js";
+} from "../../../src/tools/system/filesystem.js";
 import {
   buildSessionMemoryUpdatePrompt,
   substituteSessionMemoryVariables,
   truncateSessionMemoryForCompact,
-} from "./prompts.js";
+} from "../../../src/memory/session/prompts.js";
 import {
   createSessionMemoryEditPolicy,
   manuallyExtractSessionMemory,
@@ -39,18 +39,18 @@ import {
   setupSessionMemoryFile,
   shouldExtractMemory,
   initSessionMemory,
-} from "./sessionMemory.js";
+} from "../../../src/memory/session/sessionMemory.js";
 import {
   createSessionMemoryState,
   isSessionMemoryEnabled,
   resolveSessionMemoryPath,
-} from "./sessionMemoryUtils.js";
+} from "../../../src/memory/session/sessionMemoryUtils.js";
 
 const runAgentMockState = vi.hoisted(() => ({
   calls: [] as unknown[],
 }));
 
-vi.mock("../../agents/run-agent.js", () => ({
+vi.mock("../../../src/agents/run-agent.js", () => ({
   runAgent: async function* (params: unknown) {
     runAgentMockState.calls.push(params);
     return {

@@ -19,7 +19,7 @@ import {
   createBashTool as createUnboundBashTool,
   isCommandAllowed,
   validateShellCommand,
-} from "./bash.js";
+} from "../../../src/tools/system/bash.js";
 import {
   bindExplicitDangerBoundary,
   explicitDangerBroker,
@@ -35,14 +35,14 @@ import {
   type SupervisedProcessOptions,
   type SupervisedProcessResult,
 } from "../../../src/utils/supervisedProcess.js";
-import { classifyShellWorkspaceWritePolicy } from "../../llm/shell-write-policy.js";
-import { attachToolRuntimeContext } from "../runtimes/context.js";
+import { classifyShellWorkspaceWritePolicy } from "../../../src/llm/shell-write-policy.js";
+import { attachToolRuntimeContext } from "../../../src/tools/runtimes/context.js";
 import {
   DEFAULT_DENY_LIST,
   DEFAULT_DENY_PREFIXES,
   DANGEROUS_SHELL_PATTERNS,
-} from "./types.js";
-import type { Logger } from "../../utils/logger.js";
+} from "../../../src/tools/system/types.js";
+import type { Logger } from "../../../src/utils/logger.js";
 import {
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,

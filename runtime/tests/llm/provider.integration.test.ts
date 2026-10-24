@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { createProvider, type ProviderName } from "./provider.js";
+import { createProvider, type ProviderName } from "../../src/llm/provider.js";
 
 function envEnabled(name: string): boolean {
   const raw = process.env[name]?.trim().toLowerCase();

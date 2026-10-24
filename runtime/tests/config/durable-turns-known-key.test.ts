@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { KNOWN_CONFIG_KEYS, defaultConfig } from "../config/schema.js";
-import { normalizeRawConfig } from "../config/schema.js";
+import { KNOWN_CONFIG_KEYS, defaultConfig } from "../../src/config/schema.js";
+import { normalizeRawConfig } from "../../src/config/schema.js";
 
 describe("durableTurns known key (todo-116)", () => {
   it("is a known top-level config key", () => {

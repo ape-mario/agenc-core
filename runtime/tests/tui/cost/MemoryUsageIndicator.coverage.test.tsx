@@ -10,12 +10,12 @@ const mockUseMemoryUsage = vi.hoisted(() =>
   })),
 )
 
-vi.mock('../hooks/useMemoryUsage.js', () => ({
+vi.mock('../../../src/tui/hooks/useMemoryUsage.js', () => ({
   useMemoryUsage: mockUseMemoryUsage,
 }))
 
-import { createRoot } from '../ink/root.js'
-import { MemoryUsageIndicator } from './MemoryUsageIndicator.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { MemoryUsageIndicator } from '../../../src/tui/cost/MemoryUsageIndicator.js'
 
 function createStreams(): {
   stdout: PassThrough

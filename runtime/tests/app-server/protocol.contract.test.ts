@@ -34,7 +34,7 @@ import {
   type AgenCDaemonInternalResultByMethod,
   type EventMcpStatusChangedParams,
   type SessionMcpStatusResult,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 interface ProtocolSchema {
   readonly $id: string;

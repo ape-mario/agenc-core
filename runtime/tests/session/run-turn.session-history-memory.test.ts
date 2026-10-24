@@ -42,31 +42,31 @@ vi.mock("axios", () => {
   };
 });
 
-import { AsyncQueue } from "../utils/async-queue.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
-import { TurnTimingState } from "./turn-context.js";
+} from "../../src/session/session.js";
+import { TurnTimingState } from "../../src/session/turn-context.js";
 import type {
   Config,
   ManagedFeatures,
   ModelInfo,
   SessionConfiguration,
   TurnContext,
-} from "./turn-context.js";
+} from "../../src/session/turn-context.js";
 import type {
   LLMMessage,
   LLMProvider,
   LLMResponse,
   StreamProgressCallback,
-} from "../llm/types.js";
-import type { ToolRegistry } from "../tool-registry.js";
-import type { Tool } from "../tools/types.js";
+} from "../../src/llm/types.js";
+import type { ToolRegistry } from "../../src/tool-registry.js";
+import type { Tool } from "../../src/tools/types.js";
 import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 import { createTestConfigStore } from "../fixtures.js";
 

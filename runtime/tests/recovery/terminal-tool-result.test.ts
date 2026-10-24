@@ -6,7 +6,7 @@ import {
   synthesizeTerminalResults,
   terminalToolCauseFromAbortReason,
   terminalToolCauseFromError,
-} from "./terminal-tool-result.js";
+} from "../../src/recovery/terminal-tool-result.js";
 
 describe("terminal-tool-result", () => {
   test("buildTerminalToolResult by cause", () => {

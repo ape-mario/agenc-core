@@ -9,8 +9,8 @@ import {
   normalizeMcpElicitationRequestParams,
   restoreMcpElicitationContextMeta,
   serializeMcpElicitationResponse,
-} from "./mcp.js";
-import type { McpElicitationRequest } from "./types.js";
+} from "../../src/elicitation/mcp.js";
+import type { McpElicitationRequest } from "../../src/elicitation/types.js";
 
 describe("MCP elicitation", () => {
   it("restores context metadata while dropping progress tokens", () => {

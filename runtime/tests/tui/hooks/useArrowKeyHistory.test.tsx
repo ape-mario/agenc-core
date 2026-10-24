@@ -27,14 +27,14 @@ type PastedContentLike = {
   type: 'text'
 }
 
-vi.mock('../context/notifications.js', () => ({
+vi.mock('../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => ({
     addNotification: harness.addNotification,
     removeNotification: harness.removeNotification,
   }),
 }))
 
-vi.mock('../history/history.js', () => ({
+vi.mock('../../../src/tui/history/history.js', () => ({
   getHistory: async function* () {
     harness.historyReadCount += 1
     for (const entry of harness.entries) {
@@ -43,11 +43,11 @@ vi.mock('../history/history.js', () => ({
   },
 }))
 
-import { createRoot } from '../ink/root.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import {
   type HistoryMode,
   useArrowKeyHistory,
-} from './useArrowKeyHistory.js'
+} from '../../../src/tui/hooks/useArrowKeyHistory.js'
 
 type HookResult = ReturnType<typeof useArrowKeyHistory>
 

@@ -7,13 +7,13 @@ import {
   hasContentAfterIndex,
   isMessageStreaming,
   type Props,
-} from "./MessageRow.js";
+} from "../../../src/tui/components/MessageRow.js";
 
 const rowMock = vi.hoisted(() => ({
   collapsibleToolNames: new Set<string>(["Read", "Grep", "GroupedRead"]),
 }));
 
-vi.mock("../../utils/collapseReadSearch.js", () => ({
+vi.mock("../../../src/utils/collapseReadSearch.js", () => ({
   getDisplayMessageFromCollapsed: (message: any) => message.displayMessage ?? message,
   getToolSearchOrReadInfo: (
     name: string,
@@ -31,7 +31,7 @@ vi.mock("../../utils/collapseReadSearch.js", () => ({
     (message.toolUseIds ?? []).some(id => ids.has(id)),
 }));
 
-vi.mock("../../utils/messages.js", () => ({
+vi.mock("../../../src/utils/messages.js", () => ({
   EMPTY_STRING_SET: new Set<string>(),
   getProgressMessagesFromLookup: () => [],
   getSiblingToolUseIDsFromLookup: () => new Set<string>(),
@@ -41,7 +41,7 @@ vi.mock("../../utils/messages.js", () => ({
   },
 }));
 
-vi.mock("./Message.js", () => ({
+vi.mock("../../../src/tui/components/Message.js", () => ({
   Message: () => null,
   hasThinkingContent: (message: any) =>
     message?.message?.content?.some((block: any) =>
@@ -49,19 +49,19 @@ vi.mock("./Message.js", () => ({
     ) ?? false,
 }));
 
-vi.mock("./messageRenderPolicy.js", () => ({
+vi.mock("../../../src/tui/components/messageRenderPolicy.js", () => ({
   shouldRenderStatically: () => true,
 }));
 
-vi.mock("./MessageModel.js", () => ({
+vi.mock("../../../src/tui/components/MessageModel.js", () => ({
   MessageModel: () => null,
 }));
 
-vi.mock("./MessageTimestamp.js", () => ({
+vi.mock("../../../src/tui/components/MessageTimestamp.js", () => ({
   MessageTimestamp: () => null,
 }));
 
-vi.mock("./OffscreenFreeze.js", () => ({
+vi.mock("../../../src/tui/components/OffscreenFreeze.js", () => ({
   OffscreenFreeze: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 

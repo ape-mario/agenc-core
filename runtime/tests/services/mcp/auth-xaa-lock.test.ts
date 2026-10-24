@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { InvalidGrantError } from '@modelcontextprotocol/sdk/server/auth/errors.js'
-import type { SecureStorageData } from '../../utils/secureStorage/index.js'
+import type { SecureStorageData } from '../../../src/utils/secureStorage/index.js'
 import {
   AgenCAuthProvider,
   getServerKey,
   wrapFetchWithStepUpDetection,
-} from './auth.js'
-import type { McpSSEServerConfig } from './types.js'
-import { performCrossAppAccess } from './xaa.js'
-import * as lockfile from '../../utils/lockfile.js'
-import { resolveHomeContext } from '../../config/home.js'
+} from '../../../src/services/mcp/auth.js'
+import type { McpSSEServerConfig } from '../../../src/services/mcp/types.js'
+import { performCrossAppAccess } from '../../../src/services/mcp/xaa.js'
+import * as lockfile from '../../../src/utils/lockfile.js'
+import { resolveHomeContext } from '../../../src/config/home.js'
 
 const TEST_HOME = resolveHomeContext(
   { AGENC_HOME: '/tmp/agenc-mcp-auth-test' },
@@ -57,21 +57,21 @@ vi.mock('@modelcontextprotocol/sdk/client/auth.js', async importOriginal => ({
   refreshAuthorization: probes.refreshAuthorization,
 }))
 
-vi.mock('../../utils/envUtils.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../../utils/envUtils.js')>()),
+vi.mock('../../../src/utils/envUtils.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../src/utils/envUtils.js')>()),
   getAgenCHomeDir: () => '/tmp/agenc-mcp-auth-test',
 }))
 
-vi.mock('../../utils/lockfile.js', () => ({
+vi.mock('../../../src/utils/lockfile.js', () => ({
   lock: probes.lock,
   lockSync: probes.lockSync,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logMCPDebug: probes.logMCPDebug,
 }))
 
-vi.mock('../../utils/secureStorage/native.js', () => ({
+vi.mock('../../../src/utils/secureStorage/native.js', () => ({
   readNativeSecureStorage: () => structuredClone(probes.storageData ?? {}),
   updateNativeSecureStorage: (
     _home: unknown,
@@ -83,15 +83,15 @@ vi.mock('../../utils/secureStorage/native.js', () => ({
   },
 }))
 
-vi.mock('../../utils/secureStorage/macOsKeychainHelpers.js', () => ({
+vi.mock('../../../src/utils/secureStorage/macOsKeychainHelpers.js', () => ({
   clearKeychainCache: probes.clearKeychainCache,
 }))
 
-vi.mock('../../utils/sleep.js', () => ({
+vi.mock('../../../src/utils/sleep.js', () => ({
   sleep: probes.sleep,
 }))
 
-vi.mock('./xaaIdpLogin.js', () => ({
+vi.mock('../../../src/services/mcp/xaaIdpLogin.js', () => ({
   acquireIdpIdToken: vi.fn(),
   clearIdpIdToken: probes.clearIdpIdToken,
   discoverOidc: probes.discoverOidc,
@@ -101,7 +101,7 @@ vi.mock('./xaaIdpLogin.js', () => ({
   isXaaEnabled: () => true,
 }))
 
-vi.mock('./xaa.js', () => ({
+vi.mock('../../../src/services/mcp/xaa.js', () => ({
   XaaTokenExchangeError: class XaaTokenExchangeError extends Error {
     constructor(
       message: string,
@@ -113,7 +113,7 @@ vi.mock('./xaa.js', () => ({
   performCrossAppAccess: vi.fn(),
 }))
 
-vi.mock('./utils.js', () => ({
+vi.mock('../../../src/services/mcp/utils.js', () => ({
   getLoggingSafeMcpBaseUrl: (url: string) => url,
 }))
 

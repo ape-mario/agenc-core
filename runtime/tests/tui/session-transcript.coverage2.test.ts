@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { adaptTranscriptEvents } from "./session-transcript.js";
+import { adaptTranscriptEvents } from "../../src/tui/session-transcript.js";
 
 describe("session transcript startup message coverage", () => {
   test("projects startup content arrays, images, JSON fallback, and empty content into user rows", () => {

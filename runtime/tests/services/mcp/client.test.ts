@@ -35,8 +35,8 @@ import {
   getMcpRootUriForPath,
   getMcpServerConnectionBatchSize,
   wrapMcpTransportFetch,
-} from './client.js'
-import type { ConnectedMCPServer, MCPServerConnection } from './types.js'
+} from '../../../src/services/mcp/client.js'
+import type { ConnectedMCPServer, MCPServerConnection } from '../../../src/services/mcp/types.js'
 
 const originalAgenCHome = process.env.AGENC_HOME
 const tempDirs: string[] = []

@@ -16,65 +16,65 @@ import { createHash, randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { canonicalTmpdir } from "../helpers/canonical-temp-dir.js";
-import { AgenCSessionSnapshotPolicy } from "../state/snapshot-policy.js";
-import { pruneRolloutSessions } from "../state/pruning.js";
-import { upsertAgentRun } from "../state/agent-runs.js";
-import { RolloutStore } from "../session/rollout-store.js";
-import { persistDisplayAttachments, readDisplayArtifact } from "../session/display-artifact-store.js";
-import { validateDisplayBlock } from "../mcp-client/display-attachments.js";
-import type { RolloutItem } from "../session/rollout-item.js";
-import type { RunRuntimeSettingsSnapshot } from "../contracts/run-contracts.js";
-import { FileThreadStore } from "../thread-store/store.js";
-import { MultiProjectFileThreadStore } from "../thread-store/multi-project-store.js";
+import { AgenCSessionSnapshotPolicy } from "../../src/state/snapshot-policy.js";
+import { pruneRolloutSessions } from "../../src/state/pruning.js";
+import { upsertAgentRun } from "../../src/state/agent-runs.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { persistDisplayAttachments, readDisplayArtifact } from "../../src/session/display-artifact-store.js";
+import { validateDisplayBlock } from "../../src/mcp-client/display-attachments.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
+import type { RunRuntimeSettingsSnapshot } from "../../src/contracts/run-contracts.js";
+import { FileThreadStore } from "../../src/thread-store/store.js";
+import { MultiProjectFileThreadStore } from "../../src/thread-store/multi-project-store.js";
 import {
   openStateDatabases,
   type StateSqliteDriver,
-} from "../state/sqlite-driver.js";
-import { StateRunDurabilityRepository } from "../state/run-durability.js";
+} from "../../src/state/sqlite-driver.js";
+import { StateRunDurabilityRepository } from "../../src/state/run-durability.js";
 import {
   listUnresolvedUnknownOutcomeEffects,
   resolveUnknownOutcomeEffect,
-} from "../state/unknown-outcome-gate.js";
-import { recordInFlightToolCallUnknownOutcome } from "../state/tool-output-rotation.js";
-import { EffectReviewStaleError, type ResolveDurableEffectReviewOptions } from "../state/effect-review.js";
+} from "../../src/state/unknown-outcome-gate.js";
+import { recordInFlightToolCallUnknownOutcome } from "../../src/state/tool-output-rotation.js";
+import { EffectReviewStaleError, type ResolveDurableEffectReviewOptions } from "../../src/state/effect-review.js";
 import {
   __setAgentLifecycleResumeSourceTestHooksForTest,
   AgenCDaemonAgentLifecycleError,
   AgenCDaemonAgentManager,
-} from "./agent-lifecycle.js";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
-import { DAEMON_CLIENT_ENV_SNAPSHOT_KEYS } from "./client-env-snapshot.js";
+} from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { DAEMON_CLIENT_ENV_SNAPSHOT_KEYS } from "../../src/app-server/client-env-snapshot.js";
 import { findAgenCDaemonAgentBySessionId } from "../../src/app-server-client/index.js";
 import {
   AGENC_DAEMON_PROTOCOL_VERSION,
   AGENC_DAEMON_METHOD_CAPABILITIES_KEY,
   JSON_RPC_VERSION,
   type SessionResolveToolCallParams,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import {
   AGENC_PORTAL_CLIENT_CAPABILITY_FLAGS,
   createAgenCPortalAgentCreateRequest,
   createAgenCPortalAgentListRequest,
   createAgenCPortalAgentStopRequest,
   createAgenCPortalDaemonInitializeRequest,
-} from "../app-server-protocol/index.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+} from "../../src/app-server-protocol/index.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 import type {
   AgenCBackgroundAgentSnapshot,
   AgenCBackgroundAgentRunner,
   AgenCBackgroundAgentSessionEventBinding,
   AgenCBackgroundAgentStartParams,
-} from "./background-agent-runner.js";
+} from "../../src/app-server/background-agent-runner.js";
 import {
   AgenCBackgroundAgentMessageError,
   AgenCBackgroundAgentSuspensionShutdownError,
-} from "./background-agent-runner.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
-import { RemoteAccessBoundary } from "../remote/access.js";
+} from "../../src/app-server/background-agent-runner.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import { RemoteAccessBoundary } from "../../src/remote/access.js";
 import {
   MAX_ADDITIONAL_WORKING_DIRECTORIES,
-} from "../contracts/additional-working-directories.js";
+} from "../../src/contracts/additional-working-directories.js";
 
 function sequence(values: readonly string[]): () => string {
   let index = 0;

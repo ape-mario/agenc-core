@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { adaptTranscriptEvents } from "./session-transcript.js";
+import { adaptTranscriptEvents } from "../../src/tui/session-transcript.js";
 
 describe("session transcript collab resume coverage", () => {
   test("renders resume and close rows with fallback status summaries", () => {

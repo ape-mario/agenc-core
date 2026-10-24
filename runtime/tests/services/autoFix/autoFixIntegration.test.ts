@@ -1,14 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { runPostToolUseHooks } from "../../tools/hooks.js";
-import { getAutoFixConfig } from "./autoFixConfig.js";
+import { runPostToolUseHooks } from "../../../src/tools/hooks.js";
+import { getAutoFixConfig } from "../../../src/services/autoFix/autoFixConfig.js";
 import {
   buildAutoFixContext,
   createAutoFixPostToolHook,
   shouldRunAutoFix,
-} from "./autoFixHook.js";
-import { runAutoFixCheck } from "./autoFixRunner.js";
+} from "../../../src/services/autoFix/autoFixHook.js";
+import { runAutoFixCheck } from "../../../src/services/autoFix/autoFixRunner.js";
 import { explicitDangerBroker } from "../../helpers/explicit-danger-boundary.js";
-import { createHookExecutionAuthority } from "../../hooks/execution-authority.js";
+import { createHookExecutionAuthority } from "../../../src/hooks/execution-authority.js";
 
 const TEST_CWD = process.cwd();
 const TRUSTED_HOOK_AUTHORITY = createHookExecutionAuthority({

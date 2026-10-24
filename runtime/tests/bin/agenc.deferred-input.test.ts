@@ -4,25 +4,25 @@ import {
   __createDeferredDaemonPromptTuiSessionForTest,
   __wrapDaemonTuiSessionWithPromptPreparationForTest,
   sessionConfigurationFromAgenCConfig,
-} from "./agenc-main.js";
+} from "../../src/bin/agenc-main.js";
 import { configCommand } from "../../src/commands/config.js";
 import type { Session } from "../../src/session/session.js";
-import { ConfigStore } from "../config/store.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import { DaemonEventReplayGapError } from "../../src/tui/daemon-event-replay.js";
 import type {
   SessionSubmitOptions,
-} from "../session/autonomous-mode.js";
+} from "../../src/session/autonomous-mode.js";
 import type {
   IdleInputAdmission,
   IdleInputOwnership,
   McpManager,
   McpSurfaceSnapshot,
-} from "../session/session.js";
+} from "../../src/session/session.js";
 import type {
   SessionShellExecuteResult,
-} from "../app-server/protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 interface DeferredInputSession {
   readonly services: {

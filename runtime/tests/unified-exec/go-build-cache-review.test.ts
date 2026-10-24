@@ -4,10 +4,10 @@ import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { canWritePathWithCwd, type SandboxTransformRequest } from "../sandbox/engine/index.js";
-import { effectivePermissionProfile } from "../sandbox/engine/policy-transforms.js";
-import { permissionProfileForSandboxMode } from "../tools/runtimes/sandboxing.js";
-import { UnifiedExecProcessManager } from "./process-manager.js";
+import { canWritePathWithCwd, type SandboxTransformRequest } from "../../src/sandbox/engine/index.js";
+import { effectivePermissionProfile } from "../../src/sandbox/engine/policy-transforms.js";
+import { permissionProfileForSandboxMode } from "../../src/tools/runtimes/sandboxing.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
 
 let root: string;
 beforeEach(async () => { root = await realpath(await mkdtemp(join(tmpdir(), "rv-go-cache-"))); });

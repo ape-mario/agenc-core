@@ -4,17 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { EnvSnapshot } from "../config/env.js";
-import { resolveHomeContext } from "../config/home.js";
-import type { ConfigStore } from "../config/store.js";
-import type { SlashCommandContext } from "./types.js";
+import type { EnvSnapshot } from "../../src/config/env.js";
+import { resolveHomeContext } from "../../src/config/home.js";
+import type { ConfigStore } from "../../src/config/store.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 import {
   loadOllamaMenuModels,
   parseOllamaTags,
   readOllamaMenuModels,
-} from "./ollama-menu-models.js";
-import { readProvidersHubModels } from "./providers-hub-snapshot.js";
-import { modelCapabilityTags } from "./model-capability-tags.js";
+} from "../../src/commands/ollama-menu-models.js";
+import { readProvidersHubModels } from "../../src/commands/providers-hub-snapshot.js";
+import { modelCapabilityTags } from "../../src/commands/model-capability-tags.js";
 
 /**
  * `GET /api/tags` rows with the `capabilities` field from Ollama's list response

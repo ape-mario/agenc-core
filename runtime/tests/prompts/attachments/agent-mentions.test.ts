@@ -6,8 +6,8 @@ import { describe, expect, test } from "vitest";
 import {
   agentMentionsProducer,
   extractAgentMentions,
-} from "./agent-mentions.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+} from "../../../src/prompts/attachments/agent-mentions.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 
 function makeOpts(
   userInput: string | null,

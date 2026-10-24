@@ -3,9 +3,9 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { Text } from "../ink.js";
-import { createRoot } from "../ink/root.js";
-import { CollapsedReadSearchContent } from "./CollapsedReadSearchContent.js";
+import { Text } from "../../../src/tui/ink.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { CollapsedReadSearchContent } from "../../../src/tui/message-renderers/CollapsedReadSearchContent.js";
 
 const collapsedMock = vi.hoisted(() => ({
   featureFlags: new Set<string>(["TEAMMEM"]),
@@ -18,12 +18,12 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => collapsedMock.featureFlags.has(name),
 }));
 
-vi.mock("../context/fullscreenModeContext.js", () => ({
+vi.mock("../../../src/tui/context/fullscreenModeContext.js", () => ({
   useFullscreenMode: () => collapsedMock.fullscreen,
 }));
 
-vi.mock("../../utils/collapseReadSearch.js", async importOriginal => {
-  const actual = await importOriginal<typeof import("../../utils/collapseReadSearch.js")>();
+vi.mock("../../../src/utils/collapseReadSearch.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../../src/utils/collapseReadSearch.js")>();
   return {
     ...actual,
     getToolUseIdsFromCollapsedGroup: (message: { toolUseIds?: string[] }) =>
@@ -31,7 +31,7 @@ vi.mock("../../utils/collapseReadSearch.js", async importOriginal => {
   };
 });
 
-vi.mock("../glyphs.js", () => ({
+vi.mock("../../../src/tui/glyphs.js", () => ({
   selectAgenCTuiGlyphs: () => ({
     ellipsis: "...",
     responseGutter: ">",
@@ -39,35 +39,35 @@ vi.mock("../glyphs.js", () => ({
   }),
 }));
 
-vi.mock("../hooks/useMinDisplayTime", () => ({
+vi.mock("../../../src/tui/hooks/useMinDisplayTime.js", () => ({
   useMinDisplayTime: (value: string | undefined) => value,
 }));
 
-vi.mock("../components/messageActions", () => ({
+vi.mock("../../../src/tui/components/messageActions.js", () => ({
   useSelectedMessageBg: () => collapsedMock.selectedBg,
 }));
 
-vi.mock("../components/CtrlOToExpand", () => {
+vi.mock("../../../src/tui/components/CtrlOToExpand.js", () => {
   return {
     CtrlOToExpand: () => "[expand]",
   };
 });
 
-vi.mock("../components/ToolUseLoader", () => {
+vi.mock("../../../src/tui/components/ToolUseLoader.js", () => {
   return {
     ToolUseLoader: (props: { isError?: boolean; isUnresolved?: boolean; shouldAnimate?: boolean }) =>
       `LOADER:${props.shouldAnimate ? "anim" : "static"}:${props.isUnresolved ? "pending" : "done"}:${props.isError ? "error" : "ok"}`,
   };
 });
 
-vi.mock("../components/PrBadge", () => {
+vi.mock("../../../src/tui/components/PrBadge.js", () => {
   return {
     PrBadge: ({ number }: { number: number }) => `PR#${number}`,
   };
 });
 
-vi.mock("../../tools/Tool", async importOriginal => {
-  const actual = await importOriginal<typeof import("../../tools/Tool")>();
+vi.mock("../../../src/tools/Tool.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../../src/tools/Tool.js")>();
   return {
     ...actual,
     findToolByName: (tools: Record<string, unknown> | undefined, name: string) =>
@@ -75,11 +75,11 @@ vi.mock("../../tools/Tool", async importOriginal => {
   };
 });
 
-vi.mock("../../tools/REPLTool/primitiveTools", () => ({
+vi.mock("../../../src/tools/REPLTool/primitiveTools.js", () => ({
   getReplPrimitiveTools: () => ({}),
 }));
 
-vi.mock("./teamMemCollapsed", () => {
+vi.mock("../../../src/tui/message-renderers/teamMemCollapsed.js", () => {
   return {
     TeamMemCountParts: ({
       hasPrecedingParts,

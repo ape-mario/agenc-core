@@ -21,14 +21,14 @@ import {
   isBridgeSafeCommand,
   registerCommandProvider,
   type Command,
-} from "../commands.js";
-import { buildDefaultRegistry } from "./registry.js";
+} from "../../src/commands.js";
+import { buildDefaultRegistry } from "../../src/commands/registry.js";
 import {
   dispatchSlashCommand,
   parseSlashCommand,
   type DispatchOutcome,
-} from "./dispatcher.js";
-import type { SlashCommandContext } from "./types.js";
+} from "../../src/commands/dispatcher.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 const ambientCommandHome = vi.hoisted(() => ({ path: null as string | null }));
 

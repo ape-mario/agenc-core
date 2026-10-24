@@ -25,11 +25,11 @@ const harness = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../keybindings/useShortcutDisplay.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useShortcutDisplay.js", () => ({
   useShortcutDisplay: () => "ctrl+shift+o",
 }));
 
-vi.mock("../../../utils/sandbox/sandbox-runtime.js", () => ({
+vi.mock("../../../../src/utils/sandbox/sandbox-runtime.js", () => ({
   SandboxManager: {
     isSandboxingEnabled: () => harness.enabled,
     getSandboxViolationStore: () => ({
@@ -42,10 +42,10 @@ vi.mock("../../../utils/sandbox/sandbox-runtime.js", () => ({
   },
 }));
 
-import { createRoot } from "../../ink.js";
-import type { DOMElement, DOMNode } from "../../ink/dom.js";
-import instances from "../../ink/instances.js";
-import { SandboxPromptFooterHint } from "./SandboxPromptFooterHint.js";
+import { createRoot } from "../../../../src/tui/ink.js";
+import type { DOMElement, DOMNode } from "../../../../src/tui/ink/dom.js";
+import instances from "../../../../src/tui/ink/instances.js";
+import { SandboxPromptFooterHint } from "../../../../src/tui/components/PromptInput/SandboxPromptFooterHint.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

@@ -1,8 +1,8 @@
 import React from 'react'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { getSearchBoxDefaults, SearchBox } from './SearchBox.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { getSearchBoxDefaults, SearchBox } from '../../../src/tui/components/SearchBox.js'
 
 const previousGlyphMode = process.env.AGENC_TUI_GLYPHS
 

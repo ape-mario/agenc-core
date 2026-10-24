@@ -3,10 +3,10 @@ import { describe, expect, test } from "vitest";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
-import { agentListingDeltaProducer } from "./agent-listing-delta.js";
-import { attachmentsToMessages } from "./messages.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+} from "../../../src/session/attachment-state.js";
+import { agentListingDeltaProducer } from "../../../src/prompts/attachments/agent-listing-delta.js";
+import { attachmentsToMessages } from "../../../src/prompts/attachments/messages.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 
 interface FakeSession {
   agentDefinitions: { activeAgents: unknown[] };

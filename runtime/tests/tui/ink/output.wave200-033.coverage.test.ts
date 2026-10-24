@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import Output from './output.ts'
+import Output from '../../../src/tui/ink/output.js'
 import {
   CellWidth,
   CharPool,
@@ -9,7 +9,7 @@ import {
   cellAt,
   charInCellAt,
   createScreen,
-} from './screen.ts'
+} from '../../../src/tui/ink/screen.js'
 
 test('write skips terminal controls while preserving terminal cell positions', () => {
   const stylePool = new StylePool()

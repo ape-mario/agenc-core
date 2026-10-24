@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isTrustRecord } from "./records.js";
+import { isTrustRecord } from "../../../src/permissions/trust/records.js";
 
 describe("trust record helpers", () => {
   it("detects non-array object records", () => {

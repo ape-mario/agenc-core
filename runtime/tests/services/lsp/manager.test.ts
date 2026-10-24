@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach, vi } from "vitest";
 import { setTimeout as sleep } from "node:timers/promises";
 import { resolve } from "node:path";
 
-import { normalizeLspServerConfig } from "./config.js";
+import { normalizeLspServerConfig } from "../../../src/services/lsp/config.js";
 import {
   _resetLspManagerForTesting,
   getInitializationStatus,
@@ -12,11 +12,11 @@ import {
   reinitializeLspServerManager,
   shutdownLspServerManager,
   waitForInitialization,
-} from "./manager.js";
-import type { LSPServerInstance } from "./LSPServerInstance.js";
-import { notifyLspFileChanged } from "./fileNotifications.js";
-import { SandboxExecutionBroker } from "../../sandbox/execution-broker.js";
-import { transitionSandboxExecutionBroker } from "../../sandbox/execution-lifecycle.js";
+} from "../../../src/services/lsp/manager.js";
+import type { LSPServerInstance } from "../../../src/services/lsp/LSPServerInstance.js";
+import { notifyLspFileChanged } from "../../../src/services/lsp/fileNotifications.js";
+import { SandboxExecutionBroker } from "../../../src/sandbox/execution-broker.js";
+import { transitionSandboxExecutionBroker } from "../../../src/sandbox/execution-lifecycle.js";
 
 describe("LSP singleton manager", () => {
   beforeEach(() => {

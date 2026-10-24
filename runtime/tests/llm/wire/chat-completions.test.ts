@@ -3,9 +3,9 @@ import {
   buildChatCompletionsRequest,
   collectChatCompletionsRequestMetadata,
   parseChatCompletionsResponse,
-} from "./chat-completions.js";
-import { chatCompletionsCapabilityHintsForProvider } from "./capability-gating.js";
-import { encodeMcpToolNameForWire } from "./mcp-tool-naming.js";
+} from "../../../src/llm/wire/chat-completions.js";
+import { chatCompletionsCapabilityHintsForProvider } from "../../../src/llm/wire/capability-gating.js";
+import { encodeMcpToolNameForWire } from "../../../src/llm/wire/mcp-tool-naming.js";
 
 describe("buildChatCompletionsRequest", () => {
   test("keeps Chat Completions controls and static head unchanged across response detail levels", () => {

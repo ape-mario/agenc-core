@@ -4,8 +4,8 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { createRoot } from "../ink/root.js";
-import { ThinkingToggle } from "./ThinkingToggle.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { ThinkingToggle } from "../../../src/tui/components/ThinkingToggle.js";
 
 const harness = vi.hoisted(() => ({
   keybindings: {} as Record<
@@ -33,7 +33,7 @@ vi.mock("src/tui/hooks/useExitOnCtrlCDWithKeybindings.js", () => ({
   }),
 }));
 
-vi.mock("../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybinding: (
     action: string,
     handler: () => void,
@@ -43,10 +43,10 @@ vi.mock("../keybindings/useKeybinding.js", () => ({
   },
 }));
 
-vi.mock("./CustomSelect/select.js", async () => {
+vi.mock("../../../src/tui/components/CustomSelect/select.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
-  const { Text } = await vi.importActual<typeof import("../ink.js")>(
-    "../ink.js",
+  const { Text } = await vi.importActual<typeof import("../../../src/tui/ink.js")>(
+    "../../../src/tui/ink.js",
   );
 
   return {

@@ -15,9 +15,9 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   MAX_APPLY_PATCH_FILE_BYTES,
   MAX_APPLY_PATCH_LINE_BYTES,
-} from "./limits.js";
-import { parsePatch } from "./parser.js";
-import { applyPatchText } from "./runtime.js";
+} from "../../../src/tools/apply-patch/limits.js";
+import { parsePatch } from "../../../src/tools/apply-patch/parser.js";
+import { applyPatchText } from "../../../src/tools/apply-patch/runtime.js";
 
 const BYTE_FIXTURES_ROOT = fileURLToPath(
   new URL("../../fnd/fixtures/patches/", import.meta.url),

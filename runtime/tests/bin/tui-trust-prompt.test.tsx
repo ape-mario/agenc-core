@@ -7,12 +7,12 @@ const harness = vi.hoisted(() => ({
   unmount: vi.fn(),
 }));
 
-vi.mock("../tui/ink.js", () => ({
+vi.mock("../../src/tui/ink.js", () => ({
   render: harness.renderInk,
 }));
 
-import { CURSOR_HOME, ERASE_SCREEN } from "../tui/ink/termio/csi.js";
-import { renderProjectTrustPrompt } from "./tui-trust-prompt.js";
+import { CURSOR_HOME, ERASE_SCREEN } from "../../src/tui/ink/termio/csi.js";
+import { renderProjectTrustPrompt } from "../../src/bin/tui-trust-prompt.js";
 
 class TestReadStream extends EventEmitter {
   isTTY = true;

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest'
 
-import { stringWidth } from './stringWidth.js'
-import wrapText from './wrap-text.js'
+import { stringWidth } from '../../../src/tui/ink/stringWidth.js'
+import wrapText from '../../../src/tui/ink/wrap-text.js'
 
 describe('wrapText truncation glyphs', () => {
   const previousGlyphMode = process.env.AGENC_TUI_GLYPHS

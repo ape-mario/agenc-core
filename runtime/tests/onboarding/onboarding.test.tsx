@@ -3,27 +3,27 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 
-import { defaultConfig } from "../config/schema.js";
-import { LocalAuthBackend } from "../auth/backends/local.js";
-import { RemoteAuthBackend } from "../auth/backends/remote.js";
-import type { RemoteAuthSessionReadContext } from "../auth/session-state.js";
+import { defaultConfig } from "../../src/config/schema.js";
+import { LocalAuthBackend } from "../../src/auth/backends/local.js";
+import { RemoteAuthBackend } from "../../src/auth/backends/remote.js";
+import type { RemoteAuthSessionReadContext } from "../../src/auth/session-state.js";
 import {
   listBuiltInProviderInfo,
   providerCredentialEnvironmentLabel,
-} from "../llm/registry/provider-info.js";
-import { captureSecureStorageIngress } from "../utils/secureStorage/home.js";
-import { saveXaiOauthCredentials } from "../utils/xaiOauthCredentials.js";
-import { getProxyFetchOptions } from "../utils/proxy.js";
-import { MAX_ONBOARDING_INPUT_LENGTH } from "./inputPaste.js";
-import { hashPastedText, retrievePastedText } from "./pasteStore.js";
+} from "../../src/llm/registry/provider-info.js";
+import { captureSecureStorageIngress } from "../../src/utils/secureStorage/home.js";
+import { saveXaiOauthCredentials } from "../../src/utils/xaiOauthCredentials.js";
+import { getProxyFetchOptions } from "../../src/utils/proxy.js";
+import { MAX_ONBOARDING_INPUT_LENGTH } from "../../src/onboarding/inputPaste.js";
+import { hashPastedText, retrievePastedText } from "../../src/onboarding/pasteStore.js";
 
 const nativeByokReadOverride = vi.hoisted(() => ({
   current: null as null | ((home: unknown, provider: string) => unknown),
 }));
 
-vi.mock("../auth/native-credentials.js", async (importOriginal) => {
+vi.mock("../../src/auth/native-credentials.js", async (importOriginal) => {
   const actual = await importOriginal<
-    typeof import("../auth/native-credentials.js")
+    typeof import("../../src/auth/native-credentials.js")
   >();
   return {
     ...actual,
@@ -36,7 +36,7 @@ vi.mock("../auth/native-credentials.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../tui/ink.js", async () => {
+vi.mock("../../src/tui/ink.js", async () => {
   const React = await import("react");
   return {
     Box: ({ children }: { children?: React.ReactNode }) =>
@@ -59,7 +59,7 @@ import {
   submitFirstRunOnboardingInput,
   wizardThemeToSetting,
   type FirstRunOnboardingState,
-} from "./Onboarding.js";
+} from "../../src/onboarding/Onboarding.js";
 import {
   incrementFirstRunOnboardingSeenCount,
   maybeMarkProjectOnboardingComplete,
@@ -67,11 +67,11 @@ import {
   readOnboardingState,
   shouldShowFirstRunOnboarding,
   shouldShowProjectOnboarding,
-} from "./projectOnboardingState.js";
+} from "../../src/onboarding/projectOnboardingState.js";
 import {
   getSteps,
   isProjectOnboardingComplete,
-} from "./projectOnboardingSteps.js";
+} from "../../src/onboarding/projectOnboardingSteps.js";
 
 function withTempDir<T>(prefix: string, run: (path: string) => T): T {
   const path = mkdtempSync(join(tmpdir(), prefix));
@@ -1847,7 +1847,7 @@ describe("wizard theme mapping", () => {
 describe("theme step terminal-background awareness", () => {
   test("tells the user which themes read well on the detected terminal background", async () => {
     const { setCachedTerminalBackground } = await import(
-      "../utils/terminalBackground.js"
+      "../../src/utils/terminalBackground.js"
     );
     const config = defaultConfig();
     const context = { config, env: {}, checkLocalProviders: false };

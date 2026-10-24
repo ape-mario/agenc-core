@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { LLMProvider } from "../../llm/types.js";
-import type { Session } from "../../session/session.js";
+import type { LLMProvider } from "../../../src/llm/types.js";
+import type { Session } from "../../../src/session/session.js";
 import {
   E_TOOL_USE_SUMMARY_GENERATION_FAILED,
   TOOL_USE_SUMMARY_DEFAULT_MODEL,
@@ -9,7 +9,7 @@ import {
   generateToolUseSummary,
   truncateToolUseSummaryJson,
   type ToolUseSummaryToolInfo,
-} from "./toolUseSummaryGenerator.js";
+} from "../../../src/services/toolUseSummary/toolUseSummaryGenerator.js";
 
 function providerReturning(
   content: string,

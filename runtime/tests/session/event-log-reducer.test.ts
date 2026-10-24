@@ -4,14 +4,14 @@ import {
   reduce,
   reduceAll,
   reduceAllWithEmit,
-} from "./event-log-reducer.js";
-import { EventLog } from "./event-log.js";
-import type { RolloutItem } from "./rollout-item.js";
+} from "../../src/session/event-log-reducer.js";
+import { EventLog } from "../../src/session/event-log.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
 import {
   createCsvAgentInvocationEnvelope,
   materializeAgentInvocationMessages,
-} from "../contracts/agent-invocation-envelope.js";
-import { llmMessageToResponseItem } from "./message-history-conversion.js";
+} from "../../src/contracts/agent-invocation-envelope.js";
+import { llmMessageToResponseItem } from "../../src/session/message-history-conversion.js";
 
 describe("event-log-reducer (I-26 + I-27)", () => {
   test("history_cleared resets conversation history while preserving session facts", () => {

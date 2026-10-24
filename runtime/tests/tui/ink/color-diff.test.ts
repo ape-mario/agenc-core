@@ -7,7 +7,7 @@ import {
   ColorFile,
   getNativeModule,
   getSyntaxTheme,
-} from './native-ts/color-diff/index.js'
+} from '../../../src/tui/ink/native-ts/color-diff/index.js'
 
 describe('color-diff native TypeScript helpers', () => {
   const originalColorTerm = process.env.COLORTERM

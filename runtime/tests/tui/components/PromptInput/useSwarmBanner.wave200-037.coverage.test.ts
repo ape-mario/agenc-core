@@ -71,7 +71,7 @@ const harness = vi.hoisted(() => {
   return state
 })
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
   useAppStateStore: () => ({
@@ -79,12 +79,12 @@ vi.mock('../../state/AppState.js', () => ({
   }),
 }))
 
-vi.mock('../../state/selectors.js', () => ({
+vi.mock('../../../../src/tui/state/selectors.js', () => ({
   getActiveAgentForInput: () => harness.activeAgent,
   getViewedTeammateTask: () => harness.viewedTeammate,
 }))
 
-vi.mock('../../../tools/AgentTool/agentColorManager.js', () => ({
+vi.mock('../../../../src/tools/AgentTool/agentColorManager.js', () => ({
   AGENT_COLOR_TO_THEME_COLOR: {
     blue: 'blue_FOR_SUBAGENTS_ONLY',
     cyan: 'cyan_FOR_SUBAGENTS_ONLY',
@@ -108,45 +108,45 @@ vi.mock('../../../tools/AgentTool/agentColorManager.js', () => ({
   getAgentColor: (agentType: string) => harness.agentColors.get(agentType),
 }))
 
-vi.mock('../../../utils/standaloneAgent.js', () => ({
+vi.mock('../../../../src/utils/standaloneAgent.js', () => ({
   getStandaloneAgentName: (state: typeof harness.appState) =>
     state.standaloneAgentContext?.name,
 }))
 
-vi.mock('../../../utils/swarm/backends/detection.js', () => ({
+vi.mock('../../../../src/utils/swarm/backends/detection.js', () => ({
   isInsideTmux: () =>
     harness.insideTmuxError
       ? Promise.reject(harness.insideTmuxError)
       : Promise.resolve(harness.insideTmux),
 }))
 
-vi.mock('../../../utils/log.js', () => ({
+vi.mock('../../../../src/utils/log.js', () => ({
   logError: vi.fn(),
 }))
 
-vi.mock('../../../utils/swarm/backends/registry.js', () => ({
+vi.mock('../../../../src/utils/swarm/backends/registry.js', () => ({
   getCachedDetectionResult: () => harness.cachedDetection,
   isInProcessEnabled: () => harness.inProcessEnabled,
 }))
 
-vi.mock('../../../utils/swarm/constants.js', () => ({
+vi.mock('../../../../src/utils/swarm/constants.js', () => ({
   getSwarmSocketName: () => 'agenc-swarm-test',
 }))
 
-vi.mock('../../../utils/teammate.js', () => ({
+vi.mock('../../../../src/utils/teammate.js', () => ({
   getAgentName: () => harness.teammate.agentName,
   getTeammateColor: () => harness.teammate.color,
   getTeamName: () => harness.teammate.teamName,
   isTeammate: () => harness.teammate.active,
 }))
 
-vi.mock('../../../utils/teammateContext.js', () => ({
+vi.mock('../../../../src/utils/teammateContext.js', () => ({
   isInProcessTeammate: () => harness.inProcessTeammate,
 }))
 
-import { createRoot } from '../../ink/root.js'
-import { useSwarmBanner } from './useSwarmBanner.js'
-import { logError } from '../../../utils/log.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { useSwarmBanner } from '../../../../src/tui/components/PromptInput/useSwarmBanner.js'
+import { logError } from '../../../../src/utils/log.js'
 
 type Banner = ReturnType<typeof useSwarmBanner>
 

@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { pluginsCommand } from "./plugins.js";
-import type { SlashCommandContext } from "./types.js";
-import { ConfigStore } from "../config/store.js";
+import { pluginsCommand } from "../../src/commands/plugins.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import { ConfigStore } from "../../src/config/store.js";
 
 const inventory = vi.hoisted(() => vi.fn(async () => ({ plugins: [], errors: [] })));
-vi.mock("../plugins/cli/pluginOperations.js", async importOriginal => ({
-  ...await importOriginal<typeof import("../plugins/cli/pluginOperations.js")>(),
+vi.mock("../../src/plugins/cli/pluginOperations.js", async importOriginal => ({
+  ...await importOriginal<typeof import("../../src/plugins/cli/pluginOperations.js")>(),
   listInstalledPlugins: inventory,
 }));
 

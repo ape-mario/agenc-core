@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { LLMMessage } from "../../llm/types.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
 import {
   llmMessageToAgentSummaryMessage,
   runAgentProgressEventToAgentSummaryMessage,
-} from "./transcript.js";
+} from "../../../src/services/AgentSummary/transcript.js";
 
 describe("AgentSummary transcript conversion", () => {
   it("preserves malformed tool-call JSON as raw arguments", () => {

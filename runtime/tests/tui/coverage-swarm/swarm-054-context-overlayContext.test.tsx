@@ -3,7 +3,7 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 import { createRoot, Text } from '../../../src/tui/ink.js'
 import {
   useIsModalOverlayActive,

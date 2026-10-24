@@ -17,7 +17,7 @@ import {
   registerPermissionCallback,
   registerSandboxPermissionCallback,
   unregisterPermissionCallback,
-} from './useSwarmPermissionPoller.js'
+} from '../../../src/tui/hooks/useSwarmPermissionPoller.js'
 
 describe('useSwarmPermissionPoller callback registries', () => {
   beforeEach(() => {

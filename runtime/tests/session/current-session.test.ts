@@ -16,8 +16,8 @@ import {
   requireCurrentRuntimeSession,
   runWithCurrentRuntimeSession,
   setCurrentRuntimeSession,
-} from "./current-session.js";
-import type { Session } from "./session.js";
+} from "../../src/session/current-session.js";
+import type { Session } from "../../src/session/session.js";
 
 function fakeSession(id: string): Session {
   return { conversationId: id } as unknown as Session;

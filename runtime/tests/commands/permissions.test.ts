@@ -9,29 +9,29 @@ import {
   formatRuleList,
   exportRules,
   parseRuleArgs,
-} from "./permissions.js";
+} from "../../src/commands/permissions.js";
 import {
   __setAutoModeGateResolverForTesting,
   PermissionModeRegistry,
   transitionPermissionMode,
-} from "../permissions/permission-mode.js";
-import { applyPermissionUpdate } from "../permissions/permission-updates.js";
+} from "../../src/permissions/permission-mode.js";
+import { applyPermissionUpdate } from "../../src/permissions/permission-updates.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionMode,
   type ToolPermissionContext,
-} from "../permissions/types.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "./types.js";
-import { parseToml } from "../config/loader.js";
-import { ConfigStore } from "../config/store.js";
-import { RuntimeStateRepository } from "../config/runtime-state-repository.js";
-import { resolveHomeContext } from "../config/home.js";
+} from "../../src/permissions/types.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import { parseToml } from "../../src/config/loader.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { RuntimeStateRepository } from "../../src/config/runtime-state-repository.js";
+import { resolveHomeContext } from "../../src/config/home.js";
 import {
   authorizeBypassPermissionsConsent,
   canonicalizeBypassPermissionsCwd,
   loadBypassPermissionsConsent,
-} from "../permissions/bypass-consent-state.js";
+} from "../../src/permissions/bypass-consent-state.js";
 
 function persistedBypassConsent(cwd: string) {
   const canonicalCwd = canonicalizeBypassPermissionsCwd(cwd);

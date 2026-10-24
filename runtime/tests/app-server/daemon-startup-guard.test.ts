@@ -7,7 +7,7 @@ import {
   isAgenCDaemonStartupGuardToken,
   takeAgenCDaemonStartupGuardToken,
   type AgenCDaemonStartupGuardChannel,
-} from "./daemon-startup-guard.js";
+} from "../../src/app-server/daemon-startup-guard.js";
 
 class TestGuardChannel implements AgenCDaemonStartupGuardChannel {
   peer: TestGuardChannel | null = null;

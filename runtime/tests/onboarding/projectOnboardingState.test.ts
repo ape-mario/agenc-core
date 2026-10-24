@@ -13,7 +13,7 @@ import {
   resetFirstRunOnboarding,
   shouldShowFirstRunOnboarding,
   shouldShowProjectOnboarding,
-} from "./projectOnboardingState.js";
+} from "../../src/onboarding/projectOnboardingState.js";
 
 function withTempDir<T>(prefix: string, run: (path: string) => T): T {
   const path = mkdtempSync(join(tmpdir(), prefix));

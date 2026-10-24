@@ -1,8 +1,8 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ProviderAuthReadContext } from "../../utils/auth.js";
-import { renderToString } from "../../utils/staticRender.js";
+import type { ProviderAuthReadContext } from "../../../src/utils/auth.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 import {
   TEST_REMOTE_AUTH_ENVIRONMENT,
   TEST_REMOTE_AUTH_SESSION_CONTEXT,
@@ -46,7 +46,7 @@ const mocks = vi.hoisted(() => ({
   subscriber: false,
 }));
 
-vi.mock("../../utils/auth.js", () => ({
+vi.mock("../../../src/utils/auth.js", () => ({
   selectedProviderUsesExternalAuth: (provider: string) =>
     provider !== "anthropic" && provider !== "agenc",
   getPrimaryApiKeyFromSecureStorage: () =>
@@ -61,29 +61,29 @@ vi.mock("../../utils/auth.js", () => ({
   isAgenCAISubscriberForContext: () => mocks.subscriber,
 }));
 
-vi.mock("../../utils/config.js", () => ({
+vi.mock("../../../src/utils/config.js", () => ({
   getRuntimeState: () => ({ autoInstallIdeExtension: true }),
 }));
 
-vi.mock("../../utils/format.js", () => ({
+vi.mock("../../../src/utils/format.js", () => ({
   formatNumber: (value: number) => String(value),
 }));
 
-vi.mock("../../utils/ide.js", () => ({
+vi.mock("../../../src/utils/ide.js", () => ({
   getTerminalIdeType: () => null,
   isSupportedJetBrainsTerminal: () => false,
   toIDEDisplayName: (ideType: string | null) => ideType ?? "JetBrains IDE",
 }));
 
-vi.mock("../../utils/jetbrains.js", () => ({
+vi.mock("../../../src/utils/jetbrains.js", () => ({
   isJetBrainsPluginInstalledCachedSync: () => true,
 }));
 
-vi.mock("./memoryDiagnostics.js", () => ({
+vi.mock("../../../src/tui/startup/memoryDiagnostics.js", () => ({
   buildMemoryDiagnostics: mocks.buildMemoryDiagnostics,
 }));
 
-vi.mock("../../utils/statusNoticeHelpers.js", () => ({
+vi.mock("../../../src/utils/statusNoticeHelpers.js", () => ({
   AGENT_DESCRIPTIONS_THRESHOLD: 100,
   getAgentDescriptionsTotalTokens: () => 0,
 }));
@@ -100,7 +100,7 @@ describe("StatusNotices coverage", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("renders daemon startup guidance and then reuses loaded memory diagnostics", async () => {
-    const { StatusNotices } = await import("./StatusNotices.js");
+    const { StatusNotices } = await import("../../../src/tui/startup/StatusNotices.js");
     const daemonDisabledAuthContext = providerAuthContextWithEnvironment({
       AGENC_DAEMON_AUTOSTART: "off",
     });
@@ -144,7 +144,7 @@ describe("StatusNotices coverage", () => {
     setCoreOnlyEnvironmentVariable("AGENC_DAEMON_AUTOSTART_FAILURE", reason);
     const context = providerAuthContextWithEnvironment(userRuntimeEnvironment(process.env));
     expect(context.environment.AGENC_DAEMON_AUTOSTART_FAILURE).not.toBe(reason);
-    const { StatusNotices } = await import("./StatusNotices.js");
+    const { StatusNotices } = await import("../../../src/tui/startup/StatusNotices.js");
     const output = await renderToString(
       <StatusNotices homeContext={context.home} providerAuthContext={context} stateRepository={TEST_RUNTIME_STATE_REPOSITORY} />,
       120,

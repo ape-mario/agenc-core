@@ -4,7 +4,7 @@ import {
   resolvePerToolConfig,
   toolConfigAllowsTool,
   withDisabledTools,
-} from "./config.js";
+} from "../../src/tools/config.js";
 
 describe("tools_config per-tool resolution", () => {
   test("only canonical list fields enable or disable exact tool names", () => {

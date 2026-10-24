@@ -11,8 +11,8 @@ import {
   LayoutPositionType,
   LayoutWrap,
   type LayoutNode,
-} from './layout/node.ts'
-import applyStyles, { type Styles } from './styles.ts'
+} from '../../../src/tui/ink/layout/node.js'
+import applyStyles, { type Styles } from '../../../src/tui/ink/styles.js'
 
 function createLayoutNode(): LayoutNode {
   return {

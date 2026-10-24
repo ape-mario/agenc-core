@@ -5,20 +5,20 @@ import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { sourceUrl } from "../../../helpers/source-path.ts";
 
-import { createRoot } from "../../ink/root.js";
-import { selectAgenCTuiGlyphs } from "../../glyphs.js";
-import { stringWidth } from "../../ink/stringWidth.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { selectAgenCTuiGlyphs } from "../../../../src/tui/glyphs.js";
+import { stringWidth } from "../../../../src/tui/ink/stringWidth.js";
 import {
   getSwarmSocketName,
   SWARM_SESSION_NAME,
   SWARM_VIEW_WINDOW_NAME,
-} from "../../../utils/swarm/constants.js";
-import { TeamsDialog } from "./TeamsDialog.js";
+} from "../../../../src/utils/swarm/constants.js";
+import { TeamsDialog } from "../../../../src/tui/components/teams/TeamsDialog.js";
 import {
   getTeamListFooterText,
   getTeammateDetailFooterText,
   getTeamsDialogPromptPreview,
-} from "./TeamsDialog.layout.js";
+} from "../../../../src/tui/components/teams/TeamsDialog.layout.js";
 
 type MockTeammateStatus = {
   agentId: string;
@@ -87,11 +87,11 @@ vi.mock("usehooks-ts", async importOriginal => {
     useInterval: () => {},
   };
 });
-vi.mock("../../context/overlayContext", () => ({
+vi.mock("../../../../src/tui/context/overlayContext.js", () => ({
   useRegisterOverlay: () => {},
 }));
-vi.mock("../../ink.js", async importOriginal => {
-  const actual = await importOriginal<typeof import("../../ink.js")>();
+vi.mock("../../../../src/tui/ink.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../../../src/tui/ink.js")>();
   const ReactModule = await import("react");
 
   return {
@@ -113,40 +113,40 @@ vi.mock("../../ink.js", async importOriginal => {
     },
   };
 });
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useSetAppState: () => () => {},
 }));
-vi.mock("../../../utils/teamDiscovery.js", () => ({
+vi.mock("../../../../src/utils/teamDiscovery.js", () => ({
   getTeammateStatuses: () => teammateStatusMock.statuses,
 }));
-vi.mock("../../../utils/swarm/backends/registry.js", () => ({
+vi.mock("../../../../src/utils/swarm/backends/registry.js", () => ({
   ensureBackendsRegistered: async () => {},
   getBackendByType: () => backendMock.backend,
   getCachedBackend: () => backendMock.cachedBackend,
 }));
-vi.mock("../../../utils/tasks.js", async importOriginal => {
-  const actual = await importOriginal<typeof import("../../../utils/tasks.js")>();
+vi.mock("../../../../src/utils/tasks.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../../../src/utils/tasks.js")>();
   return {
     ...actual,
     listTasks: tasksMock.listTasks,
     unassignTeammateTasks: tasksMock.unassignTeammateTasks,
   };
 });
-vi.mock("../../../utils/teammateMailbox.js", () => ({
+vi.mock("../../../../src/utils/teammateMailbox.js", () => ({
   sendShutdownRequestToMailbox: mailboxMock.sendShutdownRequestToMailbox,
 }));
-vi.mock("../../../utils/log.js", () => ({
+vi.mock("../../../../src/utils/log.js", () => ({
   logError: logMock.logError,
 }));
-vi.mock("../../../utils/swarm/teamHelpers.js", () => ({
+vi.mock("../../../../src/utils/swarm/teamHelpers.js", () => ({
   addHiddenPaneId: teamHelpersMock.addHiddenPaneId,
   removeHiddenPaneId: teamHelpersMock.removeHiddenPaneId,
   removeMemberFromTeam: teamHelpersMock.removeMemberFromTeam,
 }));
-vi.mock("../../../utils/execFileNoThrow.js", () => ({
+vi.mock("../../../../src/utils/execFileNoThrow.js", () => ({
   execFileNoThrow: execFileNoThrowMock,
 }));
-vi.mock("../../../utils/swarm/backends/detection.js", () => ({
+vi.mock("../../../../src/utils/swarm/backends/detection.js", () => ({
   getLeaderPaneId: () => "%leader",
   IT2_COMMAND: "it2",
   isInsideTmuxSync: () => false,

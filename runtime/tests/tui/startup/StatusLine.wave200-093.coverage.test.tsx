@@ -3,9 +3,9 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from '../remoteAuthSessionContext.fixture.js'
-import { StatusLine, statusLineShouldDisplay } from './StatusLine.js'
+import { StatusLine, statusLineShouldDisplay } from '../../../src/tui/startup/StatusLine.js'
 
 const mocks = vi.hoisted(() => ({
   addNotification: vi.fn(),
@@ -36,11 +36,11 @@ vi.mock('bun:bundle', () => ({
   feature: mocks.feature,
 }))
 
-vi.mock('../../constants/outputStyles.js', () => ({
+vi.mock('../../../src/constants/outputStyles.js', () => ({
   DEFAULT_OUTPUT_STYLE_NAME: 'default-style',
 }))
 
-vi.mock('../../bootstrap/state.js', () => ({
+vi.mock('../../../src/bootstrap/state.js', () => ({
   flushInteractionTime: () => {},
   getActiveTimeCounter: () => 0,
   getIsRemoteMode: () => true,
@@ -51,7 +51,7 @@ vi.mock('../../bootstrap/state.js', () => ({
   updateLastInteractionTime: () => {},
 }))
 
-vi.mock('../../cost/tracker.js', () => ({
+vi.mock('../../../src/cost/tracker.js', () => ({
   getTotalAPIDuration: () => 2345,
   getTotalCost: () => 1.25,
   getTotalDuration: () => 3456,
@@ -61,11 +61,11 @@ vi.mock('../../cost/tracker.js', () => ({
   getTotalOutputTokens: () => 222,
 }))
 
-vi.mock('../hooks/useMainLoopModel.js', () => ({
+vi.mock('../../../src/tui/hooks/useMainLoopModel.js', () => ({
   useMainLoopModel: () => 'gpt-5',
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     disableAllHooks: true,
     outputStyle: 'compact',
@@ -73,73 +73,73 @@ vi.mock('../hooks/useSettings.js', () => ({
   }),
 }))
 
-vi.mock('../context/notifications.js', () => ({
+vi.mock('../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => ({
     addNotification: mocks.addNotification,
   }),
 }))
 
-vi.mock('../../hooks/execution-authority.js', () => ({
+vi.mock('../../../src/hooks/execution-authority.js', () => ({
   resolveAmbientHookExecutionDecision: mocks.hookExecutionDecision,
 }))
 
-vi.mock('../../utils/config.js', () => ({
+vi.mock('../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({ tui: {} }),
 }))
 
-vi.mock('../../utils/settings/canonicalAuthority.js', async importOriginal => ({
+vi.mock('../../../src/utils/settings/canonicalAuthority.js', async importOriginal => ({
   ...(await importOriginal<
-    typeof import('../../utils/settings/canonicalAuthority.js')
+    typeof import('../../../src/utils/settings/canonicalAuthority.js')
   >()),
   getCanonicalSettingsAuthority: () => ({
     current: () => ({ tui: {} }),
   }),
 }))
 
-vi.mock('../../utils/context.js', () => ({
+vi.mock('../../../src/utils/context.js', () => ({
   calculateContextPercentages: () => ({ used: 2, remaining: 98 }),
   getContextWindowForModelForContext: mocks.getContextWindowForModel,
 }))
 
-vi.mock('../../utils/cwd.js', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => '/workspace/app',
 }))
 
-vi.mock('../../utils/debug.js', () => ({
+vi.mock('../../../src/utils/debug.js', () => ({
   logForDebugging: mocks.logForDebugging,
 }))
 
-vi.mock('../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => false,
 }))
 
-vi.mock('../../utils/hooks.js', () => ({
+vi.mock('../../../src/utils/hooks.js', () => ({
   createBaseHookInput: () => ({
     transcript_path: '/workspace/transcript.jsonl',
   }),
   executeStatusLineCommand: mocks.executeStatusLineCommand,
 }))
 
-vi.mock('../../utils/messages.js', () => ({
+vi.mock('../../../src/utils/messages.js', () => ({
   getLastAssistantMessage: (messages: Array<{ uuid?: string }>) =>
     messages.at(-1),
 }))
 
-vi.mock('../../utils/model/model.js', () => ({
+vi.mock('../../../src/utils/model/model.js', () => ({
   renderModelName: (model: string) => `Rendered ${model}`,
 }))
 
-vi.mock('../../utils/sessionStorage.js', () => ({
+vi.mock('../../../src/utils/sessionStorage.js', () => ({
   getCurrentSessionTitle: () => 'Wave 093 session',
 }))
 
-vi.mock('../../utils/tokens.js', () => ({
+vi.mock('../../../src/utils/tokens.js', () => ({
   doesMostRecentAssistantMessageExceed200k:
     mocks.doesMostRecentAssistantMessageExceed200k,
   getCurrentUsage: mocks.getCurrentUsage,
 }))
 
-vi.mock('../../utils/worktree.js', () => ({
+vi.mock('../../../src/utils/worktree.js', () => ({
   getCurrentWorktreeSession: () => ({
     worktreeName: 'coverage-worker',
     worktreePath: '/workspace/worktrees/coverage-worker',
@@ -149,7 +149,7 @@ vi.mock('../../utils/worktree.js', () => ({
   }),
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: Record<string, unknown>) => unknown) =>
     selector(mocks.appState),
   useSetAppState: () => (next: unknown) => {

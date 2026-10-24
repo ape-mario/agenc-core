@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inactiveAgentMessageForTest } from "./agent-lifecycle.js";
+import { inactiveAgentMessageForTest } from "../../src/app-server/agent-lifecycle.js";
 
 describe("message for an agent that cannot take work", () => {
   // Regression: a model turn was denied `context_window_exceeded`, the run

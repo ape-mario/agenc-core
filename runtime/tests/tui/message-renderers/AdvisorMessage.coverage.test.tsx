@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import type { AdvisorBlock } from '../../utils/advisor.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { AdvisorMessage } from './AdvisorMessage.js'
+import type { AdvisorBlock } from '../../../src/utils/advisor.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { AdvisorMessage } from '../../../src/tui/message-renderers/AdvisorMessage.js'
 
 function normalize(text: string): string {
   return text.replace(/\s+/g, ' ').trim()

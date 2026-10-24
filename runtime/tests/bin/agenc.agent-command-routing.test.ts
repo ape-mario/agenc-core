@@ -7,9 +7,9 @@ const agentCliMocks = vi.hoisted(() => ({
   runAgenCAgentCli: vi.fn(),
 }));
 
-vi.mock("../app-server/agent-cli.js", async (importOriginal) => {
+vi.mock("../../src/app-server/agent-cli.js", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../app-server/agent-cli.js")>();
+    await importOriginal<typeof import("../../src/app-server/agent-cli.js")>();
   return {
     ...actual,
     defaultEnsureDaemonReady: agentCliMocks.defaultEnsureDaemonReady,
@@ -40,7 +40,7 @@ describe("agent command routing", () => {
     ]);
     agentCliMocks.runAgenCAgentCli.mockResolvedValue(0);
     try {
-      const { main } = await import("./agenc-main.js");
+      const { main } = await import("../../src/bin/agenc-main.js");
 
       await expect(main()).resolves.toBe(0);
 
@@ -66,7 +66,7 @@ describe("agent command routing", () => {
     ]);
     agentCliMocks.runAgenCAgentCli.mockResolvedValue(0);
     try {
-      const { main } = await import("./agenc-main.js");
+      const { main } = await import("../../src/bin/agenc-main.js");
 
       await expect(main()).resolves.toBe(0);
 
@@ -87,7 +87,7 @@ describe("agent command routing", () => {
   });
 
   it("overrides AGENC_WORKSPACE for attach bootstrap cwd", async () => {
-    const { envForAttachBootstrap } = await import("./agenc-main.js");
+    const { envForAttachBootstrap } = await import("../../src/bin/agenc-main.js");
 
     expect(
       envForAttachBootstrap(

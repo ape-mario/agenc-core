@@ -8,7 +8,7 @@ import {
   liveEffectRefusalsSinceReview,
   poisonLiveEffect,
   resolveLiveEffectPoison,
-} from "./effect-settlement-supervisor.js";
+} from "../../src/budget/effect-settlement-supervisor.js";
 
 /**
  * Regression from a live hardware-debugging session.

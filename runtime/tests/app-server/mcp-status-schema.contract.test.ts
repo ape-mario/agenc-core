@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { sourceUrl } from "../helpers/source-path.ts";
-import { JSON_RPC_VERSION, type SessionMcpStatusResult } from "./protocol/index.js";
+import { JSON_RPC_VERSION, type SessionMcpStatusResult } from "../../src/app-server/protocol/index.js";
 
 describe("session MCP status schema", () => {
   it("publishes the opt-in stopped state for on-demand MCP servers", () => {

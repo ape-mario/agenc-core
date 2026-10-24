@@ -52,7 +52,7 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => harness.features.has(name),
 }))
 
-vi.mock('../../../services/compact/autoCompact.js', () => ({
+vi.mock('../../../../src/services/compact/autoCompact.js', () => ({
   calculateTokenWarningStateForEnvironment: (
     tokenUsage: number,
     model: string,
@@ -67,7 +67,7 @@ vi.mock('../../../services/compact/autoCompact.js', () => ({
   },
 }))
 
-vi.mock('../../../auth/session-state.js', () => ({
+vi.mock('../../../../src/auth/session-state.js', () => ({
   hasEntitledRemoteAuthSessionSync: (context: unknown) => {
     harness.remoteAuthContexts.push(context)
     return harness.remoteManagedKeys
@@ -82,24 +82,24 @@ vi.mock('../../../auth/session-state.js', () => ({
   },
 }))
 
-vi.mock('../../../utils/auth.js', () => ({
+vi.mock('../../../../src/utils/auth.js', () => ({
   getSubscriptionTypeForContext: () => harness.subscriptionType,
 }))
 
-vi.mock('../../../bootstrap/state.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../../bootstrap/state.js')>()
+vi.mock('../../../../src/bootstrap/state.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../src/bootstrap/state.js')>()
   return {
     ...actual,
     getIsRemoteMode: () => harness.remoteMode,
   }
 })
 
-vi.mock('../../../utils/editor.js', () => ({
+vi.mock('../../../../src/utils/editor.js', () => ({
   getExternalEditor: () => harness.editor,
 }))
 
-vi.mock('../../../utils/envUtils.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../../utils/envUtils.js')>()
+vi.mock('../../../../src/utils/envUtils.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../src/utils/envUtils.js')>()
   return {
     ...actual,
     isEnvTruthy: (value: string | undefined) =>
@@ -107,11 +107,11 @@ vi.mock('../../../utils/envUtils.js', async importOriginal => {
   }
 })
 
-vi.mock('../../../utils/format.js', () => ({
+vi.mock('../../../../src/utils/format.js', () => ({
   formatDuration: (ms: number) => `${ms}ms`,
 }))
 
-vi.mock('../../../utils/hooks/cwdChangedHooks.js', () => ({
+vi.mock('../../../../src/utils/hooks/cwdChangedHooks.js', () => ({
   setEnvHookNotifier: (
     notifier: null | ((text: string, isError?: boolean) => void),
   ) => {
@@ -119,15 +119,15 @@ vi.mock('../../../utils/hooks/cwdChangedHooks.js', () => ({
   },
 }))
 
-vi.mock('../../../utils/ide.js', () => ({
+vi.mock('../../../../src/utils/ide.js', () => ({
   toIDEDisplayName: (editor: string) => `IDE:${editor}`,
 }))
 
-vi.mock('../../../utils/messages.js', () => ({
+vi.mock('../../../../src/utils/messages.js', () => ({
   getMessagesAfterCompactBoundary: (messages: unknown[]) => messages,
 }))
 
-vi.mock('../../../utils/model/providers.js', () => ({
+vi.mock('../../../../src/utils/model/providers.js', () => ({
   usesAnthropicAccountFlow: () => harness.usesAnthropicAccountFlow,
   // The harness drives auth-flow visibility through usesAnthropicAccountFlow;
   // the registry gate stays inert so existing cases keep exercising the
@@ -135,36 +135,36 @@ vi.mock('../../../utils/model/providers.js', () => ({
   isRegistryOwnedNonAnthropicModel: () => false,
 }))
 
-vi.mock('../../../utils/tokens.js', () => ({
+vi.mock('../../../../src/utils/tokens.js', () => ({
   tokenCountFromLastAPIResponse: () => harness.tokenUsage,
 }))
 
-vi.mock('../../context/notifications.js', () => ({
+vi.mock('../../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => ({
     addNotification: harness.addNotification,
     removeNotification: harness.removeNotification,
   }),
 }))
 
-vi.mock('../../hooks/useIdeConnectionStatus.js', () => ({
+vi.mock('../../../../src/tui/hooks/useIdeConnectionStatus.js', () => ({
   useIdeConnectionStatus: (mcpClients: unknown) => {
     harness.mcpClientsSeen = mcpClients
     return { status: harness.ideStatus }
   },
 }))
 
-vi.mock('../../hooks/useMainLoopModel.js', () => ({
+vi.mock('../../../../src/tui/hooks/useMainLoopModel.js', () => ({
   useMainLoopModel: () => harness.model,
 }))
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
 }))
 
-vi.mock('../AutoUpdaterWrapper.js', async () => {
+vi.mock('../../../../src/tui/components/AutoUpdaterWrapper.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     AutoUpdaterWrapper: (props: Record<string, unknown>) => {
       harness.autoUpdaterProps.push(props)
@@ -178,9 +178,9 @@ vi.mock('../AutoUpdaterWrapper.js', async () => {
   }
 })
 
-vi.mock('../ConfigurableShortcutHint.js', async () => {
+vi.mock('../../../../src/tui/components/ConfigurableShortcutHint.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     ConfigurableShortcutHint: ({
       description,
@@ -193,9 +193,9 @@ vi.mock('../ConfigurableShortcutHint.js', async () => {
   }
 })
 
-vi.mock('../IdeStatusIndicator.js', async () => {
+vi.mock('../../../../src/tui/components/IdeStatusIndicator.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     IdeStatusIndicator: ({
       ideSelection,
@@ -212,23 +212,23 @@ vi.mock('../IdeStatusIndicator.js', async () => {
   }
 })
 
-vi.mock('../../cost/MemoryUsageIndicator.js', async () => {
+vi.mock('../../../../src/tui/cost/MemoryUsageIndicator.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     MemoryUsageIndicator: () =>
       ReactModule.createElement(Text, null, 'MemoryUsage'),
   }
 })
 
-vi.mock('../TuiErrorBoundary.js', () => ({
+vi.mock('../../../../src/tui/components/TuiErrorBoundary.js', () => ({
   TuiErrorBoundary: ({ children }: { children: React.ReactNode }) =>
     React.createElement(React.Fragment, null, children),
 }))
 
-vi.mock('../../cost/TokenWarning.js', async () => {
+vi.mock('../../../../src/tui/cost/TokenWarning.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     TokenWarning: ({
       environment,
@@ -245,18 +245,18 @@ vi.mock('../../cost/TokenWarning.js', async () => {
   }
 })
 
-vi.mock('./SandboxPromptFooterHint.js', async () => {
+vi.mock('../../../../src/tui/components/PromptInput/SandboxPromptFooterHint.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../../ink.js')
+  const { Text } = await import('../../../../src/tui/ink.js')
   return {
     SandboxPromptFooterHint: () =>
       ReactModule.createElement(Text, null, 'SandboxHint'),
   }
 })
 
-import { createRoot } from '../../ink/root.js'
-import { Text } from '../../ink.js'
-import { Notifications } from './Notifications.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { Text } from '../../../../src/tui/ink.js'
+import { Notifications } from '../../../../src/tui/components/PromptInput/Notifications.js'
 
 type RenderedNotifications = {
   dispose: () => Promise<void>

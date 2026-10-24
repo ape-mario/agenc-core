@@ -4,7 +4,7 @@ import {
   getTeammateFooterLayout,
   TEAMMATE_FOOTER_EXPAND_HINT_COLUMNS,
   TEAMMATE_FOOTER_SCROLL_ARROW_COLUMNS,
-} from "./BackgroundTaskStatus.layout.js";
+} from "../../../../src/tui/components/tasks/BackgroundTaskStatus.layout.js";
 
 function renderedColumns(layout: ReturnType<typeof getTeammateFooterLayout>): number {
   const pillColumns = layout.visiblePillWidths.reduce(

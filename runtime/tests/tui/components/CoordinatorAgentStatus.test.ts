@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   getCoordinatorTaskCount,
   getVisibleAgentTasks,
-} from "./CoordinatorAgentStatus.js";
+} from "../../../src/tui/components/CoordinatorAgentStatus.js";
 
 const task = (id: string, extra: Record<string, unknown> = {}) => ({
   id,

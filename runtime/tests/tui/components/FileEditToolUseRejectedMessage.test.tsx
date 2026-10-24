@@ -1,25 +1,25 @@
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { ContentWidthProvider } from '../context/contentWidthContext.js'
-import { Text } from '../ink.js'
-import { FileEditToolUseRejectedMessage } from './FileEditToolUseRejectedMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { ContentWidthProvider } from '../../../src/tui/context/contentWidthContext.js'
+import { Text } from '../../../src/tui/ink.js'
+import { FileEditToolUseRejectedMessage } from '../../../src/tui/components/FileEditToolUseRejectedMessage.js'
 
 const renderHarness = vi.hoisted(() => ({
   highlightedCode: [] as Array<Record<string, unknown>>,
   structuredDiffs: [] as Array<Record<string, unknown>>,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 80, rows: 24 }),
 }))
 
-vi.mock('../../utils/cwd.js', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => '/repo',
 }))
 
-vi.mock('./markdown/HighlightedCode.js', () => ({
+vi.mock('../../../src/tui/components/markdown/HighlightedCode.js', () => ({
   HighlightedCode: (props: {
     code: string
     filePath: string
@@ -30,7 +30,7 @@ vi.mock('./markdown/HighlightedCode.js', () => ({
   },
 }))
 
-vi.mock('./diff/StructuredDiffList.js', () => ({
+vi.mock('../../../src/tui/components/diff/StructuredDiffList.js', () => ({
   StructuredDiffList: (props: {
     filePath: string
     firstLine: string | null

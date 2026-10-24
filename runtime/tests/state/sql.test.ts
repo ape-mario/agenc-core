@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sqlPlaceholders } from "./sql.js";
+import { sqlPlaceholders } from "../../src/state/sql.js";
 
 describe("sqlPlaceholders", () => {
   it("formats comma-separated SQLite bind placeholders", () => {

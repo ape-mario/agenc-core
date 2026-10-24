@@ -82,11 +82,11 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => harness.features.has(name),
 }));
 
-vi.mock("../../../coordinator/coordinatorMode.js", () => ({
+vi.mock("../../../../src/coordinator/coordinatorMode.js", () => ({
   isCoordinatorMode: () => harness.isCoordinator,
 }));
 
-vi.mock("../../keybindings/useShortcutDisplay.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useShortcutDisplay.js", () => ({
   useShortcutDisplay: (command: string) => {
     if (command === "chat:cancel") return "esc";
     if (command === "app:toggleTodos") return "ctrl+t";
@@ -96,9 +96,9 @@ vi.mock("../../keybindings/useShortcutDisplay.js", () => ({
   },
 }));
 
-vi.mock("../tasks/BackgroundTaskStatus.js", async () => {
+vi.mock("../../../../src/tui/components/tasks/BackgroundTaskStatus.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
   return {
     BackgroundTaskStatus: (props: Record<string, unknown>) =>
       ReactModule.createElement(
@@ -109,61 +109,61 @@ vi.mock("../tasks/BackgroundTaskStatus.js", async () => {
   };
 });
 
-vi.mock("../CoordinatorAgentStatus.js", () => ({
+vi.mock("../../../../src/tui/components/CoordinatorAgentStatus.js", () => ({
   getVisibleAgentTasks: () => [],
 }));
 
-vi.mock("../teams/TeamStatus.js", async () => {
+vi.mock("../../../../src/tui/components/teams/TeamStatus.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
   return {
     TeamStatus: () => ReactModule.createElement(Text, null, "team-pill"),
   };
 });
 
-vi.mock("../../../tasks/types.js", () => ({
+vi.mock("../../../../src/tasks/types.js", () => ({
   isBackgroundTask: (task: { readonly status?: string }) =>
     task.status === "pending" || task.status === "running",
 }));
 
-vi.mock("../tasks/taskStatusUtils.js", () => ({
+vi.mock("../../../../src/tui/components/tasks/taskStatusUtils.js", () => ({
   shouldHideTasksFooter: () => false,
 }));
 
-vi.mock("../../../utils/agentSwarmsEnabled.js", () => ({
+vi.mock("../../../../src/utils/agentSwarmsEnabled.js", () => ({
   isAgentSwarmsEnabled: () => harness.swarmsEnabled,
 }));
 
-vi.mock("../../../utils/swarm/backends/registry.js", () => ({
+vi.mock("../../../../src/utils/swarm/backends/registry.js", () => ({
   isInProcessEnabled: () => harness.inProcessEnabled,
 }));
 
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
   useAppStateStore: () => ({ getState: () => harness.appState }),
 }));
 
-vi.mock("../../../bootstrap/state.js", () => ({
+vi.mock("../../../../src/bootstrap/state.js", () => ({
   flushInteractionTime: vi.fn(),
   getIsRemoteMode: () => harness.isRemoteMode,
 }));
 
-vi.mock("./HistorySearchInput.js", async () => {
+vi.mock("../../../../src/tui/components/PromptInput/HistorySearchInput.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
   return {
     default: () => ReactModule.createElement(Text, null, "history-search"),
   };
 });
 
-vi.mock("../../hooks/usePrStatus.js", () => ({
+vi.mock("../../../../src/tui/hooks/usePrStatus.js", () => ({
   usePrStatus: () => harness.prStatus,
 }));
 
-vi.mock("../design-system/KeyboardShortcutHint.js", async () => {
+vi.mock("../../../../src/tui/components/design-system/KeyboardShortcutHint.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
   return {
     KeyboardShortcutHint: ({
       action,
@@ -175,7 +175,7 @@ vi.mock("../design-system/KeyboardShortcutHint.js", async () => {
   };
 });
 
-vi.mock("../design-system/Byline.js", async () => {
+vi.mock("../../../../src/tui/components/design-system/Byline.js", async () => {
   const ReactModule = await import("react");
   return {
     Byline: ({ children }: { readonly children?: React.ReactNode }) =>
@@ -183,59 +183,59 @@ vi.mock("../design-system/Byline.js", async () => {
   };
 });
 
-vi.mock("../../hooks/useTerminalSize.js", () => ({
+vi.mock("../../../../src/tui/hooks/useTerminalSize.js", () => ({
   useTerminalSize: () => ({ columns: harness.columns, rows: 24 }),
 }));
 
-vi.mock("../../hooks/useTasksV2.js", () => ({
+vi.mock("../../../../src/tui/hooks/useTasksV2.js", () => ({
   useTasksV2: () => harness.tasksV2,
 }));
 
-vi.mock("../../hooks/useSettings.js", () => ({
+vi.mock("../../../../src/tui/hooks/useSettings.js", () => ({
   useSettings: () => harness.config,
 }));
 
-vi.mock("../../context/fullscreenModeContext.js", () => ({
+vi.mock("../../../../src/tui/context/fullscreenModeContext.js", () => ({
   useFullscreenMode: () => harness.fullscreen,
 }));
 
-vi.mock("../../ink/terminal.js", async importOriginal => {
-  const actual = await importOriginal<typeof import("../../ink/terminal.js")>();
+vi.mock("../../../../src/tui/ink/terminal.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../../../src/tui/ink/terminal.js")>();
   return {
     ...actual,
     isXtermJs: () => harness.isXterm,
   };
 });
 
-vi.mock("../../ink/hooks/use-selection.js", () => ({
+vi.mock("../../../../src/tui/ink/hooks/use-selection.js", () => ({
   useHasSelection: () => harness.hasSelection,
   useSelection: () => ({ getState: () => harness.selectionState }),
 }));
 
-vi.mock("../../../utils/config.js", () => ({
+vi.mock("../../../../src/utils/config.js", () => ({
   getRuntimeState: () => harness.config,
 }));
 
-vi.mock("../../../utils/platform.js", () => ({
+vi.mock("../../../../src/utils/platform.js", () => ({
   getPlatform: () => harness.platform,
 }));
 
-vi.mock("../PrBadge.js", async () => {
+vi.mock("../../../../src/tui/components/PrBadge.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
   return {
     PrBadge: () => ReactModule.createElement(Text, null, "pr-pill"),
   };
 });
 
-vi.mock("./proactiveAdapter.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/proactiveAdapter.js", () => ({
   getPromptInputProactiveNextTickAt: () => harness.proactiveNextTickAt,
   isPromptInputProactiveActive: () => harness.proactiveActive,
   subscribeToPromptInputProactiveChanges: () => () => {},
 }));
 
-import { createRoot } from "../../ink.js";
-import { PromptInputFooterLeftSide } from "./PromptInputFooterLeftSide.js";
+import { createRoot } from "../../../../src/tui/ink.js";
+import { PromptInputFooterLeftSide } from "../../../../src/tui/components/PromptInput/PromptInputFooterLeftSide.js";
 
 function createStreams(): {
   readonly stdin: PassThrough & {

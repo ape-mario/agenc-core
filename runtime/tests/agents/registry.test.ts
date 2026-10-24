@@ -16,8 +16,8 @@ import {
   joinAgentPath,
   normalizeAgentNameForPath,
   resolveAgentPath,
-} from "./registry.js";
-import { createAgentRoleWorkspace, resolveAgentRole } from "./role.js";
+} from "../../src/agents/registry.js";
+import { createAgentRoleWorkspace, resolveAgentRole } from "../../src/agents/role.js";
 
 const ROLE_WORKSPACE = createAgentRoleWorkspace(process.cwd());
 

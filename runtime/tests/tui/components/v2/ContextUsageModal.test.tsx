@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { ContextUsageModal } from './ContextUsageModal.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { ContextUsageModal } from '../../../../src/tui/components/v2/ContextUsageModal.js'
 
 describe('ContextUsageModal', () => {
   it('renders structured context usage in the v2 modal shell', async () => {

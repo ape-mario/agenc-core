@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { getSelectedLinesAttachmentPrefix } from './AttachmentMessage.js';
+import { getSelectedLinesAttachmentPrefix } from '../../../src/tui/message-renderers/AttachmentMessage.js';
 
 describe('AttachmentMessage rendering helpers', () => {
   it('uses an ascii selected-lines prefix when requested', () => {

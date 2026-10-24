@@ -3,14 +3,14 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import {
   type MessageActionCaps,
   type MessageActionsNav,
   type MessageActionsState,
   type NavigableMessage,
   useMessageActions,
-} from './messageActions.js'
+} from '../../../src/tui/components/messageActions.js'
 
 function createStreams(): {
   stdout: PassThrough

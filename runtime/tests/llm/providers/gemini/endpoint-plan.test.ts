@@ -5,8 +5,8 @@ import {
   createGeminiEndpointPlan,
   geminiEndpointFor,
   parseGeminiEndpointPlan,
-} from "./endpoint-plan.js";
-import { GEMINI_DEVELOPER_NATIVE_BASE_URL } from "../../registry/provider-info.js";
+} from "../../../../src/llm/providers/gemini/endpoint-plan.js";
+import { GEMINI_DEVELOPER_NATIVE_BASE_URL } from "../../../../src/llm/registry/provider-info.js";
 
 describe("Gemini endpoint plan", () => {
   test("creates the exact immutable Developer API endpoint", () => {

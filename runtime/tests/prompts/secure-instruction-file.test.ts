@@ -14,7 +14,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   ExternalInstructionApprovalStore,
   readInstructionFileSnapshot,
-} from "./secure-instruction-file.js";
+} from "../../src/prompts/secure-instruction-file.js";
 
 const roots: string[] = [];
 

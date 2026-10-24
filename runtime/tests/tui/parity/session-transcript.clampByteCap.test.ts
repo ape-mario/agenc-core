@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { makeToolResultMessage } from "../session-transcript.js";
+import { makeToolResultMessage } from "../../../src/tui/session-transcript.js";
 
 // GAP #6 regression: clampResultText must cap by UTF-8 BYTE length, not by JS
 // character count. The buggy version sliced `text.slice(0, MAX_BYTES)`

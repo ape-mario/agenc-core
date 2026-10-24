@@ -4,18 +4,18 @@
 // while inactive runs retain the durable offline cascade.
 
 import { describe, expect, it, vi } from "vitest";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
 import {
   AgenCDaemonJsonRpcDispatcher,
   type AgenCDaemonWorkflowStartService,
-} from "./daemon-dispatcher.js";
+} from "../../src/app-server/daemon-dispatcher.js";
 import {
   AGENC_DAEMON_METHOD_CAPABILITIES_KEY,
   JSON_RPC_VERSION,
   type JsonObject,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import type { CancelAgentRunTreeReport } from "../../src/state/run-cancellation.js";
-import type { AgenCBackgroundAgentTerminalSnapshot } from "./background-agent-runner.js";
+import type { AgenCBackgroundAgentTerminalSnapshot } from "../../src/app-server/background-agent-runner.js";
 
 function request(id: string, method: string, params?: JsonObject): JsonObject {
   return {

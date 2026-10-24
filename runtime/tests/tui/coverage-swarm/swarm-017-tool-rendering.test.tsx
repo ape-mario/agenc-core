@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("../ink.js", () => {
+vi.mock("../../../src/tui/ink.js", () => {
   function Box(_props: { readonly children?: unknown }) {
     return null;
   }
@@ -10,7 +10,7 @@ vi.mock("../ink.js", () => {
   return { Box, Text };
 });
 
-import { ResultLine } from "../components/v2/primitives.js";
+import { ResultLine } from "../../../src/tui/components/v2/primitives.js";
 import {
   BashOutputView,
   createTuiTool,
@@ -19,7 +19,7 @@ import {
   GlobPathsView,
   GrepMatchesView,
   ToolErrorView,
-} from "../tool-rendering.js";
+} from "../../../src/tui/tool-rendering.js";
 
 interface ChildProps {
   readonly bold?: boolean;

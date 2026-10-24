@@ -1,23 +1,23 @@
 import { describe, expect, test } from "vitest";
-import { buildInitialTurnState } from "../session/turn-state.js";
+import { buildInitialTurnState } from "../../src/session/turn-state.js";
 import {
   isCompactionTierFailure,
   postSampleRecovery,
   runContextCollapseOverflowRecovery,
-} from "./post-sample-recovery.js";
+} from "../../src/phases/post-sample-recovery.js";
 import {
   CompactionCannotReduceError,
   CompactionFailurePersistenceError,
   CompactionTransactionError,
-} from "../services/compact/transaction-types.js";
-import { findToolTurnValidationIssue } from "../llm/tool-turn-validator.js";
+} from "../../src/services/compact/transaction-types.js";
+import { findToolTurnValidationIssue } from "../../src/llm/tool-turn-validator.js";
 import { mkCtx, mkSession } from "../../tests/fixtures.js";
-import type { LLMMessage } from "../llm/types.js";
-import type { TurnContext } from "../session/turn-context.js";
+import type { LLMMessage } from "../../src/llm/types.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
 import { createCompactionTransactionHarness } from "../helpers/compaction-transaction-harness.js";
-import { createToolResultIntegrity } from "../session/tool-result-integrity.js";
-import type { RuntimeMessage } from "../services/compact/types.js";
-import { LLMContextWindowExceededError } from "../llm/errors.js";
+import { createToolResultIntegrity } from "../../src/session/tool-result-integrity.js";
+import type { RuntimeMessage } from "../../src/services/compact/types.js";
+import { LLMContextWindowExceededError } from "../../src/llm/errors.js";
 
 function seedMessages(): LLMMessage[] {
   return [

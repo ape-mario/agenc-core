@@ -22,14 +22,14 @@ const voice = vi.hoisted(() => ({
   stopRecording: vi.fn<() => void>(),
 }));
 
-vi.mock("../../services/voice.js", () => voice);
+vi.mock("../../../src/services/voice.js", () => voice);
 
 import {
   createProcessRealtimeAudioPlayer,
   startDefaultRealtimeAudioCapture,
   type RealtimeAudioCaptureCallbacks,
   type RealtimeAudioPlayerSpawn,
-} from "./audio.js";
+} from "../../../src/tui/realtime/audio.js";
 
 function captureCallbacks(): RealtimeAudioCaptureCallbacks {
   return {

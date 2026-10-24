@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Session } from "../../session/session.js";
+import type { Session } from "../../../src/session/session.js";
 import { mkSession } from "../../fixtures.js";
 import { formatSubagentNotification } from "../../../src/agents/status.js";
-import { createWaitAgentTool } from "./wait.js";
-import type { MultiAgentV2Options } from "./common.js";
+import { createWaitAgentTool } from "../../../src/agents/v2/wait.js";
+import type { MultiAgentV2Options } from "../../../src/agents/v2/common.js";
 
 function fixture(options?: {
   readonly maxConsecutiveWaitTimeouts?: number;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { DegradedStore } from "./degraded-store.js";
+import { DegradedStore } from "../../src/session/degraded-store.js";
 
 describe("DegradedStore (I-12, I-38, I-43)", () => {
   test("append accumulates + evicts on overflow", () => {

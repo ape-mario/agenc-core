@@ -3,23 +3,23 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { AlternateScreen } from './AlternateScreen.js'
-import Text from './Text.js'
-import { TerminalSizeContext } from './TerminalSizeContext.js'
-import type { DOMElement } from '../dom.ts'
+import { AlternateScreen } from '../../../../src/tui/ink/components/AlternateScreen.js'
+import Text from '../../../../src/tui/ink/components/Text.js'
+import { TerminalSizeContext } from '../../../../src/tui/ink/components/TerminalSizeContext.js'
+import type { DOMElement } from '../../../../src/tui/ink/dom.js'
 import {
   deleteInkInstance,
   getInkInstance,
   setInkInstance,
-} from '../instances.js'
-import { createRoot } from '../root.js'
+} from '../../../../src/tui/ink/instances.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
 import {
   DISABLE_MOUSE_TRACKING,
   ENABLE_MOUSE_TRACKING,
   ENTER_ALT_SCREEN,
   EXIT_ALT_SCREEN,
-} from '../termio/dec.js'
-import { TerminalWriteProvider } from '../useTerminalNotification.js'
+} from '../../../../src/tui/ink/termio/dec.js'
+import { TerminalWriteProvider } from '../../../../src/tui/ink/useTerminalNotification.js'
 
 type TestStdout = PassThrough & {
   columns: number

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createTempWorkspaceFixture } from "../helpers/temp-workspace.js";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 import {
   JSON_RPC_VERSION,
   type AgenCDaemonSessionNotification,
   type JsonObject,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 const workspaces = createTempWorkspaceFixture(
   "agenc-disconnect-resilience-workspace-",

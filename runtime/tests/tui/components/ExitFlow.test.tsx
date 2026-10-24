@@ -1,10 +1,10 @@
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { Text } from "../ink.js";
-import { ExitFlow } from "./ExitFlow.js";
-import { gracefulShutdown } from "../../utils/gracefulShutdown.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { Text } from "../../../src/tui/ink.js";
+import { ExitFlow } from "../../../src/tui/components/ExitFlow.js";
+import { gracefulShutdown } from "../../../src/utils/gracefulShutdown.js";
 
 const mocks = vi.hoisted(() => ({
   dialogProps: undefined as
@@ -21,11 +21,11 @@ vi.mock("lodash-es/sample.js", () => ({
   default: () => mocks.sampleResult,
 }));
 
-vi.mock("../../utils/gracefulShutdown.js", () => ({
+vi.mock("../../../src/utils/gracefulShutdown.js", () => ({
   gracefulShutdown: vi.fn(async () => {}),
 }));
 
-vi.mock("./WorktreeExitDialog", () => ({
+vi.mock("../../../src/tui/components/WorktreeExitDialog.js", () => ({
   WorktreeExitDialog: (props: {
     beforeMutation?: () => boolean | Promise<boolean>;
     onCancel?: () => void;

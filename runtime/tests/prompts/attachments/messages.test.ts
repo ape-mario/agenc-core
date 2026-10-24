@@ -5,8 +5,8 @@
  */
 import { describe, expect, test } from "vitest";
 
-import { attachmentsToMessages } from "./messages.js";
-import type { Attachment } from "./types.js";
+import { attachmentsToMessages } from "../../../src/prompts/attachments/messages.js";
+import type { Attachment } from "../../../src/prompts/attachments/types.js";
 
 describe("attachmentsToMessages", () => {
   test("returns an empty array when no attachments are passed", () => {

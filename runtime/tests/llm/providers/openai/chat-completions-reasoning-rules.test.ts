@@ -6,8 +6,8 @@
 // /v1/chat/completions", seen live) and never accepted on GPT-6 Astra. The
 // OpenAI provider reaches Chat Completions through useResponsesApi: false.
 import { describe, expect, test, vi } from "vitest";
-import type { LLMChatOptions, LLMTool } from "../../types.js";
-import { OpenAIProvider } from "./adapter.js";
+import type { LLMChatOptions, LLMTool } from "../../../../src/llm/types.js";
+import { OpenAIProvider } from "../../../../src/llm/providers/openai/adapter.js";
 
 const TOOL: LLMTool = {
   type: "function",

@@ -1,9 +1,9 @@
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import Text from "../../ink/components/Text.js";
-import { renderToString } from "../../../utils/staticRender.js";
-import { usePromptInputPlaceholder } from "./usePromptInputPlaceholder.js";
+import Text from "../../../../src/tui/ink/components/Text.js";
+import { renderToString } from "../../../../src/utils/staticRender.js";
+import { usePromptInputPlaceholder } from "../../../../src/tui/components/PromptInput/usePromptInputPlaceholder.js";
 
 const mocks = vi.hoisted(() => ({
   exampleCommand: "/example",
@@ -17,11 +17,11 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => mocks.features[name] === true,
 }));
 
-vi.mock("../../hooks/useCommandQueue.js", () => ({
+vi.mock("../../../../src/tui/hooks/useCommandQueue.js", () => ({
   useCommandQueue: () => mocks.queuedCommands,
 }));
 
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useAppState: (
     selector: (state: { promptSuggestionEnabled: boolean }) => unknown,
   ) =>
@@ -30,16 +30,16 @@ vi.mock("../../state/AppState.js", () => ({
     }),
 }));
 
-vi.mock("../../../utils/exampleCommands.js", () => ({
+vi.mock("../../../../src/utils/exampleCommands.js", () => ({
   getExampleCommandFromCache: () => mocks.exampleCommand,
 }));
 
-vi.mock("../../../utils/messageQueueManager.js", () => ({
+vi.mock("../../../../src/utils/messageQueueManager.js", () => ({
   isQueuedCommandEditable: (command: { editable?: boolean }) =>
     command.editable !== false,
 }));
 
-vi.mock("./proactiveAdapter.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/proactiveAdapter.js", () => ({
   isPromptInputProactiveActive: () => mocks.proactiveActive,
 }));
 

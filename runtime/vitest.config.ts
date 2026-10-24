@@ -3,38 +3,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, isAbsolute, relative, resolve } from "path";
 import { createScanner, ScriptTarget, SyntaxKind } from "typescript";
 
-const agencRoot = resolve(__dirname, "src/agenc");
-const agencUpstreamRoot = resolve(agencRoot, "upstream");
 const runtimeSourceRoot = resolve(__dirname, "src");
 const runtimeTestRoot = resolve(__dirname, "tests");
-const relocatedUpstreamRoots = [
-  {
-    runtimeRoot: resolve(runtimeSourceRoot, "utils"),
-    upstreamRoot: resolve(agencUpstreamRoot, "utils"),
-  },
-  {
-    runtimeRoot: resolve(runtimeSourceRoot, "constants"),
-    upstreamRoot: resolve(agencUpstreamRoot, "constants"),
-  },
-  {
-    runtimeRoot: resolve(runtimeSourceRoot, "memdir"),
-    upstreamRoot: resolve(agencUpstreamRoot, "memdir"),
-  },
-];
-const sourceFileBaseAliases = [
-  {
-    runtimeBase: resolve(runtimeSourceRoot, "tools/Tool"),
-    upstreamBase: resolve(agencUpstreamRoot, "Tool"),
-  },
-  {
-    runtimeBase: resolve(agencUpstreamRoot, "tools/Tool"),
-    upstreamBase: resolve(agencUpstreamRoot, "Tool"),
-  },
-  {
-    runtimeBase: resolve(agencUpstreamRoot, "tasks/Task"),
-    upstreamBase: resolve(agencUpstreamRoot, "Task"),
-  },
-];
 const relocatedTuiSourceRoots = [
   resolve(runtimeSourceRoot, "tui/components"),
   resolve(runtimeSourceRoot, "tui/context"),
@@ -216,68 +186,7 @@ export type AgenCVitestMode =
   | "kernel"
   | "powershell";
 
-function splitModuleId(id: string): {
-  readonly path: string;
-  readonly suffix: string;
-} {
-  const index = id.search(/[?#]/);
-  if (index === -1) return { path: id, suffix: "" };
-  return {
-    path: id.slice(0, index),
-    suffix: id.slice(index),
-  };
-}
-
-function aliasedSourceBases(base: string): string[] {
-  const slash = base.lastIndexOf("/");
-  const file = slash === -1 ? base : base.slice(slash + 1);
-  const extMatch = /^(.*?)(\.(?:js|jsx|ts|tsx))?$/.exec(file);
-  const ext = extMatch?.[2] ?? "";
-  const extensionlessBase = ext === "" ? base : base.slice(0, -ext.length);
-  const fileBaseAliases = sourceFileBaseAliases
-    .filter(({ runtimeBase }) => runtimeBase === extensionlessBase)
-    .map(({ upstreamBase }) => `${upstreamBase}${ext}`);
-  return [base, ...fileBaseAliases];
-}
-
 function existingSourceFile(base: string): string | null {
-  const hasExtension = /\.[^/\\]+$/.test(base);
-  const candidates = [
-    ...new Set(
-      aliasedSourceBases(base).flatMap((sourceBase) =>
-        hasExtension
-          ? [
-              sourceBase,
-              sourceBase.replace(/\.js$/, ".ts"),
-              sourceBase.replace(/\.js$/, ".tsx"),
-              sourceBase.replace(/\.jsx$/, ".tsx"),
-            ]
-          : [
-              sourceBase,
-              `${sourceBase}.ts`,
-              `${sourceBase}.tsx`,
-              `${sourceBase}.mts`,
-              `${sourceBase}.cts`,
-              resolve(sourceBase, "index.ts"),
-              resolve(sourceBase, "index.tsx"),
-              resolve(sourceBase, "index.js"),
-            ],
-      ),
-    ),
-  ];
-  return (
-    candidates.find((candidate) => {
-      if (!existsSync(candidate)) return false;
-      try {
-        return statSync(candidate).isFile();
-      } catch {
-        return false;
-      }
-    }) ?? null
-  );
-}
-
-function existingRuntimeTestFile(base: string): string | null {
   const hasExtension = /\.[^/\\]+$/.test(base);
   const candidates = hasExtension
     ? [
@@ -318,25 +227,10 @@ function sourceRootForImporter(importer: string): string | null {
   const absoluteImporter = isAbsolute(cleanImporter)
     ? cleanImporter
     : resolve(__dirname, cleanImporter);
-  if (isWithin(agencUpstreamRoot, absoluteImporter)) return agencUpstreamRoot;
   const relocatedRoot = relocatedTuiSourceRoots.find((root) =>
     isWithin(root, absoluteImporter),
   );
   return relocatedRoot ?? null;
-}
-
-function relocatedUpstreamImporter(importer: string): string | null {
-  const cleanImporter = importer.split("?")[0] ?? importer;
-  const absoluteImporter = isAbsolute(cleanImporter)
-    ? cleanImporter
-    : resolve(__dirname, cleanImporter);
-  for (const { runtimeRoot, upstreamRoot } of relocatedUpstreamRoots) {
-    const rel = relative(runtimeRoot, absoluteImporter);
-    if (rel !== "" && !rel.startsWith("..")) {
-      return resolve(upstreamRoot, rel);
-    }
-  }
-  return null;
 }
 
 function resolveAgenCBareSrc(source: string): string | null {
@@ -350,11 +244,7 @@ function resolveAgenCBareSrc(source: string): string | null {
     );
     if (found) return found;
   }
-  for (const root of [agencUpstreamRoot, runtimeSourceRoot]) {
-    const found = existingSourceFile(resolve(root, sourceRelative));
-    if (found) return found;
-  }
-  return null;
+  return existingSourceFile(resolve(runtimeSourceRoot, sourceRelative));
 }
 
 function normalizeRuntimePath(file: string): string {
@@ -415,17 +305,6 @@ function resolveRelocatedTuiSource(
       );
       if (moved) return moved;
     }
-
-    const upstream = existingSourceFile(resolve(agencUpstreamRoot, logical));
-    if (upstream) return upstream;
-
-    if (logical.startsWith("tui/")) {
-      const stripped = logical.slice("tui/".length);
-      const strippedUpstream = existingSourceFile(
-        resolve(agencUpstreamRoot, stripped),
-      );
-      if (strippedUpstream) return strippedUpstream;
-    }
   }
   return null;
 }
@@ -441,49 +320,8 @@ function resolveRelativeAgenCSource(
   const direct = existingSourceFile(resolve(dirname(absoluteImporter), source));
   if (direct) return direct;
 
-  const relocatedImporter = relocatedUpstreamImporter(absoluteImporter);
-  if (relocatedImporter !== null) {
-    const relocatedTarget = resolve(dirname(relocatedImporter), source);
-    const relocated = existingSourceFile(relocatedTarget);
-    if (relocated) return relocated;
-  }
-
-  const sourceRoot = sourceRootForImporter(absoluteImporter);
-  if (sourceRoot === null) return null;
-  if (relocatedTuiSourceRoots.includes(sourceRoot)) {
-    return resolveRelocatedTuiSource(absoluteImporter, source);
-  }
-  return null;
-}
-
-function resolveMovedRuntimeTestSource(
-  importer: string,
-  source: string,
-): string | null {
-  if (!source.startsWith("./") && !source.startsWith("../")) return null;
-  const { path: sourcePath, suffix } = splitModuleId(source);
-  const cleanImporter = importer.split("?")[0] ?? importer;
-  const absoluteImporter = isAbsolute(cleanImporter)
-    ? cleanImporter
-    : resolve(__dirname, cleanImporter);
-  if (!isWithin(runtimeTestRoot, absoluteImporter)) return null;
-
-  const directTestTarget = existingRuntimeTestFile(
-    resolve(dirname(absoluteImporter), sourcePath),
-  );
-  if (directTestTarget !== null) return null;
-
-  const sourceImporter = resolve(
-    runtimeSourceRoot,
-    relative(runtimeTestRoot, absoluteImporter),
-  );
-  const mirrored = existingSourceFile(
-    resolve(dirname(sourceImporter), sourcePath),
-  );
-  if (mirrored !== null) return `${mirrored}${suffix}`;
-
-  const relocated = resolveRelativeAgenCSource(sourceImporter, sourcePath);
-  return relocated === null ? null : `${relocated}${suffix}`;
+  if (sourceRootForImporter(absoluteImporter) === null) return null;
+  return resolveRelocatedTuiSource(absoluteImporter, source);
 }
 
 /**
@@ -577,9 +415,7 @@ export function createAgenCVitestConfig(mode: AgenCVitestMode = "default") {
           if (source.startsWith("src/")) {
             if (
               importer === undefined ||
-              (!importer.includes("/src/agenc/") &&
-                sourceRootForImporter(importer) === null &&
-                relocatedUpstreamImporter(importer) === null)
+              sourceRootForImporter(importer) === null
             ) {
               return null;
             }
@@ -587,20 +423,8 @@ export function createAgenCVitestConfig(mode: AgenCVitestMode = "default") {
           }
           if (
             (source.startsWith("./") || source.startsWith("../")) &&
-            importer !== undefined
-          ) {
-            const movedRuntimeTestSource = resolveMovedRuntimeTestSource(
-              importer,
-              source,
-            );
-            if (movedRuntimeTestSource !== null) return movedRuntimeTestSource;
-          }
-          if (
-            (source.startsWith("./") || source.startsWith("../")) &&
             importer !== undefined &&
-            (importer.includes("/src/agenc/") ||
-              sourceRootForImporter(importer) !== null ||
-              relocatedUpstreamImporter(importer) !== null)
+            sourceRootForImporter(importer) !== null
           ) {
             return resolveRelativeAgenCSource(importer, source);
           }

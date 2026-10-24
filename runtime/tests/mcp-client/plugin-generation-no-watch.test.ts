@@ -10,7 +10,7 @@ vi.mock("node:fs", async importOriginal => ({
   watchFile: () => { calls.poll++; throw new Error("installation poller created"); },
 }));
 
-import { acquireVerifiedPluginGeneration, hashInstalledPlugin } from "./plugin-catalog-cache.js";
+import { acquireVerifiedPluginGeneration, hashInstalledPlugin } from "../../src/mcp-client/plugin-catalog-cache.js";
 
 it("creates no watcher or poller for an installation or snapshot", async () => {
   const home = await mkdtemp(join(tmpdir(), "agenc-no-plugin-watch-"));

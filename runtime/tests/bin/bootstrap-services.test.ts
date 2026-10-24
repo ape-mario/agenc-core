@@ -14,34 +14,34 @@ const policyLimitsMocks = vi.hoisted(() => ({
   configurePolicyLimitsService: vi.fn(),
 }));
 
-vi.mock("../services/policyLimits/index.js", () => ({
+vi.mock("../../src/services/policyLimits/index.js", () => ({
   configurePolicyLimitsService: policyLimitsMocks.configurePolicyLimitsService,
 }));
 
 import {
   ConfiguredHooksRuntime,
   type HookInstallTarget,
-} from "../hooks/configured-hooks.js";
-import { createHookExecutionAuthority } from "../hooks/execution-authority.js";
+} from "../../src/hooks/configured-hooks.js";
+import { createHookExecutionAuthority } from "../../src/hooks/execution-authority.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
-import { defaultConfig } from "../config/schema.js";
+import { defaultConfig } from "../../src/config/schema.js";
 import {
   COORDINATED_CONFIG_STORE_PUBLICATION,
   ConfigStore,
   type PreparedConfigStoreReload,
-} from "../config/store.js";
-import { trustProjectSync } from "../permissions/trust/project-trust.js";
+} from "../../src/config/store.js";
+import { trustProjectSync } from "../../src/permissions/trust/project-trust.js";
 import {
   PermissionAuthorityUnavailableError,
   PermissionModeRegistry,
-} from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+} from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   applyPermissionRulesSnapshot,
   readPermissionRulesSnapshot,
-} from "../permissions/settings.js";
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
-import type { PostToolUseHook } from "../tools/hooks.js";
+} from "../../src/permissions/settings.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
+import type { PostToolUseHook } from "../../src/tools/hooks.js";
 import {
   bindExecutionAdmissionJournal,
   buildBootstrapSessionServices,
@@ -50,13 +50,13 @@ import {
   loadBootstrapLspServersInBackground,
   loadBootstrapLspServers,
   shutdownBootstrapLspServers,
-} from "./bootstrap-services.js";
-import type { ExecutionAdmissionClient } from "../budget/admission-client.js";
-import type { AdmissionJournalEvent } from "../budget/admission-types.js";
-import type { Event } from "../session/event-log.js";
-import type { Session } from "../session/session.js";
-import { createProvider } from "../llm/provider.js";
-import { normalizeLspServerConfig } from "../services/lsp/config.js";
+} from "../../src/bin/bootstrap-services.js";
+import type { ExecutionAdmissionClient } from "../../src/budget/admission-client.js";
+import type { AdmissionJournalEvent } from "../../src/budget/admission-types.js";
+import type { Event } from "../../src/session/event-log.js";
+import type { Session } from "../../src/session/session.js";
+import { createProvider } from "../../src/llm/provider.js";
+import { normalizeLspServerConfig } from "../../src/services/lsp/config.js";
 import {
   _resetLspManagerForTesting,
   getInitializationStatus,
@@ -64,10 +64,10 @@ import {
   initializeLspServerManager,
   shutdownLspServerManager,
   waitForInitialization,
-} from "../services/lsp/manager.js";
-import type { LSPServerInstance } from "../services/lsp/LSPServerInstance.js";
-import { bootstrapSession } from "../session/bootstrap.js";
-import { PRODUCTION_GUARDIAN_APPROVAL_REVIEW_TIMEOUT_MS } from "../permissions/guardian/reviewer.js";
+} from "../../src/services/lsp/manager.js";
+import type { LSPServerInstance } from "../../src/services/lsp/LSPServerInstance.js";
+import { bootstrapSession } from "../../src/session/bootstrap.js";
+import { PRODUCTION_GUARDIAN_APPROVAL_REVIEW_TIMEOUT_MS } from "../../src/permissions/guardian/reviewer.js";
 
 const TEST_RUNTIME_OPTIONS = Object.freeze({
   simpleMode: false,

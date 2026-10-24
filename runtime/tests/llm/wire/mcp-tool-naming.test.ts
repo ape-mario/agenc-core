@@ -5,7 +5,7 @@ import {
   decodeMcpToolNameFromWire,
   encodeMcpToolNameForWire,
   isProviderToolNameSafe,
-} from "./mcp-tool-naming.js";
+} from "../../../src/llm/wire/mcp-tool-naming.js";
 
 describe("MCP tool-name wire encoding", () => {
   test("encodes the canonical mcp.<server>.<tool> form to mcp__<server>__<tool>", () => {

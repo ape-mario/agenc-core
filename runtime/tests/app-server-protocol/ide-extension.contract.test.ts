@@ -4,7 +4,7 @@ import {
   AGENC_DAEMON_NOTIFICATION_METHODS,
   AGENC_DAEMON_PROTOCOL_PACKAGE_NAME,
   AGENC_DAEMON_PROTOCOL_VERSION,
-} from "../app-server/protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import {
   AGENC_IDE_EXTENSION_CAPABILITY_NAMESPACE,
   AGENC_IDE_EXTENSION_LSP_CAPABILITY,
@@ -18,7 +18,7 @@ import {
   createAgenCIdeInitializeParams,
   isAgenCIdeRequiredMethod,
   isAgenCIdeRequiredNotification,
-} from "./ide-extension.js";
+} from "../../src/app-server-protocol/ide-extension.js";
 
 describe("AgenC IDE extension scaffold protocol", () => {
   it("pins the first extension repo to the VS Code target", () => {

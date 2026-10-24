@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 
 type WorktreeExitDialogProps = {
   readonly onCancel?: () => void;
@@ -19,11 +19,11 @@ vi.mock("lodash-es/sample.js", () => ({
   default: harness.sample,
 }));
 
-vi.mock("../../utils/gracefulShutdown.js", () => ({
+vi.mock("../../../src/utils/gracefulShutdown.js", () => ({
   gracefulShutdown: harness.gracefulShutdown,
 }));
 
-vi.mock("./WorktreeExitDialog", async () => {
+vi.mock("../../../src/tui/components/WorktreeExitDialog.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
 
   return {
@@ -34,7 +34,7 @@ vi.mock("./WorktreeExitDialog", async () => {
   };
 });
 
-import { ExitFlow } from "./ExitFlow.js";
+import { ExitFlow } from "../../../src/tui/components/ExitFlow.js";
 
 describe("ExitFlow coverage", () => {
   beforeEach(() => {

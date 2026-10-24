@@ -18,13 +18,13 @@ import {
   runAgenCStateCli,
   type AgenCStateCliIo,
   type RecoveryMutationCommand,
-} from "../bin/state-cli.js";
-import { StateRecoveryIncidentRepository } from "./recovery-incidents.js";
+} from "../../src/bin/state-cli.js";
+import { StateRecoveryIncidentRepository } from "../../src/state/recovery-incidents.js";
 import {
   createRecoveryMutationAdapter,
   type RecoveryMutationAdapterOptions,
-} from "./recovery-mutations.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+} from "../../src/state/recovery-mutations.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 
 let root = "";
 let driver: StateSqliteDriver;

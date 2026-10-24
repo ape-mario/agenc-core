@@ -21,7 +21,7 @@ import {
   resolveRepositoryRoot,
   runGit,
   runGitForStdout,
-} from "./git.js";
+} from "../../src/utils/git.js";
 
 async function withTempDir<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = await mkdtemp(join(tmpdir(), "agenc-git-utils-"));

@@ -16,41 +16,41 @@ import {
   ToolTimeoutError,
   validateToolArgs,
   withTimeoutAndAbort,
-} from "./execution.js";
-import type { Tool } from "./types.js";
-import type { ToolInvocation } from "./context.js";
-import type { ToolDispatchResult } from "../tool-registry.js";
-import { readPendingPhysicalSettlement } from "./physical-settlement.js";
-import { buildGuardianApprovalRequest } from "../permissions/guardian/approval-request.js";
-import type { GuardianApprovalReviewOptions } from "../permissions/guardian/reviewer.js";
+} from "../../src/tools/execution.js";
+import type { Tool } from "../../src/tools/types.js";
+import type { ToolInvocation } from "../../src/tools/context.js";
+import type { ToolDispatchResult } from "../../src/tool-registry.js";
+import { readPendingPhysicalSettlement } from "../../src/tools/physical-settlement.js";
+import { buildGuardianApprovalRequest } from "../../src/permissions/guardian/approval-request.js";
+import type { GuardianApprovalReviewOptions } from "../../src/permissions/guardian/reviewer.js";
 import type {
   PostToolUseFailureHook,
   PostToolUseHook,
   PreToolUseHook,
-} from "./hooks.js";
-import { EventLog } from "../session/event-log.js";
-import { requestToolUserApproval } from "../permissions/guardian/arbiter.js";
-import { APPROVED_FOR_SESSION } from "../permissions/review-decision.js";
+} from "../../src/tools/hooks.js";
+import { EventLog } from "../../src/session/event-log.js";
+import { requestToolUserApproval } from "../../src/permissions/guardian/arbiter.js";
+import { APPROVED_FOR_SESSION } from "../../src/permissions/review-decision.js";
 import {
   attachContextDefaults,
   hasPermissionsToUseTool,
   type AppStateSnapshot,
   type ToolEvaluatorContext,
-} from "../permissions/evaluator.js";
-import { freshDenialTracking } from "../permissions/denial-tracking.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
+} from "../../src/permissions/evaluator.js";
+import { freshDenialTracking } from "../../src/permissions/denial-tracking.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionMode,
   type PermissionResult,
   type ToolPermissionContext,
-} from "../permissions/types.js";
-import { createFileReadTool } from "./system/file-read.js";
-import { createFileWriteTool } from "./system/file-write.js";
+} from "../../src/permissions/types.js";
+import { createFileReadTool } from "../../src/tools/system/file-read.js";
+import { createFileWriteTool } from "../../src/tools/system/file-write.js";
 import {
   readSandboxExecutionBroker,
   readSandboxExecutionSurface,
-} from "../sandbox/execution-broker.js";
+} from "../../src/sandbox/execution-broker.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
 
 function makeInvocation(callId: string, toolName: string): ToolInvocation {

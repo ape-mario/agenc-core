@@ -21,7 +21,7 @@ import {
   type AgenCDaemonProcessInspectionHost,
   type LinuxAgenCDaemonProcessEntry,
   type LinuxAgenCDaemonProcessScanLimits,
-} from "./daemon-instance-identity.js";
+} from "../../src/app-server/daemon-instance-identity.js";
 
 /**
  * A process that exits while daemon discovery inspects it is not a running

@@ -14,7 +14,7 @@ import {
   sdkErrorFromType,
   shortErrorStack,
   toError,
-} from "./runtime.js";
+} from "../../src/errors/runtime.js";
 
 describe("runtime error primitives", () => {
   test("normalizes unknown errors and exact messages", () => {

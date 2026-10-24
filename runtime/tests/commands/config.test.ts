@@ -9,15 +9,15 @@ import {
   getConfigPath,
   getConfigFilePath,
   editorForEnv,
-} from "./config.js";
+} from "../../src/commands/config.js";
 import {
   readConfigMenuSnapshot,
-} from "./config-menu.js";
-import { ConfigStore } from "../config/store.js";
-import { defaultConfig, type AgenCConfig } from "../config/schema.js";
+} from "../../src/commands/config-menu.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { defaultConfig, type AgenCConfig } from "../../src/config/schema.js";
 import { canonicalTmpdir } from "../helpers/canonical-temp-dir.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "./types.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Stubs

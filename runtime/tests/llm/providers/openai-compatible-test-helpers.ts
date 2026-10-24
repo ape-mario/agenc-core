@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-import type { LLMTool } from "../types.js";
+import type { LLMTool } from "../../../src/llm/types.js";
 
 export const ECHO_TOOL: LLMTool = {
   type: "function",

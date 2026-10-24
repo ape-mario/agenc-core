@@ -33,7 +33,7 @@ import {
   trustProject,
   trustProjectSync,
   trustedProjectsPath,
-} from "./project-trust.js";
+} from "../../../src/permissions/trust/project-trust.js";
 
 function readFileSyncUtf8(path: string): string {
   return readFileSyncNode(path, "utf8");

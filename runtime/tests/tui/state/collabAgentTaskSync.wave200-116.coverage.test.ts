@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { syncCollabAgentEventToAppState } from "./collabAgentTaskSync.js";
-import type { AppState } from "./AppStateStore.js";
+import { syncCollabAgentEventToAppState } from "../../../src/tui/state/collabAgentTaskSync.js";
+import type { AppState } from "../../../src/tui/state/AppStateStore.js";
 
 function applyEvent(state: AppState, event: unknown, now = 5000): AppState {
   let next = state;

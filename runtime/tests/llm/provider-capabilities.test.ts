@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { LLMProviderError } from "./errors.js";
-import { assertProviderStructuredOutputCompatibility } from "./provider-capabilities.js";
+import { LLMProviderError } from "../../src/llm/errors.js";
+import { assertProviderStructuredOutputCompatibility } from "../../src/llm/provider-capabilities.js";
 
 const structuredOutput = {
   schema: {

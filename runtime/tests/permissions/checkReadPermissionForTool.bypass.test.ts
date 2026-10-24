@@ -4,8 +4,8 @@ import { join } from 'node:path'
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 
-import type { Tool, ToolPermissionContext } from '../tools/Tool.js'
-import { checkReadPermissionForTool } from '../utils/permissions/filesystem.js'
+import type { Tool, ToolPermissionContext } from '../../src/tools/Tool.js'
+import { checkReadPermissionForTool } from '../../src/utils/permissions/filesystem.js'
 
 // Minimal Tool stub exposing getPath, matching the shape checkReadPermissionForTool
 // requires. Only the fields the read permission check reads are populated.

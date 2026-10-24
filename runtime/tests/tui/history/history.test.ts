@@ -6,7 +6,7 @@ import {
   formatPastedTextRef,
   getPastedTextRefNumLines,
   parseReferences,
-} from './history.js'
+} from '../../../src/tui/history/history.js'
 
 describe('history paste references', () => {
   test('formats text and image references', () => {

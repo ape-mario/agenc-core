@@ -1,19 +1,19 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it, vi } from "vitest";
 
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
 import {
   AGENC_DAEMON_INTERNAL_METHODS,
   AGENC_DAEMON_METHODS,
   AGENC_DAEMON_PROTOCOL_VERSION,
   JSON_RPC_VERSION,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import {
   StartupSessionRestoreAbandonedError,
   StartupSessionRestores,
   type StartupSessionRestoreContext,
   type StartupSessionRestoreSettlement,
-} from "./startup-session-restores.js";
+} from "../../src/app-server/startup-session-restores.js";
 
 interface Target {
   readonly runId: string;

@@ -15,7 +15,7 @@ const harness = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../utils/collapseReadSearch.js", () => ({
+vi.mock("../../../src/utils/collapseReadSearch.js", () => ({
   getDisplayMessageFromCollapsed: (message: { displayMessage?: unknown }) =>
     message.displayMessage,
   getToolSearchOrReadInfo: (name: string) => ({
@@ -29,7 +29,7 @@ vi.mock("../../utils/collapseReadSearch.js", () => ({
   ) => (message.toolUseIds ?? []).some(id => inProgressToolUseIDs.has(id)),
 }));
 
-vi.mock("../../utils/messages.js", () => ({
+vi.mock("../../../src/utils/messages.js", () => ({
   EMPTY_STRING_SET: new Set<string>(),
   getProgressMessagesFromLookup: (
     message: { uuid: string },
@@ -45,9 +45,9 @@ vi.mock("../../utils/messages.js", () => ({
   }) => message.toolUseID ?? message.message?.content?.[0]?.id,
 }));
 
-vi.mock("./Message.js", async () => {
+vi.mock("../../../src/tui/components/Message.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../ink.js");
+  const { Text } = await import("../../../src/tui/ink.js");
   return {
     hasThinkingContent: (message: {
       hasThinking?: boolean;
@@ -73,30 +73,30 @@ vi.mock("./Message.js", async () => {
   };
 });
 
-vi.mock("./MessageModel.js", async () => {
+vi.mock("../../../src/tui/components/MessageModel.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../ink.js");
+  const { Text } = await import("../../../src/tui/ink.js");
   return {
     MessageModel: ({ message }: { readonly message: { uuid: string } }) =>
       ReactModule.createElement(Text, null, `Model:${message.uuid}`),
   };
 });
 
-vi.mock("./messageRenderPolicy.js", () => ({
+vi.mock("../../../src/tui/components/messageRenderPolicy.js", () => ({
   shouldRenderStatically: (message: { uuid: string }) =>
     harness.staticMessages.has(message.uuid),
 }));
 
-vi.mock("./MessageTimestamp.js", async () => {
+vi.mock("../../../src/tui/components/MessageTimestamp.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../ink.js");
+  const { Text } = await import("../../../src/tui/ink.js");
   return {
     MessageTimestamp: ({ message }: { readonly message: { uuid: string } }) =>
       ReactModule.createElement(Text, null, `Timestamp:${message.uuid}`),
   };
 });
 
-vi.mock("./OffscreenFreeze.js", async () => {
+vi.mock("../../../src/tui/components/OffscreenFreeze.js", async () => {
   const ReactModule = await import("react");
   return {
     OffscreenFreeze: ({ children }: { readonly children?: React.ReactNode }) => {
@@ -106,7 +106,7 @@ vi.mock("./OffscreenFreeze.js", async () => {
   };
 });
 
-import { createRoot } from "../ink/root.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
 import {
   allToolsResolved,
   areMessageRowPropsEqual,
@@ -114,7 +114,7 @@ import {
   isMessageStreaming,
   MessageRow,
   type Props,
-} from "./MessageRow.js";
+} from "../../../src/tui/components/MessageRow.js";
 
 function createStreams(): {
   stdout: PassThrough;

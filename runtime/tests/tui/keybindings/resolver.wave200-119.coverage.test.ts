@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 
-import type { Key } from "../ink.js";
-import { parseBindings } from "./parser.js";
+import type { Key } from "../../../src/tui/ink.js";
+import { parseBindings } from "../../../src/tui/keybindings/parser.js";
 import {
   getBindingDisplayText,
   resolveKey,
   resolveKeyWithChordState,
-} from "./resolver.js";
-import type { ParsedBinding, ParsedKeystroke } from "./types.js";
+} from "../../../src/tui/keybindings/resolver.js";
+import type { ParsedBinding, ParsedKeystroke } from "../../../src/tui/keybindings/types.js";
 
 const baseKey: Key = {
   upArrow: false,

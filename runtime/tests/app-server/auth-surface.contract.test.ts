@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   AGENC_DAEMON_METHODS,
   isAgenCDaemonMethod,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import {
   AGENC_DAEMON_AUTH_METHODS,
   createAgenCDaemonAuthHandlers,
   isAgenCDaemonAuthMethod,
-} from "./auth.js";
-import type { AuthBackend } from "../auth/backend.js";
+} from "../../src/app-server/auth.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
 
 describe("AgenC daemon auth surface", () => {
   it("exposes only the AgenC-owned auth method trio", () => {

@@ -26,7 +26,7 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => harness.features.has(name),
 }));
 
-vi.mock("../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybinding: (
     action: string,
     handler: () => void,
@@ -36,20 +36,20 @@ vi.mock("../keybindings/useKeybinding.js", () => ({
   },
 }));
 
-vi.mock("../state/AppState.js", () => ({
+vi.mock("../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
   useSetAppState: () => harness.setAppState,
 }));
 
-vi.mock("../../utils/terminalPanel.js", () => ({
+vi.mock("../../../src/utils/terminalPanel.js", () => ({
   getTerminalPanel: () => ({
     toggle: harness.terminalToggle,
   }),
 }));
 
-import { createRoot } from "../ink/root.js";
-import { GlobalKeybindingHandlers } from "./useGlobalKeybindings.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { GlobalKeybindingHandlers } from "../../../src/tui/hooks/useGlobalKeybindings.js";
 
 type TestStreams = {
   readonly stdin: PassThrough & {

@@ -4,22 +4,22 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
-import { createFileEditTool } from "../../tools/system/file-edit.js";
-import { createFileWriteTool } from "../../tools/system/file-write.js";
+import { createFileEditTool } from "../../../src/tools/system/file-edit.js";
+import { createFileWriteTool } from "../../../src/tools/system/file-write.js";
 import {
   _resetLspManagerForTesting,
   initializeLspServerManager,
   shutdownLspServerManager,
   waitForInitialization,
-} from "../../services/lsp/manager.js";
-import { normalizeLspServerConfig } from "../../services/lsp/config.js";
-import { resetAllLSPDiagnosticState } from "../../services/lsp/LSPDiagnosticRegistry.js";
-import type { LSPServerInstance } from "../../services/lsp/LSPServerInstance.js";
+} from "../../../src/services/lsp/manager.js";
+import { normalizeLspServerConfig } from "../../../src/services/lsp/config.js";
+import { resetAllLSPDiagnosticState } from "../../../src/services/lsp/LSPDiagnosticRegistry.js";
+import type { LSPServerInstance } from "../../../src/services/lsp/LSPServerInstance.js";
 import {
   clearSessionReadState,
   recordSessionRead,
   SESSION_ID_ARG,
-} from "./filesystem.js";
+} from "../../../src/tools/system/filesystem.js";
 
 const SESSION_ID = "edit-lsp-feedback-test-session";
 

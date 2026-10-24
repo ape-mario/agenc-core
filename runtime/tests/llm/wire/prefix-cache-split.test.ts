@@ -19,10 +19,10 @@ import { describe, expect, it } from "vitest";
 import {
   splitSystemPromptOnDynamicBoundary,
   SYSTEM_PROMPT_DYNAMIC_BOUNDARY_MARKER,
-} from "./shared.js";
-import { buildOpenAIResponsesRequest } from "./responses-openai.js";
-import { GrokProvider } from "../providers/grok/adapter.js";
-import type { LLMMessage } from "../types.js";
+} from "../../../src/llm/wire/shared.js";
+import { buildOpenAIResponsesRequest } from "../../../src/llm/wire/responses-openai.js";
+import { GrokProvider } from "../../../src/llm/providers/grok/adapter.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
 
 const STATIC_HEAD = "You are AgenC. Follow the project instructions.";
 

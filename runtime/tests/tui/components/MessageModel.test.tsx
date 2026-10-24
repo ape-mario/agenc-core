@@ -1,9 +1,9 @@
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import type { NormalizedMessage } from "../../types/message.js";
-import { renderToString } from "../../utils/staticRender.js";
-import { MessageModel } from "./MessageModel.js";
+import type { NormalizedMessage } from "../../../src/types/message.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { MessageModel } from "../../../src/tui/components/MessageModel.js";
 
 function assistantMessage(overrides: Record<string, unknown> = {}) {
   return {

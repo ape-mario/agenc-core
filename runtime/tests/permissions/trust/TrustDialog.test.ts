@@ -6,7 +6,7 @@ import {
   trustLocationWarning,
   trustReviewLead,
   trustSafetyNote,
-} from "./TrustDialog.js";
+} from "../../../src/permissions/trust/TrustDialog.js";
 
 describe("trustDialogOptionLabel", () => {
   it("names the buttons plainly while idle", () => {

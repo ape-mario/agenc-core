@@ -1,22 +1,22 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { resolveProviderCapabilityEntry } from "../../capabilities.js";
+import { resolveProviderCapabilityEntry } from "../../../../src/llm/capabilities.js";
 import {
   resolveModelCatalogMetadata,
   resolveRegisteredModelCatalogEntry,
-} from "../../registry/model-catalog.js";
+} from "../../../../src/llm/registry/model-catalog.js";
 import {
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
-} from "../../registry/provider-info.js";
-import type { LLMMessage } from "../../types.js";
-import { chatCompletionsCapabilityHintsForProvider } from "../../wire/capability-gating.js";
+} from "../../../../src/llm/registry/provider-info.js";
+import type { LLMMessage } from "../../../../src/llm/types.js";
+import { chatCompletionsCapabilityHintsForProvider } from "../../../../src/llm/wire/capability-gating.js";
 import {
   bodyAt,
   createSuccessfulChatResponse,
   ECHO_TOOL,
 } from "../openai-compatible-test-helpers.js";
-import { MiniMaxProvider } from "./index.js";
+import { MiniMaxProvider } from "../../../../src/llm/providers/minimax/index.js";
 
 const successfulChat = createSuccessfulChatResponse("chatcmpl_minimax");
 

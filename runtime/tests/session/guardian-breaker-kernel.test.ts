@@ -39,37 +39,37 @@ vi.mock("axios", () => {
   };
 });
 
-import { AsyncQueue } from "../utils/async-queue.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import { createTestConfigStore } from "../fixtures.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
+} from "../../src/session/session.js";
 import type {
   Config,
   ManagedFeatures,
   ModelInfo,
   SessionConfiguration,
   TurnContext,
-} from "./turn-context.js";
+} from "../../src/session/turn-context.js";
 import type {
   LLMMessage,
   LLMProvider,
   LLMResponse,
   StreamProgressCallback,
-} from "../llm/types.js";
-import type { ToolRegistry } from "../tool-registry.js";
+} from "../../src/llm/types.js";
+import type { ToolRegistry } from "../../src/tool-registry.js";
 import {
   GuardianRejectionCircuitBreaker,
   MAX_CONSECUTIVE_GUARDIAN_DENIALS_PER_TURN,
   MAX_TOTAL_GUARDIAN_DENIALS_PER_TURN,
   createGuardianRejectionCircuitBreaker,
-} from "../permissions/guardian/rejection-circuit-breaker.js";
-import { resolveAgentRuntimeOptions } from "./runtime-options.js";
+} from "../../src/permissions/guardian/rejection-circuit-breaker.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 
 // ---------------------------------------------------------------------------
 // Test harness — mirrors run-turn.test.ts's session builder shape but keeps

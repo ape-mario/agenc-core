@@ -1,10 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
-import type { AgenCRealtimeTuiControls } from "./controller.js";
+import type { AgenCRealtimeTuiControls } from "../../../src/tui/realtime/controller.js";
 import {
   executeRealtimeComposerCommand,
   parseRealtimeComposerCommand,
-} from "./commands.js";
+} from "../../../src/tui/realtime/commands.js";
 
 function createControls(): AgenCRealtimeTuiControls {
   return {

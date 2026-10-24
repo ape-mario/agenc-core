@@ -12,13 +12,13 @@ import {
   type SandboxExecRequest,
   type SandboxManager,
   type SandboxTransformRequest,
-} from "../sandbox/engine/index.js";
-import { UnifiedExecError } from "./types.js";
-import { UnifiedExecProcessManager } from "./process-manager.js";
+} from "../../src/sandbox/engine/index.js";
+import { UnifiedExecError } from "../../src/unified-exec/types.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
 import {
   createWorkspaceOperationLifetime,
   runWithWorkspaceOperationLifetime,
-} from "../workspace/tool-operation-lifetime.js";
+} from "../../src/workspace/tool-operation-lifetime.js";
 
 function passthroughSandboxManager(): Pick<
   SandboxManager,

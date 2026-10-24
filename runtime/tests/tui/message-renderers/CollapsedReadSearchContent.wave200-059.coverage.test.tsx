@@ -1,17 +1,17 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../hooks/useMinDisplayTime.js', () => ({
+vi.mock('../../../src/tui/hooks/useMinDisplayTime.js', () => ({
   useMinDisplayTime: (value: string | undefined) => value,
 }))
 
-vi.mock('../glyphs.js', () => ({
+vi.mock('../../../src/tui/glyphs.js', () => ({
   selectAgenCTuiGlyphs: () => ({
     ellipsis: '...',
     responseGutter: '>',
@@ -19,36 +19,36 @@ vi.mock('../glyphs.js', () => ({
   }),
 }))
 
-vi.mock('../../utils/collapseReadSearch.js', () => ({
+vi.mock('../../../src/utils/collapseReadSearch.js', () => ({
   getToolUseIdsFromCollapsedGroup: (message: { toolUseIDs?: string[] }) =>
     message.toolUseIDs ?? [],
 }))
 
-vi.mock('../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => true,
 }))
 
-vi.mock('../components/CtrlOToExpand.js', () => ({
+vi.mock('../../../src/tui/components/CtrlOToExpand.js', () => ({
   CtrlOToExpand: () => <>expand</>,
 }))
 
-vi.mock('../components/messageActions.js', () => ({
+vi.mock('../../../src/tui/components/messageActions.js', () => ({
   useSelectedMessageBg: () => undefined,
 }))
 
-vi.mock('../components/ToolUseLoader.js', () => ({
+vi.mock('../../../src/tui/components/ToolUseLoader.js', () => ({
   ToolUseLoader: () => <>loader</>,
 }))
 
-vi.mock('../ink.js', async () => {
-  const actual = await vi.importActual<typeof import('../ink.js')>('../ink.js')
+vi.mock('../../../src/tui/ink.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/tui/ink.js')>('../../../src/tui/ink.js')
   return {
     ...actual,
     useTheme: () => ['dark'],
   }
 })
 
-import { CollapsedReadSearchContent } from './CollapsedReadSearchContent.js'
+import { CollapsedReadSearchContent } from '../../../src/tui/message-renderers/CollapsedReadSearchContent.js'
 
 function lookupsWithReplProgress() {
   return {

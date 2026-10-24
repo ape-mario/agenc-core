@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   formatStructuredToolResult,
   makeToolResultMessage,
-} from "./session-transcript.js";
+} from "../../src/tui/session-transcript.js";
 
 // ihunt regression: the 64KB tool-result clamp must NOT sever the closing tag
 // of an extracted envelope (`<bash-stdout>…</bash-stdout>`,

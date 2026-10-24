@@ -20,7 +20,7 @@ import {
   shiftSelectionForFollow,
   startSelection,
   updateSelection,
-} from './selection.ts'
+} from '../../../src/tui/ink/selection.js'
 import {
   CellWidth,
   CharPool,
@@ -31,7 +31,7 @@ import {
   markNoSelectRegion,
   setCellAt,
   type Screen,
-} from './screen.ts'
+} from '../../../src/tui/ink/screen.js'
 
 function makeScreen(rows: string[], width = Math.max(...rows.map(r => r.length))): {
   screen: Screen

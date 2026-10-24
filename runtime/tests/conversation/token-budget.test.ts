@@ -11,7 +11,7 @@ import {
   getBudgetContinuationMessage,
   getTokenBudgetPromptSection,
   parseTokenBudget,
-} from "./token-budget.js";
+} from "../../src/conversation/token-budget.js";
 
 describe("token budget parsing", () => {
   test("parses shorthand and verbose token targets", () => {

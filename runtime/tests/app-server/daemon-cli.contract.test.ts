@@ -33,31 +33,31 @@ import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
-import type { AgenCShutdownSignal } from "../lifecycle/signal-handlers.js";
-import { openStateDatabases } from "../state/sqlite-driver.js";
+import type { AgenCShutdownSignal } from "../../src/lifecycle/signal-handlers.js";
+import { openStateDatabases } from "../../src/state/sqlite-driver.js";
 import { AgenCSessionSnapshotPolicy } from "../../src/state/snapshot-policy.js";
 import { AgenCCleanupRegistry, type AgenCCleanupTask } from "../../src/lifecycle/cleanup-registry.js";
-import { StateRunDurabilityRepository } from "../state/run-durability.js";
-import { ROLLOUT_SCHEMA_VERSION } from "../session/event-log.js";
-import { RolloutStore } from "../session/rollout-store.js";
+import { StateRunDurabilityRepository } from "../../src/state/run-durability.js";
+import { ROLLOUT_SCHEMA_VERSION } from "../../src/session/event-log.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
 import {
   resolveAgentRuntimeOptions,
   type AgentRuntimeOptions,
-} from "../session/runtime-options.js";
-import type { PendingProviderSwitch, Session } from "../session/session.js";
-import { createAgenCJsonLineDaemonRequestClient } from "./agent-cli.js";
-import { AGENC_DAEMON_PROTOCOL_VERSION, type JsonObject } from "./protocol/index.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
-import { ensureAgenCDaemonAutostart } from "./daemon-autostart.js";
-import { startAgenCDaemon } from "./daemon-control.js";
+} from "../../src/session/runtime-options.js";
+import type { PendingProviderSwitch, Session } from "../../src/session/session.js";
+import { createAgenCJsonLineDaemonRequestClient } from "../../src/app-server/agent-cli.js";
+import { AGENC_DAEMON_PROTOCOL_VERSION, type JsonObject } from "../../src/app-server/protocol/index.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
+import { ensureAgenCDaemonAutostart } from "../../src/app-server/daemon-autostart.js";
+import { startAgenCDaemon } from "../../src/app-server/daemon-control.js";
 import {
   AGENC_DAEMON_HEARTBEAT_FRESH_MS,
   type DaemonHeartbeat,
   readAgenCDaemonHeartbeat,
   resolveAgenCDaemonHeartbeatPath,
-} from "./daemon-heartbeat.js";
+} from "../../src/app-server/daemon-heartbeat.js";
 import {
   acquireAgenCDaemonLifecycleLock,
   AGENC_DAEMON_PID_MAX_BYTES,
@@ -89,54 +89,54 @@ import {
   validateAgenCDaemonWebSocketOrigin,
   writeAgenCDaemonPid,
   resolveAgenCDaemonSpawnStderrPath,
-} from "./daemon-cli.js";
-import { AGENC_DAEMON_REQUEST_TIMEOUT_MS_ENV } from "./daemon-request-policy.js";
+} from "../../src/app-server/daemon-cli.js";
+import { AGENC_DAEMON_REQUEST_TIMEOUT_MS_ENV } from "../../src/app-server/daemon-request-policy.js";
 import {
   AgenCDelegateBackgroundAgentRunner,
   type AgenCBackgroundAgentRunner,
   type AgenCBackgroundAgentSessionEventBinding,
   type AgenCBootstrapFunction,
   type AgenCEnsureAgentControlFunction,
-} from "./background-agent-runner.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { ConfigStore } from "../config/store.js";
-import { LiveApprovalBroker } from "./live-approval-broker.js";
+} from "../../src/app-server/background-agent-runner.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { LiveApprovalBroker } from "../../src/app-server/live-approval-broker.js";
 import {
   authorizeChildExecutionPlan,
   type ChildExecutionPlan,
-} from "../agents/cross-provider.js";
+} from "../../src/agents/cross-provider.js";
 import {
   _resetErrorLogForTesting,
   getErrorLogQueueStats,
   logMCPError,
 } from "../../src/utils/log.js";
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
 import {
   sandboxExecutionBrokerAuthorityFromSessionAuthority,
   sessionConfigurationFromAgenCConfig,
   sessionExecutionAuthorityFromAgenCConfig,
-} from "../session/configuration.js";
+} from "../../src/session/configuration.js";
 import { getGlobalDispatcher, setGlobalDispatcher } from "undici";
-import { clearProxyCache } from "../utils/proxy.js";
-import { clearMTLSCache } from "../utils/mtls.js";
-import { AsyncQueue } from "../utils/async-queue.js";
+import { clearProxyCache } from "../../src/utils/proxy.js";
+import { clearMTLSCache } from "../../src/utils/mtls.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import {
   buildRealtimeSessionConfig,
   RealtimeConversationManager,
   type RealtimeEvent,
   type RealtimeTransportRequest,
   type RealtimeWriter,
-} from "../conversation/realtime/conversation.js";
-import type { AuthBackend } from "../auth/backend.js";
-import type { AgenCRealtimeHeadersProvider } from "./realtime-transport.js";
+} from "../../src/conversation/realtime/conversation.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
+import type { AgenCRealtimeHeadersProvider } from "../../src/app-server/realtime-transport.js";
 import {
   daemonInstanceIdentityFromRuntimeInfo,
   readDaemonRuntimeInfo,
   resolveAgenCDaemonRuntimeInfoPath,
   writeDaemonRuntimeInfo,
-} from "./daemon-runtime-info.js";
-import type { AgenCDaemonInstanceIdentity } from "./daemon-instance-identity.js";
+} from "../../src/app-server/daemon-runtime-info.js";
+import type { AgenCDaemonInstanceIdentity } from "../../src/app-server/daemon-instance-identity.js";
 
 const TEST_RUNTIME_OPTIONS = resolveAgentRuntimeOptions({});
 

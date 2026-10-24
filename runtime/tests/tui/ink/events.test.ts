@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 
-import { ClickEvent } from './events/click-event.ts'
-import { Event } from './events/event.ts'
-import { TerminalFocusEvent } from './events/terminal-focus-event.ts'
+import { ClickEvent } from '../../../src/tui/ink/events/click-event.js'
+import { Event } from '../../../src/tui/ink/events/event.js'
+import { TerminalFocusEvent } from '../../../src/tui/ink/events/terminal-focus-event.js'
 
 describe('Ink event classes', () => {
   test('tracks immediate propagation state on the base event', () => {

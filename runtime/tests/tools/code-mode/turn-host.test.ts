@@ -9,14 +9,14 @@ import type { ToolRegistry } from "../../../src/tool-registry.js";
 import {
   startCodeModeTurnWorker,
   type CodeModeWorkerSession,
-} from "./turn-host.js";
+} from "../../../src/tools/code-mode/turn-host.js";
 import type {
   CodeModeExecuteRequest,
   CodeModeRuntimeResponse,
   CodeModeService,
   CodeModeTurnHost,
   CodeModeWaitRequest,
-} from "./types.js";
+} from "../../../src/tools/code-mode/types.js";
 
 class CapturingCodeModeService implements CodeModeService {
   host: CodeModeTurnHost | undefined;

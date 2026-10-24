@@ -12,10 +12,10 @@ import { describe, expect, it } from "vitest";
   NATIVE_PACKAGE_URL: undefined,
 };
 
-import type { SessionToolPolicy } from "../permissions/session-tool-policy.js";
-import { normalizeSessionToolPolicy } from "../permissions/session-tool-policy.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import type { Session } from "../session/session.js";
+import type { SessionToolPolicy } from "../../src/permissions/session-tool-policy.js";
+import { normalizeSessionToolPolicy } from "../../src/permissions/session-tool-policy.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import type { Session } from "../../src/session/session.js";
 
 const INSTALLER = "agenc-marketplace-kit-installer";
 
@@ -41,7 +41,7 @@ async function skillTool(opts: {
   readonly policy?: SessionToolPolicy;
   readonly config?: unknown;
 }) {
-  const { createModelFacingTools } = await import("./model-facing-tools.js");
+  const { createModelFacingTools } = await import("../../src/bin/model-facing-tools.js");
   const current = session(opts.config ?? {});
   const tool = createModelFacingTools({
     workspaceRoot: process.cwd(),

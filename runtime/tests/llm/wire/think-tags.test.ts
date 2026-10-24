@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest";
 import {
   ThinkTagStreamFilter,
   splitLeadingThinkBlock,
-} from "./think-tags.js";
-import { parseChatCompletionsResponse } from "./chat-completions.js";
+} from "../../../src/llm/wire/think-tags.js";
+import { parseChatCompletionsResponse } from "../../../src/llm/wire/chat-completions.js";
 
 /** Run chunks through a fresh filter and collect both channels. */
 function runFilter(chunks: readonly string[]): {

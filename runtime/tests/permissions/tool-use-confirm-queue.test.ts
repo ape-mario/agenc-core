@@ -1,16 +1,16 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 
-import type { ApprovalCtx } from "../tools/orchestrator.js";
-import type { ReviewDecision } from "./review-decision.js";
+import type { ApprovalCtx } from "../../src/tools/orchestrator.js";
+import type { ReviewDecision } from "../../src/permissions/review-decision.js";
 import {
   ABORT,
   APPROVED,
   APPROVED_FOR_SESSION,
   DENIED,
-} from "./review-decision.js";
-import { buildToolUseConfirmQueue } from "../tui/permission-requests.js";
-import { clearAskUserQuestionResponsesForTest, createAskUserQuestionTool } from "../tools/ask-user-question/tool.js";
-import type { AskUserQuestionInput } from "../tools/ask-user-question/tool.js";
+} from "../../src/permissions/review-decision.js";
+import { buildToolUseConfirmQueue } from "../../src/tui/permission-requests.js";
+import { clearAskUserQuestionResponsesForTest, createAskUserQuestionTool } from "../../src/tools/ask-user-question/tool.js";
+import type { AskUserQuestionInput } from "../../src/tools/ask-user-question/tool.js";
 
 interface PendingRequestLike {
   readonly id: string;

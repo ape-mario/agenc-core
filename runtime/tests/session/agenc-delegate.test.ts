@@ -34,35 +34,35 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { AsyncQueue } from "../utils/async-queue.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import { createTestConfigStore } from "../fixtures.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   Session,
   type Event,
   type EventMsg,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
+} from "../../src/session/session.js";
 import {
   type Config,
   type ManagedFeatures,
   type ModelInfo,
   type SessionConfiguration,
-} from "./turn-context.js";
+} from "../../src/session/turn-context.js";
 import type {
   LLMChatOptions,
   LLMMessage,
   LLMProvider,
   LLMResponse,
-} from "../llm/types.js";
-import { createManagedFeatures } from "../llm/registry/features.js";
+} from "../../src/llm/types.js";
+import { createManagedFeatures } from "../../src/llm/registry/features.js";
 import {
   ReviewManager,
   type ReviewRequest,
   spawnReviewTask,
-} from "./review.js";
+} from "../../src/session/review.js";
 import {
   ReviewerModelMismatchError,
   buildGuardianReviewSessionConfig,
@@ -71,27 +71,27 @@ import {
   spawnAgenCDelegateThread,
   type AgenCReviewOneShotRequest,
   type ExitReviewModePayload,
-} from "./agenc-delegate.js";
-import { newDefaultTurnWithSubId } from "./turn-context.js";
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
-import { disposeSandboxExecutionBroker } from "../sandbox/execution-lifecycle.js";
-import * as providerFactory from "../llm/provider.js";
+} from "../../src/session/agenc-delegate.js";
+import { newDefaultTurnWithSubId } from "../../src/session/turn-context.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
+import { disposeSandboxExecutionBroker } from "../../src/sandbox/execution-lifecycle.js";
+import * as providerFactory from "../../src/llm/provider.js";
 import {
   AdmissionDeniedError,
   type AdmissionAcquireInput,
   type ExecutionAdmissionClient,
-} from "../budget/admission-client.js";
-import type { AdmissionLease } from "../budget/admission-types.js";
-import { RolloutStore } from "./rollout-store.js";
-import { isSafeSessionIdSegment } from "./session-store.js";
-import { AgenCDaemonRunInspectionService } from "../app-server/run-inspection.js";
-import { resolveStateDatabasePaths } from "../state/sqlite-driver.js";
-import { resolveAgentRuntimeOptions } from "./runtime-options.js";
-import { LiveApprovalBroker } from "../app-server/live-approval-broker.js";
-import { isApprovalSessionOwnedBy, observeChildApprovalSessions } from "../agents/child-approval-context.js";
-import { isWorkflowApprovalSession } from "../permissions/approval-failure.js";
-import { UnifiedExecProcessManager } from "../unified-exec/process-manager.js";
-import * as childRunJournal from "./child-run-journal.js";
+} from "../../src/budget/admission-client.js";
+import type { AdmissionLease } from "../../src/budget/admission-types.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { isSafeSessionIdSegment } from "../../src/session/session-store.js";
+import { AgenCDaemonRunInspectionService } from "../../src/app-server/run-inspection.js";
+import { resolveStateDatabasePaths } from "../../src/state/sqlite-driver.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import { LiveApprovalBroker } from "../../src/app-server/live-approval-broker.js";
+import { isApprovalSessionOwnedBy, observeChildApprovalSessions } from "../../src/agents/child-approval-context.js";
+import { isWorkflowApprovalSession } from "../../src/permissions/approval-failure.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
+import * as childRunJournal from "../../src/session/child-run-journal.js";
 
 const TEST_REVIEW_CHILD_SESSION_ID =
   "review-70258a22d095bbaef7e15b5457a92c30c382f5bd2e4af2c54fcbf2e2e4da8a2d";

@@ -19,13 +19,13 @@ import {
   type BootTUIArgs,
   type ContinueTUIArgs,
   type ResumeTUIArgs,
-} from "./route.js";
+} from "../../src/bin/route.js";
 import {
   __resetActiveInkUnmountForTest,
   __setActiveInkUnmountForTest,
   installSignalHandlers,
   type ConfigReloadLatch,
-} from "./agenc-main.js";
+} from "../../src/bin/agenc-main.js";
 
 function makeHandles() {
   const bootTUI = vi.fn(async (_args: BootTUIArgs) => 0);

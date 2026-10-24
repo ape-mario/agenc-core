@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { tryParseShellCommand } from "./shell-quote.js";
+import { tryParseShellCommand } from "../../../src/tui/slash/shell-quote.js";
 
 describe("tryParseShellCommand", () => {
   it("returns parsed shell tokens on success", () => {

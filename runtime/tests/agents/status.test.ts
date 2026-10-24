@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentStatusTracker, agentStatusFromEvent, isFinal,
-  terminalFromAgentStatus, toAgentStatusJson, turnIdFromAgentStatus } from "./status.js";
+  terminalFromAgentStatus, toAgentStatusJson, turnIdFromAgentStatus } from "../../src/agents/status.js";
 
 describe("AgentStatusTracker", () => {
   it("reads terminal and turn IDs only from object statuses", () => {

@@ -2,7 +2,7 @@ import chalk from 'chalk'
 import stripAnsi from 'strip-ansi'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-type ColorizeModule = typeof import('./colorize.js')
+type ColorizeModule = typeof import('../../../src/tui/ink/colorize.js')
 
 const ORIGINAL_ENV = {
   AGENC_TMUX_TRUECOLOR: process.env.AGENC_TMUX_TRUECOLOR,
@@ -23,7 +23,7 @@ function restoreEnv(name: keyof typeof ORIGINAL_ENV): void {
 
 async function loadColorize(): Promise<ColorizeModule> {
   vi.resetModules()
-  return await import('./colorize.js')
+  return await import('../../../src/tui/ink/colorize.js')
 }
 
 describe('colorize coverage', () => {

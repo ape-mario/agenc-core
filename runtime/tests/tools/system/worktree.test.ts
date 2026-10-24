@@ -20,7 +20,7 @@ import {
   __resetWorktreeSessionsForTesting,
   createEnterWorktreeTool as createUnboundEnterWorktreeTool,
   createExitWorktreeTool as createUnboundExitWorktreeTool,
-} from "./worktree.js";
+} from "../../../src/tools/system/worktree.js";
 import {
   SESSION_AGENC_HOME_ARG,
   withSignedSessionId,

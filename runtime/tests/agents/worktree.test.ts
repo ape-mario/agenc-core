@@ -27,7 +27,7 @@ import {
   isWorktreeStale,
   removeAgentWorktree as removeAgentWorktreeUnbound,
   validateWorktreeSlug,
-} from "./worktree.js";
+} from "../../src/agents/worktree.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
 
 const getOrCreateWorktree = (

@@ -9,18 +9,18 @@ const execFileNoThrowMock = vi.fn(
 )
 
 function installOscMocks(): void {
-  vi.doMock('../../../utils/env.js', () => ({
+  vi.doMock('../../../../src/utils/env.js', () => ({
     env: envMock,
   }))
 
-  vi.doMock('../../../utils/execFileNoThrow.js', () => ({
+  vi.doMock('../../../../src/utils/execFileNoThrow.js', () => ({
     execFileNoThrow: execFileNoThrowMock,
     execFileNoThrowWithCwd: execFileNoThrowMock,
   }))
 }
 
 async function importFreshOscModule() {
-  return import('./osc.ts')
+  return import('../../../../src/tui/ink/termio/osc.js')
 }
 
 async function flushClipboardCopy(): Promise<void> {

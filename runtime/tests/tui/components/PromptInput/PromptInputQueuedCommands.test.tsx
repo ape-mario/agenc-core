@@ -1,7 +1,7 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderToString } from '../../../utils/staticRender.js'
-import { Text } from '../../ink.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { Text } from '../../../../src/tui/ink.js'
 
 type QueuedCommandFixture = {
   value: string
@@ -23,17 +23,17 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../hooks/useCommandQueue.js', () => ({
+vi.mock('../../../../src/tui/hooks/useCommandQueue.js', () => ({
   useCommandQueue: () => queueFixture.commands,
 }))
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (
     selector: (state: { viewingAgentTaskId?: string; isBriefOnly: boolean }) => unknown,
   ) => selector({ viewingAgentTaskId: undefined, isBriefOnly: false }),
 }))
 
-vi.mock('../Message.js', () => ({
+vi.mock('../../../../src/tui/components/Message.js', () => ({
   Message: ({ message }: { message: { message?: { content?: unknown } } }) => (
     <Text>
       {typeof message.message?.content === 'string'
@@ -43,7 +43,7 @@ vi.mock('../Message.js', () => ({
   ),
 }))
 
-vi.mock('../../../utils/messages.js', () => ({
+vi.mock('../../../../src/utils/messages.js', () => ({
   EMPTY_LOOKUPS: {},
   createUserMessage: (args: { content: unknown; timestamp?: string }) => {
     createUserMessageSpy(args)
@@ -56,7 +56,7 @@ vi.mock('../../../utils/messages.js', () => ({
   normalizeMessages: (messages: unknown[]) => messages,
 }))
 
-vi.mock('../../../utils/messageQueueManager.js', () => ({
+vi.mock('../../../../src/utils/messageQueueManager.js', () => ({
   isQueuedCommandEditable: (cmd: { mode?: string }) =>
     cmd.mode === 'prompt' || cmd.mode === 'bash',
   isQueuedCommandVisible: (cmd: { isMeta?: boolean }) => cmd.isMeta !== true,
@@ -78,7 +78,7 @@ describe('PromptInputQueuedCommands', () => {
       { value: 'first prompt', mode: 'prompt' },
       { value: 'second prompt', mode: 'prompt' },
     ]
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -93,7 +93,7 @@ describe('PromptInputQueuedCommands', () => {
   })
 
   it('shows a next-turn guidance banner for queued prompt messages', async () => {
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -102,7 +102,7 @@ describe('PromptInputQueuedCommands', () => {
   })
 
   it('does NOT repeat the "esc to interrupt" hint on the queued banner', async () => {
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -124,7 +124,7 @@ describe('PromptInputQueuedCommands', () => {
       { value: 'first prompt', mode: 'prompt' },
       { value: 'second prompt', mode: 'prompt' },
     ]
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -136,7 +136,7 @@ describe('PromptInputQueuedCommands', () => {
 
   it('omits the drop hint entirely when nothing is queued', async () => {
     queueFixture.commands = []
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -153,7 +153,7 @@ describe('PromptInputQueuedCommands', () => {
         mode: 'bash',
       },
     ]
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -168,7 +168,7 @@ describe('PromptInputQueuedCommands', () => {
         mode: 'bash',
       },
     ]
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -192,7 +192,7 @@ describe('PromptInputQueuedCommands', () => {
         },
       },
     ]
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -208,7 +208,7 @@ describe('PromptInputQueuedCommands', () => {
         mode: 'task-notification',
       },
     ]
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 100)
 
@@ -221,7 +221,7 @@ describe('PromptInputQueuedCommands', () => {
       value: `<task-notification><summary>task ${index}</summary><status>completed</status></task-notification>`,
       mode: 'task-notification',
     }))
-    const { PromptInputQueuedCommands } = await import('./PromptInputQueuedCommands.js')
+    const { PromptInputQueuedCommands } = await import('../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js')
 
     const output = await renderToString(<PromptInputQueuedCommands />, 120)
 

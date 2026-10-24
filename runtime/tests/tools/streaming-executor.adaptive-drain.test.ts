@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { StreamingToolExecutor } from "./streaming-executor.js";
-import { SHARED_READ } from "./concurrency.js";
-import { ToolLatencyStore } from "./tool-latency-store.js";
-import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
-import type { LLMTool, LLMToolCall } from "../llm/types.js";
-import type { Tool } from "./types.js";
-import type { ToolUseBlock } from "../session/turn-state.js";
+import { StreamingToolExecutor } from "../../src/tools/streaming-executor.js";
+import { SHARED_READ } from "../../src/tools/concurrency.js";
+import { ToolLatencyStore } from "../../src/tools/tool-latency-store.js";
+import type { ToolRegistry, ToolDispatchResult } from "../../src/tool-registry.js";
+import type { LLMTool, LLMToolCall } from "../../src/llm/types.js";
+import type { Tool } from "../../src/tools/types.js";
+import type { ToolUseBlock } from "../../src/session/turn-state.js";
 
 const GRACE_MS = 60_000;
 const FLAT_FLOOR_MS = 180_000;

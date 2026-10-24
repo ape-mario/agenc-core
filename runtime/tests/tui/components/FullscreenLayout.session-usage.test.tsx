@@ -1,16 +1,16 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { FullscreenLayout } from "./FullscreenLayout.js";
-import { FullscreenModeProvider } from "../context/fullscreenModeContext.js";
-import { SessionUsageContext } from "../context/sessionUsageContext.js";
-import { AppStateProvider, getDefaultAppState } from "../state/AppState.js";
-import { Text } from "../ink.js";
-import { renderToString } from "../../utils/staticRender.js";
+import { FullscreenLayout } from "../../../src/tui/components/FullscreenLayout.js";
+import { FullscreenModeProvider } from "../../../src/tui/context/fullscreenModeContext.js";
+import { SessionUsageContext } from "../../../src/tui/context/sessionUsageContext.js";
+import { AppStateProvider, getDefaultAppState } from "../../../src/tui/state/AppState.js";
+import { Text } from "../../../src/tui/ink.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 
 const mocks = vi.hoisted(() => ({ getTotalCost: vi.fn(() => 9) }));
 
-vi.mock("../../cost/tracker.js", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../../cost/tracker.js")>(),
+vi.mock("../../../src/cost/tracker.js", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../../src/cost/tracker.js")>(),
   getTotalCost: mocks.getTotalCost,
 }));
 

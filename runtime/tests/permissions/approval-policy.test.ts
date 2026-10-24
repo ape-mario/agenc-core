@@ -4,7 +4,7 @@ import {
   defaultExecApprovalRequirement,
   resolveApprovalPolicy,
   type GranularApprovalConfig,
-} from "./approval-policy.js";
+} from "../../src/permissions/approval-policy.js";
 
 describe("resolveApprovalPolicy — CLI > project-trust > config > default", () => {
   test("no inputs → DEFAULT_APPROVAL_POLICY (on_request)", () => {

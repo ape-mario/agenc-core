@@ -21,7 +21,7 @@ import { promisify } from "node:util";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createSymbolTools } from "./symbol-tools.js";
+import { createSymbolTools } from "../../../src/tools/system/symbol-tools.js";
 import type { Tool } from "../../../src/tools/types.js";
 import { bindExplicitDangerBoundary } from "../../helpers/explicit-danger-boundary.js";
 

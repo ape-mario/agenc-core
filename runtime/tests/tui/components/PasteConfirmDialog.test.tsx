@@ -1,7 +1,7 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 
 const inputState = vi.hoisted(() => ({
   handler: undefined as
@@ -17,10 +17,10 @@ const overlayMock = vi.hoisted(() => ({
   useRegisterOverlay: vi.fn(),
 }))
 
-vi.mock('../context/overlayContext.js', () => overlayMock)
+vi.mock('../../../src/tui/context/overlayContext.js', () => overlayMock)
 
-vi.mock('../ink.js', async () => {
-  const actual = await vi.importActual<typeof import('../ink.js')>('../ink.js')
+vi.mock('../../../src/tui/ink.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/tui/ink.js')>('../../../src/tui/ink.js')
   return {
     ...actual,
     useInput: (
@@ -54,7 +54,7 @@ describe('PasteConfirmDialog', () => {
   })
 
   it('registers itself as a modal overlay', async () => {
-    const { PasteConfirmDialog } = await import('./PasteConfirmDialog.js')
+    const { PasteConfirmDialog } = await import('../../../src/tui/components/PasteConfirmDialog.js')
 
     const output = await renderToString(
       <PasteConfirmDialog command="echo ok" onDecide={vi.fn()} />,
@@ -69,7 +69,7 @@ describe('PasteConfirmDialog', () => {
 
   it('consumes confirmation keys before deciding', async () => {
     const onDecide = vi.fn()
-    const { PasteConfirmDialog } = await import('./PasteConfirmDialog.js')
+    const { PasteConfirmDialog } = await import('../../../src/tui/components/PasteConfirmDialog.js')
     await renderToString(
       <PasteConfirmDialog command="echo ok" onDecide={onDecide} />,
       80,
@@ -90,7 +90,7 @@ describe('PasteConfirmDialog', () => {
 
   it('consumes unrelated keys without deciding', async () => {
     const onDecide = vi.fn()
-    const { PasteConfirmDialog } = await import('./PasteConfirmDialog.js')
+    const { PasteConfirmDialog } = await import('../../../src/tui/components/PasteConfirmDialog.js')
     await renderToString(
       <PasteConfirmDialog command="echo ok" onDecide={onDecide} />,
       80,

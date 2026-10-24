@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import type { AppState } from "./AppStateStore.js";
+import type { AppState } from "../../../src/tui/state/AppStateStore.js";
 import {
   getActiveAgentForInput,
   getViewedTeammateTask,
-} from "./selectors.js";
+} from "../../../src/tui/state/selectors.js";
 
 function makeState(
   viewingAgentTaskId: string | undefined,

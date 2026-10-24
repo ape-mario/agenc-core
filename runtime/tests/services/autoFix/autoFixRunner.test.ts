@@ -5,7 +5,7 @@ import { describe, expect, test } from "vitest";
 import {
   runAutoFixCheck,
   type AutoFixCheckOptions,
-} from "./autoFixRunner.js";
+} from "../../../src/services/autoFix/autoFixRunner.js";
 import { explicitDangerBroker } from "../../helpers/explicit-danger-boundary.js";
 
 const TEST_CWD = process.cwd();

@@ -39,7 +39,7 @@ import {
   createGlobTool as createUnboundGlobTool,
   GLOB_TOOL_NAME,
   runRipgrepFiles,
-} from "./glob.js";
+} from "../../../src/tools/system/glob.js";
 import {
   bindExplicitDangerBoundary,
   withExplicitDangerBoundary,

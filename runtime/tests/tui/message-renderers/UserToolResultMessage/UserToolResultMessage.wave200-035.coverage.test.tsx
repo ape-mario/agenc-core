@@ -1,14 +1,14 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import type { Tool } from '../../../tools/Tool.js'
+import type { Tool } from '../../../../src/tools/Tool.js'
 import {
   CANCEL_MESSAGE,
   INTERRUPT_MESSAGE_FOR_TOOL_USE,
-} from '../../../utils/messages.js'
-import { renderToString } from '../../../utils/staticRender.js'
-import { Text } from '../../ink.js'
-import { UserToolResultMessage } from './UserToolResultMessage.js'
+} from '../../../../src/utils/messages.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { Text } from '../../../../src/tui/ink.js'
+import { UserToolResultMessage } from '../../../../src/tui/message-renderers/UserToolResultMessage/UserToolResultMessage.js'
 
 describe('UserToolResultMessage wave200-035 coverage', () => {
   test('routes matched tool results through cancellation, rejection, error, and success renderers', async () => {

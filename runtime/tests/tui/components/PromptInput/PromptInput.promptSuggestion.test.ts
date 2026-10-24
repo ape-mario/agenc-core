@@ -4,7 +4,7 @@ import {
   getVisiblePromptSuggestion,
   shouldShowPromptSuggestionPlaceholder,
   shouldSuppressPromptSuggestionForTiming,
-} from "./promptSuggestionControl.js";
+} from "../../../../src/tui/components/PromptInput/promptSuggestionControl.js";
 
 describe("PromptInput prompt suggestion helpers", () => {
   it("shows generated suggestions only for idle empty prompt input", () => {

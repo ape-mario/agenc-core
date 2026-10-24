@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { submitViaElicitationPrompt } from "./elicitation-submit-routing.js";
+import { submitViaElicitationPrompt } from "../../src/tui/elicitation-submit-routing.js";
 
 function helpers() {
   return {

@@ -6,14 +6,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("bun:bundle", () => ({ feature: () => false }));
 
-import { loadCanonicalConfig } from "../config/repository.js";
-import { ConfigStore } from "../config/store.js";
-import type { AgenCMcpCliIo } from "./mcp-cli.js";
+import { loadCanonicalConfig } from "../../src/config/repository.js";
+import { ConfigStore } from "../../src/config/store.js";
+import type { AgenCMcpCliIo } from "../../src/bin/mcp-cli.js";
 import {
   formatAgenCMcpCliHelpText,
   parseAgenCMcpCliArgs,
   runAgenCMcpCli,
-} from "./mcp-cli.js";
+} from "../../src/bin/mcp-cli.js";
 
 const handlerMocks = vi.hoisted(() => ({
   mcpAddFromDesktopHandler: vi.fn(),
@@ -32,7 +32,7 @@ const configMocks = vi.hoisted(() => ({
       throw new Error(`Unexpected test scope: ${scope}`);
     }
     const { addUserMcpServerToToml } = await import(
-      "../services/mcp/user-config-toml.js"
+      "../../src/services/mcp/user-config-toml.js"
     );
     await addUserMcpServerToToml(name, config as never, configStore);
   }),
@@ -66,9 +66,9 @@ const settingsMocks = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("../cli/handlers/mcp.js", () => handlerMocks);
-vi.mock("../services/mcp/config.js", () => configMocks);
-vi.mock("../services/mcp/utils.js", () => ({
+vi.mock("../../src/cli/handlers/mcp.js", () => handlerMocks);
+vi.mock("../../src/services/mcp/config.js", () => configMocks);
+vi.mock("../../src/services/mcp/utils.js", () => ({
   describeMcpConfigFilePath: vi.fn(() => join(agencHome, "config.toml")),
   ensureConfigScope: vi.fn((scope?: string) => {
     const resolved = scope ?? "local";
@@ -97,11 +97,11 @@ vi.mock("../services/mcp/utils.js", () => ({
     Object.fromEntries(headers.map((header) => header.split(/:\s*/, 2)))
   ),
 }));
-vi.mock("../services/mcp/auth.js", () => ({
+vi.mock("../../src/services/mcp/auth.js", () => ({
   readClientSecret: vi.fn(async () => "secret"),
   saveMcpClientSecret: vi.fn(),
 }));
-vi.mock("../services/mcp/xaaIdpLogin.js", () => ({
+vi.mock("../../src/services/mcp/xaaIdpLogin.js", () => ({
   acquireIdpIdToken: xaaState.acquireIdpIdToken,
   clearIdpClientSecret: vi.fn((issuer: string) => {
     xaaState.clearedClientSecrets.push(issuer);
@@ -129,7 +129,7 @@ vi.mock("../services/mcp/xaaIdpLogin.js", () => ({
       environment.AGENC_ENABLE_XAA === "1",
   ),
 }));
-vi.mock("../utils/settings/settings.js", () => settingsMocks);
+vi.mock("../../src/utils/settings/settings.js", () => settingsMocks);
 
 const originalEnv = {
   AGENC_ENABLE_XAA: process.env.AGENC_ENABLE_XAA,

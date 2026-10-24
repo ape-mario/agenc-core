@@ -1,18 +1,18 @@
 import { describe, expect, test } from "vitest";
-import { StreamingToolExecutor } from "./streaming-executor.js";
+import { StreamingToolExecutor } from "../../src/tools/streaming-executor.js";
 import {
   SHARED_READ,
   EXCLUSIVE,
   ToolCallRuntime,
   sharedServer,
-} from "./concurrency.js";
-import { routerFromRegistry } from "./router.js";
-import { EventLog } from "../session/event-log.js";
-import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
-import type { LLMTool, LLMToolCall } from "../llm/types.js";
-import type { Tool } from "./types.js";
-import type { PreToolUseHook } from "./hooks.js";
-import type { ToolUseBlock } from "../session/turn-state.js";
+} from "../../src/tools/concurrency.js";
+import { routerFromRegistry } from "../../src/tools/router.js";
+import { EventLog } from "../../src/session/event-log.js";
+import type { ToolRegistry, ToolDispatchResult } from "../../src/tool-registry.js";
+import type { LLMTool, LLMToolCall } from "../../src/llm/types.js";
+import type { Tool } from "../../src/tools/types.js";
+import type { PreToolUseHook } from "../../src/tools/hooks.js";
+import type { ToolUseBlock } from "../../src/session/turn-state.js";
 
 function makeBlock(id: string, name: string): ToolUseBlock {
   return { type: "tool_use", id, name, input: {} };

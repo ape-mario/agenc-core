@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest'
 
-import Box from './components/Box.tsx'
-import Text from './components/Text.tsx'
+import Box from '../../../src/tui/ink/components/Box.js'
+import Text from '../../../src/tui/ink/components/Text.js'
 import {
   applyPositionedHighlight,
   renderToScreen,
   scanPositions,
-} from './render-to-screen.ts'
+} from '../../../src/tui/ink/render-to-screen.js'
 import {
   CellWidth,
   CharPool,
@@ -17,7 +17,7 @@ import {
   createScreen,
   setCellAt,
   type Screen,
-} from './screen.ts'
+} from '../../../src/tui/ink/screen.js'
 
 function makeScreen(width: number, height: number): {
   screen: Screen

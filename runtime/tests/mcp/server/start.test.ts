@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import type { ToolRegistry } from "../../tool-registry.js";
+import type { ToolRegistry } from "../../../src/tool-registry.js";
 import {
   formatMcpSseServeUrl,
   MCP_INBOUND_TOOL_ADMISSION_REQUIRED_CODE,
@@ -13,7 +13,7 @@ import {
   resolveMcpServeDefaults,
   startMcpServerFromConfig,
   startMcpSseServe,
-} from "./start.js";
+} from "../../../src/mcp/server/start.js";
 
 const UNREACHABLE_REGISTRY: ToolRegistry = {
   get tools() {

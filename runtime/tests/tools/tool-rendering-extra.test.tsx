@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
 // Same AgenC ink stub as the bash and edit renderer tests.
-vi.mock("../tui/ink.js", () => {
+vi.mock("../../src/tui/ink.js", () => {
   function Box(_props: { readonly children?: unknown }) {
     return null;
   }
@@ -11,7 +11,7 @@ vi.mock("../tui/ink.js", () => {
   return { Box, Text };
 });
 
-import { ResultLine } from "../tui/components/v2/primitives.js";
+import { ResultLine } from "../../src/tui/components/v2/primitives.js";
 import {
   createTuiTool,
   FileReadView,
@@ -19,7 +19,7 @@ import {
   GlobPathsView,
   GrepMatchesView,
   ToolErrorView,
-} from "../tui/tool-rendering.js";
+} from "../../src/tui/tool-rendering.js";
 
 interface ChildProps {
   readonly children?: unknown;
@@ -79,7 +79,7 @@ describe("createTuiTools — pre-seed canonicalization", () => {
   });
 
   test("the pre-seed list does not include the legacy 'Read' name (canonicalization fix)", async () => {
-    const mod = await import("../tui/tool-rendering.js");
+    const mod = await import("../../src/tui/tool-rendering.js");
     const tools = mod.createTuiTools([]);
     const names = tools.map((t: { name: string }) => t.name).sort();
     expect(names).toContain("FileRead");
@@ -537,7 +537,7 @@ describe("Tool error cross-cutting dispatch", () => {
 
 describe("formatStructuredToolResult ⇄ per-tool view wire-shape lock", () => {
   test("FileRead envelope produced by formatStructuredToolResult is consumed by FileReadView (no shape drift)", async () => {
-    const transcript = await import("../tui/session-transcript.js");
+    const transcript = await import("../../src/tui/session-transcript.js");
     const blocks = transcript.formatStructuredToolResult(
       "FileRead",
       "tool_call_completed",
@@ -558,7 +558,7 @@ describe("formatStructuredToolResult ⇄ per-tool view wire-shape lock", () => {
   });
 
   test("Write envelope produced by formatStructuredToolResult is consumed by FileWriteView", async () => {
-    const transcript = await import("../tui/session-transcript.js");
+    const transcript = await import("../../src/tui/session-transcript.js");
     const blocks = transcript.formatStructuredToolResult(
       "Write",
       "tool_call_completed",
@@ -571,7 +571,7 @@ describe("formatStructuredToolResult ⇄ per-tool view wire-shape lock", () => {
   });
 
   test("Grep envelope produced by formatStructuredToolResult is consumed by GrepMatchesView", async () => {
-    const transcript = await import("../tui/session-transcript.js");
+    const transcript = await import("../../src/tui/session-transcript.js");
     const blocks = transcript.formatStructuredToolResult(
       "Grep",
       "tool_call_completed",
@@ -588,7 +588,7 @@ describe("formatStructuredToolResult ⇄ per-tool view wire-shape lock", () => {
   });
 
   test("Glob envelope produced by formatStructuredToolResult is consumed by GlobPathsView", async () => {
-    const transcript = await import("../tui/session-transcript.js");
+    const transcript = await import("../../src/tui/session-transcript.js");
     const blocks = transcript.formatStructuredToolResult(
       "Glob",
       "tool_call_completed",
@@ -603,7 +603,7 @@ describe("formatStructuredToolResult ⇄ per-tool view wire-shape lock", () => {
   });
 
   test("formatStructuredToolError envelope is consumed by ToolErrorView", async () => {
-    const transcript = await import("../tui/session-transcript.js");
+    const transcript = await import("../../src/tui/session-transcript.js");
     const blocks = transcript.formatStructuredToolError(
       "FileRead",
       "ENOENT: no such file",

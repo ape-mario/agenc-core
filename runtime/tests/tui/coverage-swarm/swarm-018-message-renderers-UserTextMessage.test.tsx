@@ -61,20 +61,20 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => state.features.has(name),
 }))
 
-vi.mock('../message-renderers/UserTextMessage.renderers.js', () => ({
+vi.mock('../../../src/tui/message-renderers/UserTextMessage.renderers.js', () => ({
   ...state.renderers,
 }))
 
-import { NO_CONTENT_MESSAGE } from '../../constants/messages.js'
+import { NO_CONTENT_MESSAGE } from '../../../src/constants/messages.js'
 import {
   COMMAND_MESSAGE_TAG,
   LOCAL_COMMAND_CAVEAT_TAG,
   TASK_NOTIFICATION_TAG,
   TEAMMATE_MESSAGE_TAG,
   TICK_TAG,
-} from '../../constants/xml.js'
-import { INTERRUPT_MESSAGE } from '../../utils/messages.js'
-import { UserTextMessage } from '../message-renderers/UserTextMessage.js'
+} from '../../../src/constants/xml.js'
+import { INTERRUPT_MESSAGE } from '../../../src/utils/messages.js'
+import { UserTextMessage } from '../../../src/tui/message-renderers/UserTextMessage.js'
 
 type UserTextMessageProps = Parameters<typeof UserTextMessage>[0]
 type ReactElementWithProps = React.ReactElement<Record<string, unknown>>

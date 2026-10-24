@@ -26,7 +26,7 @@ import {
   type RequestNetworkApprovalOptions,
   type ReviewDecision,
   type SandboxPolicy,
-} from "./network-approval.js";
+} from "../../src/permissions/network-approval.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Test fixtures

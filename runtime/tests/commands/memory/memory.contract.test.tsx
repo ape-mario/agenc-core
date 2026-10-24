@@ -3,14 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import type { SlashCommandContext } from "../types.js";
-import { memorySlashCommand } from "./slash.js";
-import { getRelativeMemoryPathForRoots } from "../../tui/components/memory/path-format.js";
+import type { SlashCommandContext } from "../../../src/commands/types.js";
+import { memorySlashCommand } from "../../../src/commands/memory/slash.js";
+import { getRelativeMemoryPathForRoots } from "../../../src/tui/components/memory/path-format.js";
 import {
   buildMemoryFileSelectorOptions,
   getInitialMemoryPath,
   OPEN_FOLDER_PREFIX,
-} from "../../tui/components/memory/selector-options.js";
+} from "../../../src/tui/components/memory/selector-options.js";
 
 const root = resolve(process.cwd(), "..");
 
@@ -28,22 +28,22 @@ function fakeContext(): SlashCommandContext {
 }
 
 function mockMemoryCommandRuntime(): void {
-  vi.doMock("../../tui/ink.js", () => ({
+  vi.doMock("../../../src/tui/ink.js", () => ({
     Box: ({ children }: { children?: React.ReactNode }) =>
       React.createElement("box", null, children),
     Link: ({ url }: { url: string }) => React.createElement("link", { url }),
     Text: ({ children }: { children?: React.ReactNode }) =>
       React.createElement("text", null, children),
   }));
-  vi.doMock("../../tui/components/design-system/Dialog.js", () => ({
+  vi.doMock("../../../src/tui/components/design-system/Dialog.js", () => ({
     Dialog: ({ children }: { children?: React.ReactNode }) =>
       React.createElement("dialog", null, children),
   }));
-  vi.doMock("../../tui/components/memory/path-format.js", () => ({
+  vi.doMock("../../../src/tui/components/memory/path-format.js", () => ({
     getRelativeMemoryPath: (path: string) => `relative:${path}`,
     getRelativeMemoryPathForRoots,
   }));
-  vi.doMock("../../utils/editor.js", () => ({
+  vi.doMock("../../../src/utils/editor.js", () => ({
     openFileInExternalEditor: vi.fn(() => true),
   }));
 }
@@ -52,11 +52,11 @@ describe("memory command contract", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.resetModules();
-    vi.doUnmock("../../memory/index.js");
-    vi.doUnmock("../../tui/components/memory/path-format.js");
-    vi.doUnmock("../../tui/components/design-system/Dialog.js");
-    vi.doUnmock("../../tui/ink.js");
-    vi.doUnmock("../../utils/editor.js");
+    vi.doUnmock("../../../src/memory/index.js");
+    vi.doUnmock("../../../src/tui/components/memory/path-format.js");
+    vi.doUnmock("../../../src/tui/components/design-system/Dialog.js");
+    vi.doUnmock("../../../src/tui/ink.js");
+    vi.doUnmock("../../../src/utils/editor.js");
   });
 
   it("keeps the memory slash command wired into registry and TUI surfaces", () => {
@@ -103,7 +103,7 @@ describe("memory command contract", () => {
     const clearMemoryFileCaches = vi.fn();
     const getMemoryFiles = vi.fn().mockResolvedValue([]);
     mockMemoryCommandRuntime();
-    vi.doMock("../../memory/index.js", () => ({
+    vi.doMock("../../../src/memory/index.js", () => ({
       clearMemoryFileCaches,
       getMemoryFiles,
     }));
@@ -128,12 +128,12 @@ describe("memory command contract", () => {
     const clearMemoryFileCaches = vi.fn();
     const getMemoryFiles = vi.fn().mockResolvedValue([]);
     mockMemoryCommandRuntime();
-    vi.doMock("../../memory/index.js", () => ({
+    vi.doMock("../../../src/memory/index.js", () => ({
       clearMemoryFileCaches,
       getMemoryFiles,
     }));
 
-    const { call } = await import("./memory.js");
+    const { call } = await import("../../../src/commands/memory/memory.js");
     const node = await call(vi.fn(), {} as never, "");
 
     expect(clearMemoryFileCaches).toHaveBeenCalledTimes(1);
@@ -146,11 +146,11 @@ describe("memory command contract", () => {
 
   it("opens existing memory files without clobbering contents and prefers VISUAL over EDITOR", async () => {
     mockMemoryCommandRuntime();
-    vi.doMock("../../memory/index.js", () => ({
+    vi.doMock("../../../src/memory/index.js", () => ({
       clearMemoryFileCaches: vi.fn(),
       getMemoryFiles: vi.fn().mockResolvedValue([]),
     }));
-    const { openMemoryFile } = await import("./memory.js");
+    const { openMemoryFile } = await import("../../../src/commands/memory/memory.js");
     const onDone = vi.fn();
     const writeFile = vi
       .fn()
@@ -184,11 +184,11 @@ describe("memory command contract", () => {
 
   it("passes shell-like memory paths to the argv-safe editor launcher and reports editor failures", async () => {
     mockMemoryCommandRuntime();
-    vi.doMock("../../memory/index.js", () => ({
+    vi.doMock("../../../src/memory/index.js", () => ({
       clearMemoryFileCaches: vi.fn(),
       getMemoryFiles: vi.fn().mockResolvedValue([]),
     }));
-    const { openMemoryFile } = await import("./memory.js");
+    const { openMemoryFile } = await import("../../../src/commands/memory/memory.js");
     const onDone = vi.fn();
     const shellLikePath = '/tmp/project/notes"; touch injected; ".md';
     const openFileInExternalEditor = vi.fn(() => false);
@@ -213,7 +213,7 @@ describe("memory command contract", () => {
     const previousVisual = process.env.VISUAL;
     const previousEditor = process.env.EDITOR;
     const { getExternalEditor, openFileInExternalEditor } = await import(
-      "../../utils/editor.js"
+      "../../../src/utils/editor.js"
     );
     const clearEditorCache = () => {
       (
@@ -245,7 +245,7 @@ describe("memory command contract", () => {
 
   it("preserves the Windows editor availability bypass and parses quoted editor commands", async () => {
     const { editorExecutableAvailable, splitEditorCommand } = await import(
-      "../../utils/editor.js"
+      "../../../src/utils/editor.js"
     );
 
     expect(editorExecutableAvailable("definitely-missing-editor", "win32")).toBe(
@@ -359,7 +359,7 @@ describe("memory command contract", () => {
 
   it("formats v2 memory states distinctly for project, user, absent, and folder rows", async () => {
     mockMemoryCommandRuntime();
-    vi.doMock("../../memory/index.js", () => ({
+    vi.doMock("../../../src/memory/index.js", () => ({
       clearMemoryFileCaches: vi.fn(),
       getMemoryFiles: vi.fn().mockResolvedValue([]),
     }));
@@ -367,7 +367,7 @@ describe("memory command contract", () => {
       memoryOptionKind,
       memoryOptionState,
       memoryPreviewText,
-    } = await import("./memory.js");
+    } = await import("../../../src/commands/memory/memory.js");
     const options = buildMemoryFileSelectorOptions({
       existingMemoryFiles: [
         { path: "/repo/AGENC.md", type: "Project", content: "project note" },

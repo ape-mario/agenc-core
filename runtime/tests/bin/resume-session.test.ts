@@ -25,8 +25,8 @@ import {
   DEFAULT_SESSION_ROOT_MARKERS,
   getProjectDir,
   isSafeSessionIdSegment,
-} from "../session/session-store.js";
-import { sanitizePath } from "../utils/sessionStoragePortable.js";
+} from "../../src/session/session-store.js";
+import { sanitizePath } from "../../src/utils/sessionStoragePortable.js";
 import {
   __setResumeSessionTestHooksForTest,
   reproveResumeSessionAllowingAppend,
@@ -34,7 +34,7 @@ import {
   resolveLatestSessionId as resolveLatestSessionIdWithHome,
   resolveResumeSessionId as resolveResumeSessionIdWithHome,
   type ResolvedResumeSession,
-} from "./resume-session.js";
+} from "../../src/bin/resume-session.js";
 
 let workHome: string;
 let agencHome: string;

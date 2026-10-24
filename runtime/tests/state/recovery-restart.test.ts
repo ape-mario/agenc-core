@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { recoverDaemonStateOnStartup } from "./recovery.js";
+import { recoverDaemonStateOnStartup } from "../../src/state/recovery.js";
 import {
   ROLLOUT_SCHEMA_VERSION,
   type Event,
@@ -24,7 +24,7 @@ import {
   recoverCanonicalRunJournalsOnStartup,
   StartupResumeSourceBudget,
 } from "../../src/state/startup-run-journal-recovery.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 import { openFndFixtureCatalog } from "../helpers/fnd-fixtures.js";
 
 let home = "";

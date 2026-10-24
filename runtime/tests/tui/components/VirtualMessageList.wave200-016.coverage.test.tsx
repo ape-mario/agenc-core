@@ -18,7 +18,7 @@ const virtualScroll = vi.hoisted(() => ({
   scrollToIndex: vi.fn(),
 }));
 
-vi.mock("../hooks/useVirtualScroll.js", () => ({
+vi.mock("../../../src/tui/hooks/useVirtualScroll.js", () => ({
   useVirtualScroll: (_scrollRef: unknown, keys: readonly string[]) => ({
     bottomSpacer: 0,
     getItemElement: (index: number) =>
@@ -34,16 +34,16 @@ vi.mock("../hooks/useVirtualScroll.js", () => ({
   }),
 }));
 
-import { createRoot } from "../ink/root.js";
-import { Text } from "../ink.js";
-import type { ScrollBoxHandle } from "../ink/components/ScrollBox.js";
-import type { DOMElement } from "../ink/dom.js";
-import type { RenderableMessage } from "../../types/message.js";
-import { ScrollChromeContext } from "./FullscreenLayout.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { Text } from "../../../src/tui/ink.js";
+import type { ScrollBoxHandle } from "../../../src/tui/ink/components/ScrollBox.js";
+import type { DOMElement } from "../../../src/tui/ink/dom.js";
+import type { RenderableMessage } from "../../../src/types/message.js";
+import { ScrollChromeContext } from "../../../src/tui/components/FullscreenLayout.js";
 import {
   type StickyPrompt,
   VirtualMessageList,
-} from "./VirtualMessageList.js";
+} from "../../../src/tui/components/VirtualMessageList.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

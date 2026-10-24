@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { AsyncQueue } from "../../utils/async-queue.js";
+import { AsyncQueue } from "../../../src/utils/async-queue.js";
 import {
   buildRealtimeSessionConfig,
   buildRealtimeSessionConfigFromSession,
@@ -17,7 +17,7 @@ import {
   type RealtimeTransportConnection,
   type RealtimeTransportRequest,
   type RealtimeWriter,
-} from "./conversation.js";
+} from "../../../src/conversation/realtime/conversation.js";
 
 class FakeWriter implements RealtimeWriter {
   readonly audioFrames: RealtimeAudioFrame[] = [];

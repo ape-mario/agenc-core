@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   compileAndLoadAgenCNativePeerCredentialBinding,
   loadAgenCNativePeerCredentialBinding,
-} from "./transport/peer-credentials.js";
+} from "../../src/app-server/transport/peer-credentials.js";
 
 describe.skipIf(process.platform !== "linux")("bundled peer credentials", () => {
   const directories: string[] = [];

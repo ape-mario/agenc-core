@@ -20,25 +20,25 @@ vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
 vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
   StreamableHTTPClientTransport: class {},
 }));
-vi.mock("./connect-with-cleanup.js", () => ({
+vi.mock("../../../src/mcp-client/transports/connect-with-cleanup.js", () => ({
   connectMCPClientWithCleanup: async () => {},
 }));
-vi.mock("../../elicitation/mcp.js", () => ({
+vi.mock("../../../src/elicitation/mcp.js", () => ({
   configureMcpElicitationClient: async () => {},
 }));
-vi.mock("../../services/mcp/hostCapabilities.js", () => ({
+vi.mock("../../../src/services/mcp/hostCapabilities.js", () => ({
   buildMcpHostClientCapabilities: () => ({ roots: {} }),
   configureMcpHostRequestHandlers: () => {},
 }));
-vi.mock("../../utils/proxy.js", () => ({
+vi.mock("../../../src/utils/proxy.js", () => ({
   getProxyFetchOptions: () => ({}),
 }));
 
-import { createStdioMCPConnection } from "./stdio.js";
-import { createSseMCPConnection } from "./sse.js";
-import { createHttpMCPConnection } from "./http.js";
-import { createWebSocketMCPConnection } from "./websocket.js";
-import { createMCPConnection } from "../connection.js";
+import { createStdioMCPConnection } from "../../../src/mcp-client/transports/stdio.js";
+import { createSseMCPConnection } from "../../../src/mcp-client/transports/sse.js";
+import { createHttpMCPConnection } from "../../../src/mcp-client/transports/http.js";
+import { createWebSocketMCPConnection } from "../../../src/mcp-client/transports/websocket.js";
+import { createMCPConnection } from "../../../src/mcp-client/connection.js";
 
 const handlers = {
   onToolsListChanged: vi.fn(),

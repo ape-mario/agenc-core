@@ -6,17 +6,17 @@ import chalk from 'chalk'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import type Ink from './ink.tsx'
-import { drainStdin } from './ink.tsx'
-import type { DOMElement, ElementNames } from './dom.ts'
-import type { Frame } from './frame.ts'
-import instances from './instances.ts'
-import { createRoot, type Root } from './root.ts'
-import { CellWidth, cellAt } from './screen.ts'
-import { BEL } from './termio/ansi.ts'
-import { CURSOR_HOME, ERASE_SCREEN } from './termio/csi.ts'
-import { ENABLE_MOUSE_TRACKING, ENTER_ALT_SCREEN } from './termio/dec.ts'
-import { useTerminalNotification } from './useTerminalNotification.ts'
+import type Ink from '../../../src/tui/ink/ink.js'
+import { drainStdin } from '../../../src/tui/ink/ink.js'
+import type { DOMElement, ElementNames } from '../../../src/tui/ink/dom.js'
+import type { Frame } from '../../../src/tui/ink/frame.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot, type Root } from '../../../src/tui/ink/root.js'
+import { CellWidth, cellAt } from '../../../src/tui/ink/screen.js'
+import { BEL } from '../../../src/tui/ink/termio/ansi.js'
+import { CURSOR_HOME, ERASE_SCREEN } from '../../../src/tui/ink/termio/csi.js'
+import { ENABLE_MOUSE_TRACKING, ENTER_ALT_SCREEN } from '../../../src/tui/ink/termio/dec.js'
+import { useTerminalNotification } from '../../../src/tui/ink/useTerminalNotification.js'
 
 const clipboardMock = vi.hoisted(() => ({
   logError: vi.fn(),
@@ -24,8 +24,8 @@ const clipboardMock = vi.hoisted(() => ({
   supportsTabStatus: vi.fn(() => false),
 }))
 
-vi.mock('./termio/osc.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('./termio/osc.ts')>()
+vi.mock('../../../src/tui/ink/termio/osc.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../src/tui/ink/termio/osc.js')>()
   return {
     ...actual,
     setClipboard: clipboardMock.setClipboard,
@@ -33,11 +33,11 @@ vi.mock('./termio/osc.js', async importOriginal => {
   }
 })
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: clipboardMock.logError,
 }))
 
-vi.mock('../../utils/fullscreen.js', () => ({
+vi.mock('../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => false,
 }))
 

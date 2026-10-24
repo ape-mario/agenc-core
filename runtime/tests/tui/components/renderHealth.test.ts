@@ -1,14 +1,14 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { formatRenderHealthWarning } from "./App.js";
+import { formatRenderHealthWarning } from "../../../src/tui/components/App.js";
 import {
   formatTuiBackpressureWarning,
   getTuiBackpressureSnapshot,
   recordTuiBackpressure,
   resetTuiBackpressureForTesting,
   subscribeTuiBackpressure,
-} from "../backpressure.js";
-import { FpsTracker } from "../../utils/fpsTracker.js";
+} from "../../../src/tui/backpressure.js";
+import { FpsTracker } from "../../../src/utils/fpsTracker.js";
 
 describe("FpsTracker", () => {
   test("computes average and 1% low from the same render-duration window", () => {

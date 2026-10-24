@@ -1,26 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AuthBackend } from "../auth/backend.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
 import { createTempWorkspaceFixture } from "../helpers/temp-workspace.js";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { sessionTranscriptV2FromRollout } from "./background-agent-runner.js";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { sessionTranscriptV2FromRollout } from "../../src/app-server/background-agent-runner.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
 import {
   AgenCDaemonJsonRpcDispatcher,
   TEST_ONLY_ALLOW_UNADMITTED_COMMAND_EXEC_START,
-} from "./daemon-dispatcher.js";
+} from "../../src/app-server/daemon-dispatcher.js";
 import {
   AGENC_DAEMON_PROTOCOL_VERSION,
   AGENC_DAEMON_METHOD_CAPABILITIES_KEY,
   AGENC_PORTAL_MOBILE_STATUS_PUSH_CAPABILITY,
   JSON_RPC_VERSION,
   type JsonObject,
-} from "./protocol/index.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
-import { RoutineSessionPreparation } from "../routines/session-preparation.js";
+} from "../../src/app-server/protocol/index.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
+import { RoutineSessionPreparation } from "../../src/routines/session-preparation.js";
 import {
   AgenCRealtimeRpcService,
   TEST_ONLY_ALLOW_UNADMITTED_REALTIME_START,
-} from "./realtime.js";
+} from "../../src/app-server/realtime.js";
 
 const workspaces = createTempWorkspaceFixture(
   "agenc-daemon-dispatcher-workspace-",

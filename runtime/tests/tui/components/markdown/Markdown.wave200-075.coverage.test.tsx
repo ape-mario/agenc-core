@@ -1,14 +1,14 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { StreamingMarkdown } from './Markdown.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { StreamingMarkdown } from '../../../../src/tui/components/markdown/Markdown.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../hooks/useSettings.js', () => ({
+vi.mock('../../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),

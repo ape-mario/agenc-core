@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { ReservedErrorBuffer, SidecarManager } from "./sidecar.js";
-import { EventLog } from "./event-log.js";
-import type { Sidecar } from "./sidecar.js";
+import { ReservedErrorBuffer, SidecarManager } from "../../src/session/sidecar.js";
+import { EventLog } from "../../src/session/event-log.js";
+import type { Sidecar } from "../../src/session/sidecar.js";
 
 describe("ReservedErrorBuffer (I-43)", () => {
   test("accepts entries + evicts oldest on overflow", () => {

@@ -5,13 +5,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const readRemoteBearerCredential = vi.hoisted(() => vi.fn());
 
-vi.mock("../native-credentials.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../native-credentials.js")>();
+vi.mock("../../../src/auth/native-credentials.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/auth/native-credentials.js")>();
   readRemoteBearerCredential.mockImplementation(actual.readRemoteBearerCredential);
   return { ...actual, readRemoteBearerCredential };
 });
 
-import { RemoteAuthBackend } from "./remote.js";
+import { RemoteAuthBackend } from "../../../src/auth/backends/remote.js";
 
 describe("RemoteAuthBackend without a signed-in state", () => {
   const homes: string[] = [];

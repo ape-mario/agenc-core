@@ -1,14 +1,14 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { Tool } from '../../tools/Tool.js'
+import type { Tool } from '../../../src/tools/Tool.js'
 import type {
   AgenCToolUseBlockParam,
   ProgressMessage,
-} from '../../types/message.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { Text } from '../ink.js'
-import { AssistantToolUseMessage } from './AssistantToolUseMessage.js'
+} from '../../../src/types/message.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { Text } from '../../../src/tui/ink.js'
+import { AssistantToolUseMessage } from '../../../src/tui/message-renderers/AssistantToolUseMessage.js'
 
 const appStateMock = vi.hoisted(() => ({
   pendingWorkerRequest: undefined as undefined | { toolUseId: string },
@@ -18,23 +18,23 @@ const appStateMock = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../utils/classifierApprovalsHook.js', () => ({
+vi.mock('../../../src/utils/classifierApprovalsHook.js', () => ({
   useIsClassifierChecking: () => false,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 80, rows: 24 }),
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppStateMaybeOutsideOfProvider: (
     selector: (state: typeof appStateMock) => unknown,
   ) => selector(appStateMock),
 }))
 
-vi.mock('../ink.js', async () => {
-  const actual = await vi.importActual<typeof import('../ink.js')>(
-    '../ink.js',
+vi.mock('../../../src/tui/ink.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/tui/ink.js')>(
+    '../../../src/tui/ink.js',
   )
   return {
     ...actual,

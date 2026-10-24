@@ -18,22 +18,22 @@ const execFileNoThrowMock = vi.fn(
 const logErrorMock = vi.fn()
 
 function installOscMocks(): void {
-  vi.doMock('../../../utils/execFileNoThrow.js', () => ({
+  vi.doMock('../../../../src/utils/execFileNoThrow.js', () => ({
     execFileNoThrow: execFileNoThrowMock,
     execFileNoThrowWithCwd: execFileNoThrowMock,
   }))
 
-  vi.doMock('../../../utils/log.js', () => ({
+  vi.doMock('../../../../src/utils/log.js', () => ({
     logError: logErrorMock,
   }))
 
-  vi.doMock('../../../utils/tempfile.js', () => ({
+  vi.doMock('../../../../src/utils/tempfile.js', () => ({
     createPrivateTempFile: createPrivateTempFileMock,
   }))
 }
 
 async function importFreshOscModule() {
-  return import('./osc.ts')
+  return import('../../../../src/tui/ink/termio/osc.js')
 }
 
 async function flushClipboardCopy(): Promise<void> {

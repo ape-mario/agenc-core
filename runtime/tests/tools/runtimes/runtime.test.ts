@@ -16,39 +16,39 @@ import { describe, expect, test, vi } from "vitest";
 import {
   canReadPathWithCwd,
   hasFullDiskReadAccess,
-} from "../../sandbox/engine/index.js";
-import { EventLog } from "../../session/event-log.js";
-import type { LLMToolCall } from "../../llm/types.js";
-import { ToolRouter } from "../router.js";
-import type { Tool } from "../types.js";
-import { EXCLUSIVE, SHARED_READ } from "../concurrency.js";
-import { createApplyPatchTool } from "../apply-patch/tool.js";
-import { createExecCommandTool } from "../system/exec-command.js";
+} from "../../../src/sandbox/engine/index.js";
+import { EventLog } from "../../../src/session/event-log.js";
+import type { LLMToolCall } from "../../../src/llm/types.js";
+import { ToolRouter } from "../../../src/tools/router.js";
+import type { Tool } from "../../../src/tools/types.js";
+import { EXCLUSIVE, SHARED_READ } from "../../../src/tools/concurrency.js";
+import { createApplyPatchTool } from "../../../src/tools/apply-patch/tool.js";
+import { createExecCommandTool } from "../../../src/tools/system/exec-command.js";
 import {
   createFileEditTool,
   createFileMultiEditTool,
-} from "../system/file-edit.js";
-import { createFileWriteTool } from "../system/file-write.js";
-import { createPlanningTools } from "../system/planning.js";
+} from "../../../src/tools/system/file-edit.js";
+import { createFileWriteTool } from "../../../src/tools/system/file-write.js";
+import { createPlanningTools } from "../../../src/tools/system/planning.js";
 import {
   clearAllPlanSlugs,
   getPlanFilePath,
   setPlanSlug,
-} from "../../planning/plan-files.js";
-import { resolveHomeContext } from "../../config/home.js";
-import { recordSessionRead } from "../system/filesystem.js";
-import { createWriteStdinTool } from "../system/write-stdin.js";
+} from "../../../src/planning/plan-files.js";
+import { resolveHomeContext } from "../../../src/config/home.js";
+import { recordSessionRead } from "../../../src/tools/system/filesystem.js";
+import { createWriteStdinTool } from "../../../src/tools/system/write-stdin.js";
 import {
   enforceRuntimeSandboxAttempt,
   permissionProfileForRuntimeContext,
   permissionProfileForSandboxMode,
-} from "./sandboxing.js";
-import { resolveRuntimePathTarget } from "./paths.js";
+} from "../../../src/tools/runtimes/sandboxing.js";
+import { resolveRuntimePathTarget } from "../../../src/tools/runtimes/paths.js";
 import {
   readToolRuntimeContext,
   type ToolRuntimeCallContext,
-} from "./context.js";
-import { createToolExecutionRuntime } from "./parallel.js";
+} from "../../../src/tools/runtimes/context.js";
+import { createToolExecutionRuntime } from "../../../src/tools/runtimes/parallel.js";
 
 const TEST_SESSION_TEMP_ROOT = join(tmpdir(), "agenc-runtime-session-root");
 const TEST_RUNTIME_SERVICES = {

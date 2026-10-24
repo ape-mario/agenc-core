@@ -10,24 +10,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createModelFacingTools } from "./model-facing-tools.js";
-import type { Tool } from "../tools/types.js";
+import { createModelFacingTools } from "../../src/bin/model-facing-tools.js";
+import type { Tool } from "../../src/tools/types.js";
 import {
   resetStateForTests,
   setCwdState,
   setOriginalCwd,
   setProjectRoot,
-} from "../bootstrap/state.js";
+} from "../../src/bootstrap/state.js";
 import {
   getCronScheduler,
   resetCronSchedulerForTests,
-} from "../utils/cronScheduler.js";
-import { listAllCronTasks } from "../utils/cronTasks.js";
-import type { Session } from "../session/session.js";
+} from "../../src/utils/cronScheduler.js";
+import { listAllCronTasks } from "../../src/utils/cronTasks.js";
+import type { Session } from "../../src/session/session.js";
 import {
   resetCommandQueueForTesting,
   getCommandQueueSnapshot,
-} from "../utils/messageQueueManager.js";
+} from "../../src/utils/messageQueueManager.js";
 
 let tempRoot: string;
 const conversationId = "cron-live-tools-session";
@@ -236,7 +236,7 @@ describe("live Cron tools drive the real scheduler", () => {
       // …and the bootstrap re-arm path starts a fresh runner from the
       // persisted store.
       const { startCronSchedulerRunner } =
-        await import("./model-facing-tools.js");
+        await import("../../src/bin/model-facing-tools.js");
       await startCronSchedulerRunner({
         conversationId,
         workspaceRoot: tempRoot,

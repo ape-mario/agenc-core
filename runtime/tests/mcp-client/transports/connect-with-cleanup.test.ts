@@ -6,7 +6,7 @@ import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import {
   connectMCPClientWithCleanup,
   MCPTransportCleanupError,
-} from "./connect-with-cleanup.js";
+} from "../../../src/mcp-client/transports/connect-with-cleanup.js";
 
 describe("connectMCPClientWithCleanup", () => {
   it("preserves the connection error after awaiting successful cleanup", async () => {

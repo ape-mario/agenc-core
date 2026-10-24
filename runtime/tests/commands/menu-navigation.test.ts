@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nextMenuIndex, previousMenuIndex } from "./menu-navigation.js";
+import { nextMenuIndex, previousMenuIndex } from "../../src/commands/menu-navigation.js";
 
 describe("menu navigation", () => {
   it("wraps upward from the first row to the last row", () => {

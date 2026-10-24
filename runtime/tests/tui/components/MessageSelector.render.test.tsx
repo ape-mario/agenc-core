@@ -42,12 +42,12 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: unknown) => unknown) =>
     selector(harness.appState),
 }))
 
-vi.mock('../../utils/fileHistory.js', () => ({
+vi.mock('../../../src/utils/fileHistory.js', () => ({
   fileHistoryCanRestore: () => true,
   fileHistoryEnabled: () => {
     throw new Error('MessageSelector must read file history settings from AppState')
@@ -55,7 +55,7 @@ vi.mock('../../utils/fileHistory.js', () => ({
   fileHistoryGetDiffStats: harness.fileHistoryGetDiffStats,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
@@ -66,11 +66,11 @@ vi.mock('src/tui/hooks/useExitOnCtrlCDWithKeybindings.js', () => ({
   }),
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 80, rows: 24 }),
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybinding: (name: string, handler: () => unknown) => {
     harness.keybindings[name] = handler
   },
@@ -79,9 +79,9 @@ vi.mock('../keybindings/useKeybinding.js', () => ({
   },
 }))
 
-vi.mock('./CustomSelect/select', async () => {
+vi.mock('../../../src/tui/components/CustomSelect/select.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../ink.js')
+  const { Text } = await import('../../../src/tui/ink.js')
   return {
     Select: (props: typeof harness.selectProps) => {
       harness.selectProps = props
@@ -96,9 +96,9 @@ vi.mock('./CustomSelect/select', async () => {
   }
 })
 
-import { createRoot } from '../ink/root.js'
-import type { Message, UserMessage } from '../../types/message.js'
-import { MessageSelector } from './MessageSelector.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { Message, UserMessage } from '../../../src/types/message.js'
+import { MessageSelector } from '../../../src/tui/components/MessageSelector.js'
 
 function userMessage(uuid: string, text: string): UserMessage {
   return {

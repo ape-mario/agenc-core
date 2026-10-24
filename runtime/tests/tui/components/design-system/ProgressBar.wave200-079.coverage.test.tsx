@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { Box, Text } from '../../ink.js'
-import { ProgressBar } from './ProgressBar.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { Box, Text } from '../../../../src/tui/ink.js'
+import { ProgressBar } from '../../../../src/tui/components/design-system/ProgressBar.js'
 
 function renderDelimitedBar(node: React.ReactNode): Promise<string> {
   return renderToString(

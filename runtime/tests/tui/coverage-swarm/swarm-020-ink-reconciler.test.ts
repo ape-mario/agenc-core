@@ -3,10 +3,10 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { expect, test, vi } from 'vitest'
 
-import type { DOMElement, ElementNames } from '../ink/dom.ts'
-import type { Root } from '../ink/root.ts'
+import type { DOMElement, ElementNames } from '../../../src/tui/ink/dom.js'
+import type { Root } from '../../../src/tui/ink/root.js'
 
-vi.mock('../../utils/fullscreen.js', () => ({
+vi.mock('../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => false,
 }))
 
@@ -75,8 +75,8 @@ async function createHarness(): Promise<{
   dispose: () => Promise<void>
 }> {
   const [{ createRoot }, { default: instances }] = await Promise.all([
-    import('../ink/root.ts'),
-    import('../ink/instances.ts'),
+    import('../../../src/tui/ink/root.js'),
+    import('../../../src/tui/ink/instances.js'),
   ])
   const { stdout, stdin, stderr, stderrWrites } = createTestStreams()
   const root = await createRoot({
@@ -168,7 +168,7 @@ test('debug repaint flag is parsed lazily and cached', async () => {
   try {
     vi.resetModules()
     process.env.AGENC_DEBUG_REPAINTS = '1'
-    const enabledModule = await import('../ink/reconciler.ts')
+    const enabledModule = await import('../../../src/tui/ink/reconciler.js')
 
     expect(enabledModule.isDebugRepaintsEnabled()).toBe(true)
     process.env.AGENC_DEBUG_REPAINTS = '0'
@@ -176,7 +176,7 @@ test('debug repaint flag is parsed lazily and cached', async () => {
 
     vi.resetModules()
     process.env.AGENC_DEBUG_REPAINTS = '0'
-    const disabledModule = await import('../ink/reconciler.ts')
+    const disabledModule = await import('../../../src/tui/ink/reconciler.js')
 
     expect(disabledModule.isDebugRepaintsEnabled()).toBe(false)
   } finally {
@@ -190,7 +190,7 @@ test('debug repaint flag is parsed lazily and cached', async () => {
 })
 
 test('owner chain walk stops at the reconciler fiber limit', async () => {
-  const { getOwnerChain } = await import('../ink/reconciler.ts')
+  const { getOwnerChain } = await import('../../../src/tui/ink/reconciler.js')
   let fiber: { elementType: { name: string }; return?: unknown } | undefined
 
   for (let index = 59; index >= 0; index--) {
@@ -212,7 +212,7 @@ test('profile counters expose last yoga time and reset cleanly', async () => {
     markCommitStart,
     recordYogaMs,
     resetProfileCounters,
-  } = await import('../ink/reconciler.ts')
+  } = await import('../../../src/tui/ink/reconciler.js')
 
   recordYogaMs(12.5)
   markCommitStart()

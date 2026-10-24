@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { searchModels, type ModelSearchFields } from "./model-search.js";
+import { searchModels, type ModelSearchFields } from "../../src/commands/model-search.js";
 import OPENROUTER_MODELS from "../fixtures/openrouter-models-298.json" with { type: "json" };
 
 type Model = { readonly id: string; readonly label?: string };

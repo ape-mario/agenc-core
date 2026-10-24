@@ -4,10 +4,10 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { buildToolRegistry } from "../tool-registry.js";
-import type { Tool } from "./types.js";
+import { buildToolRegistry } from "../../src/tool-registry.js";
+import type { Tool } from "../../src/tools/types.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
-import { SYSTEM_SEARCH_TOOLS_NAME } from "./system/tool-search-name.js";
+import { SYSTEM_SEARCH_TOOLS_NAME } from "../../src/tools/system/tool-search-name.js";
 import {
   DEFER_RARE_TOOLS_ENV,
   DELEGATION_COMPANION_TOOLS,

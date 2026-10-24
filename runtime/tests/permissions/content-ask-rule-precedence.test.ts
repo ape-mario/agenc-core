@@ -10,22 +10,22 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { createTempWorkspaceFixture } from "../helpers/temp-workspace.js";
-import type { Session } from "../session/session.js";
-import { createFileReadTool } from "../tools/system/file-read.js";
-import { createFileWriteTool } from "../tools/system/file-write.js";
+import type { Session } from "../../src/session/session.js";
+import { createFileReadTool } from "../../src/tools/system/file-read.js";
+import { createFileWriteTool } from "../../src/tools/system/file-write.js";
 import {
   attachContextDefaults,
   hasPermissionsToUseTool,
   type ToolEvaluatorContext,
-} from "./evaluator.js";
-import { checkToolPathPermission, validatePath } from "./path-validation.js";
-import { applyPermissionUpdate } from "./permission-updates.js";
+} from "../../src/permissions/evaluator.js";
+import { checkToolPathPermission, validatePath } from "../../src/permissions/path-validation.js";
+import { applyPermissionUpdate } from "../../src/permissions/permission-updates.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionMode,
   type PermissionResult,
   type ToolPermissionContext,
-} from "./types.js";
+} from "../../src/permissions/types.js";
 
 type RuleDestination =
   | "userSettings"

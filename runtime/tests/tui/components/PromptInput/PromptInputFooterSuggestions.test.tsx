@@ -2,14 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   renderToAnsiString,
   renderToString,
-} from '../../../utils/staticRender.js'
-import { ThemeProvider } from '../design-system/ThemeProvider.js'
-import { getTheme, type ThemeName } from '../../../utils/theme.js'
+} from '../../../../src/utils/staticRender.js'
+import { ThemeProvider } from '../../../../src/tui/components/design-system/ThemeProvider.js'
+import { getTheme, type ThemeName } from '../../../../src/utils/theme.js'
 import {
   getSuggestionListWidth,
   PromptInputFooterSuggestions,
   type SuggestionItem,
-} from './PromptInputFooterSuggestions.js'
+} from '../../../../src/tui/components/PromptInput/PromptInputFooterSuggestions.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,

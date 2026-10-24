@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import type { Key } from "../ink.js";
-import { getKeyName, matchesBinding, matchesKeystroke } from "./match.js";
-import type { ParsedBinding, ParsedKeystroke } from "./types.js";
+import type { Key } from "../../../src/tui/ink.js";
+import { getKeyName, matchesBinding, matchesKeystroke } from "../../../src/tui/keybindings/match.js";
+import type { ParsedBinding, ParsedKeystroke } from "../../../src/tui/keybindings/types.js";
 
 const baseKey: Key = {
   upArrow: false,

@@ -6,27 +6,27 @@ import { tmpdir } from "node:os";
 import {
   buildToolRegistry as buildProductionToolRegistry,
   type BuildToolRegistryOptions,
-} from "./tool-registry.js";
+} from "../src/tool-registry.js";
 import {
   createModelFacingTools,
   __setLiveWebFetchDnsAllLookupForTests,
-} from "./bin/model-facing-tools.js";
-import { PermissionModeRegistry } from "./permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "./permissions/types.js";
-import type { Session } from "./session/session.js";
+} from "../src/bin/model-facing-tools.js";
+import { PermissionModeRegistry } from "../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../src/permissions/types.js";
+import type { Session } from "../src/session/session.js";
 import {
   clearExitPlanModeApprovalsForTest,
   recordExitPlanModeApproval,
-} from "./planning/exit-plan-approval.js";
-import type { Tool } from "./tools/types.js";
-import { QuickJsCodeModeService } from "./tools/code-mode/service.js";
-import { createTaskTools } from "./tools/tasks/index.js";
+} from "../src/planning/exit-plan-approval.js";
+import type { Tool } from "../src/tools/types.js";
+import { QuickJsCodeModeService } from "../src/tools/code-mode/service.js";
+import { createTaskTools } from "../src/tools/tasks/index.js";
 import { explicitDangerBroker } from "./helpers/explicit-danger-boundary.js";
-import { ConfigStore } from "./config/store.js";
-import { defaultConfig } from "./config/schema.js";
-import { getAttachmentTrackingState } from "./session/attachment-state.js";
-import { createAgentRoleWorkspace } from "./agents/role.js";
-import { resolveAgentRuntimeOptions } from "./session/runtime-options.js";
+import { ConfigStore } from "../src/config/store.js";
+import { defaultConfig } from "../src/config/schema.js";
+import { getAttachmentTrackingState } from "../src/session/attachment-state.js";
+import { createAgentRoleWorkspace } from "../src/agents/role.js";
+import { resolveAgentRuntimeOptions } from "../src/session/runtime-options.js";
 
 function buildToolRegistry(options: BuildToolRegistryOptions) {
   return buildProductionToolRegistry({

@@ -14,10 +14,10 @@ import {
   MAX_RESOURCE_NAME_BYTES,
   MAX_RESOURCE_URI_BYTES,
   createResourceBridge,
-} from "./resources.js";
-import { extensionForMimeType, persistBinaryContent } from "../utils/mcpOutputStorage.js";
-import { clearCurrentRuntimeSession, setCurrentRuntimeSession } from "../session/current-session.js";
-import type { Session } from "../session/session.js";
+} from "../../src/mcp-client/resources.js";
+import { extensionForMimeType, persistBinaryContent } from "../../src/utils/mcpOutputStorage.js";
+import { clearCurrentRuntimeSession, setCurrentRuntimeSession } from "../../src/session/current-session.js";
+import type { Session } from "../../src/session/session.js";
 
 function makeClient(overrides: {
   listResources?: ReturnType<typeof vi.fn>;

@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   __createDeferredDaemonPromptTuiSessionForTest,
   sessionConfigurationFromAgenCConfig,
-} from "./agenc-main.js";
-import { ConfigStore } from "../config/store.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+} from "../../src/bin/agenc-main.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 // The TUI provisions its turn-deferred daemon session while the user types the
 // first prompt, so Enter only has to start a turn. These tests pin that the

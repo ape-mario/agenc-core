@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
-import { UnifiedExecProcessManager } from "./process-manager.js";
-import { UnifiedExecError } from "./types.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
+import { UnifiedExecError } from "../../src/unified-exec/types.js";
 
 /**
  * Recovery through owned process identity (#2477).

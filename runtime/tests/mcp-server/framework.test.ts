@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { MCP_ERROR_INVALID_REQUEST, MCP_ERROR_INVALID_PARAMS, MCP_ERROR_METHOD_NOT_FOUND, MCP_ERROR_NOT_INITIALIZED, MCP_ERROR_PARSE } from "./types.js";
-import { McpServerFramework, ensureMcpOutgoingSerializable } from "./framework.js";
+import { MCP_ERROR_INVALID_REQUEST, MCP_ERROR_INVALID_PARAMS, MCP_ERROR_METHOD_NOT_FOUND, MCP_ERROR_NOT_INITIALIZED, MCP_ERROR_PARSE } from "../../src/mcp-server/types.js";
+import { McpServerFramework, ensureMcpOutgoingSerializable } from "../../src/mcp-server/framework.js";
 import { McpToolRegistry } from "./tools.js";
 
 function request(id: number, method: string, params?: unknown) {

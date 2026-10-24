@@ -36,7 +36,7 @@ vi.mock("axios", () => {
   };
 });
 
-vi.mock("../memory/session/sessionMemory.js", () => ({
+vi.mock("../../src/memory/session/sessionMemory.js", () => ({
   runSessionMemoryPostSamplingHook: async (context: unknown) => {
     sessionMemoryPostSamplingMockState.calls.push(context);
     if (sessionMemoryPostSamplingMockState.error) {
@@ -52,35 +52,35 @@ import {
   PERSONALITY_SPEC_START_MARKER,
   type ModelMessages,
   type Personality,
-} from "../context/personality-spec-instructions.js";
+} from "../../src/context/personality-spec-instructions.js";
 import type {
   LLMMessage,
   LLMProvider,
   LLMResponse,
   StreamProgressCallback,
-} from "../llm/types.js";
-import { trustProjectSync } from "../permissions/trust/project-trust.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import { AsyncQueue } from "../utils/async-queue.js";
-import { bootstrapLocalRuntimeSession } from "../bin/bootstrap.js";
+} from "../../src/llm/types.js";
+import { trustProjectSync } from "../../src/permissions/trust/project-trust.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { bootstrapLocalRuntimeSession } from "../../src/bin/bootstrap.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "../session/session.js";
+} from "../../src/session/session.js";
 import type {
   Config,
   ManagedFeatures,
   ModelInfo,
   SessionConfiguration,
   TurnContext,
-} from "../session/turn-context.js";
-import { TurnTimingState } from "../session/turn-context.js";
-import type { ToolRegistry } from "../tool-registry.js";
+} from "../../src/session/turn-context.js";
+import { TurnTimingState } from "../../src/session/turn-context.js";
+import type { ToolRegistry } from "../../src/tool-registry.js";
 import { createTestConfigStore } from "../fixtures.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 
 const LOCAL_FRIENDLY_TEMPLATE =
   "You optimize for team morale and being a supportive teammate as much as code quality.";
@@ -461,7 +461,7 @@ describe("personality contract", () => {
     });
 
     const { provider, seenMessages, seenSystemPrompts } = mkProviderRecorder();
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockReturnValue(provider as never);
     vi.spyOn(Session.prototype, "startMcpManager").mockResolvedValue(undefined);
 

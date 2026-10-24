@@ -5,11 +5,11 @@ const headerHelperMocks = vi.hoisted(() => ({
   execFileNoThrowWithCwd: vi.fn(),
 }))
 
-vi.mock('../../utils/execFileNoThrow.js', () => ({
+vi.mock('../../../src/utils/execFileNoThrow.js', () => ({
   execFileNoThrowWithCwd: headerHelperMocks.execFileNoThrowWithCwd,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: vi.fn(),
   logMCPDebug: vi.fn(),
   logMCPError: vi.fn(),
@@ -19,8 +19,8 @@ vi.mock('src/utils/debug.js', () => ({
   logAntError: vi.fn(),
 }))
 
-import { getMcpServerHeaders } from './headersHelper.js'
-import { parseHeaders } from './utils.js'
+import { getMcpServerHeaders } from '../../../src/services/mcp/headersHelper.js'
+import { parseHeaders } from '../../../src/services/mcp/utils.js'
 
 afterEach(() => {
   vi.clearAllMocks()

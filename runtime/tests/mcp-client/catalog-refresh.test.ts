@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { createPromptBridge } from "./prompts.js";
-import { createResourceBridge } from "./resources.js";
-import { createToolBridge as createToolBridgeWithEnvironment } from "./tools.js";
+import { createPromptBridge } from "../../src/mcp-client/prompts.js";
+import { createResourceBridge } from "../../src/mcp-client/resources.js";
+import { createToolBridge as createToolBridgeWithEnvironment } from "../../src/mcp-client/tools.js";
 
 describe("MCP catalog refresh primitives", () => {
   test("prompt refresh throws instead of swallowing a list failure", async () => {

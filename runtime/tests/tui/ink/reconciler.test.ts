@@ -3,13 +3,13 @@ import { PassThrough } from 'node:stream'
 import { expect, test, vi } from 'vitest'
 import React from 'react'
 
-import type { DOMElement, ElementNames } from './dom.ts'
-import instances from './instances.ts'
-import { LayoutEdge } from './layout/node.ts'
-import type { ParsedKey } from './parse-keypress.ts'
-import { createRoot } from './root.ts'
+import type { DOMElement, ElementNames } from '../../../src/tui/ink/dom.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { LayoutEdge } from '../../../src/tui/ink/layout/node.js'
+import type { ParsedKey } from '../../../src/tui/ink/parse-keypress.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 
-vi.mock('../../utils/fullscreen.js', () => ({
+vi.mock('../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => false,
 }))
 

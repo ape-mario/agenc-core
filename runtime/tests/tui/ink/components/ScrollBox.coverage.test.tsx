@@ -3,11 +3,11 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import type { DOMElement } from "../dom.js";
-import instances from "../instances.js";
-import { createRoot } from "../root.js";
-import ScrollBox, { type ScrollBoxHandle } from "./ScrollBox.js";
-import Text from "./Text.js";
+import type { DOMElement } from "../../../../src/tui/ink/dom.js";
+import instances from "../../../../src/tui/ink/instances.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import ScrollBox, { type ScrollBoxHandle } from "../../../../src/tui/ink/components/ScrollBox.js";
+import Text from "../../../../src/tui/ink/components/Text.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

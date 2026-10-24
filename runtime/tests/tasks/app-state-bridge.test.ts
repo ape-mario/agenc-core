@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { BackgroundTaskSnapshot } from "./lifecycle.js";
-import { syncBackgroundTaskSnapshotToAppState } from "./app-state-bridge.js";
+import type { BackgroundTaskSnapshot } from "../../src/tasks/lifecycle.js";
+import { syncBackgroundTaskSnapshotToAppState } from "../../src/tasks/app-state-bridge.js";
 
 function snapshot(
   overrides: Partial<BackgroundTaskSnapshot> = {},

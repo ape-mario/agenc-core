@@ -1,12 +1,12 @@
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import Text from "../ink/components/Text.js";
-import { renderToString } from "../../utils/staticRender.js";
+import Text from "../../../src/tui/ink/components/Text.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
 import {
   FpsMetricsProvider,
   useFpsMetrics,
-} from "./fpsMetrics.js";
+} from "../../../src/tui/context/fpsMetrics.js";
 
 const getMetrics = () => ({
   averageFps: 60,

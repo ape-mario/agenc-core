@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { adaptTranscriptEvents } from "../session-transcript.js";
+import { adaptTranscriptEvents } from "../../../src/tui/session-transcript.js";
 
 // Contract: begin/end branches in session-transcript must drop events whose
 // payload.callId is not a string, mirroring the pre-existing tool_progress

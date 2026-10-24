@@ -4,7 +4,7 @@ import {
   AGENC_PORTAL_PROTOCOL_VERSION,
   createAgenCPortalMobileStatusSnapshot,
   type AgenCPortalDashboardSnapshot,
-} from "./index.js";
+} from "../../src/app-server-protocol/index.js";
 
 function createDashboardSnapshot(): AgenCPortalDashboardSnapshot {
   return {

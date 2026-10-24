@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultConfig, type AgenCConfig } from "../config/schema.js";
+import { defaultConfig, type AgenCConfig } from "../../src/config/schema.js";
 import { canonicalTmpdir } from "../helpers/canonical-temp-dir.js";
 import {
   agencHomeFromCommandContext,
@@ -9,8 +9,8 @@ import {
   configFilePathFromCommandContext,
   getConfigFilePath,
   readCommandConfig,
-} from "./config-context.js";
-import type { SlashCommandContext } from "./types.js";
+} from "../../src/commands/config-context.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function contextWithStores(params: {
   readonly direct?: AgenCConfig;

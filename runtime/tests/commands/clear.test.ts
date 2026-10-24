@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { clearCommand, clearSession } from "./clear.js";
-import { buildDefaultRegistry } from "./registry.js";
-import { dispatchSlashCommand, parseSlashCommand } from "./dispatcher.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "./types.js";
+import { clearCommand, clearSession } from "../../src/commands/clear.js";
+import { buildDefaultRegistry } from "../../src/commands/registry.js";
+import { dispatchSlashCommand, parseSlashCommand } from "../../src/commands/dispatcher.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
-vi.mock("../prompts/sections.js", () => ({
+vi.mock("../../src/prompts/sections.js", () => ({
   clearSystemPromptSections: vi.fn(),
 }));
 
-import { clearSystemPromptSections } from "../prompts/sections.js";
+import { clearSystemPromptSections } from "../../src/prompts/sections.js";
 import { mkSession } from "../fixtures.js";
-import { taskBudgetOf, setSessionTaskTokenBudget } from "../session/task-budget.js";
+import { taskBudgetOf, setSessionTaskTokenBudget } from "../../src/session/task-budget.js";
 
 function stubSession(opts: {
   history?: unknown[];

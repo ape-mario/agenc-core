@@ -6,7 +6,7 @@ import {
   hueToRgb,
   parseRGB,
   truncateSpinnerText,
-} from './utils.js'
+} from '../../../../src/tui/components/spinner/utils.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,

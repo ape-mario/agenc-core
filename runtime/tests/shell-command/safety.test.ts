@@ -8,7 +8,7 @@ import {
   isSafePowerShellWords,
   isSafeWindowsCommand,
   shellCommandIsKnownSafe,
-} from "./safety.js";
+} from "../../src/shell-command/safety.js";
 
 describe("isKnownSafeCommand", () => {
   test("allows read-only Unix commands and tight git branch inspection", () => {

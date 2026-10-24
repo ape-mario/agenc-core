@@ -2,8 +2,8 @@ import React from 'react'
 import { marked, type Tokens } from 'marked'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { MarkdownTable } from './MarkdownTable.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { MarkdownTable } from '../../../../src/tui/components/markdown/MarkdownTable.js'
 
 const originalGlyphMode = process.env.AGENC_TUI_GLYPHS
 

@@ -1,9 +1,9 @@
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../../utils/staticRender.js";
-import type { MultiSelectState, UseMultiSelectStateProps } from "./use-multi-select-state.js";
-import type { OptionWithDescription } from "./select.js";
+import { renderToString } from "../../../../src/utils/staticRender.js";
+import type { MultiSelectState, UseMultiSelectStateProps } from "../../../../src/tui/components/CustomSelect/use-multi-select-state.js";
+import type { OptionWithDescription } from "../../../../src/tui/components/CustomSelect/select.js";
 
 const stateMock = vi.hoisted(() => ({
   hookProps: [] as UseMultiSelectStateProps<string>[],
@@ -38,7 +38,7 @@ const inputOptionMock = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("./use-multi-select-state.js", () => ({
+vi.mock("../../../../src/tui/components/CustomSelect/use-multi-select-state.js", () => ({
   useMultiSelectState: (props: UseMultiSelectStateProps<string>) => {
     stateMock.hookProps.push(props);
     if (!stateMock.state) throw new Error("missing mocked multi-select state");
@@ -46,14 +46,14 @@ vi.mock("./use-multi-select-state.js", () => ({
   },
 }));
 
-vi.mock("./select-option.js", () => ({
+vi.mock("../../../../src/tui/components/CustomSelect/select-option.js", () => ({
   SelectOption: (props: (typeof optionMock.props)[number]) => {
     optionMock.props.push(props);
     return <>{props.children}</>;
   },
 }));
 
-vi.mock("./select-input-option.js", () => ({
+vi.mock("../../../../src/tui/components/CustomSelect/select-input-option.js", () => ({
   SelectInputOption: (props: (typeof inputOptionMock.props)[number]) => {
     inputOptionMock.props.push(props);
     return <>{props.children}</>;
@@ -111,7 +111,7 @@ describe("SelectMulti", () => {
 
   test("passes normalized props into the multi-select state hook", async () => {
     const onCancel = vi.fn();
-    const { SelectMulti } = await import("./SelectMulti.js");
+    const { SelectMulti } = await import("../../../../src/tui/components/CustomSelect/SelectMulti.js");
 
     await renderToString(
       <SelectMulti options={[textOption("one")]} onCancel={onCancel} />,
@@ -129,7 +129,7 @@ describe("SelectMulti", () => {
   });
 
   test("renders text options with indexes, selection, focus, and scroll hints", async () => {
-    const { SelectMulti } = await import("./SelectMulti.js");
+    const { SelectMulti } = await import("../../../../src/tui/components/CustomSelect/SelectMulti.js");
 
     const output = await renderToString(
       <SelectMulti
@@ -177,7 +177,7 @@ describe("SelectMulti", () => {
       visibleToIndex: 2,
     });
 
-    const { SelectMulti } = await import("./SelectMulti.js");
+    const { SelectMulti } = await import("../../../../src/tui/components/CustomSelect/SelectMulti.js");
     const output = await renderToString(
       <SelectMulti
         options={[textOption("before"), option, textOption("after")]}
@@ -222,7 +222,7 @@ describe("SelectMulti", () => {
       focusedValue: "two",
       selectedValues: [],
     });
-    const { SelectMulti } = await import("./SelectMulti.js");
+    const { SelectMulti } = await import("../../../../src/tui/components/CustomSelect/SelectMulti.js");
 
     const output = await renderToString(
       <SelectMulti
@@ -248,7 +248,7 @@ describe("SelectMulti", () => {
 
   test("renders submit buttons in focused and unfocused states", async () => {
     const onSubmit = vi.fn();
-    const { SelectMulti } = await import("./SelectMulti.js");
+    const { SelectMulti } = await import("../../../../src/tui/components/CustomSelect/SelectMulti.js");
 
     stateMock.state = state({ isSubmitFocused: true });
     const focused = await renderToString(

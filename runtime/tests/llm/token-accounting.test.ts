@@ -36,8 +36,8 @@ import {
   type ProviderNativeTokenCountResult,
   type ProviderTokenCountCapability,
   type TokenAccountingRequest,
-} from "./token-accounting.js";
-import type { LLMContentPart, LLMMessage, LLMTool } from "./types.js";
+} from "../../src/llm/token-accounting.js";
+import type { LLMContentPart, LLMMessage, LLMTool } from "../../src/llm/types.js";
 
 const COMPLETE_COMPONENTS = [
   "system",

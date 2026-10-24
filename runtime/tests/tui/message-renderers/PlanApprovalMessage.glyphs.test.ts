@@ -5,7 +5,7 @@ import {
   formatTeammateMessageContent,
   getPlanApprovalResponseTitle,
   tryRenderPlanApprovalMessage,
-} from './PlanApprovalMessage.js';
+} from '../../../src/tui/message-renderers/PlanApprovalMessage.js';
 
 describe('PlanApprovalMessage glyph fallbacks', () => {
   it('uses shared status glyphs for approval response titles', () => {

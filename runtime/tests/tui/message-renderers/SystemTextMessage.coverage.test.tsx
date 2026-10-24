@@ -1,24 +1,24 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { SystemTextMessage } from './SystemTextMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { SystemTextMessage } from '../../../src/tui/message-renderers/SystemTextMessage.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     tui: { showTurnDuration: false },
   }),
 }))
 
-vi.mock('../../utils/browser.js', () => ({
+vi.mock('../../../src/utils/browser.js', () => ({
   openPath: () => {},
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppStateStore: () => ({
     getState: () => ({ tasks: {} }),
   }),

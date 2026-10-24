@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { LLMMessage } from "../llm/types.js";
-import type { CompletedToolResultRecord } from "../session/turn-state.js";
+import type { LLMMessage } from "../../src/llm/types.js";
+import type { CompletedToolResultRecord } from "../../src/session/turn-state.js";
 import {
   createMemoryExtractionTriggerState,
   DEFAULT_MIN_ELIGIBLE_TURNS,
@@ -10,7 +10,7 @@ import {
   memoryExtractionVisibleRange,
   parseMemoryToolArguments,
   shouldDeferForEligibleTurnCadence,
-} from "./extraction-triggers.js";
+} from "../../src/memory/extraction-triggers.js";
 
 describe("memory extraction triggers", () => {
   it("falls back to retained visible messages when compaction shrinks history", () => {

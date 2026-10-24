@@ -4,7 +4,7 @@ import {
   computeTeammateActivityMaxWidth,
   computeTeammatePreviewTextWidth,
   getMessagePreview,
-} from './TeammateSpinnerLine.js'
+} from '../../../../src/tui/components/spinner/TeammateSpinnerLine.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,

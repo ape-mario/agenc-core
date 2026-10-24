@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { buildInitialTurnState } from "../session/turn-state.js";
-import { postSampleRecovery } from "./post-sample-recovery.js";
+import { buildInitialTurnState } from "../../src/session/turn-state.js";
+import { postSampleRecovery } from "../../src/phases/post-sample-recovery.js";
 import { mkCtx, mkSession } from "../../tests/fixtures.js";
-import type { TurnState } from "../session/turn-state.js";
+import type { TurnState } from "../../src/session/turn-state.js";
 
 /**
  * Puts the turn in the state `isStreamingFallbackOccured` recognises: a

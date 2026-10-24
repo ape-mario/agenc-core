@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig } from "../../config/schema.js";
-import { StaticModelsManager } from "../models-manager.js";
-import { resolveRegisteredModelCatalogEntry } from "../registry/model-catalog.js";
-import { BUILT_IN_PROVIDER_MODEL_CATALOG, BUILT_IN_PROVIDER_DEFAULT_MODELS } from "../registry/provider-info.js";
-import { resolveReasoningEffort } from "../reasoning-effort.js";
+import { defaultConfig } from "../../../src/config/schema.js";
+import { StaticModelsManager } from "../../../src/llm/models-manager.js";
+import { resolveRegisteredModelCatalogEntry } from "../../../src/llm/registry/model-catalog.js";
+import { BUILT_IN_PROVIDER_MODEL_CATALOG, BUILT_IN_PROVIDER_DEFAULT_MODELS } from "../../../src/llm/registry/provider-info.js";
+import { resolveReasoningEffort } from "../../../src/llm/reasoning-effort.js";
 import { getModelCosts } from "../../../src/utils/modelCost.js";
 import { computeUsdCostWithResolution, DEFAULT_MODEL_COSTS } from "../../../src/session/cost.js";
 import { resolveSessionReasoningEffort } from "../../../src/session/session-reasoning-effort.js";
-import { buildAnthropicMessagesRequest } from "../wire/messages-anthropic.js";
+import { buildAnthropicMessagesRequest } from "../../../src/llm/wire/messages-anthropic.js";
 
 // Verified with Anthropic's authenticated Models API and model overview
 // pricing/capability pages on 2026-09-29.

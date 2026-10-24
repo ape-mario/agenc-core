@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { applySGR } from "./sgr.js";
-import { defaultStyle } from "./types.js";
+import { applySGR } from "../../../../src/tui/ink/termio/sgr.js";
+import { defaultStyle } from "../../../../src/tui/ink/termio/types.js";
 
 describe("applySGR", () => {
   test("applies and clears basic text attributes", () => {

@@ -8,7 +8,7 @@ import {
   resolveProviderStructuredOutputMode,
   supportsOpenAIStructuredOutputs,
   supportsXaiStructuredOutputsWithTools,
-} from "./structured-output.js";
+} from "../../src/llm/structured-output.js";
 
 const SCHEMA = {
   type: "object",

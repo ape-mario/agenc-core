@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionMode,
-} from "../permissions/types.js";
+} from "../../src/permissions/types.js";
 import type {
   ManagedFeatures,
   SessionConfiguration,
-} from "../session/turn-context.js";
+} from "../../src/session/turn-context.js";
 import {
   createRequestUserInputTool,
   normalizeRequestUserInputArgs,
   requestUserInputAvailableModes,
   requestUserInputToolDescription,
   type RequestUserInputToolSession,
-} from "./request-user-input.js";
-import type { RequestUserInputResponse } from "./types.js";
+} from "../../src/elicitation/request-user-input.js";
+import type { RequestUserInputResponse } from "../../src/elicitation/types.js";
 
 function features(defaultMode = false): ManagedFeatures {
   return {

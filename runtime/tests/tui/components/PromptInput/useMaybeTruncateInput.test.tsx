@@ -1,12 +1,12 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import Text from '../../ink/components/Text.js'
-import { renderToString } from '../../../utils/staticRender.js'
+import Text from '../../../../src/tui/ink/components/Text.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 import {
   buildTruncatedPromptInputUpdate,
   useMaybeTruncateInput,
-} from './useMaybeTruncateInput.js'
+} from '../../../../src/tui/components/PromptInput/useMaybeTruncateInput.js'
 
 const oversizedInput = (prefix: string) =>
   `${prefix}\n${'x'.repeat(10_500)}\n${prefix}`
@@ -39,7 +39,7 @@ describe('buildTruncatedPromptInputUpdate', () => {
     const input = oversizedInput('unchanged')
 
     vi.resetModules()
-    vi.doMock('./inputPaste.js', () => ({
+    vi.doMock('../../../../src/tui/components/PromptInput/inputPaste.js', () => ({
       maybeTruncateInput: () => ({
         newInput: input,
         newPastedContents: {},
@@ -47,7 +47,7 @@ describe('buildTruncatedPromptInputUpdate', () => {
     }))
 
     const { buildTruncatedPromptInputUpdate } = await import(
-      './useMaybeTruncateInput.js'
+      '../../../../src/tui/components/PromptInput/useMaybeTruncateInput.js'
     )
 
     expect(buildTruncatedPromptInputUpdate(input, {})).toBeNull()
@@ -55,7 +55,7 @@ describe('buildTruncatedPromptInputUpdate', () => {
 })
 
 afterEach(() => {
-  vi.doUnmock('./inputPaste.js')
+  vi.doUnmock('../../../../src/tui/components/PromptInput/inputPaste.js')
 })
 
 function TruncateProbe({

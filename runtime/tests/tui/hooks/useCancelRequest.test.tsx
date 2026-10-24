@@ -1,7 +1,7 @@
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { renderToString } from '../../utils/staticRender.js'
-import type { SpinnerMode } from '../components/spinner/types.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import type { SpinnerMode } from '../../../src/tui/components/spinner/types.js'
 
 const fixture = vi.hoisted(() => ({
   state: {
@@ -51,7 +51,7 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppStateStore: () => ({
     getState: () => fixture.state,
     setState: (updater: (prev: typeof fixture.state) => typeof fixture.state) => {
@@ -67,26 +67,26 @@ vi.mock('../state/AppState.js', () => ({
     selector(fixture.state),
 }))
 
-vi.mock('../components/PromptInput/utils.js', () => ({
+vi.mock('../../../src/tui/components/PromptInput/utils.js', () => ({
 }))
 
-vi.mock('../context/notifications', () => ({
+vi.mock('../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => fixture.notifications,
 }))
 
-vi.mock('../context/overlayContext', () => ({
+vi.mock('../../../src/tui/context/overlayContext.js', () => ({
   useIsModalOverlayActive: () => fixture.overlayActive,
 }))
 
-vi.mock('./useCommandQueue', () => ({
+vi.mock('../../../src/tui/hooks/useCommandQueue.js', () => ({
   useCommandQueue: () => ({ length: fixture.queuedCommandsLength }),
 }))
 
-vi.mock('../keybindings/shortcutFormat.js', () => ({
+vi.mock('../../../src/tui/keybindings/shortcutFormat.js', () => ({
   getShortcutDisplay: () => 'ctrl+x ctrl+k',
 }))
 
-vi.mock('../urgentCancelInput.js', () => ({
+vi.mock('../../../src/tui/urgentCancelInput.js', () => ({
   registerUrgentCancelInputHandler: (
     handler: (
       input: string,
@@ -103,7 +103,7 @@ vi.mock('../urgentCancelInput.js', () => ({
   },
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybinding: (
     action: string,
     handler: () => void,
@@ -123,8 +123,8 @@ vi.mock('../keybindings/useKeybinding.js', () => ({
   },
 }))
 
-vi.mock('../ink.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../ink.js')>()
+vi.mock('../../../src/tui/ink.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/tui/ink.js')>()
   return {
     ...actual,
     useInput: (
@@ -140,18 +140,18 @@ vi.mock('../ink.js', async (importOriginal) => {
   }
 })
 
-vi.mock('../state/teammateViewHelpers', () => ({
+vi.mock('../../../src/tui/state/teammateViewHelpers.js', () => ({
   exitTeammateView: vi.fn(),
 }))
 
-vi.mock('../../tasks/LocalAgentTask/LocalAgentTask', () => ({
+vi.mock('../../../src/tasks/LocalAgentTask/LocalAgentTask.js', () => ({
   killAllRunningAgentTasks: (...args: unknown[]) =>
     fixture.killAllRunningAgentTasks(...args),
   markAgentsNotified: (...args: unknown[]) =>
     fixture.markAgentsNotified(...args),
 }))
 
-vi.mock('../../utils/messageQueueManager.js', () => ({
+vi.mock('../../../src/utils/messageQueueManager.js', () => ({
   clearCommandQueue: vi.fn(),
   enqueuePendingNotification: (...args: unknown[]) =>
     fixture.enqueuePendingNotification(...args),
@@ -185,7 +185,7 @@ async function renderHandler(
     readonly inputValue?: string
   } = {},
 ): Promise<void> {
-  const { CancelRequestHandler } = await import('./useCancelRequest.js')
+  const { CancelRequestHandler } = await import('../../../src/tui/hooks/useCancelRequest.js')
   const { screen = 'prompt', ...rest } = overrides
   await renderToString(
     <CancelRequestHandler

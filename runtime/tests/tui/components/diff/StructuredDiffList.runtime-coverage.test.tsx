@@ -1,7 +1,7 @@
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
+import { renderToString } from "../../../../src/utils/staticRender.js";
 
 const structuredDiffMock = vi.hoisted(() => ({
   props: [] as Array<{
@@ -14,7 +14,7 @@ const structuredDiffMock = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("./StructuredDiff", () => ({
+vi.mock("../../../../src/tui/components/diff/StructuredDiff.js", () => ({
   StructuredDiff: (props: (typeof structuredDiffMock.props)[number]) => {
     structuredDiffMock.props.push(props);
     return null;
@@ -37,7 +37,7 @@ describe("StructuredDiffList", () => {
   });
 
   test("renders each hunk and inserts ellipsis separators", async () => {
-    const { StructuredDiffList } = await import("./StructuredDiffList.js");
+    const { StructuredDiffList } = await import("../../../../src/tui/components/diff/StructuredDiffList.js");
 
     const output = await renderToString(
       <StructuredDiffList
@@ -68,7 +68,7 @@ describe("StructuredDiffList", () => {
   });
 
   test("renders an empty list without hunks or separators", async () => {
-    const { StructuredDiffList } = await import("./StructuredDiffList.js");
+    const { StructuredDiffList } = await import("../../../../src/tui/components/diff/StructuredDiffList.js");
 
     const output = await renderToString(
       <StructuredDiffList

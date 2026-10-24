@@ -61,15 +61,15 @@ vi.mock('src/utils/debug.js', () => ({
   logForDebugging: harness.logForDebugging,
 }))
 
-vi.mock('../../utils/debug.js', () => ({
+vi.mock('../../../src/utils/debug.js', () => ({
   logForDebugging: harness.logForDebugging,
 }))
 
-vi.mock('../../utils/execFileNoThrow.js', () => ({
+vi.mock('../../../src/utils/execFileNoThrow.js', () => ({
   execFileNoThrow: harness.execFileNoThrow,
 }))
 
-vi.mock('../../utils/plans.js', () => {
+vi.mock('../../../src/utils/plans.js', () => {
   const getPlansDirectory = () => '/tmp/agenc-plans'
   ;(
     getPlansDirectory as typeof getPlansDirectory & {
@@ -80,35 +80,35 @@ vi.mock('../../utils/plans.js', () => {
   return { getPlansDirectory }
 })
 
-vi.mock('../../utils/Shell.js', () => ({
+vi.mock('../../../src/utils/Shell.js', () => ({
   setCwd: harness.setCwd,
 }))
 
-vi.mock('../../utils/sessionStorage', () => ({
+vi.mock('../../../src/utils/sessionStorage.js', () => ({
   saveWorktreeState: harness.saveWorktreeState,
   writeAgentMetadata: vi.fn(async () => undefined),
 }))
 
-vi.mock('../../utils/sessionStorage.js', () => ({
+vi.mock('../../../src/utils/sessionStorage.js', () => ({
   saveWorktreeState: harness.saveWorktreeState,
   writeAgentMetadata: vi.fn(async () => undefined),
 }))
 
-vi.mock('../../utils/worktree.js', () => ({
+vi.mock('../../../src/utils/worktree.js', () => ({
   cleanupWorktree: harness.cleanupWorktree,
   getCurrentWorktreeSession: () => harness.session,
   keepWorktree: harness.keepWorktree,
   killTmuxSession: harness.killTmuxSession,
 }))
 
-vi.mock('./spinner/Spinner.js', () => ({
+vi.mock('../../../src/tui/components/spinner/Spinner.js', () => ({
   Spinner: () => null,
 }))
 
-vi.mock('./design-system/Dialog', async () => {
+vi.mock('../../../src/tui/components/design-system/Dialog.js', async () => {
   const ReactModule = await vi.importActual<typeof import('react')>('react')
   const { Box, Text } =
-    await vi.importActual<typeof import('../ink.js')>('../ink.js')
+    await vi.importActual<typeof import('../../../src/tui/ink.js')>('../../../src/tui/ink.js')
 
   return {
     Dialog: (props: CapturedDialogProps) => {
@@ -126,10 +126,10 @@ vi.mock('./design-system/Dialog', async () => {
   }
 })
 
-vi.mock('./CustomSelect/select', async () => {
+vi.mock('../../../src/tui/components/CustomSelect/select.js', async () => {
   const ReactModule = await vi.importActual<typeof import('react')>('react')
   const { Box, Text } =
-    await vi.importActual<typeof import('../ink.js')>('../ink.js')
+    await vi.importActual<typeof import('../../../src/tui/ink.js')>('../../../src/tui/ink.js')
 
   return {
     Select: (props: CapturedSelectProps) => {
@@ -154,9 +154,9 @@ vi.mock('./CustomSelect/select', async () => {
   }
 })
 
-import { createRoot } from '../ink/root.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { WorktreeExitDialog } from './WorktreeExitDialog.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { WorktreeExitDialog } from '../../../src/tui/components/WorktreeExitDialog.js'
 
 function baseSession(
   overrides: Partial<WorktreeSession> = {},

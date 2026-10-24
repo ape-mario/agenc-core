@@ -12,7 +12,7 @@ import {
   selectionFocusMoveForKey,
   shouldClearSelectionOnKey,
   type ModalPagerAction,
-} from "./ScrollKeybindingHandler.js";
+} from "../../../src/tui/components/ScrollKeybindingHandler.js";
 
 vi.mock("bun:bundle", () => ({
   feature: () => false,

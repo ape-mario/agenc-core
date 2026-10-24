@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { adaptTranscriptEvents } from "./session-transcript.js";
+import { adaptTranscriptEvents } from "../../src/tui/session-transcript.js";
 
 /**
  * A denied model turn used to be COMPLETELY silent: the turn "completes" in a

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { FORK_AGENT } from "./forkSubagent.js";
+import { FORK_AGENT } from "../../../src/tools/AgentTool/forkSubagent.js";
 
 describe("forked agent limits", () => {
   it("does not impose an implicit turn cap", () => {

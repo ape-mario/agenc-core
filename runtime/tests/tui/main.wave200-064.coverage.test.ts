@@ -1,10 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("./ink.js", () => ({
+vi.mock("../../src/tui/ink.js", () => ({
   render: vi.fn(),
 }));
 
-vi.mock("./components/App.js", () => ({
+vi.mock("../../src/tui/components/App.js", () => ({
   AgenCTuiApp: vi.fn(() => null),
 }));
 
@@ -13,7 +13,7 @@ import {
   STDIN_LOSS_FLUSH_HARD_CAP_MS,
   STDIN_LOSS_TEARDOWN_HARD_CAP_MS,
   type StdinLossSession,
-} from "./main.js";
+} from "../../src/tui/main.js";
 
 describe("TUI main stdin loss coverage", () => {
   test("flushes session state, emits a structured warning, unmounts, and exits", async () => {

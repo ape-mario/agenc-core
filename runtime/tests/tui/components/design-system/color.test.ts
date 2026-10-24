@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { color } from "./color.js";
+import { color } from "../../../../src/tui/components/design-system/color.js";
 
 const mocks = vi.hoisted(() => ({
   colorizeCalls: [] as Array<{
@@ -11,14 +11,14 @@ const mocks = vi.hoisted(() => ({
   themeCalls: [] as string[],
 }));
 
-vi.mock("../../ink/colorize.js", () => ({
+vi.mock("../../../../src/tui/ink/colorize.js", () => ({
   colorize: (text: string, colorValue: string | undefined, type: string) => {
     mocks.colorizeCalls.push({ text, color: colorValue, type });
     return `${type}:${colorValue}:${text}`;
   },
 }));
 
-vi.mock("../../../utils/theme.js", () => ({
+vi.mock("../../../../src/utils/theme.js", () => ({
   getTheme: (themeName: string) => {
     mocks.themeCalls.push(themeName);
     return { agenc: "#ff6600", text: "ansi:white" };

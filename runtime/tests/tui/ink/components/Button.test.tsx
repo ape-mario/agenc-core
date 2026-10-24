@@ -3,14 +3,14 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import Button from './Button.js'
-import type { ButtonState } from './Button.js'
-import Text from './Text.js'
-import type { DOMElement } from '../dom.ts'
-import instances from '../instances.ts'
-import { createRoot } from '../root.ts'
+import Button from '../../../../src/tui/ink/components/Button.js'
+import type { ButtonState } from '../../../../src/tui/ink/components/Button.js'
+import Text from '../../../../src/tui/ink/components/Text.js'
+import type { DOMElement } from '../../../../src/tui/ink/dom.js'
+import instances from '../../../../src/tui/ink/instances.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
 
-vi.mock('../../../utils/fullscreen.js', () => ({
+vi.mock('../../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => false,
 }))
 

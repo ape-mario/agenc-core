@@ -5,7 +5,7 @@ import {
   classifyOpenAINetworkFailure,
   extractOpenAICategoryMarker,
   formatOpenAICategoryMarker,
-} from "./openai-compatible.js";
+} from "../../src/errors/openai-compatible.js";
 
 describe("OpenAI-compatible error classification", () => {
   test("classifies localhost ECONNREFUSED as connection_refused", () => {

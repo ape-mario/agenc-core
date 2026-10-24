@@ -1,9 +1,9 @@
 import React from "react";
 import { afterEach, describe, expect, test } from "vitest";
 
-import type { MCPServerConnection } from "../../services/mcp/types.js";
-import { renderToString } from "../../utils/staticRender.js";
-import { IdeStatusIndicator } from "./IdeStatusIndicator.js";
+import type { MCPServerConnection } from "../../../src/services/mcp/types.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { IdeStatusIndicator } from "../../../src/tui/components/IdeStatusIndicator.js";
 
 function ideClient(type: MCPServerConnection["type"]): MCPServerConnection {
   return {

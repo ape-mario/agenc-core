@@ -25,11 +25,11 @@
  */
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { runTurn } from "./run-turn.js";
-import { drainPendingExtraction } from "../services/extractMemories/extractMemories.js";
+import { runTurn } from "../../src/session/run-turn.js";
+import { drainPendingExtraction } from "../../src/services/extractMemories/extractMemories.js";
 import { MEMORY_EXTRACTION_FENCE_ENV_VAR } from "../helpers/hermetic-env.mjs";
 import { drain, mkCtx, mkProvider, mkSession } from "../fixtures.js";
-import type { LLMMessage } from "../llm/types.js";
+import type { LLMMessage } from "../../src/llm/types.js";
 
 /** Stable marker text from the extraction child's own task prompt. */
 const EXTRACTION_PROMPT_MARKER = "## How to save memories";

@@ -3,18 +3,18 @@
  */
 import { afterEach, describe, expect, test } from "vitest";
 
-import type { LLMMessage } from "../../llm/types.js";
-import type { ToolPermissionContext } from "../../permissions/types.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
+import type { ToolPermissionContext } from "../../../src/permissions/types.js";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+} from "../../../src/session/attachment-state.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 import {
   getVerifyPlanReminderTurnCount,
   VERIFY_PLAN_REMINDER_CONFIG,
   verifyPlanReminderProducer,
-} from "./verify-plan-reminder.js";
+} from "../../../src/prompts/attachments/verify-plan-reminder.js";
 
 const originalVerifyPlanEnv = process.env.AGENC_VERIFY_PLAN;
 

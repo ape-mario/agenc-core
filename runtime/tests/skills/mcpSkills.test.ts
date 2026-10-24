@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchMcpSkillsForClient } from "./mcpSkills.js";
-import { formatSkillListingWithinBudget } from "./local-loader.js";
-import type { MCPServerConnection } from "../services/mcp/types.js";
+import { fetchMcpSkillsForClient } from "../../src/skills/mcpSkills.js";
+import { formatSkillListingWithinBudget } from "../../src/skills/local-loader.js";
+import type { MCPServerConnection } from "../../src/services/mcp/types.js";
 
 type FakeSkillResource = {
   readonly uri: string;

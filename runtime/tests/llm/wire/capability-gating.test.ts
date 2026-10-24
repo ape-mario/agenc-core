@@ -4,8 +4,8 @@ import {
   chatCompletionsCapabilityHintsForProvider,
   filterToolsForLocalProfile,
   usesLocalToolProfile,
-} from "./capability-gating.js";
-import { buildChatCompletionsRequest } from "./chat-completions.js";
+} from "../../../src/llm/wire/capability-gating.js";
+import { buildChatCompletionsRequest } from "../../../src/llm/wire/chat-completions.js";
 
 describe("chatCompletionsCapabilityHintsForProvider", () => {
   describe("acceptsReasoningEffort", () => {

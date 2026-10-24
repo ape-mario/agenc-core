@@ -12,15 +12,15 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runtimeRootPath } from "../helpers/source-path.ts";
 import { MAX_CSV_JOB_REGISTRATION_HOLD_MS } from "../../src/contracts/csv-job-contract.js";
-import { CsvAgentJobsRepository } from "./csv-agent-jobs.js";
-import { STATE_DB_MIGRATIONS } from "./migrations/index.js";
+import { CsvAgentJobsRepository } from "../../src/state/csv-agent-jobs.js";
+import { STATE_DB_MIGRATIONS } from "../../src/state/migrations/index.js";
 import {
   STATE_PRE_V21_BACKUP_FILENAME,
   applyMigrations,
   openStateDatabases,
   resolveStateDatabasePaths,
   type StateSqliteDriver,
-} from "./sqlite-driver.js";
+} from "../../src/state/sqlite-driver.js";
 
 let home: string;
 let cwd: string;

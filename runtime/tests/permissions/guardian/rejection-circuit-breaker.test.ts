@@ -15,7 +15,7 @@ import {
   MAX_CONSECUTIVE_GUARDIAN_DENIALS_PER_TURN,
   MAX_TOTAL_GUARDIAN_DENIALS_PER_TURN,
   createGuardianRejectionCircuitBreaker,
-} from "./rejection-circuit-breaker.js";
+} from "../../../src/permissions/guardian/rejection-circuit-breaker.js";
 
 describe("GuardianRejectionCircuitBreaker", () => {
   test("stays closed below the consecutive threshold", () => {

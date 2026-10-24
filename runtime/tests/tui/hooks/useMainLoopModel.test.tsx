@@ -1,9 +1,9 @@
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import Text from '../ink/components/Text.js'
-import { useMainLoopModel } from './useMainLoopModel.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import Text from '../../../src/tui/ink/components/Text.js'
+import { useMainLoopModel } from '../../../src/tui/hooks/useMainLoopModel.js'
 
 const appState = vi.hoisted(() => ({
   mainLoopModel: undefined as string | undefined,
@@ -15,7 +15,7 @@ const model = vi.hoisted(() => ({
   parsedInputs: [] as string[],
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppStateMaybeOutsideOfProvider: (
     selector: (state: {
       mainLoopModel?: string
@@ -24,7 +24,7 @@ vi.mock('../state/AppState.js', () => ({
   ) => selector(appState),
 }))
 
-vi.mock('../../utils/model/model.js', () => ({
+vi.mock('../../../src/utils/model/model.js', () => ({
   getDefaultMainLoopModelSetting: () => model.defaultSetting,
   parseUserSpecifiedModel: (value: string) => {
     model.parsedInputs.push(value)

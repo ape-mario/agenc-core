@@ -7,9 +7,9 @@ import {
   exportAgentState,
   importAgentState,
   parseAgenCStateExportPayload,
-} from "./export-import.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
-import { readRotatedToolOutputLog } from "./tool-output-rotation.js";
+} from "../../src/state/export-import.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
+import { readRotatedToolOutputLog } from "../../src/state/tool-output-rotation.js";
 
 let sourceHome = "";
 let targetHome = "";

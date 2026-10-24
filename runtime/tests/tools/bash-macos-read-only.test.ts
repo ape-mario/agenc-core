@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 import { checkReadOnlyConstraints } from '../../src/tools/BashTool/readOnlyValidation.js'
 import { shellCallIsGranted } from '../../src/permissions/read-only-grant.js'
 import { checkPathConstraints } from '../../src/tools/BashTool/pathValidation.js'
-import { createEmptyToolPermissionContext } from '../permissions/types.js'
+import { createEmptyToolPermissionContext } from '../../src/permissions/types.js'
 
 const platform = vi.hoisted(() => ({ value: 'macos' }))
 vi.mock('../../src/utils/platform.js', async importOriginal => ({

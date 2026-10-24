@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { Parser } from "./parser.js";
+import { Parser } from "../../../../src/tui/ink/termio/parser.js";
 
 const ESC = "\x1b";
 const BEL = "\x07";

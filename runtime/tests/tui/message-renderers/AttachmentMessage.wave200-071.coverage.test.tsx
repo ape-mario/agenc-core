@@ -1,18 +1,18 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { AttachmentMessage } from './AttachmentMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { AttachmentMessage } from '../../../src/tui/message-renderers/AttachmentMessage.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../utils/agentSwarmsEnabled.js', () => ({
+vi.mock('../../../src/utils/agentSwarmsEnabled.js', () => ({
   isAgentSwarmsEnabled: () => true,
 }))
 
-vi.mock('../../utils/teammateMailbox.js', () => ({
+vi.mock('../../../src/utils/teammateMailbox.js', () => ({
   isTaskAssignment: (text: string) => {
     try {
       const parsed = JSON.parse(text)
@@ -31,11 +31,11 @@ vi.mock('../../utils/teammateMailbox.js', () => ({
   isShutdownApproved: (text: string) => text === 'shutdown-approved',
 }))
 
-vi.mock('../components/messageActions', () => ({
+vi.mock('../../../src/tui/components/messageActions.js', () => ({
   useSelectedMessageBg: () => undefined,
 }))
 
-vi.mock('./PlanApprovalMessage', async () => {
+vi.mock('../../../src/tui/message-renderers/PlanApprovalMessage.js', async () => {
   const ReactActual = await vi.importActual<typeof import('react')>('react')
 
   return {
@@ -52,7 +52,7 @@ vi.mock('./PlanApprovalMessage', async () => {
   }
 })
 
-vi.mock('./UserTeammateMessage', async () => {
+vi.mock('../../../src/tui/message-renderers/UserTeammateMessage.js', async () => {
   const ReactActual = await vi.importActual<typeof import('react')>('react')
 
   return {

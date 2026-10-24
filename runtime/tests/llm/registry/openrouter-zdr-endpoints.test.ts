@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ModelMetadataResolver } from "../model-metadata.js";
-import { ensureOpenRouterZdrEndpoints } from "../../commands/live-model-catalog.js";
-import type { SlashCommandContext } from "../../commands/types.js";
+import { ModelMetadataResolver } from "../../../src/llm/model-metadata.js";
+import { ensureOpenRouterZdrEndpoints } from "../../../src/commands/live-model-catalog.js";
+import type { SlashCommandContext } from "../../../src/commands/types.js";
 
 import {
   isOpenRouterRouterModel,
@@ -11,7 +11,7 @@ import {
   OPENROUTER_ZDR_ENDPOINTS_URL,
   recordOpenRouterZdrEndpoints,
   resetOpenRouterZdrEndpointsForTesting,
-} from "./openrouter-zdr-endpoints.js";
+} from "../../../src/llm/registry/openrouter-zdr-endpoints.js";
 
 /** Entries in the shape GET /api/v1/endpoints/zdr returned on 2026-10-22. */
 function endpoint(modelId: string, provider: string, tag: string): Record<string, unknown> {

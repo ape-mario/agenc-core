@@ -1,11 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
-import { orchestrateToolCall, type ApprovalCtx, type ReviewDecision } from "./orchestrator.js";
-import { enforceRuntimeSandboxAttempt } from "./runtimes/sandboxing.js";
-import { buildToolRuntimeAttemptContext, buildToolRuntimeCallContext } from "./runtimes/context.js";
-import { ApprovalStore } from "../permissions/approval-cache.js";
-import type { Tool } from "./types.js";
-import { ToolRouter } from "./router.js";
-import { EventLog } from "../session/event-log.js";
+import { orchestrateToolCall, type ApprovalCtx, type ReviewDecision } from "../../src/tools/orchestrator.js";
+import { enforceRuntimeSandboxAttempt } from "../../src/tools/runtimes/sandboxing.js";
+import { buildToolRuntimeAttemptContext, buildToolRuntimeCallContext } from "../../src/tools/runtimes/context.js";
+import { ApprovalStore } from "../../src/permissions/approval-cache.js";
+import type { Tool } from "../../src/tools/types.js";
+import { ToolRouter } from "../../src/tools/router.js";
+import { EventLog } from "../../src/session/event-log.js";
 
 function fixture(nonInteractive = false) {
   const session = {

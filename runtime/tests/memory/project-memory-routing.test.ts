@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('bun:bundle', () => ({ feature: () => false }))
-vi.mock('../tools.js', () => ({}))
+vi.mock('../../src/tools.js', () => ({}))
 vi.mock('src/tools.js', () => ({}))
 
 import {
   extractAtMentionedFiles,
   extractMcpResourceMentions,
-} from '../utils/attachments.js'
+} from '../../src/utils/attachments.js'
 
 describe('project-memory mention routing', () => {
   it('keeps reserved memory mentions out of file and MCP extractors', () => {

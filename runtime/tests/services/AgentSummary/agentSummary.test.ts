@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Message } from "../../types/message.js";
-import type { CacheSafeParams } from "../PromptSuggestion/runtime.js";
+import type { Message } from "../../../src/types/message.js";
+import type { CacheSafeParams } from "../../../src/services/PromptSuggestion/runtime.js";
 import {
   SUMMARY_INTERVAL_MS,
   buildSummaryPrompt,
@@ -9,7 +9,7 @@ import {
   filterIncompleteToolCalls,
   startAgentSummarization,
   type AgentSummaryRunForkedAgentParams,
-} from "./agentSummary.js";
+} from "../../../src/services/AgentSummary/agentSummary.js";
 
 function userMessage(id: string, content: unknown): Message {
   return {

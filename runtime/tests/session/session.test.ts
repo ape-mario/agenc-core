@@ -25,17 +25,17 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RolloutStore } from "./rollout-store.js";
-import { createToolBridge } from "../mcp-client/tools.js";
-import { readDisplayArtifact } from "./display-artifact-store.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
+import { readDisplayArtifact } from "../../src/session/display-artifact-store.js";
 
 import {
   buildRealtimeSessionConfig,
   type RealtimeEvent,
   type RealtimeTransportConnection,
   type RealtimeWriter,
-} from "../conversation/realtime/conversation.js";
-import { AsyncQueue } from "../utils/async-queue.js";
+} from "../../src/conversation/realtime/conversation.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import {
   DEFAULT_LEGACY_EVENT_QUEUE_DEPTH,
   Session,
@@ -43,8 +43,8 @@ import {
   type PendingProviderSwitch,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
-import type { PendingWorktreeState } from "./pending-worktree.js";
+} from "../../src/session/session.js";
+import type { PendingWorktreeState } from "../../src/session/pending-worktree.js";
 import {
   buildTurnContext,
   newDefaultTurnWithSubId,
@@ -55,62 +55,62 @@ import {
   type ReasoningEffort,
   type SessionConfiguration,
   type SessionForTurn,
-} from "./turn-context.js";
-import { isPlanMode } from "./plan-mode.js";
-import type { TurnContext } from "./turn-context.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
+} from "../../src/session/turn-context.js";
+import { isPlanMode } from "../../src/session/plan-mode.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "./attachment-state.js";
+} from "../../src/session/attachment-state.js";
 import {
   createEmptyToolPermissionContext,
   type PermissionMode,
   type ToolPermissionContext,
-} from "../permissions/types.js";
-import type { LLMContentPart, LLMMessage, LLMProvider } from "../llm/types.js";
-import { ProviderHttpClient } from "../llm/client.js";
+} from "../../src/permissions/types.js";
+import type { LLMContentPart, LLMMessage, LLMProvider } from "../../src/llm/types.js";
+import { ProviderHttpClient } from "../../src/llm/client.js";
 import {
   createProvider,
   isFactoryProvider,
   readProviderFactoryOptions,
   readProviderIdentity,
-} from "../llm/provider.js";
-import { createGeminiEndpointPlan } from "../llm/providers/gemini/endpoint-plan.js";
-import type { AuthBackend } from "../auth/backend.js";
-import { clearSession } from "../commands/clear.js";
+} from "../../src/llm/provider.js";
+import { createGeminiEndpointPlan } from "../../src/llm/providers/gemini/endpoint-plan.js";
+import type { AuthBackend } from "../../src/auth/backend.js";
+import { clearSession } from "../../src/commands/clear.js";
 import {
   createCsvAgentInvocationEnvelope,
   materializeAgentInvocationMessages,
-} from "../contracts/agent-invocation-envelope.js";
+} from "../../src/contracts/agent-invocation-envelope.js";
 import {
   attachCompactionSession,
   createCompactionTransactionHarness,
   createProvider as createCompactionProvider,
 } from "../helpers/compaction-transaction-harness.js";
-import { sessionTranscriptV2FromRollout } from "../app-server/background-agent-runner/journal-reconstruction.js";
-import { daemonTranscriptSnapshotEvents } from "../tui/daemon-transcript-snapshot.js";
-import { adaptTranscriptEvents } from "../tui/session-transcript.js";
-import { CompactionReconstructionRequiredError } from "../services/compact/transaction-types.js";
+import { sessionTranscriptV2FromRollout } from "../../src/app-server/background-agent-runner/journal-reconstruction.js";
+import { daemonTranscriptSnapshotEvents } from "../../src/tui/daemon-transcript-snapshot.js";
+import { adaptTranscriptEvents } from "../../src/tui/session-transcript.js";
+import { CompactionReconstructionRequiredError } from "../../src/services/compact/transaction-types.js";
 import {
   getSessionTempNamespaceName,
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,
-} from "./runtime-options.js";
-import { runWithCurrentRuntimeSession } from "./current-session.js";
-import { resolveMainLoopReasoningEffort } from "./session-reasoning-effort.js";
-import { withSessionReasoningEffort } from "./reasoning-effort-for-model.js";
+} from "../../src/session/runtime-options.js";
+import { runWithCurrentRuntimeSession } from "../../src/session/current-session.js";
+import { resolveMainLoopReasoningEffort } from "../../src/session/session-reasoning-effort.js";
+import { withSessionReasoningEffort } from "../../src/session/reasoning-effort-for-model.js";
 import {
   clearSessionReadState,
   recordSessionRead,
-} from "../tools/system/filesystem.js";
-import { extractBundledSkillFiles } from "../skills/bundled-extraction-registry.js";
-import { getCurrentBundledSkillExtractionRoot } from "../skills/bundled-root-authority.js";
-import { ConfigStore } from "../config/store.js";
-import { runWithCanonicalSettingsAuthority } from "../utils/settings/canonicalAuthority.js";
-import { SessionProviderService } from "./provider-service.js";
-import { resolveProviderRuntimeRequest } from "../llm/provider-request.js";
-import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from "../prompts/system-prompt-boundary.js";
+} from "../../src/tools/system/filesystem.js";
+import { extractBundledSkillFiles } from "../../src/skills/bundled-extraction-registry.js";
+import { getCurrentBundledSkillExtractionRoot } from "../../src/skills/bundled-root-authority.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { runWithCanonicalSettingsAuthority } from "../../src/utils/settings/canonicalAuthority.js";
+import { SessionProviderService } from "../../src/session/provider-service.js";
+import { resolveProviderRuntimeRequest } from "../../src/llm/provider-request.js";
+import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from "../../src/prompts/system-prompt-boundary.js";
 
 (globalThis as Record<string, unknown>).MACRO ??= {
   VERSION: "test-version",
@@ -3059,7 +3059,7 @@ describe("Session.shutdown dispatches SessionEnd hooks", () => {
 
   it("fires registered SessionEnd hooks with the session id", async () => {
     const { registerSessionEndHook, resetLifecycleHookRegistry } =
-      await import("../llm/hooks/registry.js");
+      await import("../../src/llm/hooks/registry.js");
     const seen: Array<{ reason: string; session_id?: string }> = [];
     resetLifecycleHookRegistry();
     registerSessionEndHook(async (input) => {
@@ -3077,7 +3077,7 @@ describe("Session.shutdown dispatches SessionEnd hooks", () => {
 
   it("passes its captured bare authority to SessionEnd outside turn scope", async () => {
     const { registerSessionEndHook, resetLifecycleHookRegistry } =
-      await import("../llm/hooks/registry.js");
+      await import("../../src/llm/hooks/registry.js");
     const sessionEnd = vi.fn(async () => ({
       succeeded: true,
       output: "must not run",
@@ -3114,7 +3114,7 @@ describe("Session file rewind (previewFileRewind / rewindFilesToMessage)", () =>
     session: Session;
     file: string;
   }> {
-    const { FileHistory } = await import("./file-history.js");
+    const { FileHistory } = await import("../../src/session/file-history.js");
     project = mkdtempSync(join(tmpdir(), "agenc-session-rewind-"));
     const file = join(project, "tracked.txt");
     writeFileSync(file, "original", "utf8");

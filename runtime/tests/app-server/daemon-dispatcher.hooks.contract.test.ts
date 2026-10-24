@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
 import {
   AGENC_DAEMON_PROTOCOL_VERSION,
   JSON_RPC_VERSION,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import type {
   SessionHooksSetDisabledParams,
   SessionHooksStatusParams,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 async function initialize(connection: {
   dispatch(message: Record<string, unknown>): Promise<unknown>;

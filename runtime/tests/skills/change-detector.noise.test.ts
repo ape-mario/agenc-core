@@ -4,12 +4,12 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FileWatcher } from "../file-watcher/index.js";
+import { FileWatcher } from "../../src/file-watcher/index.js";
 import {
   createSkillChangeDetector,
   type SkillChangeDetector,
-} from "./change-detector.js";
-import { createLocalSkillsServices } from "./local-loader.js";
+} from "../../src/skills/change-detector.js";
+import { createLocalSkillsServices } from "../../src/skills/local-loader.js";
 
 const tempDirs: string[] = [];
 let detector: SkillChangeDetector;

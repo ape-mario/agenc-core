@@ -13,7 +13,7 @@ import {
   setFsImplementation,
   setOriginalFsImplementation,
   type FsOperations,
-} from '../../utils/fsOperations.js'
+} from '../../../src/utils/fsOperations.js'
 
 let tempCwd = ''
 
@@ -46,19 +46,19 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../utils/cwd.js', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => tempCwd,
   pwd: () => tempCwd,
   runWithCwdOverride: <T,>(_cwd: string, fn: () => T) => fn(),
 }))
 
-vi.mock('../../utils/settings/settings.js', () => ({
+vi.mock('../../../src/utils/settings/settings.js', () => ({
   getExecutionAuthoritySettings: () => harness.settings,
   getInitialSettings: () => harness.settings,
   getSettingsForSource: () => undefined,
 }))
 
-vi.mock('../../utils/config.js', () => ({
+vi.mock('../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({}),
   checkHasTrustDialogAccepted: () => true,
 }))
@@ -67,7 +67,7 @@ vi.mock('../../utils/config.js', () => ({
 // shell prefix providers, etc) that aren't reachable from the tested code
 // paths. Stub the few helpers fileSuggestions.ts imports so the module graph
 // stays small.
-vi.mock('../../utils/hooks.js', () => ({
+vi.mock('../../../src/utils/hooks.js', () => ({
   createBaseHookInput: () => ({ base: true }),
   executeFileSuggestionCommand: async (input: unknown) => {
     harness.commandInputs.push(input)
@@ -76,25 +76,25 @@ vi.mock('../../utils/hooks.js', () => ({
   },
 }))
 
-vi.mock('../../utils/markdownConfigLoader.js', () => ({
+vi.mock('../../../src/utils/markdownConfigLoader.js', () => ({
   AGENC_CONFIG_DIRECTORIES: [],
   loadMarkdownFilesForSubdir: async () => [],
 }))
 
-vi.mock('../../utils/git', () => ({
+vi.mock('../../../src/utils/git.js', () => ({
   findGitRoot: () => harness.gitRoot,
   gitExe: () => 'git',
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-vi.mock('../../utils/path.js', () => ({
+vi.mock('../../../src/utils/path.js', () => ({
   expandPath: (value: string) => value.replace(/^~/, '/home/tester'),
 }))
 
-vi.mock('../../utils/ripgrep.js', () => ({
+vi.mock('../../../src/utils/ripgrep.js', () => ({
   ripGrep: harness.ripGrep,
 }))
 
@@ -105,7 +105,7 @@ vi.mock('src/utils/debug.js', () => ({
 // FileIndex is a Rust-backed native module the empty-query path does not need
 // directly, but it sits in the same module graph. Provide a no-op stand-in so
 // the import resolves without a build step.
-vi.mock('../ink/native-ts/file-index/index', () => ({
+vi.mock('../../../src/tui/ink/native-ts/file-index/index.js', () => ({
   CHUNK_MS: 4,
   FileIndex: class {
     loadFromFileListAsync(paths: string[]) {
@@ -134,7 +134,7 @@ import {
   getDirectoryNamesAsync,
   getHiddenTopLevelMatches,
   pathListSignature,
-} from './fileSuggestions.js'
+} from '../../../src/tui/hooks/fileSuggestions.js'
 
 beforeEach(() => {
   harness.reset()

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createSpawnAgentTool } from "./spawn.js";
-import type { MultiAgentV2Options } from "./common.js";
-import type { Session } from "../../session/session.js";
-import { createAgentRoleWorkspace } from "../role.js";
-import { AgentRoleCatalog } from "../role-catalog.js";
+import { createSpawnAgentTool } from "../../../src/agents/v2/spawn.js";
+import type { MultiAgentV2Options } from "../../../src/agents/v2/common.js";
+import type { Session } from "../../../src/session/session.js";
+import { createAgentRoleWorkspace } from "../../../src/agents/role.js";
+import { AgentRoleCatalog } from "../../../src/agents/role-catalog.js";
 
 const ROLE_WORKSPACE = createAgentRoleWorkspace("/repo");
 const ROLE_CATALOG = new AgentRoleCatalog(ROLE_WORKSPACE);

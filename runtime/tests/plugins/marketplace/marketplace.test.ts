@@ -15,9 +15,9 @@ import {
   removeMarketplaceOp,
   upgradeMarketplaceOp,
   type Fetcher,
-} from "./marketplace.js";
-import { parseMarketplaceInput } from "./parseMarketplaceInput.js";
-import { validateMarketplaceManifest } from "../validation.js";
+} from "../../../src/plugins/marketplace/marketplace.js";
+import { parseMarketplaceInput } from "../../../src/plugins/marketplace/parseMarketplaceInput.js";
+import { validateMarketplaceManifest } from "../../../src/plugins/validation.js";
 
 async function tempRuntime(): Promise<{
   readonly root: string;

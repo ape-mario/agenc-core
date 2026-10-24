@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { LMStudioProvider } from "./index.js";
-import { withLmstudioHealthSidecar } from "./health.js";
-import { BUILT_IN_PROVIDER_BASE_URLS } from "../../registry/provider-info.js";
+import { LMStudioProvider } from "../../../../src/llm/providers/lmstudio/index.js";
+import { withLmstudioHealthSidecar } from "../../../../src/llm/providers/lmstudio/health.js";
+import { BUILT_IN_PROVIDER_BASE_URLS } from "../../../../src/llm/registry/provider-info.js";
 
 function sseResponse(frames: string[]): Response {
   const encoder = new TextEncoder();

@@ -3,9 +3,9 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { McpServerConfig, ScopedMcpServerConfig } from "../../services/mcp/types.js";
-import type { CanonicalSettingsAuthority } from "../../utils/settings/canonicalAuthority.js";
-import { createRoot } from "../ink/root.js";
+import type { McpServerConfig, ScopedMcpServerConfig } from "../../../src/services/mcp/types.js";
+import type { CanonicalSettingsAuthority } from "../../../src/utils/settings/canonicalAuthority.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
 
 const configMock = vi.hoisted(() => {
   const state = {
@@ -61,12 +61,12 @@ const themeMock = vi.hoisted(() => ({
   theme: {},
 }));
 
-vi.mock("../../services/mcp/config.js", () => ({
+vi.mock("../../../src/services/mcp/config.js", () => ({
   addMcpConfig: configMock.addMcpConfig,
   getAllMcpConfigs: configMock.getAllMcpConfigs,
 }));
 
-vi.mock("../../utils/gracefulShutdown.js", () => ({
+vi.mock("../../../src/utils/gracefulShutdown.js", () => ({
   gracefulShutdown: shutdownMock.gracefulShutdown,
 }));
 
@@ -74,8 +74,8 @@ vi.mock("src/utils/process.js", () => ({
   writeToStdout: processMock.writeToStdout,
 }));
 
-vi.mock("../ink.js", async () => {
-  const actual = await vi.importActual<typeof import("../ink.js")>("../ink.js");
+vi.mock("../../../src/tui/ink.js", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/tui/ink.js")>("../../../src/tui/ink.js");
   return {
     ...actual,
     color: () => (text: string) => text,
@@ -83,7 +83,7 @@ vi.mock("../ink.js", async () => {
   };
 });
 
-vi.mock("./CustomSelect/SelectMulti.js", () => ({
+vi.mock("../../../src/tui/components/CustomSelect/SelectMulti.js", () => ({
   SelectMulti: (props: NonNullable<typeof selectMultiMock.props>) => {
     selectMultiMock.props = props;
     selectMultiMock.renderCount++;
@@ -91,14 +91,14 @@ vi.mock("./CustomSelect/SelectMulti.js", () => ({
   },
 }));
 
-vi.mock("./design-system/Dialog.js", () => ({
+vi.mock("../../../src/tui/components/design-system/Dialog.js", () => ({
   Dialog: (props: NonNullable<typeof dialogMock.props>) => {
     dialogMock.props = props;
     return props.children;
   },
 }));
 
-vi.mock("./ConfigurableShortcutHint.js", () => ({
+vi.mock("../../../src/tui/components/ConfigurableShortcutHint.js", () => ({
   ConfigurableShortcutHint: ({
     fallback,
     description,
@@ -108,11 +108,11 @@ vi.mock("./ConfigurableShortcutHint.js", () => ({
   }) => `${fallback} ${description}`,
 }));
 
-vi.mock("./design-system/Byline.js", () => ({
+vi.mock("../../../src/tui/components/design-system/Byline.js", () => ({
   Byline: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("./design-system/KeyboardShortcutHint.js", () => ({
+vi.mock("../../../src/tui/components/design-system/KeyboardShortcutHint.js", () => ({
   KeyboardShortcutHint: ({
     shortcut,
     action,
@@ -196,7 +196,7 @@ async function renderImportDialog({
   onDone?: () => void;
 }) {
   const { MCPServerDesktopImportDialog } = await import(
-    "./MCPServerDesktopImportDialog.js"
+    "../../../src/tui/components/MCPServerDesktopImportDialog.js"
   );
   const io = stdio();
   const root = await createRoot({

@@ -37,7 +37,7 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../../../services/compact/autoCompact.js", () => ({
+vi.mock("../../../../src/services/compact/autoCompact.js", () => ({
   calculateTokenWarningStateForEnvironment: (tokenUsage: number, model: string) => ({
     isAboveWarningThreshold: harness.compactWarning,
     model,
@@ -45,27 +45,27 @@ vi.mock("../../../services/compact/autoCompact.js", () => ({
   }),
 }));
 
-vi.mock("../../../utils/auth.js", () => ({
+vi.mock("../../../../src/utils/auth.js", () => ({
   getApiKeyHelperElapsedMs: () => harness.helperElapsedMs,
   getConfiguredApiKeyHelper: () =>
     harness.helperConfigured ? "echo helper" : null,
   getSubscriptionTypeForContext: () => harness.subscriptionType,
 }));
 
-vi.mock("../../../utils/editor.js", () => ({
+vi.mock("../../../../src/utils/editor.js", () => ({
   getExternalEditor: () => harness.editor,
 }));
 
-vi.mock("../../../utils/envUtils.js", () => ({
+vi.mock("../../../../src/utils/envUtils.js", () => ({
   isEnvTruthy: (value: string | undefined) =>
     value === "1" || value === "true" || value === "yes",
 }));
 
-vi.mock("../../../utils/format.js", () => ({
+vi.mock("../../../../src/utils/format.js", () => ({
   formatDuration: (ms: number) => `${ms}ms`,
 }));
 
-vi.mock("../../../utils/hooks/cwdChangedHooks.js", () => ({
+vi.mock("../../../../src/utils/hooks/cwdChangedHooks.js", () => ({
   setEnvHookNotifier: (
     notifier: null | ((text: string, isError?: boolean) => void),
   ) => {
@@ -73,44 +73,44 @@ vi.mock("../../../utils/hooks/cwdChangedHooks.js", () => ({
   },
 }));
 
-vi.mock("../../../utils/ide.js", () => ({
+vi.mock("../../../../src/utils/ide.js", () => ({
   toIDEDisplayName: (editor: string) => `IDE:${editor}`,
 }));
 
-vi.mock("../../../utils/messages.js", () => ({
+vi.mock("../../../../src/utils/messages.js", () => ({
   getMessagesAfterCompactBoundary: (messages: unknown[]) => messages,
 }));
 
-vi.mock("../../../utils/tokens.js", () => ({
+vi.mock("../../../../src/utils/tokens.js", () => ({
   tokenCountFromLastAPIResponse: () => harness.tokenUsage,
 }));
 
-vi.mock("../../context/notifications.js", () => ({
+vi.mock("../../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({
     addNotification: harness.addNotification,
     removeNotification: harness.removeNotification,
   }),
 }));
 
-vi.mock("../../hooks/useIdeConnectionStatus.js", () => ({
+vi.mock("../../../../src/tui/hooks/useIdeConnectionStatus.js", () => ({
   useIdeConnectionStatus: (mcpClients: unknown) => {
     harness.mcpClientsSeen = mcpClients;
     return { status: harness.ideStatus };
   },
 }));
 
-vi.mock("../../hooks/useMainLoopModel.js", () => ({
+vi.mock("../../../../src/tui/hooks/useMainLoopModel.js", () => ({
   useMainLoopModel: () => harness.model,
 }));
 
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
 }));
 
-vi.mock("../AutoUpdaterWrapper.js", async () => {
+vi.mock("../../../../src/tui/components/AutoUpdaterWrapper.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
 
   return {
     AutoUpdaterWrapper: (props: Record<string, unknown>) => {
@@ -120,9 +120,9 @@ vi.mock("../AutoUpdaterWrapper.js", async () => {
   };
 });
 
-vi.mock("../ConfigurableShortcutHint.js", async () => {
+vi.mock("../../../../src/tui/components/ConfigurableShortcutHint.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
 
   return {
     ConfigurableShortcutHint: ({
@@ -135,9 +135,9 @@ vi.mock("../ConfigurableShortcutHint.js", async () => {
   };
 });
 
-vi.mock("../IdeStatusIndicator.js", async () => {
+vi.mock("../../../../src/tui/components/IdeStatusIndicator.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
 
   return {
     IdeStatusIndicator: ({
@@ -155,9 +155,9 @@ vi.mock("../IdeStatusIndicator.js", async () => {
   };
 });
 
-vi.mock("../../cost/MemoryUsageIndicator.js", async () => {
+vi.mock("../../../../src/tui/cost/MemoryUsageIndicator.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
 
   return {
     MemoryUsageIndicator: () =>
@@ -165,14 +165,14 @@ vi.mock("../../cost/MemoryUsageIndicator.js", async () => {
   };
 });
 
-vi.mock("../TuiErrorBoundary.js", () => ({
+vi.mock("../../../../src/tui/components/TuiErrorBoundary.js", () => ({
   TuiErrorBoundary: ({ children }: { children: React.ReactNode }) =>
     children,
 }));
 
-vi.mock("../../cost/TokenWarning.js", async () => {
+vi.mock("../../../../src/tui/cost/TokenWarning.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
 
   return {
     TokenWarning: ({
@@ -192,9 +192,9 @@ vi.mock("../../cost/TokenWarning.js", async () => {
   };
 });
 
-vi.mock("./SandboxPromptFooterHint.js", async () => {
+vi.mock("../../../../src/tui/components/PromptInput/SandboxPromptFooterHint.js", async () => {
   const ReactModule = await import("react");
-  const { Text } = await import("../../ink.js");
+  const { Text } = await import("../../../../src/tui/ink.js");
 
   return {
     SandboxPromptFooterHint: () =>
@@ -202,8 +202,8 @@ vi.mock("./SandboxPromptFooterHint.js", async () => {
   };
 });
 
-import { createRoot } from "../../ink/root.js";
-import { Notifications } from "./Notifications.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { Notifications } from "../../../../src/tui/components/PromptInput/Notifications.js";
 
 type NotificationsProps = React.ComponentProps<typeof Notifications>;
 

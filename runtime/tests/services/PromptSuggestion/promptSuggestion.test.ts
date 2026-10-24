@@ -4,13 +4,13 @@ const runForkedAgentMock = vi.hoisted(() => vi.fn());
 const isSpeculationEnabledMock = vi.hoisted(() => vi.fn(() => false));
 const startSpeculationMock = vi.hoisted(() => vi.fn());
 
-vi.mock("./speculation.js", () => ({
+vi.mock("../../../src/services/PromptSuggestion/speculation.js", () => ({
   isSpeculationEnabled: isSpeculationEnabledMock,
   startSpeculation: startSpeculationMock,
 }));
 
-vi.mock("./runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("./runtime.js")>("./runtime.js");
+vi.mock("../../../src/services/PromptSuggestion/runtime.js", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/services/PromptSuggestion/runtime.js")>("../../../src/services/PromptSuggestion/runtime.js");
   return {
     ...actual,
     runForkedAgent: runForkedAgentMock,
@@ -22,19 +22,19 @@ import {
   getSuggestionSuppressReason,
   shouldEnablePromptSuggestion,
   shouldFilterSuggestion,
-} from "./promptSuggestion.js";
+} from "../../../src/services/PromptSuggestion/promptSuggestion.js";
 import {
   getIsNonInteractiveSession as getBootstrapIsNonInteractiveSession,
   resetStateForTests,
   setIsInteractive,
-} from "../../bootstrap/state.js";
+} from "../../../src/bootstrap/state.js";
 import {
   clearDynamicTeamContext,
   createTeammateContext,
   isTeammate as isLiveTeammate,
   runWithTeammateContext,
   setDynamicTeamContext,
-} from "../../utils/teammate.js";
+} from "../../../src/utils/teammate.js";
 
 describe("PromptSuggestion service", () => {
   afterEach(() => {

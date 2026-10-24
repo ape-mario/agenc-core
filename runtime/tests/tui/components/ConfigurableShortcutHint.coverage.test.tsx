@@ -1,15 +1,15 @@
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { Box } from "../ink.js";
-import { KeybindingProvider } from "../keybindings/KeybindingContext.js";
-import { parseBindings } from "../keybindings/parser.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { Box } from "../../../src/tui/ink.js";
+import { KeybindingProvider } from "../../../src/tui/keybindings/KeybindingContext.js";
+import { parseBindings } from "../../../src/tui/keybindings/parser.js";
 import type {
   KeybindingContextName,
   ParsedKeystroke,
-} from "../keybindings/types.js";
-import { ConfigurableShortcutHint } from "./ConfigurableShortcutHint.js";
+} from "../../../src/tui/keybindings/types.js";
+import { ConfigurableShortcutHint } from "../../../src/tui/components/ConfigurableShortcutHint.js";
 
 const bindings = parseBindings([
   {

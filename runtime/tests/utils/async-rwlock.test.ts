@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { AsyncRwLock } from "./async-rwlock.js";
+import { AsyncRwLock } from "../../src/utils/async-rwlock.js";
 
 describe("AsyncRwLock", () => {
   test("happy path: read and write return values", async () => {

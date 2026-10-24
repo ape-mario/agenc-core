@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { createAgentRoleWorkspace } from "../agents/role.js";
-import { EventLog } from "../session/event-log.js";
-import type { Session } from "../session/session.js";
-import type { TurnContext } from "../session/turn-context.js";
-import type { TurnState } from "../session/turn-state.js";
+import { createAgentRoleWorkspace } from "../../src/agents/role.js";
+import { EventLog } from "../../src/session/event-log.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import type { TurnState } from "../../src/session/turn-state.js";
 import {
   ensureExtractMemoriesInitialized,
   executeExtractMemories,
-} from "../services/extractMemories/extractMemories.js";
-import { cloneFileStateCache } from "../utils/fileStateCache.js";
-import { commit } from "./commit.js";
-import { MAX_STOP_HOOK_BLOCKS } from "./stop-hooks.js";
+} from "../../src/services/extractMemories/extractMemories.js";
+import { cloneFileStateCache } from "../../src/utils/fileStateCache.js";
+import { commit } from "../../src/phases/commit.js";
+import { MAX_STOP_HOOK_BLOCKS } from "../../src/phases/stop-hooks.js";
 
 const terminalHookMocks = vi.hoisted(() => ({
   promptCalls: [] as Array<{ context: unknown; options: unknown }>,
@@ -20,12 +20,12 @@ const terminalHookMocks = vi.hoisted(() => ({
   autoReject: false,
 }));
 
-vi.mock("../services/extractMemories/extractMemories.js", () => ({
+vi.mock("../../src/services/extractMemories/extractMemories.js", () => ({
   ensureExtractMemoriesInitialized: vi.fn(),
   executeExtractMemories: vi.fn(async () => {}),
 }));
 
-vi.mock("../services/PromptSuggestion/promptSuggestion.js", () => ({
+vi.mock("../../src/services/PromptSuggestion/promptSuggestion.js", () => ({
   executePromptSuggestion: vi.fn(async (context: unknown, options: unknown) => {
     terminalHookMocks.order.push("prompt");
     terminalHookMocks.promptCalls.push({ context, options });
@@ -33,7 +33,7 @@ vi.mock("../services/PromptSuggestion/promptSuggestion.js", () => ({
   }),
 }));
 
-vi.mock("../services/autoDream/autoDream.js", () => ({
+vi.mock("../../src/services/autoDream/autoDream.js", () => ({
   executeAutoDream: vi.fn(
     async (context: unknown, appendSystemMessage: unknown) => {
       terminalHookMocks.order.push("dream");

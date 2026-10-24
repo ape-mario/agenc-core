@@ -4,14 +4,14 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, test } from "vitest";
 
-import { ApplyPatchMatchWorkBudget, seekSequence } from "./seek-sequence.js";
+import { ApplyPatchMatchWorkBudget, seekSequence } from "../../../src/tools/apply-patch/seek-sequence.js";
 import {
   applyTextReplacements,
   parseTextDocument,
   type TextReplacement,
-} from "./text-document.js";
-import { parsePatch } from "./parser.js";
-import { applyPatchText } from "./runtime.js";
+} from "../../../src/tools/apply-patch/text-document.js";
+import { parsePatch } from "../../../src/tools/apply-patch/parser.js";
+import { applyPatchText } from "../../../src/tools/apply-patch/runtime.js";
 
 const PROPERTY_CASE_COUNT = 600;
 const SCALING_SMALL_LINE_COUNT = 20_000;

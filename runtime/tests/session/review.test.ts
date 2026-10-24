@@ -24,30 +24,30 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as reviewDelegate from "./agenc-delegate.js";
+import * as reviewDelegate from "../../src/session/agenc-delegate.js";
 
-import { AsyncQueue } from "../utils/async-queue.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import { createTestConfigStore } from "../fixtures.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
+} from "../../src/session/session.js";
 import {
   type Config,
   type ManagedFeatures,
   type ModelInfo,
   type SessionConfiguration,
-} from "./turn-context.js";
+} from "../../src/session/turn-context.js";
 import type {
   LLMChatOptions,
   LLMMessage,
   LLMProvider,
   LLMResponse,
-} from "../llm/types.js";
+} from "../../src/llm/types.js";
 import {
   REVIEW_EXIT_INTERRUPTED_TMPL,
   REVIEW_EXIT_SUCCESS_TMPL,
@@ -59,9 +59,9 @@ import {
   renderReviewExitSuccess,
   spawnReviewTask,
   type ReviewRequest,
-} from "./review.js";
-import { resolveAgentRuntimeOptions } from "./runtime-options.js";
-import { RolloutStore } from "./rollout-store.js";
+} from "../../src/session/review.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Fixture (mirrors tasks.test.ts::buildSession)

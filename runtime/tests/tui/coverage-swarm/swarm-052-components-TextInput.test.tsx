@@ -52,15 +52,15 @@ vi.mock('chalk', () => ({
   },
 }))
 
-vi.mock('../hooks/useClipboardImageHint.js', () => ({
+vi.mock('../../../src/tui/hooks/useClipboardImageHint.js', () => ({
   useClipboardImageHint: harness.clipboardImageHint,
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => harness.settings,
 }))
 
-vi.mock('../context/voice.js', () => ({
+vi.mock('../../../src/tui/context/voice.js', () => ({
   useVoiceState: (selector: (state: typeof harness.voice) => unknown) => {
     const selected = selector(harness.voice)
     harness.voiceStateCalls.push(
@@ -70,11 +70,11 @@ vi.mock('../context/voice.js', () => ({
   },
 }))
 
-vi.mock('../../utils/envUtils.js', () => ({
+vi.mock('../../../src/utils/envUtils.js', () => ({
   isEnvTruthy: () => harness.accessibilityEnabled,
 }))
 
-vi.mock('../ink.js', async () => {
+vi.mock('../../../src/tui/ink.js', async () => {
   const ReactModule = await import('react')
 
   return {
@@ -87,7 +87,7 @@ vi.mock('../ink.js', async () => {
   }
 })
 
-vi.mock('../hooks/useTextInput.js', () => ({
+vi.mock('../../../src/tui/hooks/useTextInput.js', () => ({
   useTextInput: (props: Record<string, unknown>) => {
     harness.textInputCalls.push(props)
     return {
@@ -105,7 +105,7 @@ vi.mock('../hooks/useTextInput.js', () => ({
   },
 }))
 
-vi.mock('../components/BaseTextInput.js', async () => {
+vi.mock('../../../src/tui/components/BaseTextInput.js', async () => {
   const ReactModule = await import('react')
 
   return {
@@ -116,8 +116,8 @@ vi.mock('../components/BaseTextInput.js', async () => {
   }
 })
 
-import { createRoot } from '../ink/root.js'
-import TextInput from '../components/TextInput.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import TextInput from '../../../src/tui/components/TextInput.js'
 
 type TextInputProps = React.ComponentProps<typeof TextInput>
 

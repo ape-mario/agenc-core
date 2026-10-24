@@ -5,7 +5,7 @@ import {
   getOpenAICompatibleContextWindow,
   getOpenAICompatibleMaxOutputTokens,
   OPENAI_COMPATIBLE_FALLBACK_CONTEXT_WINDOW,
-} from "./openai-compatible-token-limits.js";
+} from "../../src/llm/openai-compatible-token-limits.js";
 
 describe("compatible-provider token tables", () => {
   test("resolves known exact context and output limits", () => {

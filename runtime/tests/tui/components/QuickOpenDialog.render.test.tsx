@@ -4,11 +4,11 @@ import * as path from 'node:path'
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ConfigStore } from '../../config/store.js'
+import { ConfigStore } from '../../../src/config/store.js'
 import {
   type CanonicalSettingsAuthority,
   getCanonicalSettingsAuthority,
-} from '../../utils/settings/canonicalAuthority.js'
+} from '../../../src/utils/settings/canonicalAuthority.js'
 
 type PickerAction = {
   action: string
@@ -52,37 +52,37 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../context/overlayContext', () => ({
+vi.mock('../../../src/tui/context/overlayContext.js', () => ({
   useRegisterOverlay: harness.registerOverlay,
 }))
 
-vi.mock('../hooks/fileSuggestions', () => ({
+vi.mock('../../../src/tui/hooks/fileSuggestions.js', () => ({
   generateFileSuggestions: harness.generateFileSuggestions,
 }))
 
-vi.mock('../hooks/useTerminalSize', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => harness.terminal,
 }))
 
-vi.mock('../../utils/log', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-vi.mock('../../utils/cwd', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => harness.cwd,
 }))
 
-vi.mock('../../utils/editor', () => ({
+vi.mock('../../../src/utils/editor.js', () => ({
   openFileInExternalEditor: harness.openFileInExternalEditor,
 }))
 
-vi.mock('../../utils/readFileInRange', () => ({
+vi.mock('../../../src/utils/readFileInRange.js', () => ({
   readFileInRange: harness.readFileInRange,
 }))
 
-vi.mock('./design-system/FuzzyPicker', async (importOriginal) => {
+vi.mock('../../../src/tui/components/design-system/FuzzyPicker.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('./design-system/FuzzyPicker')>()
+    await importOriginal<typeof import('../../../src/tui/components/design-system/FuzzyPicker.js')>()
   return {
     ...actual,
     FuzzyPicker: (props: CapturedPickerProps) => {
@@ -92,9 +92,9 @@ vi.mock('./design-system/FuzzyPicker', async (importOriginal) => {
   }
 })
 
-import { createRoot } from '../ink/root.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { QuickOpenDialog } from './QuickOpenDialog.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { QuickOpenDialog } from '../../../src/tui/components/QuickOpenDialog.js'
 
 const DEFAULT_SETTINGS_AUTHORITY = new ConfigStore({
   home: '/tmp/agenc-quick-open-render-test',

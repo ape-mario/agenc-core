@@ -2,18 +2,18 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgenCSessionSnapshotPolicy } from "./snapshot-policy.js";
+import { AgenCSessionSnapshotPolicy } from "../../src/state/snapshot-policy.js";
 import {
   SESSION_SNAPSHOT_HARD_CAP,
   type AgentSnapshotPruningReport,
-} from "./pruning.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+} from "../../src/state/pruning.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 import {
   readRotatedToolOutputLog,
   recordInFlightToolCallStart,
   resolveToolOutputLogPath,
-} from "./tool-output-rotation.js";
-import { recoverDaemonStateOnStartup } from "./recovery.js";
+} from "../../src/state/tool-output-rotation.js";
+import { recoverDaemonStateOnStartup } from "../../src/state/recovery.js";
 
 let home = "";
 let cwd = "";

@@ -20,8 +20,8 @@ import {
   isBridgeSafeCommand,
   runSlashCommand,
   type SlashCommandRunContext,
-} from "./slash.js";
-import type { Session } from "../session/session.js";
+} from "../../src/bin/slash.js";
+import type { Session } from "../../src/session/session.js";
 
 function stubSession(): Session {
   return {

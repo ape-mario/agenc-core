@@ -20,7 +20,7 @@ import {
   newWorkspaceWritePolicy,
   sandboxAllowsNetwork,
   type SandboxPolicy,
-} from "./sandbox.js";
+} from "../../src/permissions/sandbox.js";
 
 const isPosix = path.sep === "/";
 

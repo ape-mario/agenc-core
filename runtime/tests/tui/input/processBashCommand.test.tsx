@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   recordInputBurst,
   resetBurstDetector,
-} from "./burst-detector.js";
-import { processBashCommand } from "./processBashCommand.js";
+} from "../../../src/tui/input/burst-detector.js";
+import { processBashCommand } from "../../../src/tui/input/processBashCommand.js";
 
 const mocks = vi.hoisted(() => ({
   bashCall: vi.fn(async () => ({
@@ -21,27 +21,27 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("../components/BashModeProgress.js", () => ({
+vi.mock("../../../src/tui/components/BashModeProgress.js", () => ({
   BashModeProgress: vi.fn(() => null),
 }));
 
-vi.mock("../components/PasteConfirmDialog.js", () => ({
+vi.mock("../../../src/tui/components/PasteConfirmDialog.js", () => ({
   PasteConfirmDialog: vi.fn(() => null),
 }));
 
-vi.mock("../../tools/canonicalToolSurface.js", () => ({
+vi.mock("../../../src/tools/canonicalToolSurface.js", () => ({
   CanonicalBashTool: {
     call: mocks.bashCall,
   },
 }));
 
-vi.mock("../../tools/PowerShellTool/PowerShellTool.js", () => ({
+vi.mock("../../../src/tools/PowerShellTool/PowerShellTool.js", () => ({
   PowerShellTool: {
     call: vi.fn(),
   },
 }));
 
-vi.mock("../../utils/errors.js", () => ({
+vi.mock("../../../src/utils/errors.js", () => ({
   errorMessage: vi.fn((error: unknown) =>
     error instanceof Error ? error.message : String(error),
   ),
@@ -52,7 +52,7 @@ vi.mock("../../utils/errors.js", () => ({
   },
 }));
 
-vi.mock("../../utils/messages.js", () => ({
+vi.mock("../../../src/utils/messages.js", () => ({
   createSyntheticUserCaveatMessage: vi.fn(() => ({
     type: "system",
     message: { content: "synthetic caveat" },
@@ -71,21 +71,21 @@ vi.mock("../../utils/messages.js", () => ({
   ),
 }));
 
-vi.mock("../../utils/shell/resolveDefaultShell.js", () => ({
+vi.mock("../../../src/utils/shell/resolveDefaultShell.js", () => ({
   resolveDefaultShell: vi.fn(() => "bash"),
 }));
 
-vi.mock("../../utils/shell/shellToolUtils.js", () => ({
+vi.mock("../../../src/utils/shell/shellToolUtils.js", () => ({
   getPowerShellTool: vi.fn(() => null),
   isPowerShellToolEnabled: vi.fn(() => false),
   SHELL_TOOL_NAMES: ["system.bash"],
 }));
 
-vi.mock("../../utils/toolResultStorage.js", () => ({
+vi.mock("../../../src/utils/toolResultStorage.js", () => ({
   processToolResultBlock: mocks.processToolResultBlock,
 }));
 
-vi.mock("../../utils/xml.js", () => ({
+vi.mock("../../../src/utils/xml.js", () => ({
   escapeXml: vi.fn((value: string) => value),
 }));
 

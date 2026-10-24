@@ -4,7 +4,7 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import type { AutoUpdaterResult } from "../../utils/autoUpdater.js";
+import type { AutoUpdaterResult } from "../../../src/utils/autoUpdater.js";
 
 const harness = vi.hoisted(() => ({
   getCurrentInstallationType: vi.fn(async () => "unknown"),
@@ -32,36 +32,36 @@ vi.mock("src/utils/debug.js", () => ({
   logForDebugging: harness.logForDebugging,
 }));
 
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: harness.logError,
 }));
 
-vi.mock("../../utils/autoUpdater.js", () => ({
+vi.mock("../../../src/utils/autoUpdater.js", () => ({
   getLatestVersion: harness.getLatestVersion,
   getMaxVersion: harness.getMaxVersion,
   installGlobalPackage: harness.installGlobalPackage,
   shouldSkipVersion: harness.shouldSkipVersion,
 }));
 
-vi.mock("../../utils/config.js", () => ({
+vi.mock("../../../src/utils/config.js", () => ({
   getRuntimeState: harness.getRuntimeState,
   isAutoUpdaterDisabled: harness.isAutoUpdaterDisabled,
 }));
 
-vi.mock("../../utils/doctorDiagnostic.js", () => ({
+vi.mock("../../../src/utils/doctorDiagnostic.js", () => ({
   getCurrentInstallationType: harness.getCurrentInstallationType,
 }));
 
-vi.mock("../../utils/localInstaller.js", () => ({
+vi.mock("../../../src/utils/localInstaller.js", () => ({
   installOrUpdateAgenCPackage: harness.installOrUpdateAgenCPackage,
   localInstallationExists: harness.localInstallationExists,
 }));
 
-vi.mock("../../utils/nativeInstaller/installer.js", () => ({
+vi.mock("../../../src/utils/nativeInstaller/installer.js", () => ({
   removeInstalledSymlink: harness.removeInstalledSymlink,
 }));
 
-vi.mock("../../utils/semver.js", () => {
+vi.mock("../../../src/utils/semver.js", () => {
   const compareVersions = (left: string, right: string): number => {
     const leftParts = left.split(".").map(Number);
     const rightParts = right.split(".").map(Number);
@@ -82,13 +82,13 @@ vi.mock("../../utils/semver.js", () => {
   };
 });
 
-vi.mock("../../utils/settings/settings.js", () => ({
+vi.mock("../../../src/utils/settings/settings.js", () => ({
   getExecutionAuthoritySettings: () => ({ autoUpdatesChannel: "stable" }),
   getInitialSettings: () => ({ autoUpdatesChannel: "stable" }),
 }));
 
-import { createRoot } from "../ink/root.js";
-import { AutoUpdater } from "./AutoUpdater.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { AutoUpdater } from "../../../src/tui/components/AutoUpdater.js";
 
 const originalGlyphMode = process.env.AGENC_TUI_GLYPHS;
 const originalMacro = (globalThis as Record<string, unknown>).MACRO;

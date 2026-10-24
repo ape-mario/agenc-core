@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseDirectCommandLine,
   tokenizeShellCommand,
-} from "./command-line.js";
+} from "../../../src/tools/system/command-line.js";
 
 describe("command-line", () => {
   it("tokenizes quoted arguments without shell operators", () => {

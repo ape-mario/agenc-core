@@ -4,8 +4,8 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../../ink.js'
-import { HighlightedCodeFallback } from './HighlightedCodeFallback.js'
+import { createRoot } from '../../../../src/tui/ink.js'
+import { HighlightedCodeFallback } from '../../../../src/tui/components/markdown/HighlightedCodeFallback.js'
 
 const highlightMock = vi.hoisted(() => {
   const highlight = vi.fn(
@@ -21,7 +21,7 @@ const highlightMock = vi.hoisted(() => {
   }
 })
 
-vi.mock('../../../utils/cliHighlight.js', () => ({
+vi.mock('../../../../src/utils/cliHighlight.js', () => ({
   getCliHighlightPromise: highlightMock.getCliHighlightPromise,
 }))
 

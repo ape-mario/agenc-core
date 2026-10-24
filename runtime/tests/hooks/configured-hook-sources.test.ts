@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 
-import type { ConfigLayerSnapshot } from "../config/repository.js";
-import type { AgenCConfig, HooksMap } from "../config/schema.js";
+import type { ConfigLayerSnapshot } from "../../src/config/repository.js";
+import type { AgenCConfig, HooksMap } from "../../src/config/schema.js";
 import {
   resolveConfiguredHookSources,
   type ConfiguredHookAuthoritySnapshot,
-} from "./configured-hook-sources.js";
+} from "../../src/hooks/configured-hook-sources.js";
 
 function hooks(command: string): HooksMap {
   return {

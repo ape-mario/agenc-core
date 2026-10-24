@@ -2,20 +2,20 @@ import { Buffer } from "node:buffer";
 
 import { describe, expect, test, vi } from "vitest";
 
-import { resolveProviderCapabilityEntry } from "../../capabilities.js";
-import { createProvider, readProviderIdentity } from "../../provider.js";
-import { resolveProviderCredentialAuthority } from "../../provider-options.js";
+import { resolveProviderCapabilityEntry } from "../../../../src/llm/capabilities.js";
+import { createProvider, readProviderIdentity } from "../../../../src/llm/provider.js";
+import { resolveProviderCredentialAuthority } from "../../../../src/llm/provider-options.js";
 import {
   resolveModelCatalogMetadata,
   resolveRegisteredModelCatalogEntry,
-} from "../../registry/model-catalog.js";
+} from "../../../../src/llm/registry/model-catalog.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
-} from "../../registry/provider-info.js";
-import type { LLMMessage, LLMTool } from "../../types.js";
-import { chatCompletionsCapabilityHintsForProvider } from "../../wire/capability-gating.js";
+} from "../../../../src/llm/registry/provider-info.js";
+import type { LLMMessage, LLMTool } from "../../../../src/llm/types.js";
+import { chatCompletionsCapabilityHintsForProvider } from "../../../../src/llm/wire/capability-gating.js";
 import {
   bodyAt,
   createSuccessfulChatResponse,
@@ -23,17 +23,17 @@ import {
   ONE_PIXEL_PNG,
   sseResponse,
 } from "../openai-compatible-test-helpers.js";
-import { ZaiCodingPlanProvider, ZaiProvider } from "./index.js";
+import { ZaiCodingPlanProvider, ZaiProvider } from "../../../../src/llm/providers/zai/index.js";
 import {
   LLMInvalidResponseError,
   LLMFundsError,
   LLMProviderError,
   LLMRateLimitError,
   LLMStreamTruncatedError,
-} from "../../errors.js";
-import { StreamModelError } from "../../../phases/stream-model.js";
-import { isRetryableStreamError } from "../../../session/run-turn-stream-retry.js";
-import { FallbackTriggeredError, isTransientProviderError } from "../../../recovery/api-errors.js";
+} from "../../../../src/llm/errors.js";
+import { StreamModelError } from "../../../../src/phases/stream-model.js";
+import { isRetryableStreamError } from "../../../../src/session/run-turn-stream-retry.js";
+import { FallbackTriggeredError, isTransientProviderError } from "../../../../src/recovery/api-errors.js";
 
 const successfulChat = createSuccessfulChatResponse("chatcmpl_zai");
 

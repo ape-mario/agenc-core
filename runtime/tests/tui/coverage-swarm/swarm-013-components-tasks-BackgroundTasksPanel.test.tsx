@@ -3,10 +3,10 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createRoot } from '../ink.js'
-import { getInkInstance } from '../ink/instances.js'
-import { cellAt } from '../ink/screen.js'
-import { renderToString } from '../../utils/staticRender.js'
+import { createRoot } from '../../../src/tui/ink.js'
+import { getInkInstance } from '../../../src/tui/ink/instances.js'
+import { cellAt } from '../../../src/tui/ink/screen.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 
 const appStateMock = vi.hoisted(() => ({
   state: { tasks: {} as Record<string, unknown> },
@@ -38,18 +38,18 @@ type TestStdin = PassThrough & {
   unref: () => void
 }
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof appStateMock.state) => unknown) =>
     selector(appStateMock.state),
   useSetAppState: () => appStateMock.setAppState,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => terminalSizeMock.size,
 }))
 
-vi.mock('../ink.js', async () => {
-  const actual = await vi.importActual<typeof import('../ink.js')>('../ink.js')
+vi.mock('../../../src/tui/ink.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/tui/ink.js')>('../../../src/tui/ink.js')
   return {
     ...actual,
     useInput: (
@@ -60,30 +60,30 @@ vi.mock('../ink.js', async () => {
   }
 })
 
-vi.mock('../../tasks/LocalShellTask/killShellTasks.js', () => ({
+vi.mock('../../../src/tasks/LocalShellTask/killShellTasks.js', () => ({
   killTask: killTaskMock,
 }))
 
-vi.mock('../../tasks/LocalAgentTask/LocalAgentTask.js', () => ({
+vi.mock('../../../src/tasks/LocalAgentTask/LocalAgentTask.js', () => ({
   killAsyncAgent: killAsyncAgentMock,
 }))
 
-vi.mock('../../tasks/InProcessTeammateTask/InProcessTeammateTask.js', () => ({
+vi.mock('../../../src/tasks/InProcessTeammateTask/InProcessTeammateTask.js', () => ({
   requestTeammateShutdown: requestTeammateShutdownMock,
 }))
 
-vi.mock('../../utils/fsOperations.js', async (importOriginal) => {
+vi.mock('../../../src/utils/fsOperations.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../../utils/fsOperations.js')>()
+    await importOriginal<typeof import('../../../src/utils/fsOperations.js')>()
   return {
     ...actual,
     tailFile: tailFileMock,
   }
 })
 
-vi.mock('../../utils/task/diskOutput.js', async (importOriginal) => {
+vi.mock('../../../src/utils/task/diskOutput.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../../utils/task/diskOutput.js')>()
+    await importOriginal<typeof import('../../../src/utils/task/diskOutput.js')>()
   return {
     ...actual,
     getTaskOutputPath: getTaskOutputPathMock,
@@ -229,7 +229,7 @@ describe('BackgroundTasksPanel swarm row 013', () => {
     }
 
     const { BackgroundTasksPanel } = await import(
-      '../components/tasks/BackgroundTasksPanel.js'
+      '../../../src/tui/components/tasks/BackgroundTasksPanel.js'
     )
 
     const output = await renderToString(<BackgroundTasksPanel />, 132)
@@ -269,7 +269,7 @@ describe('BackgroundTasksPanel swarm row 013', () => {
     }
 
     const { BackgroundTasksPanel } = await import(
-      '../components/tasks/BackgroundTasksPanel.js'
+      '../../../src/tui/components/tasks/BackgroundTasksPanel.js'
     )
 
     const output = await renderToString(
@@ -311,7 +311,7 @@ describe('BackgroundTasksPanel swarm row 013', () => {
 
     try {
       const { BackgroundTasksPanel } = await import(
-        '../components/tasks/BackgroundTasksPanel.js'
+        '../../../src/tui/components/tasks/BackgroundTasksPanel.js'
       )
 
       root.render(<BackgroundTasksPanel initialDetailTaskId="shell-with-result" />)
@@ -343,7 +343,7 @@ describe('BackgroundTasksPanel swarm row 013', () => {
     }
 
     const { BackgroundTasksPanel } = await import(
-      '../components/tasks/BackgroundTasksPanel.js'
+      '../../../src/tui/components/tasks/BackgroundTasksPanel.js'
     )
 
     const output = await renderToString(
@@ -389,7 +389,7 @@ describe('BackgroundTasksPanel swarm row 013', () => {
     }
 
     const { BackgroundTasksPanel } = await import(
-      '../components/tasks/BackgroundTasksPanel.js'
+      '../../../src/tui/components/tasks/BackgroundTasksPanel.js'
     )
 
     const output = await renderToString(

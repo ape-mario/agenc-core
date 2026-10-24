@@ -34,13 +34,13 @@ import {
   recoverCsvOutputIntents,
   writeCsvOutput,
   type CsvOutputIntentStore,
-} from "./csv-output.js";
+} from "../../../src/agents/jobs/csv-output.js";
 import {
   __csvOutputWindowsAclMasksForTesting,
   __setCsvOutputAfterFirstWriterAnchorForTesting,
   csvOutputWriterAnchorPaths,
   establishCsvOutputWriterAnchorsSync,
-} from "./csv-output-writer-anchor.js";
+} from "../../../src/agents/jobs/csv-output-writer-anchor.js";
 
 let root: string;
 

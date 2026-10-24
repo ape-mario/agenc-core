@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { todosCommand } from "./todos.js";
-import { getSessionId } from "../bootstrap/state.js";
-import type { SlashCommandContext } from "./types.js";
+import { todosCommand } from "../../src/commands/todos.js";
+import { getSessionId } from "../../src/bootstrap/state.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function makeCtx(
   appState?: SlashCommandContext["appState"],

@@ -3,13 +3,13 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import type { PrReviewState } from '../../utils/ghPrStatus.js'
-import { getTheme } from '../../utils/theme.js'
-import type { DOMElement } from '../ink/dom.js'
-import instances from '../ink/instances.js'
-import { createRoot } from '../ink/root.js'
-import { squashTextNodesToSegments } from '../ink/squash-text-nodes.js'
-import { PrBadge } from './PrBadge.js'
+import type { PrReviewState } from '../../../src/utils/ghPrStatus.js'
+import { getTheme } from '../../../src/utils/theme.js'
+import type { DOMElement } from '../../../src/tui/ink/dom.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { squashTextNodesToSegments } from '../../../src/tui/ink/squash-text-nodes.js'
+import { PrBadge } from '../../../src/tui/components/PrBadge.js'
 
 type TestStdin = PassThrough & {
   isTTY: boolean

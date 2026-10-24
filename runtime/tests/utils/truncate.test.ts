@@ -5,7 +5,7 @@ import {
   truncateMiddleToWidth,
   truncatePathMiddle,
   truncateToWidth,
-} from './truncate.js'
+} from '../../src/utils/truncate.js'
 
 describe('truncate utilities', () => {
   test('truncate returns empty string for undefined input', () => {

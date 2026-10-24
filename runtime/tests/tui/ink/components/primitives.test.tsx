@@ -3,15 +3,15 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import { renderToAnsiString, renderToString } from "../../../utils/staticRender.js";
-import type { DOMElement } from "../dom.ts";
-import instances from "../instances.ts";
-import { createRoot } from "../root.ts";
-import ErrorOverview from "./ErrorOverview.js";
-import Newline from "./Newline.js";
-import { RawAnsi } from "./RawAnsi.js";
-import Spacer from "./Spacer.js";
-import Text from "./Text.js";
+import { renderToAnsiString, renderToString } from "../../../../src/utils/staticRender.js";
+import type { DOMElement } from "../../../../src/tui/ink/dom.js";
+import instances from "../../../../src/tui/ink/instances.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import ErrorOverview from "../../../../src/tui/ink/components/ErrorOverview.js";
+import Newline from "../../../../src/tui/ink/components/Newline.js";
+import { RawAnsi } from "../../../../src/tui/ink/components/RawAnsi.js";
+import Spacer from "../../../../src/tui/ink/components/Spacer.js";
+import Text from "../../../../src/tui/ink/components/Text.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

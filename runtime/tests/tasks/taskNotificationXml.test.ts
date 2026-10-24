@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { buildTaskNotificationXml } from "./taskNotificationXml.js";
-import type { AppState } from "../tui/state/AppState.js";
-import { enqueuePendingNotification } from "../utils/messageQueueManager.js";
-import { enqueueAgentNotification } from "./LocalAgentTask/LocalAgentTask.js";
-import { getSessionId, switchSession } from "../bootstrap/state.js";
+import { buildTaskNotificationXml } from "../../src/tasks/taskNotificationXml.js";
+import type { AppState } from "../../src/tui/state/AppState.js";
+import { enqueuePendingNotification } from "../../src/utils/messageQueueManager.js";
+import { enqueueAgentNotification } from "../../src/tasks/LocalAgentTask/LocalAgentTask.js";
+import { getSessionId, switchSession } from "../../src/bootstrap/state.js";
 
-vi.mock("../services/PromptSuggestion/speculation.js", () => ({
+vi.mock("../../src/services/PromptSuggestion/speculation.js", () => ({
   abortSpeculation: vi.fn(),
 }));
 
-vi.mock("../utils/messageQueueManager.js", () => ({
+vi.mock("../../src/utils/messageQueueManager.js", () => ({
   enqueuePendingNotification: vi.fn(),
 }));
 

@@ -29,15 +29,15 @@ vi.mock("child_process", async (importOriginal) => {
   };
 });
 
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: logMock.logError,
 }));
 
 // Default a playback backend for every controller in this file, including
 // direct createRealtimeTuiControls calls that skip createControls. Host
 // probing stays opt-in through hostProbe.allow.
-vi.mock("./controller.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./controller.js")>();
+vi.mock("../../../src/tui/realtime/controller.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/tui/realtime/controller.js")>();
   return {
     ...actual,
     createRealtimeTuiControls(
@@ -63,22 +63,22 @@ import {
   createRealtimeWebrtcEventChannel,
   RealtimeWebrtcSessionHandle,
   type StartedRealtimeWebrtcSession,
-} from "../../conversation/realtime/webrtc/lib.js";
+} from "../../../src/conversation/realtime/webrtc/lib.js";
 import type {
   AgenCDaemonMethod,
   AgenCDaemonResultByMethod,
   JsonObject,
   ThreadRealtimeAudioChunk,
-} from "../../app-server/protocol/index.js";
+} from "../../../src/app-server/protocol/index.js";
 import type {
   RealtimeAudioCaptureCallbacks,
   RealtimeAudioPlayer,
   StartRealtimeAudioCapture,
-} from "./audio.js";
+} from "../../../src/tui/realtime/audio.js";
 import {
   createRealtimeTuiControls,
   type CreateRealtimeTuiControlsOptions,
-} from "./controller.js";
+} from "../../../src/tui/realtime/controller.js";
 import { createFailedSpawnChild } from "../../helpers/failed-spawn-child.js";
 
 function createControls(

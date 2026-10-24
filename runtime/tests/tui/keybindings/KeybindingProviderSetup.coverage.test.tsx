@@ -3,14 +3,14 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import Text from "../ink/components/Text.js";
-import { createRoot } from "../ink/root.js";
+import Text from "../../../src/tui/ink/components/Text.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
 import {
   useKeybindingContext,
   useRegisterKeybindingContext,
-} from "./KeybindingContext.js";
-import { KeybindingSetup } from "./KeybindingProviderSetup.js";
-import { parseBindings } from "./parser.js";
+} from "../../../src/tui/keybindings/KeybindingContext.js";
+import { KeybindingSetup } from "../../../src/tui/keybindings/KeybindingProviderSetup.js";
+import { parseBindings } from "../../../src/tui/keybindings/parser.js";
 
 const inputHandlers = vi.hoisted(() => [] as unknown[]);
 const addNotification = vi.hoisted(() => vi.fn());
@@ -28,24 +28,24 @@ const subscribeToKeybindingChanges = vi.hoisted(() =>
   }),
 );
 
-vi.mock("../ink.js", () => ({
+vi.mock("../../../src/tui/ink.js", () => ({
   useInput: (handler: unknown) => {
     inputHandlers.push(handler);
   },
 }));
 
-vi.mock("../context/notifications.js", () => ({
+vi.mock("../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({
     addNotification,
     removeNotification,
   }),
 }));
 
-vi.mock("../../utils/debug.js", () => ({
+vi.mock("../../../src/utils/debug.js", () => ({
   logForDebugging: () => {},
 }));
 
-vi.mock("./loadUserBindings.js", () => ({
+vi.mock("../../../src/tui/keybindings/loadUserBindings.js", () => ({
   initializeKeybindingSubscription,
   loadKeybindingsSyncWithWarnings,
   subscribeToKeybindingChanges,

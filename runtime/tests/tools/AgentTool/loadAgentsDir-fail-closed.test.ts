@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 afterEach(() => {
-  vi.doUnmock('../../utils/markdownConfigLoader.js')
+  vi.doUnmock('../../../src/utils/markdownConfigLoader.js')
   vi.unstubAllEnvs()
   vi.resetModules()
 })
@@ -39,16 +39,16 @@ describe('agent markdown discovery failures', () => {
       },
       { cache: { clear: vi.fn() } },
     )
-    vi.doMock('../../utils/markdownConfigLoader.js', () => ({
+    vi.doMock('../../../src/utils/markdownConfigLoader.js', () => ({
       loadMarkdownFilesForSubdir: rejectedLoader,
       loadMarkdownFilesForSubdirFresh: rejectedLoader,
     }))
 
     try {
       const [{ ConfigStore }, authorityModule, agentModule] = await Promise.all([
-        import('../../config/store.js'),
-        import('../../utils/settings/canonicalAuthority.js'),
-        import('./loadAgentsDir.js'),
+        import('../../../src/config/store.js'),
+        import('../../../src/utils/settings/canonicalAuthority.js'),
+        import('../../../src/tools/AgentTool/loadAgentsDir.js'),
       ])
       const authority = new ConfigStore({
         home: homeA,

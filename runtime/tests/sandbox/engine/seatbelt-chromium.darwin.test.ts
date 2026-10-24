@@ -5,13 +5,13 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { restrictedFileSystemPolicy } from "./index.js";
+import { restrictedFileSystemPolicy } from "../../../src/sandbox/engine/index.js";
 import {
   MACOS_PATH_TO_SEATBELT_EXECUTABLE,
   chromiumBundleIdentifier,
   createSeatbeltCommandArgs,
   darwinUserTempDir,
-} from "./seatbelt.js";
+} from "../../../src/sandbox/engine/seatbelt.js";
 
 // macOS only: listed in DARWIN_ONLY_DEFAULT_TEST_FILES, so other platforms
 // never discover it and nothing is skipped there.

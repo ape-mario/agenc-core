@@ -2,11 +2,11 @@ import { describe, expect, test, vi } from 'vitest'
 
 // REPL primitives are only consulted when a tool is missing from `tools`; our
 // fixtures always include the tool, but stub it to avoid pulling the real tree.
-vi.mock('../../tools/REPLTool/primitiveTools.js', () => ({
+vi.mock('../../../src/tools/REPLTool/primitiveTools.js', () => ({
   getReplPrimitiveTools: () => [],
 }))
 
-import { collapseReadSearchGroups } from '../../utils/collapseReadSearch.js'
+import { collapseReadSearchGroups } from '../../../src/utils/collapseReadSearch.js'
 
 // A minimal tool whose absence of `isSearchOrReadCommand` makes the collapser
 // treat it as a non-collapsible tool use (exactly like the real Edit tool for

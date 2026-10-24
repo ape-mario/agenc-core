@@ -6,8 +6,8 @@ import {
   resolveProviderApiKeyEnvironment,
   resolveProviderBaseURLEnvironment,
   resolveProviderCredentialEnvironment,
-} from "./provider-ingress.js";
-import { BUILT_IN_PROVIDER_DEFINITIONS } from "./provider-info.js";
+} from "../../../src/llm/registry/provider-ingress.js";
+import { BUILT_IN_PROVIDER_DEFINITIONS } from "../../../src/llm/registry/provider-info.js";
 
 describe("provider environment ingress", () => {
   it("resolves every declared key and endpoint alias", () => {

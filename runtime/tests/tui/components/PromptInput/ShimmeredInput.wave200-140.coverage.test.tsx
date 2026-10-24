@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { HighlightedInput } from './ShimmeredInput.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { HighlightedInput } from '../../../../src/tui/components/PromptInput/ShimmeredInput.js'
 
 describe('HighlightedInput coverage', () => {
   test('renders plain, highlighted, shimmered, and empty input lines', async () => {

@@ -7,14 +7,14 @@ import {
   statusLineGroupWidth,
   type PlacedStatusLineFact,
   type StatusLineFact,
-} from "./statusLineLayout.js";
+} from "../../../src/tui/components/statusLineLayout.js";
 import {
   statusLineLeftFacts,
   statusLineRightFacts,
   statusLineSegments,
   statusLineUsageItems,
-} from "./FullscreenLayout.js";
-import type { ZeroDataRetentionStatus } from "../../llm/zero-data-retention.js";
+} from "../../../src/tui/components/FullscreenLayout.js";
+import type { ZeroDataRetentionStatus } from "../../../src/llm/zero-data-retention.js";
 
 const WIDTHS = [160, 120, 100, 80, 60, 50, 40] as const;
 const RETAINED: ZeroDataRetentionStatus = { provider: "deepseek", state: "retained", reason: "DeepSeek keeps input." };

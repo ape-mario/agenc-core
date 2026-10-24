@@ -1,25 +1,25 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { AppStateProvider } from '../../state/AppState.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { AppStateProvider } from '../../../../src/tui/state/AppState.js'
 import {
   RejectedPlanMessage,
   RejectedToolUseMessage,
   UserImageMessage,
   UserToolCanceledMessage,
-} from './messagePrimitives.js'
+} from '../../../../src/tui/components/v2/messagePrimitives.js'
 
 const imageHarness = vi.hoisted(() => ({
   hyperlinks: false,
   storedPath: null as string | null,
 }))
 
-vi.mock('../../../utils/imageStore.js', () => ({
+vi.mock('../../../../src/utils/imageStore.js', () => ({
   getStoredImagePath: () => imageHarness.storedPath,
 }))
 
-vi.mock('../../ink/supports-hyperlinks.js', () => ({
+vi.mock('../../../../src/tui/ink/supports-hyperlinks.js', () => ({
   supportsHyperlinks: () => imageHarness.hyperlinks,
 }))
 

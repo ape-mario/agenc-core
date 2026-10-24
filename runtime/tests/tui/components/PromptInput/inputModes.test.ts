@@ -5,7 +5,7 @@ import {
   getValueFromInput,
   isInputModeCharacter,
   prependModeCharacterToInput,
-} from './inputModes.js'
+} from '../../../../src/tui/components/PromptInput/inputModes.js'
 
 describe('inputModes', () => {
   describe('getModeFromInput', () => {

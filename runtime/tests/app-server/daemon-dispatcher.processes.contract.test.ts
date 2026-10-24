@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
-import { AGENC_DAEMON_PROTOCOL_VERSION } from "./protocol/index.js";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
+import { AGENC_DAEMON_PROTOCOL_VERSION } from "../../src/app-server/protocol/index.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 
 describe("daemon background process controls", () => {
   it("validates opaque task parameters before dispatching a stop", async () => {

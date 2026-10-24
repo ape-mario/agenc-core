@@ -13,10 +13,10 @@ import {
   OFFICIAL_MARKETPLACE_NAME,
   OFFICIAL_MARKETPLACE_REFRESH_MS,
   OFFICIAL_MARKETPLACE_URL,
-} from "./catalog-cli.js";
-import { addMarketplaceOp, upgradeMarketplaceOp, readMarketplaceIndex } from "./marketplace.js";
-import { pluginSignaturePayloadBytes } from "../resolution.js";
-import { pluginListWithCatalog } from "../cli/pluginCliCommands.js";
+} from "../../../src/plugins/marketplace/catalog-cli.js";
+import { addMarketplaceOp, upgradeMarketplaceOp, readMarketplaceIndex } from "../../../src/plugins/marketplace/marketplace.js";
+import { pluginSignaturePayloadBytes } from "../../../src/plugins/resolution.js";
+import { pluginListWithCatalog } from "../../../src/plugins/cli/pluginCliCommands.js";
 
 async function tempRuntime(): Promise<{
   readonly root: string;
@@ -272,7 +272,7 @@ describe("marketplace catalog CLI surface", () => {
     const digest = first.marketplaces[0]?.plugins[0]?.payloadDigest;
     expect(digest).toMatch(/^sha256:/u);
     vi.resetModules();
-    const fresh = await import("./catalog-cli.js");
+    const fresh = await import("../../../src/plugins/marketplace/catalog-cli.js");
     const second = await fresh.buildMarketplaceCatalog(options, undefined, true);
     expect(second.marketplaces[0]?.plugins[0]?.payloadDigest).toBe(digest);
     expect(fetches()).toBe(2);
@@ -285,7 +285,7 @@ describe("marketplace catalog CLI surface", () => {
     const display = await buildMarketplaceCatalog(runtime);
     expect(display.marketplaces[0]?.plugins[0]?.payloadDigest).toBeUndefined();
     vi.resetModules();
-    const fresh = await import("./catalog-cli.js");
+    const fresh = await import("../../../src/plugins/marketplace/catalog-cli.js");
     expect((await fresh.buildMarketplaceCatalog(runtime, undefined, true)).marketplaces[0]?.plugins[0]?.payloadDigest)
       .toBeUndefined();
     expect(fetches()).toBe(1);
@@ -380,7 +380,7 @@ describe("marketplace catalog CLI surface", () => {
     }));
     requests.length = 0;
     vi.resetModules();
-    const fresh = await import("./catalog-cli.js");
+    const fresh = await import("../../../src/plugins/marketplace/catalog-cli.js");
     const second = await fresh.buildMarketplaceCatalog(catalogOptions, undefined, true);
     expect(requests).toContain(manifestUrlB);
     expect(second.marketplaces[0]?.plugins[0]?.payloadDigest).toBeDefined();
@@ -415,7 +415,7 @@ describe("marketplace catalog CLI surface", () => {
     }));
     requests.length = 0;
     vi.resetModules();
-    const fresh = await import("./catalog-cli.js");
+    const fresh = await import("../../../src/plugins/marketplace/catalog-cli.js");
     const second = await fresh.buildMarketplaceCatalog(options, undefined, true);
     expect(requests).toContain(url(pinB));
     expect(second.marketplaces[0]?.plugins[0]?.payloadDigest).toBeDefined();
@@ -436,7 +436,7 @@ describe("marketplace catalog CLI surface", () => {
     await rm(join(options.root, "private", "plugin-adverts", "binding-key"), { force: true });
     offline = true;
     vi.resetModules();
-    const fresh = await import("./catalog-cli.js");
+    const fresh = await import("../../../src/plugins/marketplace/catalog-cli.js");
     for (let poll = 0; poll < 3; poll++) {
       const result = await fresh.buildMarketplaceCatalog(runtime, undefined, true);
       expect(result.marketplaces[0]?.plugins[0]?.payloadDigest).toBeUndefined();
@@ -455,7 +455,7 @@ describe("marketplace catalog CLI surface", () => {
     expect(requests).toHaveLength(2);
     await rm(join(options.root, "private", "plugin-adverts", "binding-key"), { force: true });
     vi.resetModules();
-    const fresh = await import("./catalog-cli.js");
+    const fresh = await import("../../../src/plugins/marketplace/catalog-cli.js");
     now = start + OFFICIAL_MARKETPLACE_REFRESH_MS - 1000;
     expect((await fresh.buildMarketplaceCatalog(runtime, undefined, true)).marketplaces[0]?.plugins[0]?.payloadDigest)
       .toMatch(/^sha256:/u);
@@ -543,9 +543,9 @@ describe("marketplace catalog CLI surface", () => {
     await rm(join(options.root, "private", "plugin-adverts", "binding-key"), { force: true });
     offline = true;
     vi.resetModules();
-    const first = await import("./catalog-cli.js");
+    const first = await import("../../../src/plugins/marketplace/catalog-cli.js");
     vi.resetModules();
-    const second = await import("./catalog-cli.js");
+    const second = await import("../../../src/plugins/marketplace/catalog-cli.js");
     await Promise.all([first.buildMarketplaceCatalog(runtime, undefined, true),
       second.buildMarketplaceCatalog(runtime, undefined, true)]);
     expect(attempts).toBe(1);
@@ -567,7 +567,7 @@ describe("marketplace catalog CLI surface", () => {
     await rm(join(options.root, "private", "plugin-adverts", "binding-key"), { force: true });
     offline = true;
     vi.resetModules();
-    const fresh = await import("./catalog-cli.js");
+    const fresh = await import("../../../src/plugins/marketplace/catalog-cli.js");
     await fresh.buildMarketplaceCatalog(runtime, undefined, true);
     expect(requests).toHaveLength(2);
     for (let window = 0; window < 3; window++) {
@@ -606,7 +606,7 @@ describe("marketplace catalog CLI surface", () => {
     await rm(join(options.root, "private", "plugin-adverts", "binding-key"), { force: true });
     recovering = true;
     vi.resetModules();
-    const first = await import("./catalog-cli.js");
+    const first = await import("../../../src/plugins/marketplace/catalog-cli.js");
     const firstPoll = first.buildMarketplaceCatalog(runtime, undefined, true);
     await firstFetchStarted;
 
@@ -629,7 +629,7 @@ describe("marketplace catalog CLI surface", () => {
     });
     try {
       vi.resetModules();
-      const second = await import("./catalog-cli.js");
+      const second = await import("../../../src/plugins/marketplace/catalog-cli.js");
       const secondPoll = second.buildMarketplaceCatalog(runtime, undefined, true);
       await secondObserved;
       unblockFirstFetch();
@@ -643,7 +643,7 @@ describe("marketplace catalog CLI surface", () => {
       vi.resetModules();
     }
     await rm(join(options.root, "private", "plugin-adverts", "binding-key"), { force: true });
-    const third = await import("./catalog-cli.js");
+    const third = await import("../../../src/plugins/marketplace/catalog-cli.js");
     await third.buildMarketplaceCatalog(runtime, undefined, true);
     expect(recoveryRequests).toBe(2);
   });
@@ -663,7 +663,7 @@ describe("marketplace catalog CLI surface", () => {
     now += OFFICIAL_MARKETPLACE_REFRESH_MS + 1;
     offline = true;
     vi.resetModules();
-    const fresh = await import("./catalog-cli.js");
+    const fresh = await import("../../../src/plugins/marketplace/catalog-cli.js");
     const expired = await fresh.buildMarketplaceCatalog(runtime, undefined, true);
     expect(expired.marketplaces[0]?.plugins[0]?.payloadDigest).toBe(digest);
     expect(fetches()).toBe(2);
@@ -742,13 +742,13 @@ describe("marketplace catalog CLI surface", () => {
     now += OFFICIAL_MARKETPLACE_REFRESH_MS + 1;
     holdRefresh = true;
     vi.resetModules();
-    const first = await import("./catalog-cli.js");
+    const first = await import("../../../src/plugins/marketplace/catalog-cli.js");
     const inFlight = first.buildMarketplaceCatalog(runtime, undefined, true, false, selected("remote-0"));
     await started;
     try {
       await buildMarketplaceCatalog(runtime, undefined, true, false, selected("remote-128"));
       vi.resetModules();
-      const second = await import("./catalog-cli.js");
+      const second = await import("../../../src/plugins/marketplace/catalog-cli.js");
       await second.buildMarketplaceCatalog(runtime, undefined, true, false, selected("remote-0"));
       expect(aRequests).toBe(1);
       const retained = JSON.parse(await readFile(sidecarPath, "utf8"));

@@ -15,7 +15,7 @@ import {
   SandboxManager,
   restrictedFileSystemPolicy,
   unrestrictedFileSystemPolicy,
-} from "./index.js";
+} from "../../../src/sandbox/engine/index.js";
 import {
   MACOS_PATH_TO_SEATBELT_EXECUTABLE,
   MACOS_SEATBELT_CHROMIUM_BUNDLE_POLICY,
@@ -26,7 +26,7 @@ import {
   createSeatbeltCommandArgs,
   darwinUserTempDir,
   seatbeltRegexForUnreadableGlob,
-} from "./seatbelt.js";
+} from "../../../src/sandbox/engine/seatbelt.js";
 
 const TEST_SESSION_TEMP_ROOT = "/tmp/agenc-seatbelt-session-root";
 

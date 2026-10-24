@@ -3,14 +3,14 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import { createRoot, type Root } from "../ink/root.js";
+import { createRoot, type Root } from "../../../src/tui/ink/root.js";
 import {
   adaptTranscriptEvents,
   formatStructuredToolResult,
   useSessionTranscript,
   type AdaptedTranscript,
   type SessionTranscriptEvent,
-} from "../session-transcript.js";
+} from "../../../src/tui/session-transcript.js";
 
 function evt(
   id: string,

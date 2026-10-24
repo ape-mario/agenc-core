@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { toTombstoneUserMessage, tombstoneOrphans } from "./tombstone.js";
-import type { TurnState } from "../session/turn-state.js";
+import { toTombstoneUserMessage, tombstoneOrphans } from "../../src/recovery/tombstone.js";
+import type { TurnState } from "../../src/session/turn-state.js";
 
 function mkState(): TurnState {
   return {

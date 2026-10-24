@@ -56,16 +56,16 @@ vi.mock('usehooks-ts', async () => {
   }
 })
 
-vi.mock('../context/notifications.js', () => ({
+vi.mock('../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => ({ addNotification: harness.addNotification }),
 }))
 
-vi.mock('../context/overlayContext', () => ({
+vi.mock('../../../src/tui/context/overlayContext.js', () => ({
   useIsModalOverlayActive: () => false,
   useRegisterOverlay: vi.fn(),
 }))
 
-vi.mock('../ink.js', async () => {
+vi.mock('../../../src/tui/ink.js', async () => {
   const ReactModule = await import('react')
   return {
     Text: ({ children }: { readonly children?: React.ReactNode }) =>
@@ -74,63 +74,63 @@ vi.mock('../ink.js', async () => {
   }
 })
 
-vi.mock('../keybindings/KeybindingContext.js', () => ({
+vi.mock('../../../src/tui/keybindings/KeybindingContext.js', () => ({
   useOptionalKeybindingContext: () => ({ pendingChord: null }),
   useRegisterKeybindingContext: vi.fn(),
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybindings: (handlers: Record<string, () => unknown>) => {
     Object.assign(harness.keybindings, handlers)
   },
 }))
 
-vi.mock('../keybindings/useShortcutDisplay.js', () => ({
+vi.mock('../../../src/tui/keybindings/useShortcutDisplay.js', () => ({
   useShortcutDisplay: () => 'alt+t',
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
   useAppStateStore: () => ({ getState: () => harness.appState }),
 }))
 
-vi.mock('../../utils/agentSwarmsEnabled', () => ({
+vi.mock('../../../src/utils/agentSwarmsEnabled.js', () => ({
   isAgentSwarmsEnabled: () => Boolean(harness.appState.teamContext),
 }))
 
-vi.mock('../../utils/bash/shellCompletion.js', () => ({
+vi.mock('../../../src/utils/bash/shellCompletion.js', () => ({
   getShellCompletions: vi.fn(async () => []),
 }))
 
-vi.mock('../../utils/sessionStorage.js', () => ({
+vi.mock('../../../src/utils/sessionStorage.js', () => ({
   getSessionIdFromLog: (log: { readonly sessionId?: string }) =>
     log.sessionId ?? 'session-1',
   searchSessionsByCustomTitle: vi.fn(async () => []),
   writeAgentMetadata: vi.fn(async () => undefined),
 }))
 
-vi.mock('../../utils/suggestions/directoryCompletion.js', () => ({
+vi.mock('../../../src/utils/suggestions/directoryCompletion.js', () => ({
   getDirectoryCompletions: vi.fn(async () => []),
   getPathCompletions: vi.fn(async () => []),
   isPathLikeToken: (token: string) =>
     token.startsWith('/') || token.startsWith('./') || token.startsWith('~/'),
 }))
 
-vi.mock('../../utils/suggestions/shellHistoryCompletion.js', () => ({
+vi.mock('../../../src/utils/suggestions/shellHistoryCompletion.js', () => ({
   getShellHistoryCompletion: vi.fn(async () => null),
 }))
 
-vi.mock('../../utils/suggestions/slackChannelSuggestions.js', () => ({
+vi.mock('../../../src/utils/suggestions/slackChannelSuggestions.js', () => ({
   getSlackChannelSuggestions: vi.fn(async () => []),
   hasSlackMcpServer: () => false,
 }))
 
-vi.mock('../../utils/swarm/constants.js', () => ({
+vi.mock('../../../src/utils/swarm/constants.js', () => ({
   TEAM_LEAD_NAME: 'team-lead',
 }))
 
-vi.mock('./fileSuggestions', () => ({
+vi.mock('../../../src/tui/hooks/fileSuggestions.js', () => ({
   applyFileSuggestion: (
     replacementValue: string,
     input: string,
@@ -152,13 +152,13 @@ vi.mock('./fileSuggestions', () => ({
   startBackgroundCacheRefresh: vi.fn(),
 }))
 
-vi.mock('./unifiedSuggestions', () => ({
+vi.mock('../../../src/tui/hooks/unifiedSuggestions.js', () => ({
   generateUnifiedSuggestions: vi.fn(async () => []),
 }))
 
-import { createRoot } from '../ink/root.js'
-import type { SuggestionItem } from '../components/PromptInput/PromptInputFooterSuggestions.js'
-import { useTypeahead } from './useTypeahead.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { SuggestionItem } from '../../../src/tui/components/PromptInput/PromptInputFooterSuggestions.js'
+import { useTypeahead } from '../../../src/tui/hooks/useTypeahead.js'
 
 type SuggestionsState = {
   commandArgumentHint?: string

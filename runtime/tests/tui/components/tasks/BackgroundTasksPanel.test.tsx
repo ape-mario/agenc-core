@@ -1,7 +1,7 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 
 const appStateMock = vi.hoisted(() => ({
   state: { tasks: {} as Record<string, unknown> },
@@ -22,19 +22,19 @@ const killTaskMock = vi.hoisted(() => vi.fn())
 const killAsyncAgentMock = vi.hoisted(() => vi.fn())
 const requestTeammateShutdownMock = vi.hoisted(() => vi.fn())
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof appStateMock.state) => unknown) =>
     selector(appStateMock.state),
   useSetAppState: () => appStateMock.setAppState,
 }))
 
-vi.mock('../../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => terminalSizeMock.size,
 }))
 
-vi.mock('../../ink.js', async () => {
-  const actual = await vi.importActual<typeof import('../../ink.js')>(
-    '../../ink.js',
+vi.mock('../../../../src/tui/ink.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/tui/ink.js')>(
+    '../../../../src/tui/ink.js',
   )
   return {
     ...actual,
@@ -46,15 +46,15 @@ vi.mock('../../ink.js', async () => {
   }
 })
 
-vi.mock('../../../tasks/LocalShellTask/killShellTasks.js', () => ({
+vi.mock('../../../../src/tasks/LocalShellTask/killShellTasks.js', () => ({
   killTask: killTaskMock,
 }))
 
-vi.mock('../../../tasks/LocalAgentTask/LocalAgentTask.js', () => ({
+vi.mock('../../../../src/tasks/LocalAgentTask/LocalAgentTask.js', () => ({
   killAsyncAgent: killAsyncAgentMock,
 }))
 
-vi.mock('../../../tasks/InProcessTeammateTask/InProcessTeammateTask.js', () => ({
+vi.mock('../../../../src/tasks/InProcessTeammateTask/InProcessTeammateTask.js', () => ({
   requestTeammateShutdown: requestTeammateShutdownMock,
 }))
 
@@ -133,7 +133,7 @@ describe('BackgroundTasksPanel', () => {
         outputTail: 'server ready on loopback', outputBytes: 24, stop: async () => {} },
     }) } }
     terminalSizeMock.size = { columns: 148, rows: 50 }
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
     const output = await renderToString(<BackgroundTasksPanel initialDetailTaskId="managed" />, 148)
     expect(output).toContain('server ready on loopback')
     expect(output).toContain('Stop failed: daemon disconnected')
@@ -147,7 +147,7 @@ describe('BackgroundTasksPanel', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
 
     const output = await renderToString(
       <BackgroundTasksPanel initialDetailTaskId="b1" />,
@@ -170,7 +170,7 @@ describe('BackgroundTasksPanel', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
 
     const output = await renderToString(
       <BackgroundTasksPanel initialDetailTaskId="missing-task" />,
@@ -214,7 +214,7 @@ describe('BackgroundTasksPanel', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
     terminalSizeMock.size = { columns: 148, rows: 30 }
 
     const output = await renderToString(<BackgroundTasksPanel />, 148)
@@ -242,7 +242,7 @@ describe('BackgroundTasksPanel', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
 
     const output = await renderToString(
       <BackgroundTasksPanel initialDetailTaskId="r1" />,
@@ -276,7 +276,7 @@ describe('BackgroundTasksPanel', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
 
     const listOutput = await renderToString(<BackgroundTasksPanel />, 34)
     const detailOutput = await renderToString(
@@ -297,7 +297,7 @@ describe('BackgroundTasksPanel', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
 
     await renderToString(
       <BackgroundTasksPanel
@@ -322,7 +322,7 @@ describe('BackgroundTasksPanel', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
 
     const pendingShellOutput = await renderToString(
       <BackgroundTasksPanel initialDetailTaskId="b1" />,

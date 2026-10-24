@@ -3,18 +3,18 @@ import {
   dispatchPostCompact,
   dispatchPreCompact,
   dispatchSessionStart,
-} from "./dispatcher.js";
+} from "../../../src/llm/hooks/dispatcher.js";
 import {
   registerPostCompactHook,
   registerPreCompactHook,
   registerSessionStartHook,
   resetLifecycleHookRegistry,
-} from "./registry.js";
+} from "../../../src/llm/hooks/registry.js";
 import type {
   PostCompactHook,
   PreCompactHook,
   SessionStartHook,
-} from "./types.js";
+} from "../../../src/llm/hooks/types.js";
 
 const compactHookContext = {
   session_id: "session-test",

@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   resolvePinnedRipgrepPath,
   selectPinnedRipgrepPath,
-} from "./pinned-ripgrep.js";
+} from "../../../src/tools/system/pinned-ripgrep.js";
 
 const temporaryRoots: string[] = [];
 const runtimeRoot = fileURLToPath(new URL("../../..", import.meta.url));

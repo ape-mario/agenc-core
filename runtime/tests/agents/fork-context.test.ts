@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LLMMessage } from "../llm/types.js";
-import { buildCacheSafeParams, forkSubagent } from "./fork-context.js";
-import type { Session } from "../session/session.js";
+import type { LLMMessage } from "../../src/llm/types.js";
+import { buildCacheSafeParams, forkSubagent } from "../../src/agents/fork-context.js";
+import type { Session } from "../../src/session/session.js";
 import {
   createCsvAgentInvocationEnvelope,
   materializeAgentInvocationMessages,
-} from "../contracts/agent-invocation-envelope.js";
+} from "../../src/contracts/agent-invocation-envelope.js";
 
 function stubSession(
   rolloutStore: {

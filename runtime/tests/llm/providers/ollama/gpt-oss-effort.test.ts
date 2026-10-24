@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { OllamaProvider } from "./adapter.js";
+import { OllamaProvider } from "../../../../src/llm/providers/ollama/adapter.js";
 import type { LLMChatOptions, LLMMessage } from "../../../../src/llm/types.js";
 import { resolveReasoningEffort } from "../../../../src/llm/reasoning-effort.js";
 import { reasoningEffortAcceptedByModel } from "../../../../src/session/reasoning-effort-for-model.js";

@@ -8,22 +8,22 @@ import { sourcePath } from "../helpers/source-path.ts";
 import {
   bootstrapLocalRuntimeSession,
   type LocalRuntimeBootstrap,
-} from "./bootstrap.js";
-import type { Event } from "../session/event-log.js";
+} from "../../src/bin/bootstrap.js";
+import type { Event } from "../../src/session/event-log.js";
 import type {
   LLMMessage,
   LLMProvider,
   LLMResponse,
   LLMTool,
   LLMToolCall,
-} from "../llm/types.js";
-import type { PhaseEvent } from "../phases/events.js";
+} from "../../src/llm/types.js";
+import type { PhaseEvent } from "../../src/phases/events.js";
 import {
   approveProjectMcpServerSync,
   trustProjectSync,
-} from "../permissions/trust/project-trust.js";
-import { projectMcpServerApprovalDigest } from "../services/mcp/utils.js";
-import { runCommand } from "../utils/process.js";
+} from "../../src/permissions/trust/project-trust.js";
+import { projectMcpServerApprovalDigest } from "../../src/services/mcp/utils.js";
+import { runCommand } from "../../src/utils/process.js";
 
 const FIXTURE_PATH = sourcePath("mcp-client/test-fixtures/stdio-pid-server.cjs");
 const MCP_SERVER_NAME = "live";
@@ -221,7 +221,7 @@ async function expectLiveMcpEndToEnd(params: {
     seenToolNamesByCall,
     seenMessagesByCall,
   });
-  const providerMod = await import("../llm/provider.js");
+  const providerMod = await import("../../src/llm/provider.js");
   const createProviderSpy = vi
     .spyOn(providerMod, "createProvider")
     .mockReturnValue(provider as never);
@@ -468,7 +468,7 @@ describe("bootstrapLocalRuntimeSession deferred built-in tool discovery", () => 
 
     const seenToolNamesByCall: string[][] = [];
     const provider = makeBuiltinDiscoveryProvider({ seenToolNamesByCall, workspace });
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     vi.spyOn(providerMod, "createProvider").mockReturnValue(provider as never);
 
     let boot: LocalRuntimeBootstrap | null = null;

@@ -4,7 +4,7 @@ import {
   buildMessageSelectorFileHistoryMetadata,
   computeMessageOptionTextWidth,
   messagesAfterAreOnlySynthetic,
-} from './MessageSelector.js'
+} from '../../../src/tui/components/MessageSelector.js'
 
 describe('computeMessageOptionTextWidth', () => {
   it('clamps below-padding widths to one usable column', () => {

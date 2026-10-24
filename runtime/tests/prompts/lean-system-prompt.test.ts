@@ -6,10 +6,10 @@
  */
 import { describe, expect, test } from "vitest";
 
-import type { TurnContext } from "../session/turn-context.js";
-import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../tools/untrusted-tool-result-framing.js";
-import { assembleSystemPrompt } from "./system-prompt.js";
-import { LEAN_SYSTEM_PROMPT_ENV, leanSystemPromptEnabled } from "./lean-system-prompt.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../../src/tools/untrusted-tool-result-framing.js";
+import { assembleSystemPrompt } from "../../src/prompts/system-prompt.js";
+import { LEAN_SYSTEM_PROMPT_ENV, leanSystemPromptEnabled } from "../../src/prompts/lean-system-prompt.js";
 import {
   getSelectedProviderEnvironment,
   runWithStartupProviderSelection,

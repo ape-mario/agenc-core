@@ -5,7 +5,7 @@ import {
   LLMContextWindowExceededError,
   LLMRateLimitError,
   LLMServerError,
-} from "../errors.js";
+} from "../../../src/llm/errors.js";
 import {
   AgenCApiError,
   classifyApiError,
@@ -13,8 +13,8 @@ import {
   isMediaSizeError,
   mapAgenCApiErrorToLLMError,
   parsePromptTooLongTokenCounts,
-} from "./errors.js";
-import { AgenCApiError as CanonicalAgenCApiError } from "../../errors/api.js";
+} from "../../../src/llm/api/errors.js";
+import { AgenCApiError as CanonicalAgenCApiError } from "../../../src/errors/api.js";
 
 describe("llm api errors", () => {
   test("keeps the original message for Gemini daily request quota exhaustion", () => {

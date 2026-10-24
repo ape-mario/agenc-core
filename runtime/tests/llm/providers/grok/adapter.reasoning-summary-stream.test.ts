@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { LLMStreamTruncatedError } from "../../errors.js";
-import type { LLMStreamChunk } from "../../types.js";
-import { GrokProvider } from "./adapter.js";
+import { LLMStreamTruncatedError } from "../../../../src/llm/errors.js";
+import type { LLMStreamChunk } from "../../../../src/llm/types.js";
+import { GrokProvider } from "../../../../src/llm/providers/grok/adapter.js";
 import { StreamProgressError, StreamProgressTracker } from "../../../../src/llm/stream-progress.js";
 
 function buildXaiResponse(id: string, text: string): Record<string, unknown> {

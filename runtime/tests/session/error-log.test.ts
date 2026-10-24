@@ -2,9 +2,9 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { ErrorLogSidecar } from "./error-log.js";
-import type { Event } from "./event-log.js";
-import { StateSqliteReader } from "../state/sqlite-driver.js";
+import { ErrorLogSidecar } from "../../src/session/error-log.js";
+import type { Event } from "../../src/session/event-log.js";
+import { StateSqliteReader } from "../../src/state/sqlite-driver.js";
 
 describe("ErrorLogSidecar", () => {
   let project = "";
@@ -93,7 +93,7 @@ describe("ErrorLogSidecar", () => {
   });
 
   test("classifies internal diagnostics semantically instead of by one-off cause names", async () => {
-    const errorLog = await import("./error-log.js") as unknown as {
+    const errorLog = await import("../../src/session/error-log.js") as unknown as {
       classifyErrorLogEvent?: (event: Event) => {
         readonly persist: boolean;
         readonly reason?: string;

@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { defaultConfig } from "../config/schema.js";
-import type { AuthBackend, AuthProviderSlug, AuthSessionId, AuthSubscriptionTier } from "../auth/backend.js";
+import { defaultConfig } from "../../src/config/schema.js";
+import type { AuthBackend, AuthProviderSlug, AuthSessionId, AuthSubscriptionTier } from "../../src/auth/backend.js";
 import {
   collectProviderAvailability,
   formatAgenCProvidersCliHelpText,
   parseAgenCProvidersCliArgs,
   runAgenCProvidersCli,
   type AgenCProvidersCliIo,
-} from "./providers-cli.js";
+} from "../../src/bin/providers-cli.js";
 
 function createIo(): AgenCProvidersCliIo & {
   readonly stdoutText: () => string;

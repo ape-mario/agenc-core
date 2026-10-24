@@ -21,11 +21,11 @@ import {
   resolveIncludes,
   type TierEntry,
   type TieredInstructions,
-} from "./agenc-md.js";
+} from "../../src/prompts/agenc-md.js";
 import {
   ExternalInstructionApprovalStore,
   readInstructionFileSnapshot,
-} from "./secure-instruction-file.js";
+} from "../../src/prompts/secure-instruction-file.js";
 
 const POSIX = platform() !== "win32";
 const posixTest = POSIX ? test : test.skip;

@@ -30,38 +30,38 @@ vi.mock('fs/promises', () => ({
   writeFile: harness.writeFile,
 }))
 
-vi.mock('../../bootstrap/state.js', () => ({
+vi.mock('../../../src/bootstrap/state.js', () => ({
   getProjectRoot: () => '/workspace/project',
   getSessionId: () => 'session-current',
 }))
 
-vi.mock('../../utils/cleanupRegistry.js', () => ({
+vi.mock('../../../src/utils/cleanupRegistry.js', () => ({
   registerCleanup: harness.registerCleanup,
 }))
 
-vi.mock('../../utils/envUtils.js', () => ({
+vi.mock('../../../src/utils/envUtils.js', () => ({
   getAgenCHomeDir: () => '/tmp/agenc-home',
   isEnvTruthy: () => false,
 }))
 
-vi.mock('../../utils/lockfile.js', () => ({
+vi.mock('../../../src/utils/lockfile.js', () => ({
   lock: harness.lock,
 }))
 
-vi.mock('../../utils/pasteStore.js', () => ({
+vi.mock('../../../src/utils/pasteStore.js', () => ({
   hashPastedText: (content: string) => `hash:${content.length}`,
   retrievePastedText: vi.fn(),
   storePastedText: vi.fn(),
 }))
 
-vi.mock('../../utils/slowOperations.js', () => ({
+vi.mock('../../../src/utils/slowOperations.js', () => ({
   jsonParse: JSON.parse,
   jsonStringify: JSON.stringify,
 }))
 
-async function loadHistoryModule(): Promise<typeof import('./history.js')> {
+async function loadHistoryModule(): Promise<typeof import('../../../src/tui/history/history.js')> {
   vi.resetModules()
-  return import('./history.js')
+  return import('../../../src/tui/history/history.js')
 }
 
 async function waitFor(assertion: () => void): Promise<void> {

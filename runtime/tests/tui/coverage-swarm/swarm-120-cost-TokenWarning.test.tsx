@@ -18,7 +18,7 @@ vi.mock("bun:bundle", () => ({
   feature: (flag: string) => state.enabledFeatures.has(flag),
 }));
 
-vi.mock("../../services/compact/autoCompact.js", () => ({
+vi.mock("../../../src/services/compact/autoCompact.js", () => ({
   calculateTokenWarningStateForEnvironment: () => ({
     isAboveAutoCompactThreshold: state.autoCompactEnabled,
     isAboveErrorThreshold: state.errorThreshold,
@@ -30,20 +30,20 @@ vi.mock("../../services/compact/autoCompact.js", () => ({
   isAutoCompactEnabledForEnvironment: () => state.autoCompactEnabled,
 }));
 
-vi.mock("../../services/compact/compactWarningHook.js", () => ({
+vi.mock("../../../src/services/compact/compactWarningHook.js", () => ({
   useCompactWarningSuppression: () => state.suppressWarning,
 }));
 
-vi.mock("../../services/contextCollapse/index.js", () => ({
+vi.mock("../../../src/services/contextCollapse/index.js", () => ({
   isContextCollapseEnabled: () => state.collapseEnabled,
 }));
 
-vi.mock("../../llm/context-window-upgrade.js", () => ({
+vi.mock("../../../src/llm/context-window-upgrade.js", () => ({
   getUpgradeMessage: () => state.upgradeMessage,
 }));
 
-import { renderToString } from "../../utils/staticRender.js";
-import { TokenWarning } from "../cost/TokenWarning.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { TokenWarning } from "../../../src/tui/cost/TokenWarning.js";
 
 async function renderWarning(tokenUsage = 192_000): Promise<string> {
   return renderToString(

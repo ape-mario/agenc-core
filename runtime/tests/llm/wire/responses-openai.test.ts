@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
-import type { LLMMessage, LLMTool } from "../types.js";
-import { encodeMcpToolNameForWire } from "./mcp-tool-naming.js";
+import type { LLMMessage, LLMTool } from "../../../src/llm/types.js";
+import { encodeMcpToolNameForWire } from "../../../src/llm/wire/mcp-tool-naming.js";
 import {
   advertisedResponsesToolNames,
   buildOpenAIResponsesRequest,
   parseOpenAIResponsesResponse,
-} from "./responses-openai.js";
+} from "../../../src/llm/wire/responses-openai.js";
 
 const TEST_TOOLS: LLMTool[] = [
   {

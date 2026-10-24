@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   computeUnseenDivider,
   countUnseenAssistantTurns,
-} from "./FullscreenLayout.js";
+} from "../../../src/tui/components/FullscreenLayout.js";
 
 function assistantMessage(
   uuid: string,

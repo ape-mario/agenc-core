@@ -8,7 +8,7 @@ import {
   hasShownHintThisSession,
   markShownThisSession,
   setPendingHint,
-} from "./hints.js";
+} from "../../src/errors/hints.js";
 
 describe("AgenC code hints", () => {
   test("extracts supported hint tags and strips hint lines", () => {

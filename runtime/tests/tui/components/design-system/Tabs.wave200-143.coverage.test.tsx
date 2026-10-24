@@ -3,11 +3,11 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import type { DOMElement, DOMNode } from "../../ink/dom.js";
-import instances from "../../ink/instances.js";
-import { createRoot } from "../../ink/root.js";
-import { Text } from "../../ink.js";
-import { Tab, Tabs, useTabHeaderFocus } from "./Tabs.js";
+import type { DOMElement, DOMNode } from "../../../../src/tui/ink/dom.js";
+import instances from "../../../../src/tui/ink/instances.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { Text } from "../../../../src/tui/ink.js";
+import { Tab, Tabs, useTabHeaderFocus } from "../../../../src/tui/components/design-system/Tabs.js";
 
 const keybindingMock = vi.hoisted(() => ({
   registrations: [] as Array<{
@@ -16,7 +16,7 @@ const keybindingMock = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("../../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybindings: (
     handlers: Record<string, () => void>,
     options: { context?: string; isActive?: boolean },

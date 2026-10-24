@@ -19,24 +19,24 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createPluginMenuActions,
   pluginsCommand,
-} from "./plugins.js";
-import { PluginsMenuView } from "./plugins-menu.js";
-import type { SlashCommandContext } from "./types.js";
-import { parseToml } from "../config/loader.js";
-import { ConfigStore } from "../config/store.js";
-import { pluginFilesystemKey } from "../plugins/directories.js";
+} from "../../src/commands/plugins.js";
+import { PluginsMenuView } from "../../src/commands/plugins-menu.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import { parseToml } from "../../src/config/loader.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { pluginFilesystemKey } from "../../src/plugins/directories.js";
 import {
   disableAllPluginsOp,
   formatPluginList,
   installPluginOp,
   listInstalledPlugins,
   updatePluginOp,
-} from "../plugins/cli/pluginOperations.js";
-import { pluginListWithCatalog } from "../plugins/cli/pluginCliCommands.js";
-import { addMarketplaceOp } from "../plugins/marketplace/marketplace.js";
-import { buildMarketplaceCatalog } from "../plugins/marketplace/catalog-cli.js";
-import { createRoot } from "../tui/ink.js";
-import { AppStateProvider, getDefaultAppState } from "../tui/state/AppState.js";
+} from "../../src/plugins/cli/pluginOperations.js";
+import { pluginListWithCatalog } from "../../src/plugins/cli/pluginCliCommands.js";
+import { addMarketplaceOp } from "../../src/plugins/marketplace/marketplace.js";
+import { buildMarketplaceCatalog } from "../../src/plugins/marketplace/catalog-cli.js";
+import { createRoot } from "../../src/tui/ink.js";
+import { AppStateProvider, getDefaultAppState } from "../../src/tui/state/AppState.js";
 
 const SYNC_START = "\x1B[?2026h";
 const SYNC_END = "\x1B[?2026l";

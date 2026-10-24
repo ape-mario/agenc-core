@@ -3,13 +3,13 @@
 // model info on the xAI sign-in route (see priority-processing.test.ts).
 import { describe, expect, test } from "vitest";
 
-import type { ModelInfo } from "../../../session/turn-context.js";
+import type { ModelInfo } from "../../../../src/session/turn-context.js";
 import {
   withoutXaiSignInFastTier,
   xaiSendsPriorityProcessing,
   xaiServedSpeed,
   xaiSupportsPriorityProcessing,
-} from "./priority-processing.js";
+} from "../../../../src/llm/providers/grok/priority-processing.js";
 
 describe("priority-processing helpers", () => {
   test("only the Grok rows with a Fast tier support it", () => {

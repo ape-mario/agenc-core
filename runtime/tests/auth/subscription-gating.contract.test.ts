@@ -2,10 +2,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { createAgenCDaemonRuntimeAuthBackend } from "../app-server/provider-key-vending.js";
-import { bootstrapLocalRuntimeSession } from "../bin/bootstrap.js";
-import { Session } from "../session/session.js";
-import { RemoteAuthBackend } from "./backends/remote.js";
+import { createAgenCDaemonRuntimeAuthBackend } from "../../src/app-server/provider-key-vending.js";
+import { bootstrapLocalRuntimeSession } from "../../src/bin/bootstrap.js";
+import { Session } from "../../src/session/session.js";
+import { RemoteAuthBackend } from "../../src/auth/backends/remote.js";
 
 ;(globalThis as Record<string, unknown>).MACRO ??= {
   FEEDBACK_CHANNEL: "https://github.com/tetsuo-ai/agenc-core/issues",
@@ -134,7 +134,7 @@ describe("remote subscription gating", () => {
       keyVendor,
       subscriptionTierResolver: () => "free",
     });
-    const providerMod = await import("../llm/provider.js");
+    const providerMod = await import("../../src/llm/provider.js");
     const createProviderSpy = vi
       .spyOn(providerMod, "createProvider")
       .mockImplementation(

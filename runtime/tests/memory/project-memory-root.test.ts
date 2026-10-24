@@ -14,28 +14,28 @@ import { join, sep } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("bun:bundle", () => ({ feature: () => false }));
-vi.mock("../tools.js", () => ({}));
+vi.mock("../../src/tools.js", () => ({}));
 vi.mock("src/tools.js", () => ({}));
 
-import { getProjectRoot, setProjectRoot } from "../bootstrap/state.js";
-import { ConfigStore } from "../config/store.js";
+import { getProjectRoot, setProjectRoot } from "../../src/bootstrap/state.js";
+import { ConfigStore } from "../../src/config/store.js";
 import {
   buildProjectMemoryDirectory,
   getProjectMemoryEntrypoint,
   getProjectMemoryPath,
-} from "../memory/paths.js";
-import { relevantMemoriesProducer } from "../prompts/attachments/relevant-memories.js";
-import { closeFullCorpusMemoryIndexes } from "../memory/find-relevant.js";
+} from "../../src/memory/paths.js";
+import { relevantMemoriesProducer } from "../../src/prompts/attachments/relevant-memories.js";
+import { closeFullCorpusMemoryIndexes } from "../../src/memory/find-relevant.js";
 import {
   resolveAutoMemoryDirectory,
   sanitizePathForProjectKey,
-} from "../services/extractMemories/memory-paths.js";
-import { getAttachmentTrackingState } from "../session/attachment-state.js";
-import { projectStorageKey } from "../utils/project-storage-key.js";
+} from "../../src/services/extractMemories/memory-paths.js";
+import { getAttachmentTrackingState } from "../../src/session/attachment-state.js";
+import { projectStorageKey } from "../../src/utils/project-storage-key.js";
 import {
   enterCanonicalSettingsAuthority,
   resetCanonicalSettingsAuthorityForTesting,
-} from "../utils/settings/canonicalAuthority.js";
+} from "../../src/utils/settings/canonicalAuthority.js";
 
 let tempRoot = "";
 let home = "";

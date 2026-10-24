@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
 
-import type { Command } from "../../../commands.js";
-import { generateCommandSuggestions } from "../../../utils/suggestions/commandSuggestions.js";
+import type { Command } from "../../../../src/commands.js";
+import { generateCommandSuggestions } from "../../../../src/utils/suggestions/commandSuggestions.js";
 
-vi.mock("../../../utils/config.js", () => ({
+vi.mock("../../../../src/utils/config.js", () => ({
   getRuntimeState: () => {
     throw new Error("ambient runtime state is forbidden in slash suggestions");
   },

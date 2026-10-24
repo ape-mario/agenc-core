@@ -11,7 +11,7 @@ import {
   renderPersonalitySpecBody,
   renderPersonalitySpecInstructions,
   type ModelMessages,
-} from "./personality-spec-instructions.js";
+} from "../../src/context/personality-spec-instructions.js";
 
 function modelMessages(personalityDefault = ""): ModelMessages {
   return {

@@ -3,12 +3,12 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import type Ink from './ink.tsx'
-import type { Frame } from './frame.ts'
-import instances from './instances.ts'
-import { createRoot, type Root } from './root.ts'
-import { CURSOR_HOME, ERASE_SCREEN, cursorPosition } from './termio/csi.ts'
-import { ENABLE_MOUSE_TRACKING } from './termio/dec.ts'
+import type Ink from '../../../src/tui/ink/ink.js'
+import type { Frame } from '../../../src/tui/ink/frame.js'
+import instances from '../../../src/tui/ink/instances.js'
+import { createRoot, type Root } from '../../../src/tui/ink/root.js'
+import { CURSOR_HOME, ERASE_SCREEN, cursorPosition } from '../../../src/tui/ink/termio/csi.js'
+import { ENABLE_MOUSE_TRACKING } from '../../../src/tui/ink/termio/dec.js'
 
 type TestStdout = PassThrough & {
   columns: number

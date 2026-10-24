@@ -11,17 +11,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { ConfigStore } from '../../config/store.js'
+import { ConfigStore } from '../../../src/config/store.js'
 import {
   resetCanonicalSettingsAuthorityForTesting,
   runWithCanonicalSettingsAuthority,
-} from '../../utils/settings/canonicalAuthority.js'
+} from '../../../src/utils/settings/canonicalAuthority.js'
 
-import { getAgentColor } from './agentColorManager.js'
+import { getAgentColor } from '../../../src/tools/AgentTool/agentColorManager.js'
 import {
   getAllowedSettingSources,
   setAllowedSettingSources,
-} from '../../bootstrap/state.js'
+} from '../../../src/bootstrap/state.js'
 import {
   __setMarkdownAgentDirsForTesting,
   __setPluginAgentCacheClearerForTesting,
@@ -39,17 +39,17 @@ import {
   requireAgentDefinitionRoleFingerprint,
   type AgentDefinition,
   type PluginAgentDefinition,
-} from './loadAgentsDir.js'
-import { getPrompt } from './prompt.js'
+} from '../../../src/tools/AgentTool/loadAgentsDir.js'
+import { getPrompt } from '../../../src/tools/AgentTool/prompt.js'
 import {
   _resetAgentRolesForTesting,
   createAgentRoleWorkspace,
   registerAgentRole,
-} from '../../agents/role.js'
+} from '../../../src/agents/role.js'
 import {
   resolveAgentRuntimeOptions,
   runWithAgentRuntimeOptions,
-} from '../../session/runtime-options.js'
+} from '../../../src/session/runtime-options.js'
 
 const allSettingSources = [
   'userSettings',

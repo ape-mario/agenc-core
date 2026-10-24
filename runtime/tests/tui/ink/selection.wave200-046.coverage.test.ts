@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { createSelectionState, shiftSelection } from './selection.ts'
+import { createSelectionState, shiftSelection } from '../../../src/tui/ink/selection.js'
 
 describe('selection shift coverage', () => {
   test('prunes stale scroll accumulators and clamps anchor spans', () => {

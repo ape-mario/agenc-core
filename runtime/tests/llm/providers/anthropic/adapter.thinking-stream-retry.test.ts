@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { LLMInvalidResponseError } from "../../errors.js";
-import type { LLMStreamChunk } from "../../types.js";
-import { isResampleableStreamInterruption } from "../../../recovery/api-errors.js";
-import { AnthropicProvider } from "./adapter.js";
+import { LLMInvalidResponseError } from "../../../../src/llm/errors.js";
+import type { LLMStreamChunk } from "../../../../src/llm/types.js";
+import { isResampleableStreamInterruption } from "../../../../src/recovery/api-errors.js";
+import { AnthropicProvider } from "../../../../src/llm/providers/anthropic/adapter.js";
 import {
   settleFallbackChatStream,
   sseResponse,

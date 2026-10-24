@@ -2,10 +2,10 @@ import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getSecureStorage } from "../../utils/secureStorage/index.js";
-import { readNativeSecureStorage } from "../../utils/secureStorage/native.js";
-import { resolveSecureStorageHome } from "../../utils/secureStorage/home.js";
-import { RemoteAuthBackend } from "./remote.js";
+import { getSecureStorage } from "../../../src/utils/secureStorage/index.js";
+import { readNativeSecureStorage } from "../../../src/utils/secureStorage/native.js";
+import { resolveSecureStorageHome } from "../../../src/utils/secureStorage/home.js";
+import { RemoteAuthBackend } from "../../../src/auth/backends/remote.js";
 
 const REMOTE_AUTH_LOGIN_POLL_URL_ENV = "AGENC_REMOTE_AUTH_LOGIN_POLL_URL";
 const REMOTE_AUTH_LOGIN_START_URL_ENV = "AGENC_REMOTE_AUTH_LOGIN_START_URL";

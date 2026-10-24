@@ -3,9 +3,9 @@ import { describe, expect, test } from "vitest";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
-import { outputStyleProducer } from "./output-style.js";
+} from "../../../src/session/attachment-state.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
+import { outputStyleProducer } from "../../../src/prompts/attachments/output-style.js";
 
 function makeOpts(sessionKey: object): GetAttachmentsOptions {
   return {

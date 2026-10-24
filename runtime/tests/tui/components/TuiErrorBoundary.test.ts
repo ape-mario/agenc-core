@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { TuiErrorBoundary } from './TuiErrorBoundary.js'
+import { TuiErrorBoundary } from '../../../src/tui/components/TuiErrorBoundary.js'
 
 describe('TuiErrorBoundary', () => {
   test('renders children before an error is recorded', () => {

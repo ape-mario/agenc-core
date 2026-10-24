@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   AGENC_IDE_EXTENSION_PACKAGE_NAME,
   AGENC_IDE_EXTENSION_REPOSITORY_NAME,
-} from "./ide-extension.js";
+} from "../../src/app-server-protocol/ide-extension.js";
 
 interface ExtensionPackageJson {
   readonly name?: string;

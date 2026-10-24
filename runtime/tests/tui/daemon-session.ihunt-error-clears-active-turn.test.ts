@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 // These mocks mirror the ones in daemon-session.contract.test.ts: importing
 // daemon-session.js transitively pulls in App.js, which requires the ink/UI
 // modules below to be stubbed so the module graph loads under vitest.
-vi.mock("./ink.js", () => ({
+vi.mock("../../src/tui/ink.js", () => ({
   Box: () => null,
   Text: () => null,
   useApp: () => ({ exit: () => {} }),
@@ -15,19 +15,19 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../commands.js", () => ({
+vi.mock("../../src/commands.js", () => ({
   listTuiCommandList: () => [],
 }));
 
-vi.mock("../agents/role-definitions.js", () => ({
+vi.mock("../../src/agents/role-definitions.js", () => ({
   listAgentRoleDefinitions: () => [],
 }));
 
-vi.mock("../llm/pasted-content.js", () => ({
+vi.mock("../../src/llm/pasted-content.js", () => ({
   pastedContentsToLLMMessage: () => null,
 }));
 
-vi.mock("../tools.js", () => ({
+vi.mock("../../src/tools.js", () => ({
   assembleToolPool: () => [],
   filterToolsByDenyRules: (tools: unknown) => tools,
   getAllBaseTools: () => [],
@@ -43,41 +43,41 @@ vi.mock("src/tools.js", () => ({
   getTools: () => [],
 }));
 
-vi.mock("./context/fpsMetrics.js", () => ({
+vi.mock("../../src/tui/context/fpsMetrics.js", () => ({
   FpsMetricsProvider: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("./context/stats.js", () => ({
+vi.mock("../../src/tui/context/stats.js", () => ({
   StatsProvider: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("./state/onChangeAppState.js", () => ({
+vi.mock("../../src/tui/state/onChangeAppState.js", () => ({
   onChangeAppState: () => {},
 }));
 
-vi.mock("./components/Messages.js", () => ({
+vi.mock("../../src/tui/components/Messages.js", () => ({
   Messages: () => null,
 }));
 
-vi.mock("./components/PromptInput/PromptInput.js", () => ({
+vi.mock("../../src/tui/components/PromptInput/PromptInput.js", () => ({
   default: () => null,
 }));
 
-vi.mock("./context/promptOverlayContext.js", () => ({
+vi.mock("../../src/tui/context/promptOverlayContext.js", () => ({
   PromptOverlayProvider: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("./keybindings/KeybindingProviderSetup.js", () => ({
+vi.mock("../../src/tui/keybindings/KeybindingProviderSetup.js", () => ({
   KeybindingSetup: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("./permission-requests.js", () => ({
+vi.mock("../../src/tui/permission-requests.js", () => ({
   AgenCPermissionOverlay: () => null,
   buildToolUseConfirmQueue: () => [],
   usePermissionRequests: () => [],
 }));
 
-vi.mock("./session-transcript.js", () => ({
+vi.mock("../../src/tui/session-transcript.js", () => ({
   useSessionTranscript: () => ({
     messages: [],
     toolNames: [],
@@ -88,11 +88,11 @@ vi.mock("./session-transcript.js", () => ({
   }),
 }));
 
-vi.mock("./tool-jsx-state.js", () => ({
+vi.mock("../../src/tui/tool-jsx-state.js", () => ({
   useToolJSX: () => [null, () => {}],
 }));
 
-vi.mock("./tool-rendering.js", () => ({
+vi.mock("../../src/tui/tool-rendering.js", () => ({
   createTuiTools: () => [],
 }));
 
@@ -100,14 +100,14 @@ import {
   type AgenCDaemonConnectionState,
   type AgenCDaemonTuiClient,
   type AgenCTuiBridgeSession,
-} from "./daemon-session.js";
+} from "../../src/tui/daemon-session.js";
 import { createDaemonTuiSessionFixture as createDaemonTuiSession } from "../helpers/daemon-tui-session.js";
 import type {
   AgenCDaemonInternalMethod,
   AgenCDaemonMethod,
   AgenCDaemonResultByMethod,
   JsonObject,
-} from "../app-server/protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 function createBaseSession(): AgenCTuiBridgeSession {
   return {

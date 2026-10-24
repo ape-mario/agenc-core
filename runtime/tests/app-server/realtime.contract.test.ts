@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, test } from "vitest";
-import { AsyncQueue } from "../utils/async-queue.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import {
   buildRealtimeSessionConfig,
   RealtimeConversationManager,
@@ -8,18 +8,18 @@ import {
   type RealtimeEvent,
   type RealtimeTransportRequest,
   type RealtimeWriter,
-} from "../conversation/realtime/conversation.js";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
+} from "../../src/conversation/realtime/conversation.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
 import {
   AGENC_DAEMON_PROTOCOL_VERSION,
   JSON_RPC_VERSION,
   type JsonObject,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 import {
   AgenCRealtimeRpcService,
   REALTIME_EXECUTION_ADMISSION_DIAGNOSTIC,
   TEST_ONLY_ALLOW_UNADMITTED_REALTIME_START,
-} from "./realtime.js";
+} from "../../src/app-server/realtime.js";
 import {
   AGENC_REALTIME_CALL_MULTIPART_BOUNDARY,
   AgenCRealtimeCallClient,
@@ -31,7 +31,7 @@ import {
   realtimeCallMultipartBody,
   realtimeSessionConfigToProviderJson,
   realtimeWebSocketUrl,
-} from "./realtime-transport.js";
+} from "../../src/app-server/realtime-transport.js";
 
 describe("AgenC daemon realtime JSON-RPC surface", () => {
   test("fails realtime start closed without a durable execution admission contract", async () => {

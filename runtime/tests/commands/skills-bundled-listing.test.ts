@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
   NATIVE_PACKAGE_URL: undefined,
 };
 
-import type { Session } from "../session/session.js";
+import type { Session } from "../../src/session/session.js";
 
 function stubSession(opts: {
   availableSkills?: ReadonlyArray<{ readonly name: string }>;
@@ -42,7 +42,7 @@ function stubSession(opts: {
 describe("/skills bundled skill listing", () => {
   it("lists registered bundled skills with the bundled source tag", async () => {
     const { collectSkillsSnapshot, formatSkillsSnapshot } = await import(
-      "./skills.js"
+      "../../src/commands/skills.js"
     );
     const snapshot = await collectSkillsSnapshot(stubSession({}));
 
@@ -60,7 +60,7 @@ describe("/skills bundled skill listing", () => {
   });
 
   it("keeps the kit installer out of the listing until the marketplace is enabled", async () => {
-    const { collectSkillsSnapshot } = await import("./skills.js");
+    const { collectSkillsSnapshot } = await import("../../src/commands/skills.js");
     const names = async (config: Record<string, unknown>) =>
       (await collectSkillsSnapshot(stubSession({ config }))).availableSkills.map(
         (skill) => skill.name,
@@ -76,7 +76,7 @@ describe("/skills bundled skill listing", () => {
   });
 
   it("lists only the bundled skills a toolPolicy enables, and never the installer", async () => {
-    const { collectSkillsSnapshot } = await import("./skills.js");
+    const { collectSkillsSnapshot } = await import("../../src/commands/skills.js");
     const marketplaceOn = { protocol: { enabled: true, adapter: "marketplace-cli" } };
     const names = async (toolPolicy: unknown) =>
       (await collectSkillsSnapshot(stubSession({ toolPolicy, config: marketplaceOn }))).availableSkills
@@ -93,7 +93,7 @@ describe("/skills bundled skill listing", () => {
   });
 
   it("lets a local skill shadow a bundled skill with the same name", async () => {
-    const { collectSkillsSnapshot } = await import("./skills.js");
+    const { collectSkillsSnapshot } = await import("../../src/commands/skills.js");
     const snapshot = await collectSkillsSnapshot(
       stubSession({ availableSkills: [{ name: "browser-automation" }] }),
     );

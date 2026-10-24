@@ -11,7 +11,7 @@ import {
   parseRGB,
   truncateSpinnerText,
   toRGBColor,
-} from './utils.js'
+} from '../../../../src/tui/components/spinner/utils.js'
 
 const originalTerm = process.env.TERM
 const originalGlyphMode = process.env.AGENC_TUI_GLYPHS

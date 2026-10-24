@@ -27,7 +27,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   };
 });
 
-import { createLocalSkillsServices, loadLocalSkillsSnapshot } from "./local-loader.js";
+import { createLocalSkillsServices, loadLocalSkillsSnapshot } from "../../src/skills/local-loader.js";
 
 function tmpRoot(label: string): string {
   return mkdtempSync(join(tmpdir(), `agenc-${label}-`));

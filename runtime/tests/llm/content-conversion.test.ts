@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
-import type { LLMMessage } from "./types.js";
+import type { LLMMessage } from "../../src/llm/types.js";
 
 import {
   cloneLlmContent,
   cloneLlmMessageSnapshot,
   fromRuntimeMessageContent,
   toRuntimeMessageContent,
-} from "./content-conversion.js";
+} from "../../src/llm/content-conversion.js";
 
 describe("LLM content conversion", () => {
   test("clones provider-compatible content parts and filters malformed parts", () => {

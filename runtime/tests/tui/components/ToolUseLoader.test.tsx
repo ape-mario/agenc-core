@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { toolStarFrames, toolStaticGlyph } from './ToolStateGlyph.js'
-import { ToolUseLoader } from './ToolUseLoader.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { toolStarFrames, toolStaticGlyph } from '../../../src/tui/components/ToolStateGlyph.js'
+import { ToolUseLoader } from '../../../src/tui/components/ToolUseLoader.js'
 
 function RerenderLoader() {
   const [tick, setTick] = React.useState(0)

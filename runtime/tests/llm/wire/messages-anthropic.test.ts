@@ -4,9 +4,9 @@ import {
   buildAnthropicMessagesRequest,
   parseAnthropicMessagesResponse,
   SYSTEM_PROMPT_DYNAMIC_BOUNDARY_MARKER,
-} from "./messages-anthropic.js";
-import { ANTHROPIC_STRUCTURED_OUTPUT_TOOL_NAME } from "../structured-output.js";
-import type { LLMMessage } from "../types.js";
+} from "../../../src/llm/wire/messages-anthropic.js";
+import { ANTHROPIC_STRUCTURED_OUTPUT_TOOL_NAME } from "../../../src/llm/structured-output.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
 
 /** A turn that reads two files in parallel, followed by both results. */
 function parallelReadHistory(): LLMMessage[] {

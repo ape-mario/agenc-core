@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isPermissionDeniedToolResult,
   PERMISSION_DENIED_TOOL_RESULT_MESSAGE,
-} from "./tool-result-denial.js";
+} from "../../src/tui/tool-result-denial.js";
 
 describe("isPermissionDeniedToolResult", () => {
   it("detects direct denial text", () => {

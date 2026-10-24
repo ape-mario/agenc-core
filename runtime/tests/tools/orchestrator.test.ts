@@ -19,13 +19,13 @@ import {
   type GranularApprovalConfig,
   type PermissionRequestHook,
   type ReviewDecision,
-} from "./orchestrator.js";
-import type { Tool } from "./types.js";
-import { ConfiguredHooksRuntime } from "../hooks/configured-hooks.js";
-import { createHookExecutionAuthority } from "../hooks/execution-authority.js";
+} from "../../src/tools/orchestrator.js";
+import type { Tool } from "../../src/tools/types.js";
+import { ConfiguredHooksRuntime } from "../../src/hooks/configured-hooks.js";
+import { createHookExecutionAuthority } from "../../src/hooks/execution-authority.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
-import { Policy } from "../sandbox/execpolicy/policy.js";
-import { REJECT_RULES_APPROVAL_REASON } from "../sandbox/escalation/unix-escalation.js";
+import { Policy } from "../../src/sandbox/execpolicy/policy.js";
+import { REJECT_RULES_APPROVAL_REASON } from "../../src/sandbox/escalation/unix-escalation.js";
 
 const readTool: Tool = {
   name: "FileRead",

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { Semaphore } from "./concurrency.js";
-import { AsyncRwLock } from "../utils/async-rwlock.js";
+import { Semaphore } from "../../src/tools/concurrency.js";
+import { AsyncRwLock } from "../../src/utils/async-rwlock.js";
 
 // ──────────────────────────────────────────────────────────────────────
 // Abort-aware lock/semaphore acquisition (GOAL ITEM #2).

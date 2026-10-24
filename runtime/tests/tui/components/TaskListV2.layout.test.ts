@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { getTaskListTextWidth, getTaskListV2GlyphText } from './TaskListV2.js'
+import { getTaskListTextWidth, getTaskListV2GlyphText } from '../../../src/tui/components/TaskListV2.js'
 
 describe('getTaskListTextWidth', () => {
   test('clamps text width to one column for tiny terminals', () => {

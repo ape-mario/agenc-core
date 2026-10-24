@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { UnifiedExecProcessManager } from "./process-manager.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
 
 const OMITTED_MARKER = /\n\[\.\.\. omitted \d+ chars \.\.\.\]\n/;
 /** The default budget of one result: 10,000 tokens at 4 chars per token. */

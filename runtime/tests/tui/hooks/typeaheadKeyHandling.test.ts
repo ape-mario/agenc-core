@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   type AutocompleteKeyboardEvent,
   consumeAutocompleteEnterKey,
-} from './typeaheadKeyHandling.js'
+} from '../../../src/tui/hooks/typeaheadKeyHandling.js'
 
 function makeEvent(
   overrides: Partial<AutocompleteKeyboardEvent> = {},

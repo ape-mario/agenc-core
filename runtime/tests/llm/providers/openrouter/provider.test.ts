@@ -5,13 +5,13 @@ import {
   OPENROUTER_DEFAULT_TITLE,
   OpenRouterProvider,
   openRouterExtraBody,
-} from "./index.js";
+} from "../../../../src/llm/providers/openrouter/index.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
-} from "../../registry/provider-info.js";
-import { isLLMPreGenerationRejection } from "../../errors.js";
+} from "../../../../src/llm/registry/provider-info.js";
+import { isLLMPreGenerationRejection } from "../../../../src/llm/errors.js";
 
 describe("OpenRouterProvider", () => {
   test("sends OpenRouter routing headers on chat-completions requests", async () => {

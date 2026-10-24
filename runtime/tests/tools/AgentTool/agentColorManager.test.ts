@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest'
-import { getAgentColor, setAgentColor } from './agentColorManager.js'
+import { getAgentColor, setAgentColor } from '../../../src/tools/AgentTool/agentColorManager.js'
 
 describe('getAgentColor', () => {
   afterEach(() => {

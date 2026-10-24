@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildDefaultRegistry } from "./registry.js";
+import { buildDefaultRegistry } from "../../src/commands/registry.js";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../tui/remoteAuthSessionContext.fixture.js";
 import {
   helpCommand,
@@ -9,13 +9,13 @@ import {
   groupHelpCommands,
   normalizeHelpQuery,
   type HelpCommand,
-} from "./help.js";
+} from "../../src/commands/help.js";
 import {
   setGlobalCommandRegistry,
   type CommandRegistry,
   type SlashCommand,
   type SlashCommandContext,
-} from "./types.js";
+} from "../../src/commands/types.js";
 
 function makeCtx(overrides: Partial<SlashCommandContext> = {}): SlashCommandContext {
   return {

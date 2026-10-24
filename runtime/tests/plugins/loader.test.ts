@@ -11,23 +11,23 @@ import {
   getPluginsDirectory,
   pluginFilesystemKey,
   sanitizePluginId,
-} from "./directories.js";
+} from "../../src/plugins/directories.js";
 import {
   createPluginFromPath,
   discoverPluginRoots,
   discoverPluginSkillRoots,
   loadPlugins,
-} from "./loader.js";
+} from "../../src/plugins/loader.js";
 import {
   loadPluginManifest,
   PLUGIN_MANIFEST_RELATIVE_PATH,
-} from "./manifest.js";
+} from "../../src/plugins/manifest.js";
 import {
   normalizePluginManifest,
   PluginManifestError,
   resolveManifestRelativePath,
-} from "./manifest-schema.js";
-import { validateManifest, validatePluginContents } from "./validation.js";
+} from "../../src/plugins/manifest-schema.js";
+import { validateManifest, validatePluginContents } from "../../src/plugins/validation.js";
 
 describe("plugin manifest", () => {
   test("loads the canonical manifest and normalizes interface prompts", async () => {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { builtInProviderIds } from "./provider-info.js";
+import { builtInProviderIds } from "../../../src/llm/registry/provider-info.js";
 import {
   PROVIDER_RETENTION,
   PROVIDER_RETENTION_CHECKED_ON,
-} from "./provider-retention.js";
+} from "../../../src/llm/registry/provider-retention.js";
 
 /**
  * The classification read from each provider's documentation on 2026-10-22.

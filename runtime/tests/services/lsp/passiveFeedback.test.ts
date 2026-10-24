@@ -3,10 +3,10 @@ import { describe, expect, test, beforeEach } from "vitest";
 import {
   checkForLSPDiagnostics,
   resetAllLSPDiagnosticState,
-} from "./LSPDiagnosticRegistry.js";
-import type { LSPServerManager } from "./LSPServerManager.js";
-import { formatDiagnosticsForAttachment, registerLSPNotificationHandlers } from "./passiveFeedback.js";
-import type { LSPServerInstance } from "./LSPServerInstance.js";
+} from "../../../src/services/lsp/LSPDiagnosticRegistry.js";
+import type { LSPServerManager } from "../../../src/services/lsp/LSPServerManager.js";
+import { formatDiagnosticsForAttachment, registerLSPNotificationHandlers } from "../../../src/services/lsp/passiveFeedback.js";
+import type { LSPServerInstance } from "../../../src/services/lsp/LSPServerInstance.js";
 
 describe("passive LSP feedback", () => {
   beforeEach(() => resetAllLSPDiagnosticState());

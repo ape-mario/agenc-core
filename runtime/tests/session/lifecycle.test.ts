@@ -3,15 +3,15 @@ import { SessionWriteBehindQueue } from "../../src/session/write-behind.js";
 import {
   SESSION_LIFECYCLE_SHUTDOWN_BUDGET_MS,
   shutdownSessionLifecycle,
-} from "./lifecycle.js";
+} from "../../src/session/lifecycle.js";
 import { mkCtx, mkSession } from "../fixtures.js";
 import {
   executeExtractMemories,
   initExtractMemories,
-} from "../services/extractMemories/extractMemories.js";
-import { resolveAgentRuntimeOptions } from "./runtime-options.js";
-import type { Session } from "./session.js";
-import type { TurnContext } from "./turn-context.js";
+} from "../../src/services/extractMemories/extractMemories.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
 
 function stubSession() {
   return {

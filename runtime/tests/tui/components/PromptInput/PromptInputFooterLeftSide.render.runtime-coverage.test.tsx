@@ -3,9 +3,9 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { Text } from "../../ink.js";
-import { createRoot } from "../../ink/root.js";
-import { PromptInputFooterLeftSide } from "./PromptInputFooterLeftSide.js";
+import { Text } from "../../../../src/tui/ink.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { PromptInputFooterLeftSide } from "../../../../src/tui/components/PromptInput/PromptInputFooterLeftSide.js";
 
 const footerMock = vi.hoisted(() => ({
   appState: {
@@ -48,24 +48,24 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => footerMock.featureFlags.has(name),
 }));
 
-vi.mock("../../../coordinator/coordinatorMode.js", () => ({
+vi.mock("../../../../src/coordinator/coordinatorMode.js", () => ({
   isCoordinatorMode: () => footerMock.isCoordinator,
 }));
 
-vi.mock("../../keybindings/useShortcutDisplay.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useShortcutDisplay.js", () => ({
   useShortcutDisplay: (_id: string, _scope: string, fallback: string) => fallback,
 }));
 
-vi.mock("../../../utils/config.js", () => ({
+vi.mock("../../../../src/utils/config.js", () => ({
   getRuntimeState: () => footerMock.globalConfig,
 }));
 
-vi.mock("../../../utils/permissions/PermissionMode.js", () => ({
+vi.mock("../../../../src/utils/permissions/PermissionMode.js", () => ({
   getModeColor: () => "mode",
   isDefaultMode: (mode: string | undefined) => mode === undefined || mode === "default",
 }));
 
-vi.mock("../tasks/BackgroundTaskStatus.js", () => ({
+vi.mock("../../../../src/tui/components/tasks/BackgroundTaskStatus.js", () => ({
   BackgroundTaskStatus: (props: {
     isLeaderIdle?: boolean;
     isViewingTeammate?: boolean;
@@ -78,31 +78,31 @@ vi.mock("../tasks/BackgroundTaskStatus.js", () => ({
   ),
 }));
 
-vi.mock("../../../tasks/types.js", () => ({
+vi.mock("../../../../src/tasks/types.js", () => ({
   isBackgroundTask: (task: any) =>
     task?.type === "background_task" || task?.type === "in_process_teammate",
 }));
 
-vi.mock("../tasks/taskStatusUtils.js", () => ({
+vi.mock("../../../../src/tui/components/tasks/taskStatusUtils.js", () => ({
   shouldHideTasksFooter: (tasks: Record<string, any>, showSpinnerTree: boolean) =>
     showSpinnerTree && Object.values(tasks).some(task => task.type === "in_process_teammate"),
 }));
 
-vi.mock("../../../utils/agentSwarmsEnabled.js", () => ({
+vi.mock("../../../../src/utils/agentSwarmsEnabled.js", () => ({
   isAgentSwarmsEnabled: () => footerMock.swarmsEnabled,
 }));
 
-vi.mock("../teams/TeamStatus.js", () => ({
+vi.mock("../../../../src/tui/components/teams/TeamStatus.js", () => ({
   TeamStatus: (props: { showHint?: boolean; teamsSelected?: boolean }) => (
     <Text>TEAM selected:{String(props.teamsSelected)} hint:{String(props.showHint)}</Text>
   ),
 }));
 
-vi.mock("../../../utils/swarm/backends/registry.js", () => ({
+vi.mock("../../../../src/utils/swarm/backends/registry.js", () => ({
   isInProcessEnabled: () => footerMock.inProcessEnabled,
 }));
 
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof footerMock.appState) => unknown) =>
     selector(footerMock.appState),
   useAppStateStore: () => ({
@@ -110,55 +110,55 @@ vi.mock("../../state/AppState.js", () => ({
   }),
 }));
 
-vi.mock("../../../bootstrap/state.js", () => ({
+vi.mock("../../../../src/bootstrap/state.js", () => ({
   flushInteractionTime: () => {},
   getIsRemoteMode: () => footerMock.isRemoteMode,
 }));
 
-vi.mock("./HistorySearchInput.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/HistorySearchInput.js", () => ({
   default: (props: { historyFailedMatch?: boolean; value: string }) => (
     <Text>SEARCH {props.value} failed:{String(props.historyFailedMatch)}</Text>
   ),
 }));
 
-vi.mock("../../hooks/usePrStatus.js", () => ({
+vi.mock("../../../../src/tui/hooks/usePrStatus.js", () => ({
   usePrStatus: () => footerMock.prStatus,
 }));
 
-vi.mock("../design-system/KeyboardShortcutHint.js", () => ({
+vi.mock("../../../../src/tui/components/design-system/KeyboardShortcutHint.js", () => ({
   KeyboardShortcutHint: ({ action, shortcut }: { action: string; shortcut: string }) => (
     <Text>{shortcut} to {action}</Text>
   ),
 }));
 
-vi.mock("../design-system/Byline.js", () => ({
+vi.mock("../../../../src/tui/components/design-system/Byline.js", () => ({
   Byline: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("../../hooks/useTerminalSize.js", () => ({
+vi.mock("../../../../src/tui/hooks/useTerminalSize.js", () => ({
   useTerminalSize: () => ({ columns: footerMock.terminalColumns, rows: 24 }),
 }));
 
-vi.mock("../../hooks/useTasksV2.js", () => ({
+vi.mock("../../../../src/tui/hooks/useTasksV2.js", () => ({
   useTasksV2: () => footerMock.tasksV2,
 }));
 
-vi.mock("./utils.js", async importOriginal => {
-  const actual = await importOriginal<typeof import("./utils.js")>();
+vi.mock("../../../../src/tui/components/PromptInput/utils.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../../../src/tui/components/PromptInput/utils.js")>();
   return {
     ...actual,
   };
 });
 
-vi.mock("../../hooks/useSettings.js", () => ({
+vi.mock("../../../../src/tui/hooks/useSettings.js", () => ({
   useSettings: () => footerMock.globalConfig,
 }));
 
-vi.mock("../../context/fullscreenModeContext.js", () => ({
+vi.mock("../../../../src/tui/context/fullscreenModeContext.js", () => ({
   useFullscreenMode: () => footerMock.fullscreen,
 }));
 
-vi.mock("../../ink/terminal.js", () => ({
+vi.mock("../../../../src/tui/ink/terminal.js", () => ({
   SYNC_OUTPUT_SUPPORTED: false,
   isXtermJs: () => footerMock.isXterm,
   shouldSkipMainScreenSyncMarkers: () => true,
@@ -176,24 +176,24 @@ vi.mock("../../ink/terminal.js", () => ({
   },
 }));
 
-vi.mock("../../ink/hooks/use-selection.js", () => ({
+vi.mock("../../../../src/tui/ink/hooks/use-selection.js", () => ({
   useHasSelection: () => footerMock.hasSelection,
   useSelection: () => ({
     getState: () => footerMock.selectionState,
   }),
 }));
 
-vi.mock("../../../utils/platform.js", () => ({
+vi.mock("../../../../src/utils/platform.js", () => ({
   getPlatform: () => footerMock.platform,
 }));
 
-vi.mock("../PrBadge.js", () => ({
+vi.mock("../../../../src/tui/components/PrBadge.js", () => ({
   PrBadge: ({ number, reviewState }: { number: number; reviewState?: string }) => (
     <Text>PR#{number}:{reviewState}</Text>
   ),
 }));
 
-vi.mock("./proactiveAdapter.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/proactiveAdapter.js", () => ({
   getPromptInputProactiveNextTickAt: () => footerMock.proactiveNextTickAt,
   isPromptInputProactiveActive: () => footerMock.proactiveActive,
   subscribeToPromptInputProactiveChanges: () => () => {},

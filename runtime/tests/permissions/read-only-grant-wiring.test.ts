@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { applyUnattendedPermissionPolicyToContext } from "../../src/permissions/unattended-policy.js";
-import { createEmptyToolPermissionContext } from "./types.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 /**
  * The grant is switched on in exactly one place, by the marker the routine

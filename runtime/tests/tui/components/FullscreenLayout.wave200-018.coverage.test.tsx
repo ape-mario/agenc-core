@@ -3,9 +3,9 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
-import type { ScrollBoxHandle } from '../ink/components/ScrollBox.js'
-import { useUnseenDivider } from './FullscreenLayout.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { ScrollBoxHandle } from '../../../src/tui/ink/components/ScrollBox.js'
+import { useUnseenDivider } from '../../../src/tui/components/FullscreenLayout.js'
 
 type TestScrollHandle = ScrollBoxHandle & {
   setPendingDelta: (value: number) => void

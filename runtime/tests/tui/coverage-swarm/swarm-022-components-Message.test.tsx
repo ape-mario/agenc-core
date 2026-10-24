@@ -22,36 +22,36 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => harness.features.has(name),
 }))
 
-vi.mock('../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => harness.fullscreen,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: harness.columns, rows: 24 }),
 }))
 
-vi.mock('../../services/compact/snipProjection.js', () => ({
+vi.mock('../../../src/services/compact/snipProjection.js', () => ({
   isSnipBoundaryMessage: (message: { readonly subtype?: string }) =>
     message.subtype === 'snip_boundary',
 }))
 
-vi.mock('../../services/compact/snipCompact.js', () => ({
+vi.mock('../../../src/services/compact/snipCompact.js', () => ({
   isSnipMarkerMessage: (message: { readonly subtype?: string }) =>
     message.subtype === 'snip_marker',
 }))
 
-vi.mock('../message-renderers/SnipBoundaryMessage.js', () => ({
+vi.mock('../../../src/tui/message-renderers/SnipBoundaryMessage.js', () => ({
   SnipBoundaryMessage: (props: Record<string, unknown>) => {
     harness.calls.push({ name: 'SnipBoundaryMessage', props })
     return null
   },
 }))
 
-vi.mock('../components/Message.renderers.js', async () => {
+vi.mock('../../../src/tui/components/Message.renderers.js', async () => {
   const ReactModule = await import('react')
   const renderer = (name: string) => (props: Record<string, unknown>) => {
     harness.calls.push({ name, props })
@@ -88,13 +88,13 @@ vi.mock('../components/Message.renderers.js', async () => {
   }
 })
 
-import { Box } from '../ink.js'
-import { createRoot } from '../ink/root.js'
-import type { Props } from '../components/Message.js'
+import { Box } from '../../../src/tui/ink.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { Props } from '../../../src/tui/components/Message.js'
 import {
   getToolResultMessageWidth,
   Message,
-} from '../components/Message.js'
+} from '../../../src/tui/components/Message.js'
 
 function createStreams(): {
   stdout: PassThrough

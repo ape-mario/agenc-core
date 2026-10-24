@@ -1,11 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { BUILT_IN_PROVIDER_DEFAULT_MODELS } from "../registry/provider-info.js";
+import { BUILT_IN_PROVIDER_DEFAULT_MODELS } from "../../../src/llm/registry/provider-info.js";
 import { ECHO_TOOL } from "./openai-compatible-test-helpers.js";
-import { BedrockProvider } from "./bedrock/index.js";
-import { createGeminiEndpointPlan } from "./gemini/endpoint-plan.js";
-import { GeminiProvider } from "./gemini/index.js";
-import { OpenAICompatibleProvider } from "./openai-compatible/index.js";
+import { BedrockProvider } from "../../../src/llm/providers/bedrock/index.js";
+import { createGeminiEndpointPlan } from "../../../src/llm/providers/gemini/endpoint-plan.js";
+import { GeminiProvider } from "../../../src/llm/providers/gemini/index.js";
+import { OpenAICompatibleProvider } from "../../../src/llm/providers/openai-compatible/index.js";
 import {
   abortableEventStreamResponse,
   bedrockTextDelta,

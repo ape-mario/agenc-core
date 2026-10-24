@@ -9,12 +9,12 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getCompactionReminderAttachment } from "./attachments.js";
-import { feature } from "../build/feature.js";
-import { formatContextPressureReminder } from "./messages.js";
-import { getAutoCompactThreshold } from "../services/compact/autoCompact.js";
-import { runWithStartupProviderSelection } from "../utils/model/providers.js";
-import type { Message } from "../types/message.js";
+import { getCompactionReminderAttachment } from "../../src/utils/attachments.js";
+import { feature } from "../../src/build/feature.js";
+import { formatContextPressureReminder } from "../../src/utils/messages.js";
+import { getAutoCompactThreshold } from "../../src/services/compact/autoCompact.js";
+import { runWithStartupProviderSelection } from "../../src/utils/model/providers.js";
+import type { Message } from "../../src/types/message.js";
 
 const WINDOW_ENV = "AGENC_AUTO_COMPACT_WINDOW";
 

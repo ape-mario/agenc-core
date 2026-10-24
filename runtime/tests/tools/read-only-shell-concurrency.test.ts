@@ -5,13 +5,13 @@
  */
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
-import { execCommandRunsConcurrently } from "./read-only-shell-concurrency.js";
-import { createExecCommandTool } from "./system/exec-command.js";
-import { StreamingToolExecutor, type StreamingToolResult, type TrackedTool } from "./streaming-executor.js";
-import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
-import type { LLMToolCall } from "../llm/types.js";
-import type { Tool } from "./types.js";
-import type { ToolUseBlock } from "../session/turn-state.js";
+import { execCommandRunsConcurrently } from "../../src/tools/read-only-shell-concurrency.js";
+import { createExecCommandTool } from "../../src/tools/system/exec-command.js";
+import { StreamingToolExecutor, type StreamingToolResult, type TrackedTool } from "../../src/tools/streaming-executor.js";
+import type { ToolRegistry, ToolDispatchResult } from "../../src/tool-registry.js";
+import type { LLMToolCall } from "../../src/llm/types.js";
+import type { Tool } from "../../src/tools/types.js";
+import type { ToolUseBlock } from "../../src/session/turn-state.js";
 
 const cwd = "/workspace";
 const call = (cmd: string, extra: Record<string, unknown> = {}) => ({ cmd, workdir: cwd, ...extra });

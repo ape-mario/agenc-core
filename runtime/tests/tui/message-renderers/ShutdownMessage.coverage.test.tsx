@@ -1,11 +1,11 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 import {
   getShutdownMessageSummary,
   tryRenderShutdownMessage,
-} from './ShutdownMessage.js'
+} from '../../../src/tui/message-renderers/ShutdownMessage.js'
 
 function shutdownPayload(payload: Record<string, unknown>): string {
   return JSON.stringify({

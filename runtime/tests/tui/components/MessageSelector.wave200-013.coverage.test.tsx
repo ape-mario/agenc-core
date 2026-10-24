@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Message, UserMessage } from '../../types/message.js'
-import { buildMessageSelectorFileHistoryMetadata } from './MessageSelector.js'
+import type { Message, UserMessage } from '../../../src/types/message.js'
+import { buildMessageSelectorFileHistoryMetadata } from '../../../src/tui/components/MessageSelector.js'
 
 function userMessage(uuid: string, text: string): UserMessage {
   return {

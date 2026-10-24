@@ -1,23 +1,23 @@
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../../utils/staticRender.js";
-import { General } from "./General.js";
+import { renderToString } from "../../../../src/utils/staticRender.js";
+import { General } from "../../../../src/tui/components/HelpV2/General.js";
 
 vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../../keybindings/useShortcutDisplay.js", () => ({
+vi.mock("../../../../src/tui/keybindings/useShortcutDisplay.js", () => ({
   useShortcutDisplay: (_action: string, _context: string, fallback: string) =>
     fallback,
 }));
 
-vi.mock("../../keybindings/loadUserBindings.js", () => ({
+vi.mock("../../../../src/tui/keybindings/loadUserBindings.js", () => ({
   isKeybindingCustomizationEnabled: () => false,
 }));
 
-vi.mock("../../../utils/platform.js", () => ({
+vi.mock("../../../../src/utils/platform.js", () => ({
   getPlatform: () => "linux",
 }));
 

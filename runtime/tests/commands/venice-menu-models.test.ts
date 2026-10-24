@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { saveProviderKey } from "../auth/provider-keys.js";
-import type { EnvSnapshot } from "../config/env.js";
-import { resolveHomeContext, type HomeContext } from "../config/home.js";
-import type { ConfigStore } from "../config/store.js";
-import { VENICE_MODELS, VENICE_TOOL_CALLS_NOT_DELIVERED } from "../llm/registry/venice-models.js";
-import type { SlashCommandContext } from "./types.js";
-import { loadVeniceMenuModels, readVeniceMenuModels } from "./venice-menu-models.js";
+import { saveProviderKey } from "../../src/auth/provider-keys.js";
+import type { EnvSnapshot } from "../../src/config/env.js";
+import { resolveHomeContext, type HomeContext } from "../../src/config/home.js";
+import type { ConfigStore } from "../../src/config/store.js";
+import { VENICE_MODELS, VENICE_TOOL_CALLS_NOT_DELIVERED } from "../../src/llm/registry/venice-models.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import { loadVeniceMenuModels, readVeniceMenuModels } from "../../src/commands/venice-menu-models.js";
 
 const fixture = JSON.parse(readFileSync(new URL("../llm/fixtures/venice-models.json", import.meta.url), "utf8")) as {
   readonly data: readonly { readonly id: string; readonly model_spec: { readonly capabilities: { readonly supportsFunctionCalling?: boolean } } }[];

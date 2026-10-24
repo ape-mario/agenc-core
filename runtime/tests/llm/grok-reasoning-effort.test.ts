@@ -10,11 +10,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { resolveProviderModelCapabilities } from "./capabilities.js";
-import { supportsXaiReasoningEffortParam } from "./structured-output.js";
-import { buildXaiResponsesRequest } from "./wire/responses-xai.js";
-import { GrokProvider } from "./providers/grok/adapter.js";
-import type { LLMMessage } from "./types.js";
+import { resolveProviderModelCapabilities } from "../../src/llm/capabilities.js";
+import { supportsXaiReasoningEffortParam } from "../../src/llm/structured-output.js";
+import { buildXaiResponsesRequest } from "../../src/llm/wire/responses-xai.js";
+import { GrokProvider } from "../../src/llm/providers/grok/adapter.js";
+import type { LLMMessage } from "../../src/llm/types.js";
 
 const USER_TURN: readonly LLMMessage[] = [{ role: "user", content: "hi" }];
 const DEPTH_EFFORTS = ["low", "medium", "high"] as const;

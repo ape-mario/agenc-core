@@ -1,14 +1,14 @@
 import { APIError } from "openai";
 import { describe, expect, test, vi } from "vitest";
 
-import { StreamModelError } from "../../../phases/stream-model.js";
-import { isTransientProviderError } from "../../../recovery/api-errors.js";
-import { isRetryableStreamError } from "../../../session/run-turn-stream-retry.js";
-import { LLMAuthenticationError, LLMProviderError } from "../../errors.js";
-import type { LLMMessage } from "../../types.js";
-import { GrokProvider } from "./adapter.js";
-import { isUnauthorizedError } from "./auth-refresh.js";
-import { readXaiBillingRefusal, xaiBillingRefusalError } from "./billing-refusal.js";
+import { StreamModelError } from "../../../../src/phases/stream-model.js";
+import { isTransientProviderError } from "../../../../src/recovery/api-errors.js";
+import { isRetryableStreamError } from "../../../../src/session/run-turn-stream-retry.js";
+import { LLMAuthenticationError, LLMProviderError } from "../../../../src/llm/errors.js";
+import type { LLMMessage } from "../../../../src/llm/types.js";
+import { GrokProvider } from "../../../../src/llm/providers/grok/adapter.js";
+import { isUnauthorizedError } from "../../../../src/llm/providers/grok/auth-refresh.js";
+import { readXaiBillingRefusal, xaiBillingRefusalError } from "../../../../src/llm/providers/grok/billing-refusal.js";
 
 // The body xAI returned to every request of a Terminal-Bench run on 2026-09-14 once the account reached its
 // spending limit. Each turn failed as "grok authentication failed (HTTP 403)" with no reason.
@@ -42,7 +42,7 @@ describe("xAI billing refusal", () => {
     const error = APIError.generate(403, SPENDING_LIMIT, undefined,
       new Headers({ "retry-after": "19" }));
     const funds = xaiBillingRefusalError("grok", error);
-    const { classifyChildFailure } = await import("../../../agents/child-terminal.js");
+    const { classifyChildFailure } = await import("../../../../src/agents/child-terminal.js");
     expect(classifyChildFailure("grok", funds)).toMatchObject({
       reason: "insufficient_funds", retryable: false, retryAfterMs: 19_000,
     });

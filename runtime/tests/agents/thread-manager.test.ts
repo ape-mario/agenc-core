@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgentStatusTracker } from "./status.js";
+import { AgentStatusTracker } from "../../src/agents/status.js";
 import {
   createMailboxMetadataRecord,
   Mailbox,
-} from "./mailbox.js";
-import { createAgentRoleWorkspace, resolveAgentRole } from "./role.js";
-import { ThreadManager } from "./thread-manager.js";
-import type { LiveAgent } from "./control.js";
-import type { AgentMetadata } from "./registry.js";
+} from "../../src/agents/mailbox.js";
+import { createAgentRoleWorkspace, resolveAgentRole } from "../../src/agents/role.js";
+import { ThreadManager } from "../../src/agents/thread-manager.js";
+import type { LiveAgent } from "../../src/agents/control.js";
+import type { AgentMetadata } from "../../src/agents/registry.js";
 
 const ROLE_WORKSPACE = createAgentRoleWorkspace(process.cwd());
 

@@ -1,8 +1,8 @@
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { renderToString } from "../../utils/staticRender.js";
-import { AttachmentMessage } from "./AttachmentMessage.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import { AttachmentMessage } from "../../../src/tui/message-renderers/AttachmentMessage.js";
 
 const swarmsMock = vi.hoisted(() => ({
   enabled: false,
@@ -16,11 +16,11 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../../utils/agentSwarmsEnabled.js", () => ({
+vi.mock("../../../src/utils/agentSwarmsEnabled.js", () => ({
   isAgentSwarmsEnabled: () => swarmsMock.enabled,
 }));
 
-vi.mock("../../utils/teammateMailbox.js", () => ({
+vi.mock("../../../src/utils/teammateMailbox.js", () => ({
   isTaskAssignment: (text: string) => {
     try {
       const parsed = JSON.parse(text);
@@ -39,16 +39,16 @@ vi.mock("../../utils/teammateMailbox.js", () => ({
   isShutdownApproved: (text: string) => text === "shutdown-approved",
 }));
 
-vi.mock("../state/AppState.js", () => ({
+vi.mock("../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof appStateMock) => unknown) =>
     selector(appStateMock),
 }));
 
-vi.mock("../components/messageActions", () => ({
+vi.mock("../../../src/tui/components/messageActions.js", () => ({
   useSelectedMessageBg: () => undefined,
 }));
 
-vi.mock("../components/MessageResponse", async () => {
+vi.mock("../../../src/tui/components/MessageResponse.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     MessageResponse: ({ children }: { children: React.ReactNode }) =>
@@ -56,7 +56,7 @@ vi.mock("../components/MessageResponse", async () => {
   };
 });
 
-vi.mock("../components/design-system/FullWidthRow", async () => {
+vi.mock("../../../src/tui/components/design-system/FullWidthRow.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     default: ({ children }: { children: React.ReactNode }) =>
@@ -64,7 +64,7 @@ vi.mock("../components/design-system/FullWidthRow", async () => {
   };
 });
 
-vi.mock("../components/FilePathLink", async () => {
+vi.mock("../../../src/tui/components/FilePathLink.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     FilePathLink: ({
@@ -77,7 +77,7 @@ vi.mock("../components/FilePathLink", async () => {
   };
 });
 
-vi.mock("./UserTextMessage", async () => {
+vi.mock("../../../src/tui/message-renderers/UserTextMessage.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     UserTextMessage: ({ param }: { param: { text: string } }) =>
@@ -85,7 +85,7 @@ vi.mock("./UserTextMessage", async () => {
   };
 });
 
-vi.mock("../components/v2/messagePrimitives.js", async () => {
+vi.mock("../../../src/tui/components/v2/messagePrimitives.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     UserImageMessage: ({ imageId }: { imageId: number }) =>
@@ -93,7 +93,7 @@ vi.mock("../components/v2/messagePrimitives.js", async () => {
   };
 });
 
-vi.mock("../components/DiagnosticsDisplay", async () => {
+vi.mock("../../../src/tui/components/DiagnosticsDisplay.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     DiagnosticsDisplay: () =>
@@ -101,12 +101,12 @@ vi.mock("../components/DiagnosticsDisplay", async () => {
   };
 });
 
-vi.mock("./PlanApprovalMessage", () => ({
+vi.mock("../../../src/tui/message-renderers/PlanApprovalMessage.js", () => ({
   formatTeammateMessageContent: (text: string) => `formatted ${text}`,
   tryRenderPlanApprovalMessage: () => null,
 }));
 
-vi.mock("./UserTeammateMessage", async () => {
+vi.mock("../../../src/tui/message-renderers/UserTeammateMessage.js", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
   return {
     TeammateMessageContent: ({

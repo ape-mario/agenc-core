@@ -7,9 +7,9 @@ import {
   MAX_MCP_LIST_PAGES,
   McpListPaginationError,
   type McpListPageCallOptions,
-} from "./list-pagination.js";
+} from "../../src/mcp-client/list-pagination.js";
 import { AbortError } from "../../src/utils/errors.js";
-import type { Logger } from "./_deps/logger.js";
+import type { Logger } from "../../src/mcp-client/_deps/logger.js";
 
 function testLogger(): Logger {
   return {

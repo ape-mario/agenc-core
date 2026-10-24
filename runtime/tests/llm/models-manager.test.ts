@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { mergeConfigs, defaultConfig } from "../config/schema.js";
-import { StaticModelsManager } from "./models-manager.js";
+import { mergeConfigs, defaultConfig } from "../../src/config/schema.js";
+import { StaticModelsManager } from "../../src/llm/models-manager.js";
 import { ModelRegistry } from "../../src/llm/model-registry.js";
-import { CONSERVATIVE_CONTEXT_WINDOW_TOKENS } from "./model-metadata.js";
+import { CONSERVATIVE_CONTEXT_WINDOW_TOKENS } from "../../src/llm/model-metadata.js";
 
 function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), {

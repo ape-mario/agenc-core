@@ -8,9 +8,9 @@ import { join } from "node:path";
 
 const memoryAuthority = vi.hoisted(() => ({ enabled: true }));
 
-vi.mock("../../utils/settings/settings.js", async (importOriginal) => {
+vi.mock("../../../src/utils/settings/settings.js", async (importOriginal) => {
   const actual = await importOriginal<
-    typeof import("../../utils/settings/settings.js")
+    typeof import("../../../src/utils/settings/settings.js")
   >();
   return {
     ...actual,
@@ -20,26 +20,26 @@ vi.mock("../../utils/settings/settings.js", async (importOriginal) => {
   };
 });
 
-import { getProjectRoot, setProjectRoot } from "../../bootstrap/state.js";
-import { ConfigStore } from "../../config/store.js";
-import { REDACTED_SECRET } from "../../secrets/index.js";
+import { getProjectRoot, setProjectRoot } from "../../../src/bootstrap/state.js";
+import { ConfigStore } from "../../../src/config/store.js";
+import { REDACTED_SECRET } from "../../../src/secrets/index.js";
 import {
   getAttachmentTrackingState,
   resetRelevantMemoryBudget,
-} from "../../session/attachment-state.js";
+} from "../../../src/session/attachment-state.js";
 import type {
   AdmittedMemorySelector,
   MemorySelectorRequest,
-} from "../../memory/recall-contract.js";
-import { closeFullCorpusMemoryIndexes } from "../../memory/find-relevant.js";
-import { buildProjectMemoryDirectory, getProjectMemoryPath } from "../../memory/paths.js";
+} from "../../../src/memory/recall-contract.js";
+import { closeFullCorpusMemoryIndexes } from "../../../src/memory/find-relevant.js";
+import { buildProjectMemoryDirectory, getProjectMemoryPath } from "../../../src/memory/paths.js";
 import {
   enterCanonicalSettingsAuthority,
   resetCanonicalSettingsAuthorityForTesting,
-} from "../../utils/settings/canonicalAuthority.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
-import { relevantMemoriesProducer } from "./relevant-memories.js";
-import { attachmentsToMessages } from "./messages.js";
+} from "../../../src/utils/settings/canonicalAuthority.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
+import { relevantMemoriesProducer } from "../../../src/prompts/attachments/relevant-memories.js";
+import { attachmentsToMessages } from "../../../src/prompts/attachments/messages.js";
 
 let root: string;
 let cwd: string;

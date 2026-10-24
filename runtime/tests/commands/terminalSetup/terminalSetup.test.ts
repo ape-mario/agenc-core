@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
-vi.mock("../../tools.js", () => ({
+vi.mock("../../../src/tools.js", () => ({
   getAllTools: () => [],
   getDefaultTools: () => [],
 }));
 
 const envState: { terminal: string | undefined } = { terminal: undefined };
 
-vi.mock("../../utils/env.js", () => ({
+vi.mock("../../../src/utils/env.js", () => ({
   env: new Proxy(envState as Record<string, unknown>, {
     get(target, prop) {
       return target[prop as string];
@@ -19,7 +19,7 @@ vi.mock("../../utils/env.js", () => ({
 }));
 
 const { getNativeCSIuTerminalDisplayName, shouldOfferTerminalSetup } =
-  await import("./terminalSetup.js");
+  await import("../../../src/commands/terminalSetup/terminalSetup.js");
 
 beforeEach(() => {
   envState.terminal = undefined;

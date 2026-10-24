@@ -1,14 +1,14 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { WorktreeExitLoadingState } from './WorktreeExitDialog.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { WorktreeExitLoadingState } from '../../../src/tui/components/WorktreeExitDialog.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('./spinner/Spinner.js', () => ({
+vi.mock('../../../src/tui/components/spinner/Spinner.js', () => ({
   Spinner: () => null,
 }))
 

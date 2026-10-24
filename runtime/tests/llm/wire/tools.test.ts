@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
-import type { LLMTool } from "../types.js";
+import type { LLMTool } from "../../../src/llm/types.js";
 import {
   sanitizeToolSchemaForGrammar,
   toAnthropicTools,
   toChatCompletionsTools,
   toOpenAIResponsesTools,
   toXaiResponsesTools,
-} from "./tools.js";
+} from "../../../src/llm/wire/tools.js";
 
 const TOOL: LLMTool = {
   type: "function",

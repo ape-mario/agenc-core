@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { addMarketplaceOp } from "./marketplace.js";
-import { pluginSignaturePayloadBytes } from "../resolution.js";
+import { addMarketplaceOp } from "../../../src/plugins/marketplace/marketplace.js";
+import { pluginSignaturePayloadBytes } from "../../../src/plugins/resolution.js";
 
 async function processMarket(prefix: string) {
   const root = await mkdtemp(join(tmpdir(), prefix));

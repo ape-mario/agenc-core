@@ -17,19 +17,19 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => harness.features.has(name),
 }))
 
-vi.mock('../../services/compact/snipProjection.js', () => ({
+vi.mock('../../../src/services/compact/snipProjection.js', () => ({
   isSnipBoundaryMessage: (message: { readonly subtype?: string }) =>
     message.subtype === 'snip_boundary',
 }))
 
-vi.mock('../../services/compact/snipCompact.js', () => ({
+vi.mock('../../../src/services/compact/snipCompact.js', () => ({
   isSnipMarkerMessage: (message: { readonly subtype?: string }) =>
     message.subtype === 'snip_marker',
 }))
 
-vi.mock('../message-renderers/SnipBoundaryMessage.js', async () => {
+vi.mock('../../../src/tui/message-renderers/SnipBoundaryMessage.js', async () => {
   const ReactModule = await import('react')
-  const { Text } = await import('../ink.js')
+  const { Text } = await import('../../../src/tui/ink.js')
   return {
     SnipBoundaryMessage: (props: Record<string, unknown>) => {
       harness.calls.push({ name: 'SnipBoundaryMessage', props })
@@ -38,7 +38,7 @@ vi.mock('../message-renderers/SnipBoundaryMessage.js', async () => {
   }
 })
 
-vi.mock('./Message.renderers.js', async () => {
+vi.mock('../../../src/tui/components/Message.renderers.js', async () => {
   const renderer = (name: string) => (props: Record<string, unknown>) => {
     harness.calls.push({ name, props })
     return null
@@ -66,10 +66,10 @@ vi.mock('./Message.renderers.js', async () => {
   }
 })
 
-import { createRoot } from '../ink/root.js'
-import { Box } from '../ink.js'
-import type { Props } from './Message.js'
-import { Message } from './Message.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { Box } from '../../../src/tui/ink.js'
+import type { Props } from '../../../src/tui/components/Message.js'
+import { Message } from '../../../src/tui/components/Message.js'
 
 function createStreams(): {
   stdout: PassThrough

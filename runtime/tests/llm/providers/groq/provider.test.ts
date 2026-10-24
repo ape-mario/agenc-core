@@ -1,11 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { GroqProvider } from "./index.js";
+import { GroqProvider } from "../../../../src/llm/providers/groq/index.js";
 import {
   BUILT_IN_PROVIDER_BASE_URLS,
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
-} from "../../registry/provider-info.js";
+} from "../../../../src/llm/registry/provider-info.js";
 
 describe("GroqProvider", () => {
   test("uses the Groq compatible endpoint and bearer auth", async () => {

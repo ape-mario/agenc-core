@@ -3,11 +3,11 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import type { ScrollBoxHandle } from '../ink/components/ScrollBox.js'
-import type { DOMElement } from '../ink/dom.js'
-import { Box, Text } from '../ink.js'
-import { createRoot } from '../ink/root.js'
-import { useVirtualScroll, type VirtualScrollResult } from './useVirtualScroll.js'
+import type { ScrollBoxHandle } from '../../../src/tui/ink/components/ScrollBox.js'
+import type { DOMElement } from '../../../src/tui/ink/dom.js'
+import { Box, Text } from '../../../src/tui/ink.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { useVirtualScroll, type VirtualScrollResult } from '../../../src/tui/hooks/useVirtualScroll.js'
 
 type ClampCall = readonly [number | undefined, number | undefined]
 

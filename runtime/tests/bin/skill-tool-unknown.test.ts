@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
   NATIVE_PACKAGE_URL: undefined,
 };
 
-import type { Session } from "../session/session.js";
+import type { Session } from "../../src/session/session.js";
 
 interface Entry {
   readonly name: string;
@@ -36,7 +36,7 @@ function sessionWith(availableSkills: readonly Entry[]): Session {
 }
 
 async function refusalFor(session: Session, name: string) {
-  const { createModelFacingTools } = await import("./model-facing-tools.js");
+  const { createModelFacingTools } = await import("../../src/bin/model-facing-tools.js");
   const skill = createModelFacingTools({
     workspaceRoot: process.cwd(),
     getSession: () => session,

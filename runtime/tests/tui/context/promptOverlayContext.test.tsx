@@ -3,34 +3,34 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import Text from "../ink/components/Text.js";
-import { createRoot } from "../ink/root.js";
+import Text from "../../../src/tui/ink/components/Text.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
 import {
   PromptOverlayProvider,
   usePromptOverlay,
   usePromptOverlayDialog,
   useSetPromptOverlay,
   useSetPromptOverlayDialog,
-} from "./promptOverlayContext.js";
+} from "../../../src/tui/context/promptOverlayContext.js";
 
-vi.mock("../../utils/debug.js", () => ({
+vi.mock("../../../src/utils/debug.js", () => ({
   logForDebugging: () => {},
 }));
-vi.mock("../../bootstrap/state.js", () => ({
+vi.mock("../../../src/bootstrap/state.js", () => ({
   flushInteractionTime: () => {},
   markScrollActivity: () => {},
   updateLastInteractionTime: () => {},
 }));
-vi.mock("../../utils/earlyInput.js", () => ({
+vi.mock("../../../src/utils/earlyInput.js", () => ({
   stopCapturingEarlyInput: () => {},
 }));
-vi.mock("../../utils/envUtils.js", () => ({
+vi.mock("../../../src/utils/envUtils.js", () => ({
   isEnvTruthy: () => false,
 }));
-vi.mock("../../utils/fullscreen.js", () => ({
+vi.mock("../../../src/utils/fullscreen.js", () => ({
   isMouseClicksDisabled: () => true,
 }));
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: () => {},
 }));
 

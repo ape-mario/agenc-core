@@ -44,44 +44,44 @@ const harness = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../context/overlayContext', () => ({
+vi.mock('../../../src/tui/context/overlayContext.js', () => ({
   useRegisterOverlay: harness.registerOverlay,
 }))
 
-vi.mock('../hooks/useTerminalSize', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => harness.terminal,
 }))
 
-vi.mock('../../utils/cwd', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => harness.cwd,
 }))
 
-vi.mock('../../utils/editor', () => ({
+vi.mock('../../../src/utils/editor.js', () => ({
   openFileInExternalEditor: harness.openFileInExternalEditor,
 }))
 
-vi.mock('../../utils/readFileInRange', () => ({
+vi.mock('../../../src/utils/readFileInRange.js', () => ({
   readFileInRange: harness.readFileInRange,
 }))
 
-vi.mock('../../utils/log', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: harness.logError,
 }))
 
-vi.mock('../../utils/ripgrep', () => ({
+vi.mock('../../../src/utils/ripgrep.js', () => ({
   ripGrepStream: harness.ripGrepStream,
 }))
 
-vi.mock('./design-system/FuzzyPicker', () => ({
+vi.mock('../../../src/tui/components/design-system/FuzzyPicker.js', () => ({
   FuzzyPicker: (props: CapturedPickerProps) => {
     harness.pickerProps = props
     return null
   },
 }))
 
-import { createRoot } from '../ink/root.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { GlobalSearchDialog } from './GlobalSearchDialog.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { GlobalSearchDialog } from '../../../src/tui/components/GlobalSearchDialog.js'
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))

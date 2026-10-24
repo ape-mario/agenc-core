@@ -6,13 +6,13 @@ import { describe, expect, test } from "vitest";
 import type {
   McpElicitationRequestEvent,
   McpElicitationResponse,
-} from "../../elicitation/types.js";
-import { createRoot } from "../ink/root.js";
+} from "../../../src/elicitation/types.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
 import {
   type ElicitationPromptState,
   type TuiElicitationState,
   useTuiElicitation,
-} from "./App.js";
+} from "../../../src/tui/components/App.js";
 
 type TestSession = {
   services: {

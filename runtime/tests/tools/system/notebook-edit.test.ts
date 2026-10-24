@@ -30,8 +30,8 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buildFileMutationMetadata } from "../result-metadata.js";
-import { createNotebookEditTool } from "./notebook-edit.js";
+import { buildFileMutationMetadata } from "../../../src/tools/result-metadata.js";
+import { createNotebookEditTool } from "../../../src/tools/system/notebook-edit.js";
 
 function notebook(cells: unknown[], minor = 5): Record<string, unknown> {
   return {

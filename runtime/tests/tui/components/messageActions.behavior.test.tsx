@@ -4,9 +4,9 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { Text } from '../ink.js'
-import { createRoot } from '../ink/root.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { Text } from '../../../src/tui/ink.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import {
   InVirtualListContext,
   MessageActionsBar,
@@ -20,7 +20,7 @@ import {
   toolCallOf,
   useMessageActions,
   useSelectedMessageBg,
-} from './messageActions.js'
+} from '../../../src/tui/components/messageActions.js'
 
 const actionProbe = vi.hoisted(() => ({
   keybindingCalls: [] as Array<{
@@ -29,7 +29,7 @@ const actionProbe = vi.hoisted(() => ({
   }>,
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybindings: (
     handlers: Record<string, () => void>,
     options: { context: string; isActive: boolean },

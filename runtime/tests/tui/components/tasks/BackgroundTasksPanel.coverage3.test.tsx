@@ -3,8 +3,8 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createRoot } from '../../ink.js'
-import { renderToString } from '../../../utils/staticRender.js'
+import { createRoot } from '../../../../src/tui/ink.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 
 const appStateMock = vi.hoisted(() => ({
   state: { tasks: {} } as Record<string, unknown>,
@@ -36,19 +36,19 @@ type TestStdin = PassThrough & {
   unref: () => void
 }
 
-vi.mock('../../state/AppState.js', () => ({
+vi.mock('../../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: typeof appStateMock.state) => unknown) =>
     selector(appStateMock.state),
   useSetAppState: () => appStateMock.setAppState,
 }))
 
-vi.mock('../../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => terminalSizeMock.size,
 }))
 
-vi.mock('../../ink.js', async () => {
-  const actual = await vi.importActual<typeof import('../../ink.js')>(
-    '../../ink.js',
+vi.mock('../../../../src/tui/ink.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/tui/ink.js')>(
+    '../../../../src/tui/ink.js',
   )
   return {
     ...actual,
@@ -60,29 +60,29 @@ vi.mock('../../ink.js', async () => {
   }
 })
 
-vi.mock('../../../tasks/LocalShellTask/killShellTasks.js', () => ({
+vi.mock('../../../../src/tasks/LocalShellTask/killShellTasks.js', () => ({
   killTask: killTaskMock,
 }))
 
-vi.mock('../../../tasks/LocalAgentTask/LocalAgentTask.js', () => ({
+vi.mock('../../../../src/tasks/LocalAgentTask/LocalAgentTask.js', () => ({
   killAsyncAgent: killAsyncAgentMock,
 }))
 
-vi.mock('../../../tasks/InProcessTeammateTask/InProcessTeammateTask.js', () => ({
+vi.mock('../../../../src/tasks/InProcessTeammateTask/InProcessTeammateTask.js', () => ({
   requestTeammateShutdown: requestTeammateShutdownMock,
 }))
 
-vi.mock('../../../utils/fsOperations.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../utils/fsOperations.js')>()
+vi.mock('../../../../src/utils/fsOperations.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/utils/fsOperations.js')>()
   return {
     ...actual,
     tailFile: tailFileMock,
   }
 })
 
-vi.mock('../../../utils/task/diskOutput.js', async (importOriginal) => {
+vi.mock('../../../../src/utils/task/diskOutput.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../../../utils/task/diskOutput.js')>()
+    await importOriginal<typeof import('../../../../src/utils/task/diskOutput.js')>()
   return {
     ...actual,
     getTaskOutputPath: getTaskOutputPathMock,
@@ -208,7 +208,7 @@ describe('BackgroundTasksPanel branch coverage', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
     const listOutput = await renderToString(<BackgroundTasksPanel />, 120)
     const detailOutput = await renderToString(
       <BackgroundTasksPanel initialDetailTaskId="local-agent-task" />,
@@ -238,7 +238,7 @@ describe('BackgroundTasksPanel branch coverage', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
     const output = await renderToString(
       <BackgroundTasksPanel initialDetailTaskId="teammate-task" />,
       120,
@@ -273,7 +273,7 @@ describe('BackgroundTasksPanel branch coverage', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
     const listOutput = await renderToString(<BackgroundTasksPanel />, 120)
     const detailOutput = await renderToString(
       <BackgroundTasksPanel initialDetailTaskId="teammate-no-role" />,
@@ -316,7 +316,7 @@ describe('BackgroundTasksPanel branch coverage', () => {
       },
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
     const output = await renderToString(
       <BackgroundTasksPanel initialDetailTaskId="completed-shell" />,
       120,
@@ -353,7 +353,7 @@ describe('BackgroundTasksPanel branch coverage', () => {
     })
 
     try {
-      const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+      const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
       root.render(<BackgroundTasksPanel initialDetailTaskId="running-shell" />)
       await sleep()
       root.unmount()
@@ -384,7 +384,7 @@ describe('BackgroundTasksPanel branch coverage', () => {
         }),
       },
     }
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
     await renderToString(<BackgroundTasksPanel />, 120)
 
     if (!inputHandler.current) {
@@ -433,7 +433,7 @@ describe('BackgroundTasksPanel branch coverage', () => {
     })
 
     try {
-      const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+      const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
       root.render(<BackgroundTasksPanel initialDetailTaskId="local-agent-task" />)
       await sleep()
       if (!inputHandler.current) {
@@ -457,7 +457,7 @@ describe('BackgroundTasksPanel branch coverage', () => {
       agentNameRegistry: new Map(),
     }
 
-    const { BackgroundTasksPanel } = await import('./BackgroundTasksPanel.js')
+    const { BackgroundTasksPanel } = await import('../../../../src/tui/components/tasks/BackgroundTasksPanel.js')
     const output = await renderToString(<BackgroundTasksPanel />, 120)
 
     expect(output).toContain('No background tasks')

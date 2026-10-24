@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import type { KeybindingBlock, ParsedBinding } from "./types.js";
+import type { KeybindingBlock, ParsedBinding } from "../../../src/tui/keybindings/types.js";
 import {
   checkDuplicates,
   checkReservedShortcuts,
@@ -8,7 +8,7 @@ import {
   formatWarnings,
   validateBindings,
   validateUserConfig,
-} from "./validate.js";
+} from "../../../src/tui/keybindings/validate.js";
 
 vi.mock("bun:bundle", () => ({
   feature: () => false,

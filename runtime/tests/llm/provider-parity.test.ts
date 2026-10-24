@@ -1,45 +1,45 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultConfig } from "../config/schema.js";
-import { resolveProviderCapabilityEntry } from "./capabilities.js";
-import { StaticModelsManager } from "./models-manager.js";
+import { defaultConfig } from "../../src/config/schema.js";
+import { resolveProviderCapabilityEntry } from "../../src/llm/capabilities.js";
+import { StaticModelsManager } from "../../src/llm/models-manager.js";
 import {
   createProvider,
   readProviderIdentity,
   KNOWN_PROVIDER_NAMES,
   type ProviderFactoryOptions,
   type ProviderName,
-} from "./provider.js";
-import { AnthropicProvider } from "./providers/anthropic/adapter.js";
-import { BedrockProvider } from "./providers/bedrock/index.js";
-import { DeepSeekProvider } from "./providers/deepseek/index.js";
-import { MetaProvider } from "./providers/meta/index.js";
-import { CerebrasProvider } from "./providers/cerebras/index.js";
+} from "../../src/llm/provider.js";
+import { AnthropicProvider } from "../../src/llm/providers/anthropic/adapter.js";
+import { BedrockProvider } from "../../src/llm/providers/bedrock/index.js";
+import { DeepSeekProvider } from "../../src/llm/providers/deepseek/index.js";
+import { MetaProvider } from "../../src/llm/providers/meta/index.js";
+import { CerebrasProvider } from "../../src/llm/providers/cerebras/index.js";
 import {
   ZaiCodingPlanProvider,
   ZaiProvider,
-} from "./providers/zai/index.js";
-import { KimiProvider } from "./providers/kimi/index.js";
+} from "../../src/llm/providers/zai/index.js";
+import { KimiProvider } from "../../src/llm/providers/kimi/index.js";
 import {
   QwenProvider,
   QwenTokenPlanProvider,
-} from "./providers/qwen/index.js";
-import { GeminiProvider } from "./providers/gemini/index.js";
-import { createGeminiEndpointPlan } from "./providers/gemini/endpoint-plan.js";
-import { GrokProvider } from "./providers/grok/adapter.js";
-import { VeniceProvider } from "./providers/venice/index.js";
-import { AbliterationProvider } from "./providers/abliteration/index.js";
-import { GroqProvider } from "./providers/groq/index.js";
-import { GitHubProvider } from "./providers/github/index.js";
-import { LMStudioProvider } from "./providers/lmstudio/index.js";
-import { MiniMaxProvider } from "./providers/minimax/index.js";
-import { MistralProvider } from "./providers/mistral/index.js";
-import { NvidiaNimProvider } from "./providers/nvidia-nim/index.js";
-import { OllamaProvider } from "./providers/ollama/adapter.js";
-import { OpenAICompatibleProvider } from "./providers/openai-compatible/index.js";
-import { OpenAIProvider } from "./providers/openai/adapter.js";
-import { OpenRouterProvider } from "./providers/openrouter/index.js";
-import { OllamaCloudProvider } from "./providers/ollama-cloud/index.js";
+} from "../../src/llm/providers/qwen/index.js";
+import { GeminiProvider } from "../../src/llm/providers/gemini/index.js";
+import { createGeminiEndpointPlan } from "../../src/llm/providers/gemini/endpoint-plan.js";
+import { GrokProvider } from "../../src/llm/providers/grok/adapter.js";
+import { VeniceProvider } from "../../src/llm/providers/venice/index.js";
+import { AbliterationProvider } from "../../src/llm/providers/abliteration/index.js";
+import { GroqProvider } from "../../src/llm/providers/groq/index.js";
+import { GitHubProvider } from "../../src/llm/providers/github/index.js";
+import { LMStudioProvider } from "../../src/llm/providers/lmstudio/index.js";
+import { MiniMaxProvider } from "../../src/llm/providers/minimax/index.js";
+import { MistralProvider } from "../../src/llm/providers/mistral/index.js";
+import { NvidiaNimProvider } from "../../src/llm/providers/nvidia-nim/index.js";
+import { OllamaProvider } from "../../src/llm/providers/ollama/adapter.js";
+import { OpenAICompatibleProvider } from "../../src/llm/providers/openai-compatible/index.js";
+import { OpenAIProvider } from "../../src/llm/providers/openai/adapter.js";
+import { OpenRouterProvider } from "../../src/llm/providers/openrouter/index.js";
+import { OllamaCloudProvider } from "../../src/llm/providers/ollama-cloud/index.js";
 import type {
   LLMChatOptions,
   LLMMessage,
@@ -47,11 +47,11 @@ import type {
   LLMResponse,
   LLMTool,
   LLMToolCall,
-} from "./types.js";
+} from "../../src/llm/types.js";
 import { DESKTOP_PLUGIN_TOOLS } from "./fixtures/desktop-plugin-tools.js";
-import { encodeMcpToolNameForWire } from "./wire/mcp-tool-naming.js";
-import { buildToolRegistry } from "../tool-registry.js";
-import type { Tool } from "../tools/types.js";
+import { encodeMcpToolNameForWire } from "../../src/llm/wire/mcp-tool-naming.js";
+import { buildToolRegistry } from "../../src/tool-registry.js";
+import type { Tool } from "../../src/tools/types.js";
 import { Server as McpFixtureServer } from "@modelcontextprotocol/sdk/server/index.js";
 import { Client as McpFixtureClient } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";

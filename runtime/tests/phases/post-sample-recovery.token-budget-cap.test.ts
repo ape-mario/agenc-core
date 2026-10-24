@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { buildInitialTurnState } from "../session/turn-state.js";
-import { applyPendingBudgetContinuation } from "./post-sample-recovery.js";
-import { MAX_RECOVERY_REENTRIES } from "../recovery/fallback-ladder.js";
+import { buildInitialTurnState } from "../../src/session/turn-state.js";
+import { applyPendingBudgetContinuation } from "../../src/phases/post-sample-recovery.js";
+import { MAX_RECOVERY_REENTRIES } from "../../src/recovery/fallback-ladder.js";
 import { mkCtx, mkSession } from "../../tests/fixtures.js";
-import type { TurnState } from "../session/turn-state.js";
+import type { TurnState } from "../../src/session/turn-state.js";
 
 function pendBudgetStop(state: TurnState, reason: string): void {
   state.pendingBudgetDecision = { kind: "stop", reason };

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { OllamaProvider } from "./adapter.js";
+import { OllamaProvider } from "../../../../src/llm/providers/ollama/adapter.js";
 import type { LLMChatOptions, LLMMessage } from "../../../../src/llm/types.js";
 
 const ECHO = {

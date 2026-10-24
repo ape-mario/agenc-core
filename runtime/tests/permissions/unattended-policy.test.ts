@@ -7,11 +7,11 @@ import {
   normalizeUnattendedToolList,
   resolveUnattendedPermissionDecision,
   unattendedPolicyForContext,
-} from "./unattended-policy.js";
+} from "../../src/permissions/unattended-policy.js";
 import {
   createEmptyToolPermissionContext,
   type ToolPermissionContext,
-} from "./types.js";
+} from "../../src/permissions/types.js";
 
 describe("unattended permission policy", () => {
   test("normalizes canonical risk families, trims entries, and removes duplicates", () => {

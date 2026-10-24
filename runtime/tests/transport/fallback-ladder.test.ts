@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveTransportMode } from "./fallback-ladder.js";
+import { resolveTransportMode } from "../../src/transport/fallback-ladder.js";
 
 const ENV_KEYS = [
   "AGENC_TRANSPORT",

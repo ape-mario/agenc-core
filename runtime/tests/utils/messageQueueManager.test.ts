@@ -4,12 +4,12 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../bootstrap/state.js", () => ({
+vi.mock("../../src/bootstrap/state.js", () => ({
   getActiveTimeCounter: () => null,
   getSessionId: () => "queue-test-session",
 }));
 
-vi.mock("./sessionStorage.js", () => ({
+vi.mock("../../src/utils/sessionStorage.js", () => ({
   recordQueueOperation: vi.fn(),
   writeAgentMetadata: vi.fn(async () => undefined),
 }));
@@ -26,8 +26,8 @@ import {
   registerCommandQueueOwner,
   removeLastQueuedInput,
   resetCommandQueueForTesting,
-} from "./messageQueueManager.js";
-import type { QueuedCommand } from "../types/textInputTypes.js";
+} from "../../src/utils/messageQueueManager.js";
+import type { QueuedCommand } from "../../src/types/textInputTypes.js";
 
 describe("messageQueueManager workspace ownership", () => {
   afterEach(() => {

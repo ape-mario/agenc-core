@@ -11,7 +11,7 @@ import {
   createRolloutTraceRecorder,
   type RawTraceEvent,
   type ThreadStartedTraceMetadata,
-} from "./rollout-trace.js";
+} from "../../src/session/rollout-trace.js";
 
 function freshTmpRoot(): string {
   return mkdtempSync(join(tmpdir(), "rollout-trace-test-"));

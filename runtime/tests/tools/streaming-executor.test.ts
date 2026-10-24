@@ -4,17 +4,17 @@ import { describe, expect, test, vi } from "vitest";
 import {
   StreamingToolExecutor,
   type StreamingToolUpdate,
-} from "./streaming-executor.js";
-import { routerFromRegistry, ToolRouter } from "./router.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
-import { EventLog } from "../session/event-log.js";
-import type { ToolRegistry, ToolDispatchResult } from "../tool-registry.js";
-import type { LLMTool, LLMToolCall } from "../llm/types.js";
-import type { Tool } from "./types.js";
-import { EXCLUSIVE, SHARED_READ } from "./concurrency.js";
-import type { ToolUseBlock } from "../session/turn-state.js";
-import { createExecCommandTool } from "./system/exec-command.js";
-import { UnifiedExecProcessManager } from "../unified-exec/process-manager.js";
+} from "../../src/tools/streaming-executor.js";
+import { routerFromRegistry, ToolRouter } from "../../src/tools/router.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import { EventLog } from "../../src/session/event-log.js";
+import type { ToolRegistry, ToolDispatchResult } from "../../src/tool-registry.js";
+import type { LLMTool, LLMToolCall } from "../../src/llm/types.js";
+import type { Tool } from "../../src/tools/types.js";
+import { EXCLUSIVE, SHARED_READ } from "../../src/tools/concurrency.js";
+import type { ToolUseBlock } from "../../src/session/turn-state.js";
+import { createExecCommandTool } from "../../src/tools/system/exec-command.js";
+import { UnifiedExecProcessManager } from "../../src/unified-exec/process-manager.js";
 import { withExplicitDangerBoundary } from "../helpers/explicit-danger-boundary.js";
 
 function mockRegistry(

@@ -4,9 +4,9 @@ import { basename, join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { FileWatcher } from "../file-watcher/index.js";
-import { createSkillChangeDetector } from "./change-detector.js";
-import { parseSkillFrontmatterFields } from "./loadSkillsDir.js";
+import { FileWatcher } from "../../src/file-watcher/index.js";
+import { createSkillChangeDetector } from "../../src/skills/change-detector.js";
+import { parseSkillFrontmatterFields } from "../../src/skills/loadSkillsDir.js";
 import {
   buildSkillListingWithinBudget,
   clearInvokedSkills,
@@ -17,8 +17,8 @@ import {
   formatSkillListingWithinBudget,
   loadLocalSkillsSnapshot,
   maxSkillFilesPerRoot,
-} from "./local-loader.js";
-import { substituteArguments } from "../tui/slash/argument-substitution.js";
+} from "../../src/skills/local-loader.js";
+import { substituteArguments } from "../../src/tui/slash/argument-substitution.js";
 
 function tmpRoot(label: string): string {
   return mkdtempSync(join(tmpdir(), `agenc-${label}-`));

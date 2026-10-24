@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { seekSequence } from "./seek-sequence.js";
+import { seekSequence } from "../../../src/tools/apply-patch/seek-sequence.js";
 
 describe("seekSequence", () => {
   test("returns the matching index for a normal (non-EOF) scan", () => {

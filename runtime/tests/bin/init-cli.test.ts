@@ -9,18 +9,18 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseToml } from "../config/loader.js";
+import { parseToml } from "../../src/config/loader.js";
 import {
   PROJECT_CONFIG_DIR,
   PROJECT_CONFIG_FILENAME,
   PROJECT_INSTRUCTIONS_FILENAME,
-} from "../config/project-init.js";
+} from "../../src/config/project-init.js";
 import {
   formatAgenCInitCliHelpText,
   parseAgenCInitCliArgs,
   runAgenCInitCli,
   type AgenCInitCliIo,
-} from "./init-cli.js";
+} from "../../src/bin/init-cli.js";
 
 function createIo(): AgenCInitCliIo & {
   readonly stdoutText: () => string;

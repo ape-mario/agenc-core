@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ResumeManager, RESUME_MAX_ATTEMPTS, decideResume } from "./resume.js";
-import { FallbackTriggeredError } from "../recovery/api-errors.js";
+import { ResumeManager, RESUME_MAX_ATTEMPTS, decideResume } from "../../src/agents/resume.js";
+import { FallbackTriggeredError } from "../../src/recovery/api-errors.js";
 
 describe("decideResume", () => {
   it("aborts when parent is aborted", () => {

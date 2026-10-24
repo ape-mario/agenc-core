@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createWarmSessionSetupCeiling } from "./warm-session-setup-ceiling.js";
+import { createWarmSessionSetupCeiling } from "../../src/bin/warm-session-setup-ceiling.js";
 import { itWhen } from "../helpers/platform-registration.js";
 
 // Reload the shared helper before installing filesystem fault injection.

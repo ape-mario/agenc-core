@@ -16,7 +16,7 @@ function storageHome() {
 
 beforeEach(() => {
   vi.resetModules();
-  vi.doUnmock("../utils/fsOperations.js");
+  vi.doUnmock("../../src/utils/fsOperations.js");
   installInMemoryNativeStorage();
   resetEnv();
 });
@@ -152,7 +152,7 @@ describe("remote descriptor credential storage", () => {
 
     const { buildInheritedEnvVars } = await loadSpawnUtils();
     const { runWithAgentRuntimeOptions } = await import(
-      "../session/runtime-options.js"
+      "../../src/session/runtime-options.js"
     );
     const runtimeOptions = Object.freeze({
       simpleMode: false,
@@ -244,20 +244,20 @@ describe("remote descriptor credential storage", () => {
 });
 
 async function loadAuthFileDescriptor(): Promise<
-  typeof import("../utils/authFileDescriptor.js")
+  typeof import("../../src/utils/authFileDescriptor.js")
 > {
-  return import("../utils/authFileDescriptor.js");
+  return import("../../src/utils/authFileDescriptor.js");
 }
 
 async function loadRemoteRuntimeCredentials(): Promise<
-  typeof import("../utils/secureStorage/remoteRuntimeCredentials.js")
+  typeof import("../../src/utils/secureStorage/remoteRuntimeCredentials.js")
 > {
-  return import("../utils/secureStorage/remoteRuntimeCredentials.js");
+  return import("../../src/utils/secureStorage/remoteRuntimeCredentials.js");
 }
 
 function installInMemoryNativeStorage(): void {
   const records = new Map<string, import("../../src/utils/secureStorage/index.js").SecureStorageData>();
-  vi.doMock("../utils/secureStorage/index.js", async (importOriginal) => {
+  vi.doMock("../../src/utils/secureStorage/index.js", async (importOriginal) => {
     const original = await importOriginal<
       typeof import("../../src/utils/secureStorage/index.js")
     >();
@@ -279,9 +279,9 @@ function installInMemoryNativeStorage(): void {
 }
 
 async function loadSessionIngressAuth(): Promise<
-  typeof import("../utils/sessionIngressAuth.js")
+  typeof import("../../src/utils/sessionIngressAuth.js")
 > {
-  return import("../utils/sessionIngressAuth.js");
+  return import("../../src/utils/sessionIngressAuth.js");
 }
 
 function mockDescriptorRead(token: string): void {
@@ -289,9 +289,9 @@ function mockDescriptorRead(token: string): void {
 }
 
 function mockDescriptorReadFrom(readToken: () => string): void {
-  vi.doMock("../utils/fsOperations.js", async (importOriginal) => {
+  vi.doMock("../../src/utils/fsOperations.js", async (importOriginal) => {
     const original = await importOriginal<
-      typeof import("../utils/fsOperations.js")
+      typeof import("../../src/utils/fsOperations.js")
     >();
     return {
       ...original,
@@ -304,9 +304,9 @@ function mockDescriptorReadFrom(readToken: () => string): void {
 }
 
 function mockDescriptorFailure(): void {
-  vi.doMock("../utils/fsOperations.js", async (importOriginal) => {
+  vi.doMock("../../src/utils/fsOperations.js", async (importOriginal) => {
     const original = await importOriginal<
-      typeof import("../utils/fsOperations.js")
+      typeof import("../../src/utils/fsOperations.js")
     >();
     return {
       ...original,
@@ -323,29 +323,29 @@ function mockDescriptorFailure(): void {
 }
 
 async function loadSpawnUtils(): Promise<
-  typeof import("../utils/swarm/spawnUtils.js")
+  typeof import("../../src/utils/swarm/spawnUtils.js")
 > {
-  vi.doMock("../bootstrap/state.js", () => ({
+  vi.doMock("../../src/bootstrap/state.js", () => ({
     getChromeFlagOverride: () => undefined,
     getInlinePlugins: () => [],
   }));
-  vi.doMock("../utils/bundledMode.js", () => ({
+  vi.doMock("../../src/utils/bundledMode.js", () => ({
     isInBundledMode: () => false,
   }));
-  vi.doMock("../utils/swarm/backends/teammateModeSnapshot.js", () => ({
+  vi.doMock("../../src/utils/swarm/backends/teammateModeSnapshot.js", () => ({
     getTeammateModeFromSnapshot: () => "default",
   }));
-  vi.doMock("../utils/model/providers.js", () => ({
+  vi.doMock("../../src/utils/model/providers.js", () => ({
     getSelectedProviderSelection: () => ({
       provider: "grok",
       model: "grok-test",
       environment: {},
     }),
   }));
-  vi.doMock("../utils/envUtils.js", () => ({
+  vi.doMock("../../src/utils/envUtils.js", () => ({
     getAgenCHomeDir: () => "/tmp/agenc-remote-token-test-home",
   }));
-  return import("../utils/swarm/spawnUtils.js");
+  return import("../../src/utils/swarm/spawnUtils.js");
 }
 
 function resetEnv(): void {

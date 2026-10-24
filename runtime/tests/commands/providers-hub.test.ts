@@ -8,22 +8,22 @@ import {
   normalizeApiKeyInput,
   removeProviderKey,
   saveProviderKey,
-} from "../auth/provider-keys.js";
-import * as providerKeys from "../auth/provider-keys.js";
-import { NativeSecureStorageUnavailableError } from "../utils/secureStorage/native.js";
-import { readLocalByokCredential } from "../auth/native-credentials.js";
-import type { EnvSnapshot } from "../config/env.js";
-import { resolveHomeContext, type HomeContext } from "../config/home.js";
-import type { ConfigStore } from "../config/store.js";
-import type { Session } from "../session/session.js";
+} from "../../src/auth/provider-keys.js";
+import * as providerKeys from "../../src/auth/provider-keys.js";
+import { NativeSecureStorageUnavailableError } from "../../src/utils/secureStorage/native.js";
+import { readLocalByokCredential } from "../../src/auth/native-credentials.js";
+import type { EnvSnapshot } from "../../src/config/env.js";
+import { resolveHomeContext, type HomeContext } from "../../src/config/home.js";
+import type { ConfigStore } from "../../src/config/store.js";
+import type { Session } from "../../src/session/session.js";
 import {
   chooseProviderAuth,
   chooseProviderModel,
   connectProviderWithKey,
   forgetProviderKey,
-} from "./providers-hub-actions.js";
-import { providerEnvironmentFromCommandContext } from "./config-context.js";
-import { saveXaiOauthCredentials } from "../utils/xaiOauthCredentials.js";
+} from "../../src/commands/providers-hub-actions.js";
+import { providerEnvironmentFromCommandContext } from "../../src/commands/config-context.js";
+import { saveXaiOauthCredentials } from "../../src/utils/xaiOauthCredentials.js";
 import {
   filterProvidersHubRows,
   readProvidersHubModels,
@@ -31,13 +31,13 @@ import {
   withLocalProbe,
   type ProvidersHubRow,
   type ProvidersHubSnapshot,
-} from "./providers-hub-snapshot.js";
+} from "../../src/commands/providers-hub-snapshot.js";
 import {
   recordOpenRouterZdrEndpoints,
   resetOpenRouterZdrEndpointsForTesting,
-} from "../llm/registry/openrouter-zdr-endpoints.js";
-import type { SlashCommandContext } from "./types.js";
-import { readModelMenuSnapshot } from "./model-menu-snapshot.js";
+} from "../../src/llm/registry/openrouter-zdr-endpoints.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import { readModelMenuSnapshot } from "../../src/commands/model-menu-snapshot.js";
 
 const homes: string[] = [];
 

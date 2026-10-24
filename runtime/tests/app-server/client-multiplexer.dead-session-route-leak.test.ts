@@ -15,15 +15,15 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTempWorkspaceFixture } from "../helpers/temp-workspace.js";
-import { AgenCDaemonClientMultiplexer } from "./client-multiplexer.js";
-import { AgenCDaemonSessionManager } from "./session-lifecycle.js";
+import { AgenCDaemonClientMultiplexer } from "../../src/app-server/client-multiplexer.js";
+import { AgenCDaemonSessionManager } from "../../src/app-server/session-lifecycle.js";
 import type {
   JsonObject,
   SessionAttachResult,
   SessionDetachResult,
   SessionSummary,
   SessionTerminateResult,
-} from "./protocol/index.js";
+} from "../../src/app-server/protocol/index.js";
 
 const workspaces = createTempWorkspaceFixture(
   "agenc-client-multiplexer-route-leak-workspace-",

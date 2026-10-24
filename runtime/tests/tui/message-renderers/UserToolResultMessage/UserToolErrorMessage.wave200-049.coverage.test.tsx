@@ -7,25 +7,25 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => featureFlags.has(name),
 }))
 
-vi.mock('../../hooks/useSettings.js', () => ({
+vi.mock('../../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),
 }))
 
-import type { Tool, Tools } from '../../../tools/Tool.js'
+import type { Tool, Tools } from '../../../../src/tools/Tool.js'
 import type {
   AgenCToolResultBlockParam,
   ProgressMessage,
-} from '../../../types/message.js'
-import { renderToString } from '../../../utils/staticRender.js'
+} from '../../../../src/types/message.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
 import {
   INTERRUPT_MESSAGE_FOR_TOOL_USE,
   PLAN_REJECTION_PREFIX,
   REJECT_MESSAGE_WITH_REASON_PREFIX,
-} from '../../../utils/messages.js'
-import { Text } from '../../ink.js'
-import { UserToolErrorMessage } from './UserToolErrorMessage.js'
+} from '../../../../src/utils/messages.js'
+import { Text } from '../../../../src/tui/ink.js'
+import { UserToolErrorMessage } from '../../../../src/tui/message-renderers/UserToolResultMessage/UserToolErrorMessage.js'
 
 function toolResult(content: AgenCToolResultBlockParam['content']): AgenCToolResultBlockParam {
   return {

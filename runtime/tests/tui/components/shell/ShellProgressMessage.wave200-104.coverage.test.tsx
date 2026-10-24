@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { ShellProgressMessage } from './ShellProgressMessage.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { ShellProgressMessage } from '../../../../src/tui/components/shell/ShellProgressMessage.js'
 
 describe('ShellProgressMessage wave200 coverage', () => {
   test('renders running, extra-line, and verbose shell output states', async () => {

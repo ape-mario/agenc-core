@@ -4,25 +4,25 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MCPManager } from "./manager.js";
+import { MCPManager } from "../../src/mcp-client/manager.js";
 import {
   fingerprintPluginCatalogConfig,
   readPluginCatalog,
   writePluginCatalog,
-} from "./plugin-catalog-cache.js";
-import type { MCPServerConfig } from "./types.js";
-import { createToolBridge } from "./tools.js";
+} from "../../src/mcp-client/plugin-catalog-cache.js";
+import type { MCPServerConfig } from "../../src/mcp-client/types.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
 
-vi.mock("./connection.js", () => ({ createMCPConnection: vi.fn() }));
-vi.mock("./tools.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./tools.js")>();
+vi.mock("../../src/mcp-client/connection.js", () => ({ createMCPConnection: vi.fn() }));
+vi.mock("../../src/mcp-client/tools.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/mcp-client/tools.js")>();
   return {
     ...actual,
     createToolBridge: vi.fn(actual.createToolBridge),
   };
 });
 
-import { createMCPConnection } from "./connection.js";
+import { createMCPConnection } from "../../src/mcp-client/connection.js";
 
 const mockCreateMCPConnection = vi.mocked(createMCPConnection);
 const homes: string[] = [];
@@ -167,7 +167,7 @@ describe("plugin catalog refresh guards", () => {
     try {
       await manager.start();
       await manager.callTool("lazyplug", "toolA", {});
-      const actual = await vi.importActual<typeof import("./tools.js")>("./tools.js");
+      const actual = await vi.importActual<typeof import("../../src/mcp-client/tools.js")>("../../src/mcp-client/tools.js");
       let releaseCachePublish!: () => void;
       const cachePublishHeld = new Promise<void>((resolve) => {
         releaseCachePublish = resolve;

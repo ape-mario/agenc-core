@@ -16,23 +16,23 @@ import {
   MCPManager,
   type MCPConnectionState,
   type MCPManagerStartOpts,
-} from "../mcp-client/manager.js";
-import type { MCPServerConfig } from "../mcp-client/types.js";
+} from "../../src/mcp-client/manager.js";
+import type { MCPServerConfig } from "../../src/mcp-client/types.js";
 import {
   projectMcpManagerToConnections,
   type McpManagerLike,
-} from "../mcp-client/tui-connections.js";
-import { createMCPConnection } from "../mcp-client/connection.js";
-import { createToolBridge } from "../mcp-client/tools.js";
-import { createResourceBridge } from "../mcp-client/resources.js";
-import { createPromptBridge } from "../mcp-client/prompts.js";
-import type { MCPCallObserver } from "../mcp-client/tools.js";
-import type { MCPServerConnection } from "../services/mcp/types.js";
-import type { ScopedMcpServerConfig } from "../services/mcp/types.js";
-import { loadPluginMcpServerRegistrations } from "../plugins/registration/mcp-plugin-integration.js";
-import { approveProjectMcpServerSync } from "../permissions/trust/project-trust.js";
-import { projectMcpServerApprovalDigest } from "../services/mcp/utils.js";
-import { getAllMcpConfigs } from "../services/mcp/config.js";
+} from "../../src/mcp-client/tui-connections.js";
+import { createMCPConnection } from "../../src/mcp-client/connection.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
+import { createResourceBridge } from "../../src/mcp-client/resources.js";
+import { createPromptBridge } from "../../src/mcp-client/prompts.js";
+import type { MCPCallObserver } from "../../src/mcp-client/tools.js";
+import type { MCPServerConnection } from "../../src/services/mcp/types.js";
+import type { ScopedMcpServerConfig } from "../../src/services/mcp/types.js";
+import { loadPluginMcpServerRegistrations } from "../../src/plugins/registration/mcp-plugin-integration.js";
+import { approveProjectMcpServerSync } from "../../src/permissions/trust/project-trust.js";
+import { projectMcpServerApprovalDigest } from "../../src/services/mcp/utils.js";
+import { getAllMcpConfigs } from "../../src/services/mcp/config.js";
 import {
   attachMcpManagerToSession,
   createSessionMcpManager,
@@ -42,34 +42,34 @@ import {
   resolveSessionMcpConfig as resolveRuntimeSessionMcpConfig,
   resolveSessionMcpPlan,
   startMcpManagerForSession,
-} from "./mcp-startup.js";
-import type { Session } from "./session.js";
-import { OpenAIProvider } from "../llm/providers/openai/adapter.js";
-import { ConfigStore } from "../config/store.js";
-import { readCanonicalUserConfigSnapshotSync } from "../config/update-sync.js";
-import { PluginSettingsService } from "../plugins/settings-service.js";
-import { withLocalMcpAccess } from "../mcp-client/local-control.js";
-import { verifyDesktopAuthority } from "../mcp-client/desktop-authority.js";
-import type { AgenCConfig } from "../config/schema.js";
+} from "../../src/session/mcp-startup.js";
+import type { Session } from "../../src/session/session.js";
+import { OpenAIProvider } from "../../src/llm/providers/openai/adapter.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { readCanonicalUserConfigSnapshotSync } from "../../src/config/update-sync.js";
+import { PluginSettingsService } from "../../src/plugins/settings-service.js";
+import { withLocalMcpAccess } from "../../src/mcp-client/local-control.js";
+import { verifyDesktopAuthority } from "../../src/mcp-client/desktop-authority.js";
+import type { AgenCConfig } from "../../src/config/schema.js";
 import {
   getCanonicalSettingsAuthority,
   type CanonicalSettingsAuthority,
-} from "../utils/settings/canonicalAuthority.js";
+} from "../../src/utils/settings/canonicalAuthority.js";
 
-vi.mock("../mcp-client/connection.js", () => ({
+vi.mock("../../src/mcp-client/connection.js", () => ({
   createMCPConnection: vi.fn(),
 }));
-vi.mock("../mcp-client/tools.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../mcp-client/tools.js")>()),
+vi.mock("../../src/mcp-client/tools.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/mcp-client/tools.js")>()),
   createToolBridge: vi.fn(),
 }));
-vi.mock("../mcp-client/resources.js", () => ({
+vi.mock("../../src/mcp-client/resources.js", () => ({
   createResourceBridge: vi.fn(),
 }));
-vi.mock("../mcp-client/prompts.js", () => ({
+vi.mock("../../src/mcp-client/prompts.js", () => ({
   createPromptBridge: vi.fn(),
 }));
-vi.mock("../plugins/registration/mcp-plugin-integration.js", () => ({
+vi.mock("../../src/plugins/registration/mcp-plugin-integration.js", () => ({
   loadPluginMcpServerRegistrations: vi.fn(),
 }));
 

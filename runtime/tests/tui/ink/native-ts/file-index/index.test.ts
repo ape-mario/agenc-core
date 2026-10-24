@@ -4,7 +4,7 @@ import FileIndexDefault, {
   CHUNK_MS,
   FileIndex,
   yieldToEventLoop,
-} from "./index.js";
+} from "../../../../../src/tui/ink/native-ts/file-index/index.js";
 
 describe("FileIndex", () => {
   test("deduplicates loaded paths and returns sorted top-level entries for empty queries", () => {

@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { FallbackToolUseRejectedMessage } from './FallbackToolUseRejectedMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { FallbackToolUseRejectedMessage } from '../../../src/tui/components/FallbackToolUseRejectedMessage.js'
 
 function RerenderFallbackToolUseRejectedMessage() {
   const [tick, setTick] = React.useState(0)

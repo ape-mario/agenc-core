@@ -4,7 +4,7 @@ import {
   normalizeMcpElicitationResponse,
   normalizeRequestUserInputResponse,
   respondToSessionElicitation,
-} from "./respond.js";
+} from "../../src/elicitation/respond.js";
 
 describe("respondToSessionElicitation", () => {
   it("normalizes and forwards request_user_input responses", async () => {

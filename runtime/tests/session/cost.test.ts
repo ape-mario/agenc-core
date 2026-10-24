@@ -9,12 +9,12 @@ import {
   formatTokenCount,
   formatDuration,
   registerCostSummaryOnExit,
-} from "./cost.js";
+} from "../../src/session/cost.js";
 import {
   BUILT_IN_PROVIDER_DEFAULT_MODELS,
   BUILT_IN_PROVIDER_MODEL_CATALOG,
-} from "../config/resolve-provider.js";
-import { BudgetTracker } from "../conversation/token-budget.js";
+} from "../../src/config/resolve-provider.js";
+import { BudgetTracker } from "../../src/conversation/token-budget.js";
 import { monotonicMs } from "../../src/utils/monotonic.js";
 
 const ZERO_COST_DEFAULT_PROVIDERS = new Set([

@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict'
 import { afterEach, expect, test, vi } from 'vitest'
-import { resolveHomeContext } from '../../config/home.js'
+import { resolveHomeContext } from '../../../src/config/home.js'
 
 const mcpAuthMocks = vi.hoisted(() => ({
   logMCPDebug: vi.fn(),
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logMCPDebug: mcpAuthMocks.logMCPDebug,
 }))
 
 import {
   AgenCAuthProvider,
   validateMcpOAuthAuthorizationServerMetadata,
-} from './auth.js'
-import type { McpSSEServerConfig } from './types.js'
-import { clearProxyCache } from '../../utils/proxy.js'
+} from '../../../src/services/mcp/auth.js'
+import type { McpSSEServerConfig } from '../../../src/services/mcp/types.js'
+import { clearProxyCache } from '../../../src/utils/proxy.js'
 
 const TEST_HOME = resolveHomeContext(
   { AGENC_HOME: '/tmp/agenc-mcp-auth-metadata-test' },

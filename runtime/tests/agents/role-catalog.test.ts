@@ -3,18 +3,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AgentRoleCatalog } from "./role-catalog.js";
+import { AgentRoleCatalog } from "../../src/agents/role-catalog.js";
 import {
   _resetAgentRolesForTesting,
   agentRoleFingerprint,
   createAgentRoleWorkspace,
   listBuiltInAgentRoles,
   registerAgentRole,
-} from "./role.js";
+} from "../../src/agents/role.js";
 import {
   roleToAgentDefinition,
   type AgentDefinition,
-} from "../tools/AgentTool/loadAgentsDir.js";
+} from "../../src/tools/AgentTool/loadAgentsDir.js";
 
 const temporaryRoots: string[] = [];
 

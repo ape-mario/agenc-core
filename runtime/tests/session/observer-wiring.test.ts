@@ -6,9 +6,9 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { Event, EventMsg } from "./event-log.js";
-import { createToolBridge } from "../mcp-client/tools.js";
-import { createBashTool } from "../tools/system/bash.js";
+import type { Event, EventMsg } from "../../src/session/event-log.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
+import { createBashTool } from "../../src/tools/system/bash.js";
 import { bindExplicitDangerBoundary } from "../helpers/explicit-danger-boundary.js";
 import {
   createBashExecObserverForSession,
@@ -17,7 +17,7 @@ import {
   createMCPCallObserverForSlot,
   type ObserverSessionSink,
   type SessionSlot,
-} from "./observer-wiring.js";
+} from "../../src/session/observer-wiring.js";
 
 /**
  * Minimal stub that exposes the subset of `Session` the observers

@@ -21,36 +21,36 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { LLMMessage } from "../../llm/types.js";
+import type { LLMMessage } from "../../../src/llm/types.js";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
+} from "../../../src/session/attachment-state.js";
 import { runWithCurrentRuntimeSession } from "../../../src/session/current-session.js";
 import { resolveAgentRuntimeOptions } from "../../../src/session/runtime-options.js";
 import type { Session } from "../../../src/session/session.js";
-import { attachmentsToMessages } from "./messages.js";
-import { type GetAttachmentsOptions, getAttachments } from "./orchestrator.js";
+import { attachmentsToMessages } from "../../../src/prompts/attachments/messages.js";
+import { type GetAttachmentsOptions, getAttachments } from "../../../src/prompts/attachments/orchestrator.js";
 import {
   IMAGE_MENTION_MAX_FILE_BYTES,
   IMAGE_MENTION_MAX_FILES,
   PDF_MENTION_MAX_FILE_BYTES,
-} from "./file-mentions.js";
-import { PDF_TEXT_EXTRACTION_MAX_BYTES } from "./user-pdf-input.js";
+} from "../../../src/prompts/attachments/file-mentions.js";
+import { PDF_TEXT_EXTRACTION_MAX_BYTES } from "../../../src/prompts/attachments/user-pdf-input.js";
 import {
   checkForLSPDiagnostics,
   registerPendingLSPDiagnostic,
   resetAllLSPDiagnosticState,
-} from "../../services/lsp/LSPDiagnosticRegistry.js";
-import { sideQuery } from "../../utils/sideQuery.js";
+} from "../../../src/services/lsp/LSPDiagnosticRegistry.js";
+import { sideQuery } from "../../../src/utils/sideQuery.js";
 import {
   clearSessionReadState,
   getSessionReadSnapshot,
   recordSessionRead,
-} from "../../tools/system/filesystem.js";
+} from "../../../src/tools/system/filesystem.js";
 import { explicitDangerBroker } from "../../helpers/explicit-danger-boundary.js";
 
-vi.mock("../../utils/sideQuery.js", () => ({
+vi.mock("../../../src/utils/sideQuery.js", () => ({
   sideQuery: vi.fn(),
 }));
 

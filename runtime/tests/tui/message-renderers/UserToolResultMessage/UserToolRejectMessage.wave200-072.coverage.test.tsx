@@ -1,11 +1,11 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import type { Tool, Tools } from '../../../tools/Tool.js'
-import type { ProgressMessage } from '../../../types/message.js'
-import { renderToString } from '../../../utils/staticRender.js'
-import { Text } from '../../ink.js'
-import { UserToolRejectMessage } from './UserToolRejectMessage.js'
+import type { Tool, Tools } from '../../../../src/tools/Tool.js'
+import type { ProgressMessage } from '../../../../src/types/message.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { Text } from '../../../../src/tui/ink.js'
+import { UserToolRejectMessage } from '../../../../src/tui/message-renderers/UserToolResultMessage/UserToolRejectMessage.js'
 
 const previousGlyphMode = process.env.AGENC_TUI_GLYPHS
 

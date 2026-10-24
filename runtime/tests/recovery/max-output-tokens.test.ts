@@ -1,15 +1,15 @@
 import { LIGHT_WORKSPACE_DATA_BOUNDARY, UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../../src/tools/untrusted-tool-result-framing.js";
 import { describe, expect, test } from "vitest";
-import { EventLog } from "../session/event-log.js";
-import { findToolTurnValidationIssue } from "../llm/tool-turn-validator.js";
-import type { Session } from "../session/session.js";
-import type { TurnState } from "../session/turn-state.js";
+import { EventLog } from "../../src/session/event-log.js";
+import { findToolTurnValidationIssue } from "../../src/llm/tool-turn-validator.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnState } from "../../src/session/turn-state.js";
 import {
   MAX_OUTPUT_TOKENS_ESCALATED,
   MAX_OUTPUT_TOKENS_RECOVERY_LIMIT,
   RETRY_REASONING_ONLY_CONTENT,
   runMaxOutputTokensRecovery,
-} from "./max-output-tokens.js";
+} from "../../src/recovery/max-output-tokens.js";
 
 interface FakeExecutor {
   discardCount: number;

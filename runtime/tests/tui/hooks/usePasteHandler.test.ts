@@ -17,30 +17,30 @@ const platformMock = vi.hoisted(() => ({
   current: 'linux' as 'linux' | 'macos' | 'unknown' | 'windows' | 'wsl',
 }))
 
-vi.mock('../../utils/imagePaste.js', () => ({
+vi.mock('../../../src/utils/imagePaste.js', () => ({
   PASTE_THRESHOLD: 800,
   getImageFromClipboard: imagePasteMocks.getImageFromClipboard,
   isImageFilePath: imagePasteMocks.isImageFilePath,
   tryReadImageFromPath: imagePasteMocks.tryReadImageFromPath,
 }))
 
-vi.mock('../../utils/log.js', () => ({
+vi.mock('../../../src/utils/log.js', () => ({
   logError: logMocks.logError,
 }))
 
-vi.mock('../../utils/platform.js', () => ({
+vi.mock('../../../src/utils/platform.js', () => ({
   getPlatform: () => platformMock.current,
 }))
 
-import { recordInputBurst, resetBurstDetector } from '../input/burst-detector.js'
-import { createRoot } from '../ink/root.js'
-import type { InputEvent, Key } from '../ink.js'
-import type { ImageDimensions } from '../../utils/imageResizer.js'
+import { recordInputBurst, resetBurstDetector } from '../../../src/tui/input/burst-detector.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { InputEvent, Key } from '../../../src/tui/ink.js'
+import type { ImageDimensions } from '../../../src/utils/imageResizer.js'
 import {
   shouldHandleInputAsPaste,
   supportsClipboardImageFallback,
   usePasteHandler,
-} from './usePasteHandler.js'
+} from '../../../src/tui/hooks/usePasteHandler.js'
 
 type PasteHandlerProps = Parameters<typeof usePasteHandler>[0]
 type PasteHandlerState = ReturnType<typeof usePasteHandler>

@@ -7,8 +7,8 @@ import {
   keystrokeToString,
   parseChord,
   parseKeystroke,
-} from './parser.js'
-import type { ParsedKeystroke } from './types.js'
+} from '../../../src/tui/keybindings/parser.js'
+import type { ParsedKeystroke } from '../../../src/tui/keybindings/types.js'
 
 function stroke(
   key: string,

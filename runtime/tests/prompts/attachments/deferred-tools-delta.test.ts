@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import type { LLMTool } from "../../llm/types.js";
+import type { LLMTool } from "../../../src/llm/types.js";
 import {
   _resetAttachmentTrackingStateForTest,
   getAttachmentTrackingState,
-} from "../../session/attachment-state.js";
-import { deferredToolsDeltaProducer } from "./deferred-tools-delta.js";
-import type { GetAttachmentsOptions } from "./orchestrator.js";
+} from "../../../src/session/attachment-state.js";
+import { deferredToolsDeltaProducer } from "../../../src/prompts/attachments/deferred-tools-delta.js";
+import type { GetAttachmentsOptions } from "../../../src/prompts/attachments/orchestrator.js";
 
 function tool(name: string, description = `desc for ${name}`): LLMTool {
   return {

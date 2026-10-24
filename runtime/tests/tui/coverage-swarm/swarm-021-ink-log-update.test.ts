@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import type { Diff, Frame } from '../ink/frame.ts'
-import { LogUpdate } from '../ink/log-update.ts'
+import type { Diff, Frame } from '../../../src/tui/ink/frame.js'
+import { LogUpdate } from '../../../src/tui/ink/log-update.js'
 import {
   CellWidth,
   CharPool,
@@ -9,8 +9,8 @@ import {
   HyperlinkPool,
   setCellAt,
   StylePool,
-} from '../ink/screen.ts'
-import { LINK_END } from '../ink/termio/osc.ts'
+} from '../../../src/tui/ink/screen.js'
+import { LINK_END } from '../../../src/tui/ink/termio/osc.js'
 
 type Pools = {
   stylePool: StylePool

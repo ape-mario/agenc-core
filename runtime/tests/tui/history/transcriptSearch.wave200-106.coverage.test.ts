@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { renderableSearchText } from './transcriptSearch.js'
+import { renderableSearchText } from '../../../src/tui/history/transcriptSearch.js'
 
 describe('renderableSearchText transcript attachment coverage', () => {
   test('indexes visible transcript-only attachment text and collapsed memories', () => {

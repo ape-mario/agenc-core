@@ -7,7 +7,7 @@ import {
   hasSelection,
   selectLineAt,
   shiftSelectionForFollow,
-} from '../ink/selection.ts'
+} from '../../../src/tui/ink/selection.js'
 import {
   CellWidth,
   CharPool,
@@ -16,7 +16,7 @@ import {
   createScreen,
   setCellAt,
   type Screen,
-} from '../ink/screen.ts'
+} from '../../../src/tui/ink/screen.js'
 
 function makeScreen(width: number, height: number): {
   screen: Screen

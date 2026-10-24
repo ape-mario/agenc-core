@@ -2,11 +2,11 @@ import { describe, expect, test } from "vitest";
 import {
   getAutoFixConfig,
   parseAutoFixConfig,
-} from "./autoFixConfig.js";
+} from "../../../src/services/autoFix/autoFixConfig.js";
 import {
   KNOWN_CONFIG_KEYS,
   normalizeRawConfig,
-} from "../../config/schema.js";
+} from "../../../src/config/schema.js";
 
 describe("parseAutoFixConfig", () => {
   test("parses valid full config", () => {

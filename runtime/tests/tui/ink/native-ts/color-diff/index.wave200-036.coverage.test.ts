@@ -1,7 +1,7 @@
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test } from 'vitest'
 
-import { __test, ColorDiff, ColorFile, getNativeModule } from './index.js'
+import { __test, ColorDiff, ColorFile, getNativeModule } from '../../../../../src/tui/ink/native-ts/color-diff/index.js'
 
 describe('color-diff wave200-036 coverage', () => {
   test('renders daltonized narrow diffs and terminal detection edge cases', () => {

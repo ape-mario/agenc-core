@@ -4,54 +4,54 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("./fork-context.js", () => ({
+vi.mock("../../src/agents/fork-context.js", () => ({
   forkSubagent: vi.fn(async () => ({
     messages: [{ role: "user", content: "seed prompt" }],
   })),
 }));
 
-vi.mock("./run-agent.js", () => ({
+vi.mock("../../src/agents/run-agent.js", () => ({
   runAgent: vi.fn(),
 }));
 
-vi.mock("../session/event-log.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../session/event-log.js")>()),
+vi.mock("../../src/session/event-log.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/session/event-log.js")>()),
   emitWarning: vi.fn(),
 }));
 
-import { AgentStatusTracker } from "./status.js";
-import { childTerminalOutcome } from "./child-terminal.js";
-import { Mailbox } from "./mailbox.js";
+import { AgentStatusTracker } from "../../src/agents/status.js";
+import { childTerminalOutcome } from "../../src/agents/child-terminal.js";
+import { Mailbox } from "../../src/agents/mailbox.js";
 import {
   _resetAgentRolesForTesting,
   createAgentRoleWorkspace,
   registerAgentRole,
   resolveAgentRole,
-} from "./role.js";
-import { delegate } from "./delegate.js";
-import { forkSubagent } from "./fork-context.js";
-import { runAgent } from "./run-agent.js";
-import { AgentControl, MaxDepthExceededError, type LiveAgent } from "./control.js";
+} from "../../src/agents/role.js";
+import { delegate } from "../../src/agents/delegate.js";
+import { forkSubagent } from "../../src/agents/fork-context.js";
+import { runAgent } from "../../src/agents/run-agent.js";
+import { AgentControl, MaxDepthExceededError, type LiveAgent } from "../../src/agents/control.js";
 import {
   AgentCapacityQueueFullError,
   AgentConcurrencyLimitError,
   AgentPathExistsError,
   AgentRegistry,
-} from "./registry.js";
-import type { AgentMetadata } from "./registry.js";
-import { RolloutStore } from "../session/rollout-store.js";
-import { SessionProviderService } from "../session/provider-service.js";
-import { createProvider } from "../llm/provider.js";
-import { resolveProviderRuntimeRequest } from "../llm/provider-request.js";
-import { defaultConfig } from "../config/schema.js";
-import { StaticModelsManager } from "../llm/models-manager.js";
-import { authorizeChildExecutionPlan, createChildExecutionPlan } from "./cross-provider.js";
-import type { Session } from "../session/session.js";
-import { EventLog } from "../session/event-log.js";
+} from "../../src/agents/registry.js";
+import type { AgentMetadata } from "../../src/agents/registry.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { SessionProviderService } from "../../src/session/provider-service.js";
+import { createProvider } from "../../src/llm/provider.js";
+import { resolveProviderRuntimeRequest } from "../../src/llm/provider-request.js";
+import { defaultConfig } from "../../src/config/schema.js";
+import { StaticModelsManager } from "../../src/llm/models-manager.js";
+import { authorizeChildExecutionPlan, createChildExecutionPlan } from "../../src/agents/cross-provider.js";
+import type { Session } from "../../src/session/session.js";
+import { EventLog } from "../../src/session/event-log.js";
 import {
   computeAgentInvocationEnvelopeDigest,
   createCsvAgentInvocationEnvelope,
-} from "../contracts/agent-invocation-envelope.js";
+} from "../../src/contracts/agent-invocation-envelope.js";
 
 const mockRunAgent = vi.mocked(runAgent);
 const mockForkSubagent = vi.mocked(forkSubagent);

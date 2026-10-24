@@ -3,7 +3,7 @@ import {
   getContextCollapseState,
   isContextCollapseEnabled,
   type AgenCContextCollapseState,
-} from "./index.js";
+} from "../../../src/services/contextCollapse/index.js";
 
 describe("contextCollapse disabled service surface", () => {
   it("reports the disabled collapse state without throwing", () => {

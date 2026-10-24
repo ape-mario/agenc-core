@@ -15,7 +15,7 @@ import {
   readBoundedLinuxProcIdentityFile,
   readAgenCDarwinProcessStart,
   sameAgenCDaemonInstanceIdentity,
-} from "./daemon-instance-identity.js";
+} from "../../src/app-server/daemon-instance-identity.js";
 
 describe("daemon instance identity", () => {
   it("fails closed when a proc identity file exceeds the fixed read budget", async () => {

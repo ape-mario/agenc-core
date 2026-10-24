@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import type { Key } from "../../ink.js";
+import type { Key } from "../../../../src/tui/ink.js";
 import {
   clampPromptTextInputColumns,
   getNewlineInstructions,
   isNonSpacePrintable,
   pasteReferenceLineThreshold,
-} from "./utils.js";
+} from "../../../../src/tui/components/PromptInput/utils.js";
 
 const mocks = vi.hoisted(() => ({
   config: {
@@ -19,17 +19,17 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../utils/config.js", () => ({
+vi.mock("../../../../src/utils/config.js", () => ({
   getRuntimeState: () => mocks.config,
 }));
 
-vi.mock("../../../utils/settings/canonicalAuthority.js", () => ({
+vi.mock("../../../../src/utils/settings/canonicalAuthority.js", () => ({
   getCanonicalSettingsAuthority: () => ({
     current: () => mocks.operatorConfig,
   }),
 }));
 
-vi.mock("../../../utils/env.js", () => ({
+vi.mock("../../../../src/utils/env.js", () => ({
   env: mocks.env,
 }));
 

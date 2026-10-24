@@ -8,15 +8,15 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   AgenCShutdownSignal,
   AgenCSignalProcess,
-} from "../lifecycle/signal-handlers.js";
+} from "../../src/lifecycle/signal-handlers.js";
 import {
   AGENC_DAEMON_AUTOSTART_READY_TIMEOUT_MS,
   AgenCDaemonAutostartError,
   ensureAgenCDaemonAutostart,
   resolveAgenCDaemonAutostartConfig,
   shouldAutostartAgenCDaemon,
-} from "./daemon-autostart.js";
-import { resolveAgenCDaemonHeartbeatPath } from "./daemon-heartbeat.js";
+} from "../../src/app-server/daemon-autostart.js";
+import { resolveAgenCDaemonHeartbeatPath } from "../../src/app-server/daemon-heartbeat.js";
 import {
   acquireAgenCDaemonLifecycleLock,
   DEFAULT_DAEMON_READY_TIMEOUT_MS,
@@ -27,18 +27,18 @@ import {
   runAgenCDaemonCli,
   writeAgenCDaemonPid,
   type AgenCDaemonCliHost,
-} from "./daemon-cli.js";
+} from "../../src/app-server/daemon-cli.js";
 import {
   daemonInstanceIdentityFromRuntimeInfo,
   readDaemonRuntimeInfo,
   resolveAgenCDaemonRuntimeInfoPath,
   writeDaemonRuntimeInfo,
-} from "./daemon-runtime-info.js";
+} from "../../src/app-server/daemon-runtime-info.js";
 import {
   AgenCDaemonProcessScanIncompleteError,
   type AgenCDaemonInstanceIdentity,
   type AgenCDaemonProcessIdentity,
-} from "./daemon-instance-identity.js";
+} from "../../src/app-server/daemon-instance-identity.js";
 
 const TEST_CURRENT_RUNTIME_BUILD = {
   runtimeVersion: "0.17.0-test",

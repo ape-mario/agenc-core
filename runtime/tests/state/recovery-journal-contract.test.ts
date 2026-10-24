@@ -8,21 +8,21 @@ import {
   KNOWN_EVENT_TYPES,
   ROLLOUT_SCHEMA_VERSION,
 } from "../../src/session/event-log.js";
-import { backfillPinnedRolloutContent } from "./backfill.js";
-import { CanonicalJournalIntegrityError, MAX_RECOVERY_CANONICAL_LINE_BYTES } from "./recovery-contract.js";
+import { backfillPinnedRolloutContent } from "../../src/state/backfill.js";
+import { CanonicalJournalIntegrityError, MAX_RECOVERY_CANONICAL_LINE_BYTES } from "../../src/state/recovery-contract.js";
 import {
   StrictCanonicalJournalValidator,
   validateCanonicalJournalBytes,
   validateCanonicalJournalText,
-} from "./recovery-journal-contract.js";
+} from "../../src/state/recovery-journal-contract.js";
 import {
   CANONICAL_EVENT_SCHEMA_TYPES,
   CANONICAL_ROLLOUT_SCHEMA_TYPES,
   isCanonicalEventPayload,
   isCanonicalRolloutPayload,
-} from "./recovery-journal-schema.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
-import { StateThreadRepository } from "./threads.js";
+} from "../../src/state/recovery-journal-schema.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
+import { StateThreadRepository } from "../../src/state/threads.js";
 import { RUN_RUNTIME_REASONING_EFFORTS } from "../../src/contracts/run-contracts.js";
 
 const temporaryRoots: string[] = [];

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import { permissionGrantsFromToolPermissionContext } from "./permission-grants.js";
-import { applyUnattendedPermissionPolicyToContext } from "./unattended-policy.js";
-import { createEmptyToolPermissionContext } from "./types.js";
+import { permissionGrantsFromToolPermissionContext } from "../../src/permissions/permission-grants.js";
+import { applyUnattendedPermissionPolicyToContext } from "../../src/permissions/unattended-policy.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 describe("permissionGrantsFromToolPermissionContext", () => {
   test("includes unattended policy grants for permission.list visibility", () => {

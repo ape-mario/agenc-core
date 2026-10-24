@@ -22,7 +22,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { canonicalTmpdir } from "../helpers/canonical-temp-dir.js";
 
-import { buildDelegateTool } from "./delegate-tool.js";
+import { buildDelegateTool } from "../../src/bin/delegate-tool.js";
 import {
   __resetActiveInkUnmountForTest,
   __setDaemonCliDepsForTest,
@@ -51,36 +51,36 @@ import {
   shouldLoadMcpCliConfig,
   validateAgencHome,
   type ConfigReloadLatch,
-} from "./agenc-main.js";
+} from "../../src/bin/agenc-main.js";
 import { setPendingResumeSessionId, resetPendingResumeSessionIdForTestingOnly } from "../../src/tui/pending-resume.js";
-import { ConfigStore } from "../config/store.js";
-import { defaultConfig } from "../config/schema.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { defaultConfig } from "../../src/config/schema.js";
 import {
   assembleSystemPrompt,
   SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
-} from "../prompts/system-prompt.js";
+} from "../../src/prompts/system-prompt.js";
 import {
   clearSystemPromptSections,
   __systemPromptSectionCacheSize,
-} from "../prompts/sections.js";
-import type { Session } from "../session/session.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+} from "../../src/prompts/sections.js";
+import type { Session } from "../../src/session/session.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   isProjectTrustedSync,
   trustProjectSync,
-} from "../permissions/trust/project-trust.js";
-import { getProjectDir } from "../session/session-store.js";
-import { classifyCLI } from "./route.js";
-import { isBareMode } from "../utils/envUtils.js";
+} from "../../src/permissions/trust/project-trust.js";
+import { getProjectDir } from "../../src/session/session-store.js";
+import { classifyCLI } from "../../src/bin/route.js";
+import { isBareMode } from "../../src/utils/envUtils.js";
 import {
   resolveAgentRuntimeOptions,
   resolveSessionTempRoot,
   runWithAgentRuntimeOptions,
   type AgentRuntimeOptions,
-} from "../session/runtime-options.js";
-import type { RunRuntimeSettingsSnapshot } from "../contracts/run-contracts.js";
-import { AgenCDaemonResponseError } from "../app-server/agent-cli.js";
+} from "../../src/session/runtime-options.js";
+import type { RunRuntimeSettingsSnapshot } from "../../src/contracts/run-contracts.js";
+import { AgenCDaemonResponseError } from "../../src/app-server/agent-cli.js";
 
 function stubSession() {
   return {
@@ -3946,7 +3946,7 @@ describe("main() smoke", () => {
     const waitUntilExit = vi.fn().mockResolvedValue(undefined);
     const unmount = vi.fn();
     const bootTUISpy = vi.fn(async () => ({ unmount, waitUntilExit }));
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: bootTUISpy,
     }));
 
@@ -3986,7 +3986,7 @@ describe("main() smoke", () => {
         "session.transcript.v2",
       ]);
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -4030,7 +4030,7 @@ describe("main() smoke", () => {
           return null;
         });
       }
-      vi.doMock("../tui/main.js", () => ({ bootTUI: vi.fn(async () => ({ unmount: vi.fn(), waitUntilExit: async () => {} })) }));
+      vi.doMock("../../src/tui/main.js", () => ({ bootTUI: vi.fn(async () => ({ unmount: vi.fn(), waitUntilExit: async () => {} })) }));
       const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
       try {
         trustWorkspaceForTest(tmpHome, tmpCwd);
@@ -4047,7 +4047,7 @@ describe("main() smoke", () => {
         }
       } finally {
         stderr.mockRestore();
-        vi.doUnmock("../tui/main.js");
+        vi.doUnmock("../../src/tui/main.js");
         for (const key of Object.keys(process.env)) if (!(key in previousEnv)) delete process.env[key];
         Object.assign(process.env, previousEnv);
         await rm(tmpHome, { recursive: true, force: true });
@@ -4111,7 +4111,7 @@ describe("main() smoke", () => {
       await mkdir(join(tmpCwd, "concurrent-build-output"));
     });
     const waitUntilExit = vi.fn().mockResolvedValue(undefined);
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async () => ({
         unmount: vi.fn(),
         waitUntilExit,
@@ -4153,7 +4153,7 @@ describe("main() smoke", () => {
       });
       expect(waitUntilExit).toHaveBeenCalledTimes(1);
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       process.argv = prevArgv;
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
@@ -4192,7 +4192,7 @@ describe("main() smoke", () => {
       },
     });
     const waitUntilExit = vi.fn().mockResolvedValue(undefined);
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async () => ({
         unmount: vi.fn(),
         waitUntilExit,
@@ -4210,7 +4210,7 @@ describe("main() smoke", () => {
       });
       expect(waitUntilExit).toHaveBeenCalledOnce();
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -4246,7 +4246,7 @@ describe("main() smoke", () => {
       return createContext(...args);
     });
     const boot = vi.fn(async () => ({ unmount: vi.fn(), waitUntilExit: vi.fn(async () => undefined) }));
-    vi.doMock("../tui/main.js", () => ({ bootTUI: boot }));
+    vi.doMock("../../src/tui/main.js", () => ({ bootTUI: boot }));
     try {
       trustWorkspaceForTest(tmpHome, tmpCwd);
       await expect(resumeTUIEntry({ resumeId: conversationId })).resolves.toBe(0);
@@ -4254,7 +4254,7 @@ describe("main() smoke", () => {
       expect(consumeEarlyInput()).toBe("");
     } finally {
       consumeEarlyInput();
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) if (!(key in prevEnv)) delete process.env[key];
       Object.assign(process.env, prevEnv);
       await rm(tmpHome, { recursive: true, force: true });
@@ -4305,7 +4305,7 @@ describe("main() smoke", () => {
         },
       });
     const waitUntilExit = vi.fn().mockResolvedValue(undefined);
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async () => ({
         unmount: vi.fn(),
         waitUntilExit,
@@ -4325,7 +4325,7 @@ describe("main() smoke", () => {
       });
       expect(waitUntilExit).toHaveBeenCalledOnce();
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -4427,7 +4427,7 @@ describe("main() smoke", () => {
       requestErrors: { "session.transcript.v2": new Error("transcript unavailable") },
     });
     const bootTUI = vi.fn(async () => ({ unmount: vi.fn(), waitUntilExit: async () => undefined }));
-    vi.doMock("../tui/main.js", () => ({ bootTUI }));
+    vi.doMock("../../src/tui/main.js", () => ({ bootTUI }));
     try {
       trustWorkspaceForTest(tmpHome, tmpCwd);
       await expect(attachAgentTuiEntry({
@@ -4439,7 +4439,7 @@ describe("main() smoke", () => {
       expect(daemon.client.close).toHaveBeenCalledOnce();
       expect(bootTUI).not.toHaveBeenCalled();
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       await rm(tmpHome, { recursive: true, force: true });
       await rm(tmpCwd, { recursive: true, force: true });
     }
@@ -4465,7 +4465,7 @@ describe("main() smoke", () => {
       return originalRequest(method, params);
     });
     const received: unknown[] = [];
-    vi.doMock("../tui/main.js", () => ({ bootTUI: vi.fn(async (options: { session: { getInitialTranscriptEvents(): readonly unknown[] } }) => {
+    vi.doMock("../../src/tui/main.js", () => ({ bootTUI: vi.fn(async (options: { session: { getInitialTranscriptEvents(): readonly unknown[] } }) => {
       received.push(...options.session.getInitialTranscriptEvents());
       return { unmount: vi.fn(), waitUntilExit: async () => undefined };
     }) }));
@@ -4478,7 +4478,7 @@ describe("main() smoke", () => {
       expect(daemon.client.request).toHaveBeenCalledWith("session.artifact.read", { sessionId: daemon.sessionId, id, offset: 0, length: 524_288 });
       expect(received).toEqual([{ id: "snapshot:artifact_epoch:answer", type: "agent_message", payload: { message: answer } }]);
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       await rm(tmpHome, { recursive: true, force: true });
       await rm(tmpCwd, { recursive: true, force: true });
     }
@@ -4498,7 +4498,7 @@ describe("main() smoke", () => {
     });
     const observedBareMode: boolean[] = [];
     const observedTranscript: unknown[] = [];
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (options: { session: { getInitialTranscriptEvents(): readonly unknown[] } }) => {
         observedBareMode.push(isBareMode());
         observedTranscript.push(...options.session.getInitialTranscriptEvents());
@@ -4590,7 +4590,7 @@ describe("main() smoke", () => {
       await expect(attachWithModel("client_qualified_same", "grok:grok-4.6")).resolves.toBe(0);
       expect(daemon.createTuiContext).toHaveBeenCalledTimes(2);
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -4647,7 +4647,7 @@ describe("main() smoke", () => {
       },
     });
     const waitUntilExit = vi.fn().mockResolvedValue(undefined);
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async () => ({
         unmount: vi.fn(),
         waitUntilExit,
@@ -4690,7 +4690,7 @@ describe("main() smoke", () => {
       });
       expect(waitUntilExit).toHaveBeenCalledOnce();
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       process.argv = prevArgv;
       if (prevStdinIsTTY === undefined) {
         delete (process.stdin as { isTTY?: boolean }).isTTY;
@@ -4980,7 +4980,7 @@ describe("main() smoke", () => {
       observedTempRoots.push(resolveSessionTempRoot());
     });
     const unmount = vi.fn();
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async ({ session }: { session: {
         listDaemonSessionProcesses(): Promise<unknown>;
         stopDaemonSessionProcess(taskId: string): Promise<unknown>;
@@ -5002,7 +5002,7 @@ describe("main() smoke", () => {
       expect(waitUntilExit).toHaveBeenCalledTimes(1);
       expect(observedTempRoots).toEqual([sessionTempRoot, sessionTempRoot]);
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5031,7 +5031,7 @@ describe("main() smoke", () => {
       cwd: worktree,
       roleWorkspaceCwd: authority,
     });
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async () => ({
         unmount: vi.fn(),
         waitUntilExit: vi.fn().mockResolvedValue(undefined),
@@ -5049,7 +5049,7 @@ describe("main() smoke", () => {
         }),
       );
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5096,7 +5096,7 @@ describe("main() smoke", () => {
       submit?: (message: string) => Promise<void>;
       subscribeToEvents?: (cb: (event: { type: string }) => void) => () => void;
     } | null = null;
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
         capturedSession = opts.session as typeof capturedSession;
         return { unmount, waitUntilExit };
@@ -5130,7 +5130,7 @@ describe("main() smoke", () => {
         "session.mcp.status",
       ]);
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5175,7 +5175,7 @@ describe("main() smoke", () => {
       submit?: (message: string) => Promise<void>;
       services?: { runtimeOptions?: { lightMode?: boolean } };
     } | null = null;
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
         capturedSession = opts.session as typeof capturedSession;
         return { unmount: vi.fn(), waitUntilExit };
@@ -5200,7 +5200,7 @@ describe("main() smoke", () => {
         }),
       );
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5234,7 +5234,7 @@ describe("main() smoke", () => {
       sessionId: "session_tui_mode_prompt",
       cwd: tmpCwd,
     });
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async () => ({
         unmount: vi.fn(),
         waitUntilExit: vi.fn().mockResolvedValue(undefined),
@@ -5250,7 +5250,7 @@ describe("main() smoke", () => {
         }),
       );
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5299,7 +5299,7 @@ describe("main() smoke", () => {
     let capturedSession: {
       submit?: (message: string) => Promise<void>;
     } | null = null;
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
         capturedSession = opts.session as typeof capturedSession;
         return { unmount, waitUntilExit };
@@ -5345,7 +5345,7 @@ describe("main() smoke", () => {
         content: "hello daemon",
       });
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       if (ttyDescriptor === undefined) {
         Reflect.deleteProperty(process.stdin, "isTTY");
       } else {
@@ -5404,7 +5404,7 @@ describe("main() smoke", () => {
       submit?: (message: string) => Promise<void>;
       cancelActiveTurn?: (reason?: string) => Promise<void>;
     } | null = null;
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
         capturedSession = opts.session as typeof capturedSession;
         return { unmount, waitUntilExit };
@@ -5436,7 +5436,7 @@ describe("main() smoke", () => {
         reason: "interrupted",
       });
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5489,7 +5489,7 @@ describe("main() smoke", () => {
     let capturedSession: {
       submit?: (message: string) => Promise<void>;
     } | null = null;
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
         capturedSession = opts.session as typeof capturedSession;
         return { unmount, waitUntilExit };
@@ -5533,7 +5533,7 @@ describe("main() smoke", () => {
       expect(daemon.createConnectedTuiClient).toHaveBeenCalledTimes(2);
       expect(daemon.client.close).toHaveBeenCalled();
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5589,7 +5589,7 @@ describe("main() smoke", () => {
     let capturedSession: {
       submit?: (message: string) => Promise<void>;
     } | null = null;
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
         capturedSession = opts.session as typeof capturedSession;
         return { unmount, waitUntilExit };
@@ -5613,7 +5613,7 @@ describe("main() smoke", () => {
         NodeJS.ProcessEnv | undefined;
       expect(env).not.toHaveProperty("AGENC_MCP_SERVERS");
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5660,7 +5660,7 @@ describe("main() smoke", () => {
       emit?: (event: unknown) => void;
       subscribeToEvents?: (cb: (event: unknown) => void) => () => void;
     } | null = null;
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
         capturedSession = opts.session as typeof capturedSession;
         return { unmount, waitUntilExit };
@@ -5698,7 +5698,7 @@ describe("main() smoke", () => {
       expect(daemon.startPromptAgent).not.toHaveBeenCalled();
       expect(localEvents).toEqual([event]);
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5744,7 +5744,7 @@ describe("main() smoke", () => {
           cb: (event: { type: string; [key: string]: unknown }) => void,
         ) => () => void;
       } | null = null;
-      vi.doMock("../tui/main.js", () => ({
+      vi.doMock("../../src/tui/main.js", () => ({
         bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
           capturedSession = opts.session as typeof capturedSession;
           return { unmount, waitUntilExit };
@@ -5784,7 +5784,7 @@ describe("main() smoke", () => {
         ]);
       } finally {
         process.argv = prevArgv;
-        vi.doUnmock("../tui/main.js");
+        vi.doUnmock("../../src/tui/main.js");
         for (const key of Object.keys(process.env)) {
           if (!(key in prevEnv)) delete process.env[key];
         }
@@ -5821,7 +5821,7 @@ describe("main() smoke", () => {
     let capturedSession: {
       submit?: (message: string) => Promise<void>;
     } | null = null;
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async (opts: { session: typeof capturedSession }) => {
         capturedSession = opts.session as typeof capturedSession;
         return { unmount: vi.fn(), waitUntilExit };
@@ -5846,7 +5846,7 @@ describe("main() smoke", () => {
         env: process.env,
       });
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -5906,7 +5906,7 @@ describe("main() smoke", () => {
       sessionId: "session_boot_failure",
       cwd: tmpCwd,
     });
-    vi.doMock("../tui/main.js", () => ({
+    vi.doMock("../../src/tui/main.js", () => ({
       bootTUI: vi.fn(async () => {
         throw new Error("boot failed");
       }),
@@ -5923,7 +5923,7 @@ describe("main() smoke", () => {
         env: process.env,
       });
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       for (const key of Object.keys(process.env)) {
         if (!(key in prevEnv)) delete process.env[key];
       }
@@ -6129,14 +6129,14 @@ describe("main() smoke", () => {
     const tmpHome = await mkdtemp(join(canonicalTmpdir(), "budget-attach-home-"));
     const tmpCwd = await mkdtemp(join(canonicalTmpdir(), "budget-attach-cwd-"));
     const daemon = installDaemonCliDepsForTest({ cwd: tmpCwd, liveSessionMetadata: { [key]: 0 } });
-    vi.doMock("../tui/main.js", () => ({ bootTUI: vi.fn(async () => ({ unmount: vi.fn(), waitUntilExit: async () => undefined })) }));
+    vi.doMock("../../src/tui/main.js", () => ({ bootTUI: vi.fn(async () => ({ unmount: vi.fn(), waitUntilExit: async () => undefined })) }));
     try {
       trustWorkspaceForTest(tmpHome, tmpCwd);
       await expect(attachAgentTuiEntry({ agentId: daemon.agentId, clientId: "budget-zero", env: {
         AGENC_HOME: tmpHome, AGENC_WORKSPACE: tmpCwd, HOME: tmpHome,
       } })).resolves.toBe(0);
     } finally {
-      vi.doUnmock("../tui/main.js");
+      vi.doUnmock("../../src/tui/main.js");
       await rm(tmpHome, { recursive: true, force: true });
       await rm(tmpCwd, { recursive: true, force: true });
     }

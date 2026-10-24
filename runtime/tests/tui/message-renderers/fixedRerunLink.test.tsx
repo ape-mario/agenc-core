@@ -1,11 +1,11 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Tool } from '../../tools/Tool.js'
-import type { AgenCToolUseBlockParam } from '../../types/message.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { isFixedRerunSuccess } from './fixedRerunLink.js'
-import { AssistantToolUseMessage } from './AssistantToolUseMessage.js'
+import type { Tool } from '../../../src/tools/Tool.js'
+import type { AgenCToolUseBlockParam } from '../../../src/types/message.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { isFixedRerunSuccess } from '../../../src/tui/message-renderers/fixedRerunLink.js'
+import { AssistantToolUseMessage } from '../../../src/tui/message-renderers/AssistantToolUseMessage.js'
 
 const classifierMock = vi.hoisted(() => ({ checking: false }))
 
@@ -17,22 +17,22 @@ const appStateMock = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../utils/classifierApprovalsHook.js', () => ({
+vi.mock('../../../src/utils/classifierApprovalsHook.js', () => ({
   useIsClassifierChecking: () => classifierMock.checking,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 80, rows: 24 }),
 }))
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppStateMaybeOutsideOfProvider: (
     selector: (state: typeof appStateMock) => unknown,
   ) => selector(appStateMock),
 }))
 
-vi.mock('../ink.js', async () => {
-  const actual = await vi.importActual<typeof import('../ink.js')>('../ink.js')
+vi.mock('../../../src/tui/ink.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/tui/ink.js')>('../../../src/tui/ink.js')
   return { ...actual, useTheme: () => ['dark'] }
 })
 

@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   compileAndLoadAgenCNativePeerCredentialBinding,
   loadAgenCNativePeerCredentialBinding,
-} from "./transport/peer-credentials.js";
+} from "../../src/app-server/transport/peer-credentials.js";
 
 function tempDir(prefix: string): string {
   return mkdtempSync(path.join(tmpdir(), prefix));
@@ -65,7 +65,7 @@ describe("AgenC Unix peer credential native binding", () => {
     });
     try {
       const { loadAgenCNativePeerCredentialBinding: loadBinding } =
-        await import("./transport/peer-credentials.js");
+        await import("../../src/app-server/transport/peer-credentials.js");
       expect(
         loadBinding({
           nativeAddonPath: addonPath,

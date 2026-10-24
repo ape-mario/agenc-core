@@ -5,7 +5,7 @@ import {
   parseArgumentNames,
   parseArguments,
   substituteArguments,
-} from "./argument-substitution.js";
+} from "../../../src/tui/slash/argument-substitution.js";
 
 describe("parseArguments", () => {
   it("splits shell-style arguments and preserves quoted spans", () => {

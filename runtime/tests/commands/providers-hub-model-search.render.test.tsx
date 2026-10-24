@@ -2,16 +2,16 @@ import { PassThrough } from "node:stream";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProvidersHubView, type ProvidersHubServices } from "./providers-hub.js";
+import { ProvidersHubView, type ProvidersHubServices } from "../../src/commands/providers-hub.js";
 import type {
   ProvidersHubModelRow,
   ProvidersHubRow,
   ProvidersHubSnapshot,
-} from "./providers-hub-snapshot.js";
+} from "../../src/commands/providers-hub-snapshot.js";
 import OPENROUTER_MODELS from "../fixtures/openrouter-models-298.json" with { type: "json" };
 import { renderPtyRows } from "../../scripts/check-tui-e2e/harness.mjs";
-import { createRoot } from "../tui/ink.js";
-import { AppStateProvider, getDefaultAppState } from "../tui/state/AppState.js";
+import { createRoot } from "../../src/tui/ink.js";
+import { AppStateProvider, getDefaultAppState } from "../../src/tui/state/AppState.js";
 
 const UP = "\u001b[A";
 const DOWN = "\u001b[B";

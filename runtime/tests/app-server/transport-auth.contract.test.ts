@@ -20,7 +20,7 @@ import {
   ensureAgenCDaemonCookie,
   normalizeAgenCDaemonCookie,
   verifyAgenCDaemonCookie,
-} from "./transport/auth.js";
+} from "../../src/app-server/transport/auth.js";
 
 async function tempAgencHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), "agenc-transport-auth-"));

@@ -14,15 +14,15 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => false,
 }))
 
-vi.mock('../hooks/useTerminalSize.js', () => ({
+vi.mock('../../../src/tui/hooks/useTerminalSize.js', () => ({
   useTerminalSize: () => ({ columns: 24, rows: 12 }),
 }))
 
-vi.mock('./Message.renderers.js', async () => {
+vi.mock('../../../src/tui/components/Message.renderers.js', async () => {
   const ReactModule = await import('react')
   const renderer = (name: string) => (props: Record<string, unknown>) => {
     harness.calls.push({ name, props })
@@ -59,10 +59,10 @@ vi.mock('./Message.renderers.js', async () => {
   }
 })
 
-import { Box } from '../ink.js'
-import { createRoot } from '../ink/root.js'
-import type { Props } from './Message.js'
-import { Message } from './Message.js'
+import { Box } from '../../../src/tui/ink.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import type { Props } from '../../../src/tui/components/Message.js'
+import { Message } from '../../../src/tui/components/Message.js'
 
 function createStreams(): {
   stdout: PassThrough

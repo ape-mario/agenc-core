@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { backfillPinnedRolloutFile } from "./backfill.js";
-import { StateRecoveryIncidentRepository } from "./recovery-incidents.js";
-import { createRecoveryMutationAdapter } from "./recovery-mutations.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
-import { StateThreadRepository } from "./threads.js";
+import { backfillPinnedRolloutFile } from "../../src/state/backfill.js";
+import { StateRecoveryIncidentRepository } from "../../src/state/recovery-incidents.js";
+import { createRecoveryMutationAdapter } from "../../src/state/recovery-mutations.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
+import { StateThreadRepository } from "../../src/state/threads.js";
 
 if (process.platform !== "win32") {
   throw new Error("the native recovery integration test requires Windows");

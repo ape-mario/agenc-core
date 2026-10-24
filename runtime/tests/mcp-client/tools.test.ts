@@ -8,20 +8,20 @@
  */
 
 import { describe, expect, test, vi } from "vitest";
-import type { ToolEvaluatorContext } from "../permissions/evaluator.js";
-import type { LLMTool } from "../llm/types.js";
-import { toChatCompletionsTools } from "../llm/wire/tools.js";
-import { freshDenialTracking } from "../permissions/denial-tracking.js";
-import { RequestPermissionsRpc } from "../permissions/rpc/request-permissions.js";
-import { buildGuardianApprovalRequest } from "../permissions/guardian/approval-request.js";
-import type { GuardianApprovalReviewOptions } from "../permissions/guardian/reviewer.js";
-import { APPROVED, DENIED } from "../permissions/review-decision.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import type { ToolEvaluatorContext } from "../../src/permissions/evaluator.js";
+import type { LLMTool } from "../../src/llm/types.js";
+import { toChatCompletionsTools } from "../../src/llm/wire/tools.js";
+import { freshDenialTracking } from "../../src/permissions/denial-tracking.js";
+import { RequestPermissionsRpc } from "../../src/permissions/rpc/request-permissions.js";
+import { buildGuardianApprovalRequest } from "../../src/permissions/guardian/approval-request.js";
+import type { GuardianApprovalReviewOptions } from "../../src/permissions/guardian/reviewer.js";
+import { APPROVED, DENIED } from "../../src/permissions/review-decision.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   createToolBridge as createToolBridgeWithEnvironment,
   type MCPCallObserver,
-} from "./tools.js";
-import { computeMCPToolCatalogSha256 } from "./supply-chain.js";
+} from "../../src/mcp-client/tools.js";
+import { computeMCPToolCatalogSha256 } from "../../src/mcp-client/supply-chain.js";
 
 type ToolBridgeOptions = Parameters<typeof createToolBridgeWithEnvironment>[3];
 type TestToolBridgeOptions = Omit<ToolBridgeOptions, "environment"> &

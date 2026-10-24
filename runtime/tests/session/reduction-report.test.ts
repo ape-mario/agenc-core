@@ -3,7 +3,7 @@ import {
   REDUCTION_REPORT_SAMPLE_CAP,
   mergeReductionReports,
   type ReductionReport,
-} from "./reduction-report.js";
+} from "../../src/session/reduction-report.js";
 
 function report(overrides: Partial<ReductionReport> = {}): ReductionReport {
   return {

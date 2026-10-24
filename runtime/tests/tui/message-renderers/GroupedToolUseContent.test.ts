@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { GroupedToolUseContent } from "./GroupedToolUseContent.js";
+import { GroupedToolUseContent } from "../../../src/tui/message-renderers/GroupedToolUseContent.js";
 
 function toolUseMessage(id: string) {
   return {

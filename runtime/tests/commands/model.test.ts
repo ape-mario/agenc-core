@@ -7,23 +7,23 @@ import {
   modelCommand,
   applyModelSwitch,
   checkModelHistoryCompat,
-} from "./model.js";
-import { modelMenuFallback, readModelMenuSnapshot } from "./model-menu-snapshot.js";
+} from "../../src/commands/model.js";
+import { modelMenuFallback, readModelMenuSnapshot } from "../../src/commands/model-menu-snapshot.js";
 import {
   recordOpenRouterZdrEndpoints,
   resetOpenRouterZdrEndpointsForTesting,
-} from "../llm/registry/openrouter-zdr-endpoints.js";
-import { applyProviderSwitch, switchProviderModel } from "./provider.js";
-import type { EnvSnapshot } from "../config/env.js";
-import { resolveHomeContext, type HomeContext } from "../config/home.js";
-import type { ConfigStore } from "../config/store.js";
-import type { Session } from "../session/session.js";
-import { getSecureStorage } from "../utils/secureStorage/index.js";
-import { saveXaiOauthCredentials } from "../utils/xaiOauthCredentials.js";
+} from "../../src/llm/registry/openrouter-zdr-endpoints.js";
+import { applyProviderSwitch, switchProviderModel } from "../../src/commands/provider.js";
+import type { EnvSnapshot } from "../../src/config/env.js";
+import { resolveHomeContext, type HomeContext } from "../../src/config/home.js";
+import type { ConfigStore } from "../../src/config/store.js";
+import type { Session } from "../../src/session/session.js";
+import { getSecureStorage } from "../../src/utils/secureStorage/index.js";
+import { saveXaiOauthCredentials } from "../../src/utils/xaiOauthCredentials.js";
 import type {
   SlashCommandAppStateBridge,
   SlashCommandContext,
-} from "./types.js";
+} from "../../src/commands/types.js";
 
 const TEST_ENVIRONMENT: EnvSnapshot = Object.freeze({
   AGENC_HOME: "/tmp/agenc-model-command-test",

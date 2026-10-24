@@ -8,10 +8,10 @@ import {
   pruneSessionStateSnapshots,
   pruneTerminalAgentRuns,
   SESSION_SNAPSHOT_HARD_CAP,
-} from "./pruning.js";
+} from "../../src/state/pruning.js";
 import { defaultConfig } from "../../src/config/schema.js";
-import { recoverDaemonStateOnStartup } from "./recovery.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+import { recoverDaemonStateOnStartup } from "../../src/state/recovery.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 
 let home = "";
 let cwd = "";

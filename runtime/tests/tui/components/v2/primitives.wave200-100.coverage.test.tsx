@@ -1,8 +1,8 @@
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { DiffInline } from './primitives.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { DiffInline } from '../../../../src/tui/components/v2/primitives.js'
 
 describe('v2 primitives coverage', () => {
   it('renders inline diffs with each row kind and optional line numbers', async () => {

@@ -1,15 +1,15 @@
 import React from 'react'
 import { describe, expect, test, vi } from 'vitest'
 
-import { NO_CONTENT_MESSAGE } from '../../constants/messages.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { UserLocalCommandOutputMessage } from './UserLocalCommandOutputMessage.js'
+import { NO_CONTENT_MESSAGE } from '../../../src/constants/messages.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { UserLocalCommandOutputMessage } from '../../../src/tui/message-renderers/UserLocalCommandOutputMessage.js'
 
 vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),

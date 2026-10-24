@@ -22,7 +22,7 @@ import {
   ProcessHardeningError,
   scrubDangerousEnvironment,
   type ProcessHardeningResult,
-} from "./index.js";
+} from "../../../src/sandbox/hardening/index.js";
 
 const temporaryPaths: string[] = [];
 

@@ -4,7 +4,7 @@ import {
   agentIdFromThreadSourceJson,
   isAgentThreadSource,
   threadSourceStringField,
-} from "../thread-store/thread-source.js";
+} from "../../src/thread-store/thread-source.js";
 
 describe("thread source metadata helpers", () => {
   it("handles null-prototype records without accepting arrays or null", () => {

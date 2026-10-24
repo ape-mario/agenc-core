@@ -4,7 +4,7 @@ import { sourceUrl } from "../../../helpers/source-path.ts";
 import {
   calculateCommandVisibleOptionCount,
   calculateHelpBodyHeight,
-} from "./layout.js";
+} from "../../../../src/tui/components/HelpV2/layout.js";
 
 const source = readFileSync(sourceUrl("tui/components/HelpV2/HelpV2.tsx"), "utf8");
 

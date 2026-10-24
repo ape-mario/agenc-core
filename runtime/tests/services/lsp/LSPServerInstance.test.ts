@@ -2,12 +2,12 @@ import { describe, expect, test, vi } from "vitest";
 import { setTimeout as sleep } from "node:timers/promises";
 import { resolve } from "node:path";
 
-import { normalizeLspServerConfig } from "./config.js";
+import { normalizeLspServerConfig } from "../../../src/services/lsp/config.js";
 import {
   createLSPServerInstance,
   DEFAULT_LSP_STARTUP_TIMEOUT_MS,
-} from "./LSPServerInstance.js";
-import type { LSPClient } from "./LSPClient.js";
+} from "../../../src/services/lsp/LSPServerInstance.js";
+import type { LSPClient } from "../../../src/services/lsp/LSPClient.js";
 
 function fakeClient(overrides: Partial<LSPClient> = {}): LSPClient & {
   readonly starts: unknown[];

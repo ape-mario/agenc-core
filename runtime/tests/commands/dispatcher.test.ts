@@ -9,14 +9,14 @@ import {
   isBridgeSafeCommand,
   maskSensitiveArgs,
   parseSlashCommand,
-} from "./dispatcher.js";
-import { CommandRegistry } from "./registry.js";
+} from "../../src/commands/dispatcher.js";
+import { CommandRegistry } from "../../src/commands/registry.js";
 import { BRIDGE_SAFE_COMMAND_NAMES } from "../../src/commands/bridge-policy.js";
 import type {
   SlashCommand,
   SlashCommandContext,
   SlashCommandResult,
-} from "./types.js";
+} from "../../src/commands/types.js";
 
 function stubCtx(overrides: Partial<SlashCommandContext> = {}): SlashCommandContext {
   return {

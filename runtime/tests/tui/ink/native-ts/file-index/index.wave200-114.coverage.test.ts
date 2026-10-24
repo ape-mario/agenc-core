@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { FileIndex } from "./index.js";
+import { FileIndex } from "../../../../../src/tui/ink/native-ts/file-index/index.js";
 
 describe("FileIndex wave200-114 coverage", () => {
   test("publishes async indexing atomically while preserving top-k and top-level search semantics", async () => {

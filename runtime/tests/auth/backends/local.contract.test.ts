@@ -2,10 +2,10 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getSecureStorage } from "../../utils/secureStorage/index.js";
-import { readNativeSecureStorage } from "../../utils/secureStorage/native.js";
-import { resolveSecureStorageHome } from "../../utils/secureStorage/home.js";
-import { LocalAuthBackend } from "./local.js";
+import { getSecureStorage } from "../../../src/utils/secureStorage/index.js";
+import { readNativeSecureStorage } from "../../../src/utils/secureStorage/native.js";
+import { resolveSecureStorageHome } from "../../../src/utils/secureStorage/home.js";
+import { LocalAuthBackend } from "../../../src/auth/backends/local.js";
 
 const TEST_TOKEN = "00000000-0000-4000-8000-000000000000";
 const TEST_TIME = new Date("2026-05-01T12:00:00.000Z");

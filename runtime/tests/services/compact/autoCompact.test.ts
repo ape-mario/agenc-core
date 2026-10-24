@@ -5,14 +5,14 @@ import {
   getAutoCompactThreshold,
   getEffectiveContextWindowSize,
   isAutoCompactEnabled,
-} from "./autoCompact.js";
-import type { RuntimeMessage } from "./types.js";
+} from "../../../src/services/compact/autoCompact.js";
+import type { RuntimeMessage } from "../../../src/services/compact/types.js";
 import type { LLMMessage } from "../../../src/llm/types.js";
 import {
   createCompactionTransactionHarness,
   createProvider,
 } from "../../helpers/compaction-transaction-harness.js";
-import { runWithStartupProviderSelection } from "../../utils/model/providers.js";
+import { runWithStartupProviderSelection } from "../../../src/utils/model/providers.js";
 import { MAX_TOKEN_ACCOUNTING_REQUEST_BYTES } from "../../../src/llm/token-accounting.js";
 
 describe("auto compact", () => {

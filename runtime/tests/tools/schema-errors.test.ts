@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { getSchemaValidationErrorOverride } from "./schema-errors.js";
-import type { Tool } from "./types.js";
+import { getSchemaValidationErrorOverride } from "../../src/tools/schema-errors.js";
+import type { Tool } from "../../src/tools/types.js";
 
 const SkillTool = { name: "Skill" } as Tool;
 

@@ -6,7 +6,7 @@ import {
   renderMcpToolApprovalTemplate,
   renderMcpToolApprovalTemplateFromTemplates,
   type McpToolApprovalTemplate,
-} from "./mcp-tool-approval-templates.js";
+} from "../../../src/permissions/rpc/mcp-tool-approval-templates.js";
 
 const calendarTemplate: McpToolApprovalTemplate = {
   connectorId: "calendar",

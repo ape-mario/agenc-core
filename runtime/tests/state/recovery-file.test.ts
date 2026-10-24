@@ -15,7 +15,7 @@ import {
   backfillPinnedRolloutFile,
   backfillRolloutFile,
   withPreparedPinnedRolloutRun,
-} from "./backfill.js";
+} from "../../src/state/backfill.js";
 import {
   CanonicalJournalIntegrityError,
   DEFAULT_MAX_RECOVERY_EVENTS_PER_RUN,
@@ -27,16 +27,16 @@ import {
   MAX_RECOVERY_PINNED_DESCRIPTORS,
   MAX_RECOVERY_SOURCES_PER_RUN,
   RecoveryOperationalError,
-} from "./recovery-contract.js";
+} from "../../src/state/recovery-contract.js";
 import {
   RecoveryDescriptorBudget,
   DiskCanonicalIdentityRegistry,
   recoveryFileLimits,
   recoveryFailureSourcePath,
   withPinnedCanonicalJournalRun,
-} from "./recovery-file.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
-import { StateThreadRepository } from "./threads.js";
+} from "../../src/state/recovery-file.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
+import { StateThreadRepository } from "../../src/state/threads.js";
 
 const temporaryRoots: string[] = [];
 

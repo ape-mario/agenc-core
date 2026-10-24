@@ -46,7 +46,7 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => harness.features.has(name),
 }));
 
-vi.mock("../history/history.js", () => ({
+vi.mock("../../../src/tui/history/history.js", () => ({
   makeHistoryReader: () => {
     let index = 0;
     const reader = {
@@ -70,11 +70,11 @@ vi.mock("../history/history.js", () => ({
   },
 }));
 
-vi.mock("../../utils/log.js", () => ({
+vi.mock("../../../src/utils/log.js", () => ({
   logError: harness.logError,
 }));
 
-vi.mock("../keybindings/useKeybinding.js", () => ({
+vi.mock("../../../src/tui/keybindings/useKeybinding.js", () => ({
   useKeybinding: (
     command: string,
     handler: () => void,
@@ -100,7 +100,7 @@ vi.mock("../keybindings/useKeybinding.js", () => ({
   },
 }));
 
-vi.mock("../ink.js", () => ({
+vi.mock("../../../src/tui/ink.js", () => ({
   useInput: (
     handler: (input: string, key: unknown, event: { keypress: string }) => void,
     options: { isActive: boolean },
@@ -112,8 +112,8 @@ vi.mock("../ink.js", () => ({
   },
 }));
 
-import { createRoot } from "../ink/root.js";
-import { useHistorySearch } from "./useHistorySearch.js";
+import { createRoot } from "../../../src/tui/ink/root.js";
+import { useHistorySearch } from "../../../src/tui/hooks/useHistorySearch.js";
 
 type HookResult = ReturnType<typeof useHistorySearch>;
 

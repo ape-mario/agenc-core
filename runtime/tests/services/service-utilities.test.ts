@@ -6,7 +6,7 @@ import {
   sendNotification,
   sendToChannel,
   type TerminalNotification,
-} from "./notifier.js";
+} from "../../src/services/notifier.js";
 import {
   countMessagesTokensWithAPI,
   countTokensViaHaikuFallback,
@@ -20,7 +20,7 @@ import {
   roughTokenCountEstimationForServiceMessages,
   stripHistoricalToolReferenceFields,
   VERTEX_COUNT_TOKENS_ALLOWED_BETAS,
-} from "./tokenEstimation.js";
+} from "../../src/services/tokenEstimation.js";
 import {
   TOKEN_FALLBACK_MARGIN_RATIO,
   TOKEN_FALLBACK_MARGIN_TOKENS,

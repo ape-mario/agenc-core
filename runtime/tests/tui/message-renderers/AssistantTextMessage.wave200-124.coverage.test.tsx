@@ -4,9 +4,9 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import { API_TIMEOUT_ERROR_MESSAGE } from '../../errors/api.js'
-import { createRoot } from '../ink/root.js'
-import { AssistantTextMessage } from './AssistantTextMessage.js'
+import { API_TIMEOUT_ERROR_MESSAGE } from '../../../src/errors/api.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { AssistantTextMessage } from '../../../src/tui/message-renderers/AssistantTextMessage.js'
 
 const originalApiTimeoutMs = process.env.API_TIMEOUT_MS
 

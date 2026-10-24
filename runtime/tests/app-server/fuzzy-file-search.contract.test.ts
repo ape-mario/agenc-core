@@ -2,13 +2,13 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { AgenCDaemonAgentManager } from "./agent-lifecycle.js";
-import { AgenCDaemonJsonRpcDispatcher } from "./daemon-dispatcher.js";
+import { AgenCDaemonAgentManager } from "../../src/app-server/agent-lifecycle.js";
+import { AgenCDaemonJsonRpcDispatcher } from "../../src/app-server/daemon-dispatcher.js";
 import {
   AgenCFuzzyFileSearchService,
   runFuzzyFileSearch,
-} from "./fuzzy-file-search.js";
-import { JSON_RPC_VERSION } from "./protocol/index.js";
+} from "../../src/app-server/fuzzy-file-search.js";
+import { JSON_RPC_VERSION } from "../../src/app-server/protocol/index.js";
 
 async function withTempTree<T>(
   setup: (root: string) => Promise<T>,

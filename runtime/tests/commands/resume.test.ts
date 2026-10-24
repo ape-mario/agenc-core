@@ -9,8 +9,8 @@ import {
   sessionIdFromFilename,
   runResume,
   resumeCommand,
-} from "./resume.js";
-import { getProjectDir } from "../session/session-store.js";
+} from "../../src/commands/resume.js";
+import { getProjectDir } from "../../src/session/session-store.js";
 
 let workHome: string;
 

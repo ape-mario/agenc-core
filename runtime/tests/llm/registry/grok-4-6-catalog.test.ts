@@ -4,9 +4,9 @@ import {
   REGISTERED_MODEL_CATALOG,
   deriveFlatCatalog,
   resolveRegisteredModelCatalogEntry,
-} from "../registry/model-catalog.js";
-import { getContextWindowForModel } from "../../utils/context.js";
-import { supportsXaiStructuredOutputsWithTools } from "../structured-output.js";
+} from "../../../src/llm/registry/model-catalog.js";
+import { getContextWindowForModel } from "../../../src/utils/context.js";
+import { supportsXaiStructuredOutputsWithTools } from "../../../src/llm/structured-output.js";
 
 /**
  * xAI shipped grok-4.6 on 2026-08-12 and it was missing from the catalog, so

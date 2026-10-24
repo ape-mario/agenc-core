@@ -2,14 +2,14 @@ import { PassThrough } from "node:stream";
 
 import React from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import type { PastedContent } from "../../../utils/config.js";
+import type { PastedContent } from "../../../../src/utils/config.js";
 import {
   enqueue,
   resetCommandQueueForTesting,
-} from "../../../utils/messageQueueManager.js";
+} from "../../../../src/utils/messageQueueManager.js";
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from "../../remoteAuthSessionContext.fixture.js";
 
-vi.mock("../../prompt-editor.js", () => ({ editPromptDraft: vi.fn(async () => "edited draft") }));
+vi.mock("../../../../src/tui/prompt-editor.js", () => ({ editPromptDraft: vi.fn(async () => "edited draft") }));
 
 const harness = vi.hoisted(() => {
   const appState = {
@@ -260,36 +260,36 @@ vi.mock("bun:bundle", () => ({
   feature: (name: string) => harness.features[name] === true,
 }));
 
-vi.mock("../../../services/PromptSuggestion/promptSuggestion.js", () => ({
+vi.mock("../../../../src/services/PromptSuggestion/promptSuggestion.js", () => ({
   abortPromptSuggestion: vi.fn(),
   logSuggestionSuppressed: vi.fn(),
 }));
 
-vi.mock("../../../services/PromptSuggestion/speculation.js", () => ({
+vi.mock("../../../../src/services/PromptSuggestion/speculation.js", () => ({
   abortSpeculation: vi.fn(),
 }));
 
-vi.mock("../../context/notifications.js", () => ({
+vi.mock("../../../../src/tui/context/notifications.js", () => ({
   useNotifications: () => ({
     addNotification: harness.addNotification,
     removeNotification: harness.removeNotification,
   }),
 }));
 
-vi.mock("../../context/overlayContext.js", () => ({
+vi.mock("../../../../src/tui/context/overlayContext.js", () => ({
   useIsModalOverlayActive: () => false,
   useRegisterOverlay: vi.fn(),
 }));
 
-vi.mock("../../context/promptOverlayContext.js", () => ({
+vi.mock("../../../../src/tui/context/promptOverlayContext.js", () => ({
   useSetPromptOverlayDialog: vi.fn(),
 }));
 
-vi.mock("../../hooks/useCommandQueue.js", () => ({
+vi.mock("../../../../src/tui/hooks/useCommandQueue.js", () => ({
   useCommandQueue: () => harness.commandQueue,
 }));
 
-vi.mock("../../hooks/useIdeAtMentioned.js", () => ({
+vi.mock("../../../../src/tui/hooks/useIdeAtMentioned.js", () => ({
   useIdeAtMentioned: vi.fn(
     (
       _clients: unknown,
@@ -304,7 +304,7 @@ vi.mock("../../hooks/useIdeAtMentioned.js", () => ({
   ),
 }));
 
-vi.mock("../../hooks/useArrowKeyHistory.js", () => ({
+vi.mock("../../../../src/tui/hooks/useArrowKeyHistory.js", () => ({
   useArrowKeyHistory: (
     onSetInput: (
       value: string,
@@ -323,12 +323,12 @@ vi.mock("../../hooks/useArrowKeyHistory.js", () => ({
   },
 }));
 
-vi.mock("../../hooks/useDoublePress.js", async (importOriginal) => ({
+vi.mock("../../../../src/tui/hooks/useDoublePress.js", async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   useDoublePress: (_single: () => void, doublePress: () => void) => doublePress,
 }));
 
-vi.mock("../../hooks/useHistorySearch.js", () => ({
+vi.mock("../../../../src/tui/hooks/useHistorySearch.js", () => ({
   useHistorySearch: (
     onSelect: (entry: {
       display: string;
@@ -345,7 +345,7 @@ vi.mock("../../hooks/useHistorySearch.js", () => ({
   },
 }));
 
-vi.mock("../../hooks/useInputBuffer.js", () => ({
+vi.mock("../../../../src/tui/hooks/useInputBuffer.js", () => ({
   useInputBuffer: () => ({
     canUndo: false,
     clearBuffer: harness.clearBuffer,
@@ -354,23 +354,23 @@ vi.mock("../../hooks/useInputBuffer.js", () => ({
   }),
 }));
 
-vi.mock("../../hooks/useMainLoopModel.js", () => ({
+vi.mock("../../../../src/tui/hooks/useMainLoopModel.js", () => ({
   useMainLoopModel: () => "gpt-5.4",
 }));
 
-vi.mock("../../hooks/useTerminalSize.js", () => ({
+vi.mock("../../../../src/tui/hooks/useTerminalSize.js", () => ({
   useTerminalSize: () => ({ columns: 100, rows: 30 }),
 }));
 
-vi.mock("../../hooks/useTypeahead.js", () => ({
+vi.mock("../../../../src/tui/hooks/useTypeahead.js", () => ({
   useTypeahead: () => harness.typeahead,
 }));
 
-vi.mock("../../ink/hooks/use-terminal-focus.js", () => ({
+vi.mock("../../../../src/tui/ink/hooks/use-terminal-focus.js", () => ({
   useTerminalFocus: () => true,
 }));
 
-vi.mock("../../ink.js", async () => {
+vi.mock("../../../../src/tui/ink.js", async () => {
   const ReactModule = await import("react");
   return {
     Box: ({ children }: { readonly children?: React.ReactNode }) =>
@@ -390,7 +390,7 @@ vi.mock("../../ink.js", async () => {
   };
 });
 
-vi.mock("../../keybindings/KeybindingContext.js", () => ({
+vi.mock("../../../../src/tui/keybindings/KeybindingContext.js", () => ({
   useOptionalKeybindingContext: () => ({
     registerHandler: (registration: Record<string, unknown>) => {
       harness.keybindingRegistrations.push(registration);
@@ -404,11 +404,11 @@ vi.mock("../../keybindings/KeybindingContext.js", () => ({
   }),
 }));
 
-vi.mock("../../keybindings/shortcutFormat.js", () => ({
+vi.mock("../../../../src/tui/keybindings/shortcutFormat.js", () => ({
   getShortcutDisplay: () => "ctrl+v",
 }));
 
-vi.mock("../../keybindings/useKeybinding.js", async () => {
+vi.mock("../../../../src/tui/keybindings/useKeybinding.js", async () => {
   const { useLayoutEffect } = await import("react")
   return ({
   useInputCapture: (handler: (input: string, key: Record<string, boolean>) => boolean, options?: { context?: string; isActive?: boolean }) => {
@@ -445,81 +445,81 @@ vi.mock("../../keybindings/useKeybinding.js", async () => {
 })
 });
 
-vi.mock("../../glyphs.js", () => ({
+vi.mock("../../../../src/tui/glyphs.js", () => ({
   selectAgenCTuiGlyphs: () => ({ horizontal: "-" }),
 }));
 
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof harness.appState) => unknown) =>
     selector(harness.appState),
   useAppStateStore: () => ({ getState: () => harness.appState }),
   useSetAppState: () => harness.setAppState,
 }));
 
-vi.mock("../../state/selectors.js", () => ({
+vi.mock("../../../../src/tui/state/selectors.js", () => ({
   getActiveAgentForInput: () => harness.activeAgent,
   getViewedTeammateTask: () => harness.viewedTeammate,
 }));
 
-vi.mock("../../state/teammateViewHelpers.js", () => ({
+vi.mock("../../../../src/tui/state/teammateViewHelpers.js", () => ({
   enterTeammateView: vi.fn(),
   exitTeammateView: vi.fn(),
   stopOrDismissAgent: vi.fn(),
 }));
 
-vi.mock("../../../commands.js", () => ({
+vi.mock("../../../../src/commands.js", () => ({
   hasCommand: () => false,
 }));
 
 vi.mock(
-  "../../../tasks/InProcessTeammateTask/InProcessTeammateTask.js",
+  "../../../../src/tasks/InProcessTeammateTask/InProcessTeammateTask.js",
   () => ({
     getRunningTeammatesSorted: () => harness.runningTeammates,
   }),
 );
 
-vi.mock("../../../tasks/types.js", () => ({
+vi.mock("../../../../src/tasks/types.js", () => ({
   isBackgroundTask: (task: unknown) => harness.isBackgroundTask(task),
 }));
 
-vi.mock("../../../tools/AgentTool/agentColorManager.js", () => ({
+vi.mock("../../../../src/tools/AgentTool/agentColorManager.js", () => ({
   AGENT_COLORS: ["cyan", "purple"],
   AGENT_COLOR_TO_THEME_COLOR: { cyan: "accent", purple: "secondary" },
 }));
 
-vi.mock("../../../utils/agentSwarmsEnabled.js", () => ({
+vi.mock("../../../../src/utils/agentSwarmsEnabled.js", () => ({
   isAgentSwarmsEnabled: () => harness.isAgentSwarmsEnabled,
 }));
 
-vi.mock("../../../utils/array.js", () => ({
+vi.mock("../../../../src/utils/array.js", () => ({
   count: (values: readonly unknown[], predicate: (value: unknown) => boolean) =>
     values.filter(predicate).length,
 }));
 
-vi.mock("../../../utils/config.js", () => ({
+vi.mock("../../../../src/utils/config.js", () => ({
   getRuntimeState: () => harness.getGlobalConfigResult,
   updateRuntimeState: harness.updateRuntimeState,
 }));
 
-vi.mock("../../../utils/cwd.js", () => ({
+vi.mock("../../../../src/utils/cwd.js", () => ({
   getCwd: () => "/repo",
 }));
 
-vi.mock("../../../utils/debug.js", () => ({
+vi.mock("../../../../src/utils/debug.js", () => ({
   logForDebugging: vi.fn(),
 }));
 
-vi.mock("../../../utils/directMemberMessage.js", () => ({
+vi.mock("../../../../src/utils/directMemberMessage.js", () => ({
   parseDirectMemberMessage: vi.fn(() => harness.directMessage),
   sendDirectMemberMessage: vi.fn(() => harness.directMessageResult),
 }));
 
-vi.mock("../../../utils/dragDropPaths.js", () => ({
+vi.mock("../../../../src/utils/dragDropPaths.js", () => ({
   extractDraggedFilePaths: (value: string) =>
     value.startsWith("/dragged/file") ? [value.trim()] : [],
 }));
 
-vi.mock("../../../utils/env.js", () => ({
+vi.mock("../../../../src/utils/env.js", () => ({
   env: {
     isSSH: () => harness.isSSH,
     get terminal() {
@@ -528,30 +528,30 @@ vi.mock("../../../utils/env.js", () => ({
   },
 }));
 
-vi.mock("../../../utils/errors.js", async (importOriginal) => {
+vi.mock("../../../../src/utils/errors.js", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../../utils/errors.js")>();
+    await importOriginal<typeof import("../../../../src/utils/errors.js")>();
   return {
     ...actual,
     errorMessage: (value: unknown) => String(value),
   };
 });
 
-vi.mock("../../context/fullscreenModeContext.js", () => ({
+vi.mock("../../../../src/tui/context/fullscreenModeContext.js", () => ({
   useFullscreenMode: () => false,
 }));
 
-vi.mock("../../../utils/imagePaste.js", () => ({
+vi.mock("../../../../src/utils/imagePaste.js", () => ({
   PASTE_THRESHOLD: 20,
   getImageFromClipboard: vi.fn(async () => null),
 }));
 
-vi.mock("../../../utils/imageStore.js", () => ({
+vi.mock("../../../../src/utils/imageStore.js", () => ({
   cacheImagePath: vi.fn(),
   storeImage: vi.fn(),
 }));
 
-vi.mock("../../../utils/keyboardShortcuts.js", () => ({
+vi.mock("../../../../src/utils/keyboardShortcuts.js", () => ({
   MACOS_OPTION_SPECIAL_CHARS: new Proxy(
     {},
     {
@@ -561,70 +561,70 @@ vi.mock("../../../utils/keyboardShortcuts.js", () => ({
   isMacosOptionChar: () => harness.isMacosOptionChar,
 }));
 
-vi.mock("../../../utils/log.js", () => ({
+vi.mock("../../../../src/utils/log.js", () => ({
   logError: vi.fn(),
 }));
 
-vi.mock("../../../utils/model/model.js", () => ({
+vi.mock("../../../../src/utils/model/model.js", () => ({
   isOpus1mMergeEnabled: () => false,
   modelDisplayString: (model: string | null) => model ?? "default",
 }));
 
-vi.mock("../../../utils/permissions/autoModeState.js", () => ({
+vi.mock("../../../../src/utils/permissions/autoModeState.js", () => ({
   setAutoModeActive: vi.fn(),
 }));
 
-vi.mock("../../../permissions/permission-mode.js", () => ({
+vi.mock("../../../../src/permissions/permission-mode.js", () => ({
   getNextPermissionMode: () => harness.nextPermissionMode,
   transitionPermissionMode: harness.transitionPermissionMode,
   isAutoModeGateEnabled: () => harness.autoModeGateEnabled,
 }));
 
-vi.mock("../../../utils/platform.js", () => ({
+vi.mock("../../../../src/utils/platform.js", () => ({
   getPlatform: () => harness.platform,
 }));
 
 
-vi.mock("../../input/processBashCommand.js", () => ({
+vi.mock("../../../../src/tui/input/processBashCommand.js", () => ({
   processBashCommand: harness.processBashCommand,
 }));
 
-vi.mock("../../../utils/settings/settings.js", () => ({
+vi.mock("../../../../src/utils/settings/settings.js", () => ({
   hasAutoModeOptIn: () => harness.hasAutoModeOptIn,
 }));
 
-vi.mock("../../../utils/suggestions/commandSuggestions.js", () => ({
+vi.mock("../../../../src/utils/suggestions/commandSuggestions.js", () => ({
   findSlashCommandPositions: () => [],
 }));
 
-vi.mock("../../../utils/suggestions/slackChannelSuggestions.js", () => ({
+vi.mock("../../../../src/utils/suggestions/slackChannelSuggestions.js", () => ({
   findSlackChannelPositions: () => [],
   getKnownChannelsVersion: () => 0,
   hasSlackMcpServer: () => false,
   subscribeKnownChannels: () => () => {},
 }));
 
-vi.mock("../../../utils/swarm/backends/registry.js", () => ({
+vi.mock("../../../../src/utils/swarm/backends/registry.js", () => ({
   isInProcessEnabled: () => harness.isInProcessEnabled,
 }));
 
-vi.mock("../../../utils/swarm/teamHelpers.js", () => ({
+vi.mock("../../../../src/utils/swarm/teamHelpers.js", () => ({
   syncTeammateMode: vi.fn(),
 }));
 
-vi.mock("../../../utils/teammate.js", () => ({
+vi.mock("../../../../src/utils/teammate.js", () => ({
   getTeammateColor: () => harness.teammateColor,
 }));
 
-vi.mock("../../../utils/teammateContext.js", () => ({
+vi.mock("../../../../src/utils/teammateContext.js", () => ({
   isInProcessTeammate: () => harness.isInProcessTeammate,
 }));
 
-vi.mock("../../../utils/teammateMailbox.js", () => ({
+vi.mock("../../../../src/utils/teammateMailbox.js", () => ({
   writeToMailbox: vi.fn(),
 }));
 
-vi.mock("../../../utils/thinking.js", () => ({
+vi.mock("../../../../src/utils/thinking.js", () => ({
   findThinkingTriggerPositions: () => [],
   findUltrareviewTriggerPositions: (text: string) =>
     Array.from(text.matchAll(/\bultrareview\b/gi), (match) => ({
@@ -636,89 +636,89 @@ vi.mock("../../../utils/thinking.js", () => ({
   isUltrathinkEnabled: () => false,
 }));
 
-vi.mock("../../../conversation/token-budget.js", () => ({
+vi.mock("../../../../src/conversation/token-budget.js", () => ({
   findTokenBudgetPositions: () => [],
 }));
 
-vi.mock("../AutoModeOptInDialog.js", () => ({
+vi.mock("../../../../src/tui/components/AutoModeOptInDialog.js", () => ({
   AutoModeOptInDialog: (props: Record<string, unknown>) => {
     harness.autoModeOptInProps = props;
     return null;
   },
 }));
 
-vi.mock("../ConfigurableShortcutHint.js", () => ({
+vi.mock("../../../../src/tui/components/ConfigurableShortcutHint.js", () => ({
   ConfigurableShortcutHint: () => null,
 }));
 
-vi.mock("../CoordinatorAgentStatus.js", () => ({
+vi.mock("../../../../src/tui/components/CoordinatorAgentStatus.js", () => ({
   getVisibleAgentTasks: () => harness.visibleAgentTasks,
   useCoordinatorTaskCount: () => harness.coordinatorTaskCount,
 }));
 
-vi.mock("../EffortIndicator.js", () => ({
+vi.mock("../../../../src/tui/components/EffortIndicator.js", () => ({
   getEffortNotificationText: (value: string | undefined) => value === undefined ? undefined : `${value} · /effort`,
 }));
 
-vi.mock("../FullscreenLayout.js", () => ({
+vi.mock("../../../../src/tui/components/FullscreenLayout.js", () => ({
   calculateFullscreenLayoutBudget: (rows: number) => ({
     bottomMaxHeight: Math.max(1, Math.floor(rows / 2)),
   }),
 }));
 
-vi.mock("../GlobalSearchDialog.js", () => ({
+vi.mock("../../../../src/tui/components/GlobalSearchDialog.js", () => ({
   GlobalSearchDialog: (props: Record<string, unknown>) => {
     harness.globalSearchProps = props;
     return null;
   },
 }));
 
-vi.mock("../../history/HistorySearchDialog.js", () => ({
+vi.mock("../../../../src/tui/history/HistorySearchDialog.js", () => ({
   HistorySearchDialog: (props: Record<string, unknown>) => {
     harness.historySearchProps = props;
     return null;
   },
 }));
 
-vi.mock("../QuickOpenDialog.js", () => ({
+vi.mock("../../../../src/tui/components/QuickOpenDialog.js", () => ({
   QuickOpenDialog: (props: Record<string, unknown>) => {
     harness.quickOpenProps = props;
     return null;
   },
 }));
 
-vi.mock("../ThinkingToggle.js", () => ({
+vi.mock("../../../../src/tui/components/ThinkingToggle.js", () => ({
   ThinkingToggle: (props: Record<string, unknown>) => {
     harness.thinkingToggleProps = props;
     return null;
   },
 }));
 
-vi.mock("../tasks/BackgroundTasksPanel.js", () => ({
+vi.mock("../../../../src/tui/components/tasks/BackgroundTasksPanel.js", () => ({
   BackgroundTasksPanel: (props: Record<string, unknown>) => {
     harness.backgroundTasksPanelProps = props;
     return null;
   },
 }));
 
-vi.mock("../tasks/taskStatusUtils.js", () => ({
+vi.mock("../../../../src/tui/components/tasks/taskStatusUtils.js", () => ({
   shouldHideTasksFooter: () => false,
 }));
 
-vi.mock("../teams/TeamsDialog.js", () => ({
+vi.mock("../../../../src/tui/components/teams/TeamsDialog.js", () => ({
   TeamsDialog: (props: Record<string, unknown>) => {
     harness.teamsDialogProps = props;
     return null;
   },
 }));
 
-vi.mock("../v2/primitives.js", async (importOriginal) => {
+vi.mock("../../../../src/tui/components/v2/primitives.js", async (importOriginal) => {
   // Keep the real module and stub only the switcher's rendering.
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, ModeSwitcher: () => null };
 });
 
-vi.mock("./ConfiguredPromptTextInput.js", async () => {
+vi.mock("../../../../src/tui/components/PromptInput/ConfiguredPromptTextInput.js", async () => {
   const ReactModule = await import("react");
   return {
     ConfiguredPromptTextInput: ({
@@ -733,52 +733,52 @@ vi.mock("./ConfiguredPromptTextInput.js", async () => {
   };
 });
 
-vi.mock("./Notifications.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/Notifications.js", () => ({
   FOOTER_TEMPORARY_STATUS_TIMEOUT: 3000,
   Notifications: () => null,
 }));
 
-vi.mock("./PromptInputFooter.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/PromptInputFooter.js", () => ({
   default: (props: Record<string, unknown>) => {
     harness.promptInputFooterProps = props;
     return null;
   },
 }));
 
-vi.mock("./PromptInputModeIndicator.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/PromptInputModeIndicator.js", () => ({
   PromptInputModeIndicator: () => null,
 }));
 
-vi.mock("./PromptInputQueuedCommands.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/PromptInputQueuedCommands.js", () => ({
   PromptInputQueuedCommands: () => null,
 }));
 
-vi.mock("./PromptInputStashNotice.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/PromptInputStashNotice.js", () => ({
   PromptInputStashNotice: () => null,
 }));
 
-vi.mock("./useMaybeTruncateInput.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/useMaybeTruncateInput.js", () => ({
   useMaybeTruncateInput: vi.fn(),
 }));
 
-vi.mock("./usePromptInputPlaceholder.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/usePromptInputPlaceholder.js", () => ({
   usePromptInputPlaceholder: () => "Type a prompt",
 }));
 
-vi.mock("./useSwarmBanner.js", () => ({
+vi.mock("../../../../src/tui/components/PromptInput/useSwarmBanner.js", () => ({
   useSwarmBanner: () => harness.swarmBanner,
 }));
 
-import { createRoot } from "../../ink/root.js";
-import { parseDirectMemberMessage, sendDirectMemberMessage } from "../../../utils/directMemberMessage.js";
-import { getImageFromClipboard } from "../../../utils/imagePaste.js";
-import { cacheImagePath, storeImage } from "../../../utils/imageStore.js";
-import { logError } from "../../../utils/log.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { parseDirectMemberMessage, sendDirectMemberMessage } from "../../../../src/utils/directMemberMessage.js";
+import { getImageFromClipboard } from "../../../../src/utils/imagePaste.js";
+import { cacheImagePath, storeImage } from "../../../../src/utils/imageStore.js";
+import { logError } from "../../../../src/utils/log.js";
 import {
   type ComposerSubmitHelpers,
   submitViaElicitationPrompt,
-} from "../../elicitation-submit-routing.js";
-import PromptInput from "./PromptInput.js";
+} from "../../../../src/tui/elicitation-submit-routing.js";
+import PromptInput from "../../../../src/tui/components/PromptInput/PromptInput.js";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -981,7 +981,7 @@ describe("PromptInput render surface", () => {
       await waitForPromptInputProps();
       expect(harness.keybindings["chat:externalEditor"]).toBeTypeOf("function");
       await harness.keybindings["chat:externalEditor"]();
-      const { editPromptDraft } = await import("../../prompt-editor.js");
+      const { editPromptDraft } = await import("../../../../src/tui/prompt-editor.js");
       expect(editPromptDraft).toHaveBeenCalledWith("draft");
       expect(onInputChange).toHaveBeenLastCalledWith("edited draft");
     } finally { await rendered.dispose(); }

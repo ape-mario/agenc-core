@@ -1,12 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
-import { createToolBridge } from "./tools.js";
-import { freshDenialTracking } from "../permissions/denial-tracking.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import { RequestPermissionsRpc } from "../permissions/rpc/request-permissions.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
+import { freshDenialTracking } from "../../src/permissions/denial-tracking.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import { RequestPermissionsRpc } from "../../src/permissions/rpc/request-permissions.js";
 import {
   attachToolRuntimeContext,
   type ToolRuntimeAttemptContext,
-} from "../tools/runtimes/context.js";
+} from "../../src/tools/runtimes/context.js";
 
 async function fixture(rawToolName = "lookup_marker") {
   const session = { services: {} } as ToolRuntimeAttemptContext["invocation"]["session"];

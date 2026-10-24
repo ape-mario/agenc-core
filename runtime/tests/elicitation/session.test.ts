@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../tui/ink.js", () => ({
+vi.mock("../../src/tui/ink.js", () => ({
   Box: () => null,
   Text: () => null,
   useApp: () => ({ exit: () => {} }),
@@ -12,19 +12,19 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("../commands.js", () => ({
+vi.mock("../../src/commands.js", () => ({
   listTuiCommandList: () => [],
 }));
 
-vi.mock("../agents/role-definitions.js", () => ({
+vi.mock("../../src/agents/role-definitions.js", () => ({
   listAgentRoleDefinitions: () => [],
 }));
 
-vi.mock("../llm/pasted-content.js", () => ({
+vi.mock("../../src/llm/pasted-content.js", () => ({
   pastedContentsToLLMMessage: () => null,
 }));
 
-vi.mock("../tools.js", () => ({
+vi.mock("../../src/tools.js", () => ({
   assembleToolPool: () => [],
   filterToolsByDenyRules: (tools: unknown) => tools,
   getAllBaseTools: () => [],
@@ -40,41 +40,41 @@ vi.mock("src/tools.js", () => ({
   getTools: () => [],
 }));
 
-vi.mock("../tui/context/fpsMetrics.js", () => ({
+vi.mock("../../src/tui/context/fpsMetrics.js", () => ({
   FpsMetricsProvider: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("../tui/context/stats.js", () => ({
+vi.mock("../../src/tui/context/stats.js", () => ({
   StatsProvider: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("../tui/state/onChangeAppState.js", () => ({
+vi.mock("../../src/tui/state/onChangeAppState.js", () => ({
   onChangeAppState: () => {},
 }));
 
-vi.mock("../tui/components/Messages.js", () => ({
+vi.mock("../../src/tui/components/Messages.js", () => ({
   Messages: () => null,
 }));
 
-vi.mock("../tui/components/PromptInput/PromptInput.js", () => ({
+vi.mock("../../src/tui/components/PromptInput/PromptInput.js", () => ({
   default: () => null,
 }));
 
-vi.mock("../tui/context/promptOverlayContext.js", () => ({
+vi.mock("../../src/tui/context/promptOverlayContext.js", () => ({
   PromptOverlayProvider: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("../tui/keybindings/KeybindingProviderSetup.js", () => ({
+vi.mock("../../src/tui/keybindings/KeybindingProviderSetup.js", () => ({
   KeybindingSetup: ({ children }: { children: unknown }) => children,
 }));
 
-vi.mock("../tui/permission-requests.js", () => ({
+vi.mock("../../src/tui/permission-requests.js", () => ({
   AgenCPermissionOverlay: () => null,
   buildToolUseConfirmQueue: () => [],
   usePermissionRequests: () => [],
 }));
 
-vi.mock("../tui/session-transcript.js", () => ({
+vi.mock("../../src/tui/session-transcript.js", () => ({
   useSessionTranscript: () => ({
     messages: [],
     toolNames: [],
@@ -85,36 +85,36 @@ vi.mock("../tui/session-transcript.js", () => ({
   }),
 }));
 
-vi.mock("../tui/tool-jsx-state.js", () => ({
+vi.mock("../../src/tui/tool-jsx-state.js", () => ({
   useToolJSX: () => [null, () => {}],
 }));
 
-vi.mock("../tui/tool-rendering.js", () => ({
+vi.mock("../../src/tui/tool-rendering.js", () => ({
   createTuiTools: () => [],
 }));
 
-import { AsyncQueue } from "../utils/async-queue.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "../session/session.js";
+} from "../../src/session/session.js";
 import type {
   Config,
   ManagedFeatures,
   ModelInfo,
   SessionConfiguration,
-} from "../session/turn-context.js";
-import type { LLMProvider } from "../llm/types.js";
+} from "../../src/session/turn-context.js";
+import type { LLMProvider } from "../../src/llm/types.js";
 import type {
   McpElicitationRequest,
   RequestUserInputArgs,
   RequestUserInputResponse,
-} from "./types.js";
-import { installElicitationResolvers } from "../tui/components/App.js";
+} from "../../src/elicitation/types.js";
+import { installElicitationResolvers } from "../../src/tui/components/App.js";
 
 function mkFeatures(): ManagedFeatures {
   return {

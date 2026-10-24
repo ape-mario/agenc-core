@@ -1,17 +1,17 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { runAdmittedModelCall } from "../../../budget/admitted-model-call.js";
+import { runAdmittedModelCall } from "../../../../src/budget/admitted-model-call.js";
 import { createAllowAdmissionHarness } from "../../../budget/admission-test-harness.js";
-import { BudgetTracker } from "../../../conversation/token-budget.js";
-import type { LLMProvider, LLMResponse } from "../../../llm/types.js";
+import { BudgetTracker } from "../../../../src/conversation/token-budget.js";
+import type { LLMProvider, LLMResponse } from "../../../../src/llm/types.js";
 import {
   computeUsdCost,
   computeUsdCostWithResolution,
   CostSidecar,
   DEFAULT_MODEL_COSTS,
-} from "../../../session/cost.js";
-import type { Session } from "../../../session/session.js";
-import { requestUsageFromGemini } from "./usage.js";
+} from "../../../../src/session/cost.js";
+import type { Session } from "../../../../src/session/session.js";
+import { requestUsageFromGemini } from "../../../../src/llm/providers/gemini/usage.js";
 
 const ACCEPTANCE_USAGE = {
   promptTokenCount: 4,

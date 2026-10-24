@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { exitCommand } from "./exit.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "./types.js";
+import { exitCommand } from "../../src/commands/exit.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 function mkctx(session: Session): SlashCommandContext {
   return {

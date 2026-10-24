@@ -20,14 +20,14 @@ import {
   RetiredConfigDirError,
   resolveHomeContext,
   resolveMigrationHomeContext,
-} from "./home.js";
-import { classifyRetiredField } from "./retired-field-manifest.js";
+} from "../../src/config/home.js";
+import { classifyRetiredField } from "../../src/config/retired-field-manifest.js";
 import {
   applyConfigV2Migration,
   checkConfigV2Migration,
   ConfigMigrationError,
   rollbackConfigV2Migration,
-} from "./migration.js";
+} from "../../src/config/migration.js";
 import {
   ConfigRepositoryError,
   loadCanonicalDaemonConfig,
@@ -35,9 +35,9 @@ import {
   readStrictConfigLayer,
   resolveMcpLayerCandidates,
   type ConfigLayerSnapshot,
-} from "./repository.js";
-import { parseCanonicalStateDocument } from "./state.js";
-import { ConfigStore } from "./store.js";
+} from "../../src/config/repository.js";
+import { parseCanonicalStateDocument } from "../../src/config/state.js";
+import { ConfigStore } from "../../src/config/store.js";
 
 const temporaryDirectories: string[] = [];
 

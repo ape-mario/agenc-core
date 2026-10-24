@@ -7,14 +7,14 @@ vi.mock('bun:bundle', () => ({
   feature: (name: string) => features.has(name),
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     syntaxHighlightingDisabled: true,
   }),
 }))
 
-import { renderToString } from '../../utils/staticRender.js'
-import { UserTextMessage } from './UserTextMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { UserTextMessage } from '../../../src/tui/message-renderers/UserTextMessage.js'
 
 function renderUserText(text: string): Promise<string> {
   return renderToString(

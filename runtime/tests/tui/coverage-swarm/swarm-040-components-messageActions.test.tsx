@@ -11,7 +11,7 @@ const probes = vi.hoisted(() => ({
   }>,
 }))
 
-vi.mock('../keybindings/useKeybinding.js', () => ({
+vi.mock('../../../src/tui/keybindings/useKeybinding.js', () => ({
   useKeybindings: (
     handlers: Record<string, () => void>,
     options: { context: string; isActive: boolean },
@@ -20,8 +20,8 @@ vi.mock('../keybindings/useKeybinding.js', () => ({
   },
 }))
 
-import { Text } from '../ink.js'
-import { createRoot, type Root } from '../ink/root.js'
+import { Text } from '../../../src/tui/ink.js'
+import { createRoot, type Root } from '../../../src/tui/ink/root.js'
 import {
   MessageActionsBar,
   MessageActionsKeybindings,
@@ -36,7 +36,7 @@ import {
   toolCallOf,
   useMessageActions,
   useSelectedMessageBg,
-} from '../components/messageActions.js'
+} from '../../../src/tui/components/messageActions.js'
 
 function createStreams(): {
   stdin: PassThrough & {

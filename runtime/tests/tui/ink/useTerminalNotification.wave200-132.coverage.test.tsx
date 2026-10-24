@@ -1,23 +1,23 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
 import {
   type TerminalNotification,
   TerminalWriteProvider,
   useTerminalNotification,
-} from './useTerminalNotification.js'
+} from '../../../src/tui/ink/useTerminalNotification.js'
 
 const terminalHarness = vi.hoisted(() => ({
   progressAvailable: false,
 }))
 
-vi.mock('../../../utils/env.js', () => ({
+vi.mock('../../../src/utils/env.js', () => ({
   env: { terminal: 'xterm' },
 }))
 
-vi.mock('./terminal.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('./terminal.js')>()
+vi.mock('../../../src/tui/ink/terminal.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../src/tui/ink/terminal.js')>()
   return {
     ...actual,
     isProgressReportingAvailable: () => terminalHarness.progressAvailable,

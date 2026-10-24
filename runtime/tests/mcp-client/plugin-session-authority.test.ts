@@ -2,31 +2,31 @@ import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { MCPManager } from "./manager.js";
-import { loadPluginMcpServerRegistrations } from "../plugins/registration/mcp-plugin-integration.js";
-import { setPluginEnabledOp, uninstallPluginOp } from "../plugins/cli/pluginOperations.js";
-import { mutateCanonicalUserConfigSync } from "../config/update-sync.js";
-import type { MCPServerConfig } from "./types.js";
-import { SandboxExecutionBroker } from "../sandbox/execution-broker.js";
-import { transitionSandboxExecutionBroker } from "../sandbox/execution-lifecycle.js";
-import { ConfigStore } from "../config/store.js";
-import { createSessionMcpService } from "../session/mcp-startup.js";
+import { MCPManager } from "../../src/mcp-client/manager.js";
+import { loadPluginMcpServerRegistrations } from "../../src/plugins/registration/mcp-plugin-integration.js";
+import { setPluginEnabledOp, uninstallPluginOp } from "../../src/plugins/cli/pluginOperations.js";
+import { mutateCanonicalUserConfigSync } from "../../src/config/update-sync.js";
+import type { MCPServerConfig } from "../../src/mcp-client/types.js";
+import { SandboxExecutionBroker } from "../../src/sandbox/execution-broker.js";
+import { transitionSandboxExecutionBroker } from "../../src/sandbox/execution-lifecycle.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { createSessionMcpService } from "../../src/session/mcp-startup.js";
 
-vi.mock("./transports/stdio.js", () => ({ createStdioMCPConnection: vi.fn() }));
-import { createStdioMCPConnection } from "./transports/stdio.js";
-vi.mock("./plugin-catalog-cache.js", async importOriginal => {
-  const actual = await importOriginal<typeof import("./plugin-catalog-cache.js")>();
+vi.mock("../../src/mcp-client/transports/stdio.js", () => ({ createStdioMCPConnection: vi.fn() }));
+import { createStdioMCPConnection } from "../../src/mcp-client/transports/stdio.js";
+vi.mock("../../src/mcp-client/plugin-catalog-cache.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../src/mcp-client/plugin-catalog-cache.js")>();
   return {
     ...actual,
     snapshotInstalledPluginOffThread: vi.fn(actual.snapshotInstalledPluginOffThread),
     removePluginCatalogs: vi.fn(actual.removePluginCatalogs),
   };
 });
-import { removePluginCatalogs, snapshotInstalledPluginOffThread } from "./plugin-catalog-cache.js";
-vi.mock("../utils/debug.js", async importOriginal => ({
-  ...await importOriginal<typeof import("../utils/debug.js")>(), logForDebugging: vi.fn(),
+import { removePluginCatalogs, snapshotInstalledPluginOffThread } from "../../src/mcp-client/plugin-catalog-cache.js";
+vi.mock("../../src/utils/debug.js", async importOriginal => ({
+  ...await importOriginal<typeof import("../../src/utils/debug.js")>(), logForDebugging: vi.fn(),
 }));
-import { logForDebugging } from "../utils/debug.js";
+import { logForDebugging } from "../../src/utils/debug.js";
 
 const spawn = vi.mocked(createStdioMCPConnection);
 const roots: string[] = [];

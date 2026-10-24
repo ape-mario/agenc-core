@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getCommandsSync, type Command } from "../../../commands.js";
-import { generateCommandSuggestions } from "../../../utils/suggestions/commandSuggestions.js";
+import { getCommandsSync, type Command } from "../../../../src/commands.js";
+import { generateCommandSuggestions } from "../../../../src/utils/suggestions/commandSuggestions.js";
 
 function localCommand(opts: {
   name: string;

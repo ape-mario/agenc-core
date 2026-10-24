@@ -1,10 +1,10 @@
 import React from "react";
 import { describe, expect, test } from "vitest";
 
-import type { MCPServerConnection } from "../../services/mcp/types.js";
-import { renderToString } from "../../utils/staticRender.js";
-import Text from "../ink/components/Text.js";
-import { useIdeConnectionStatus } from "./useIdeConnectionStatus.js";
+import type { MCPServerConnection } from "../../../src/services/mcp/types.js";
+import { renderToString } from "../../../src/utils/staticRender.js";
+import Text from "../../../src/tui/ink/components/Text.js";
+import { useIdeConnectionStatus } from "../../../src/tui/hooks/useIdeConnectionStatus.js";
 
 function connection(
   overrides: Partial<MCPServerConnection> & Record<string, unknown>,

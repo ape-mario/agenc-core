@@ -3,15 +3,15 @@ import { createInterface } from "node:readline";
 import { PassThrough } from "node:stream";
 import { describe, expect, test } from "vitest";
 
-import { MCP_ERROR_PARSE } from "./types.js";
-import { McpServerFramework } from "./framework.js";
+import { MCP_ERROR_PARSE } from "../../src/mcp-server/types.js";
+import { McpServerFramework } from "../../src/mcp-server/framework.js";
 import {
   AGENC_MCP_STDIO_DEFAULT_MAX_LINE_BYTES,
   McpStdioServerTransport,
   encodeMcpJsonLine,
-} from "./stdio.js";
+} from "../../src/mcp-server/stdio.js";
 import { McpToolRegistry } from "./tools.js";
-import type { McpCallToolResult } from "./types.js";
+import type { McpCallToolResult } from "../../src/mcp-server/types.js";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {

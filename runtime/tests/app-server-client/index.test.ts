@@ -10,21 +10,21 @@ vi.mock("bun:bundle", () => ({
 import {
   dispatchSlashCommand,
   parseSlashCommand,
-} from "../commands/dispatcher.js";
-import { readConfigMenuSnapshot } from "../commands/config-menu.js";
-import { buildDefaultRegistry } from "../commands/registry.js";
-import type { SlashCommandContext } from "../commands/types.js";
-import type { ConfigStore } from "../config/store.js";
+} from "../../src/commands/dispatcher.js";
+import { readConfigMenuSnapshot } from "../../src/commands/config-menu.js";
+import { buildDefaultRegistry } from "../../src/commands/registry.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
+import type { ConfigStore } from "../../src/config/store.js";
 import {
   applyDaemonTuiRuntimeSettingsAuthority,
   createAgenCDaemonOnlyTuiContext,
   findAgenCDaemonAgentBySessionId,
   listAgenCDaemonAgents,
-} from "./index.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+} from "../../src/app-server-client/index.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 import {
   registerSandboxExecutionLifecycleParticipant,
-} from "../sandbox/execution-lifecycle.js";
+} from "../../src/sandbox/execution-lifecycle.js";
 
 function createListClient(
   pages: Array<{
@@ -163,9 +163,9 @@ describe("app-server-client daemon helpers", () => {
     vi.resetModules();
     const watcherStart = vi.fn().mockResolvedValue(undefined);
     const watcherStop = vi.fn().mockResolvedValue(undefined);
-    vi.doMock("../skills/local-loader.js", async (importActual) => {
+    vi.doMock("../../src/skills/local-loader.js", async (importActual) => {
       const actual =
-        await importActual<typeof import("../skills/local-loader.js")>();
+        await importActual<typeof import("../../src/skills/local-loader.js")>();
       return {
         ...actual,
         createLocalSkillsServices: vi.fn(() => ({
@@ -175,10 +175,10 @@ describe("app-server-client daemon helpers", () => {
         })),
       };
     });
-    vi.doMock("../tools/AgentTool/loadAgentsDir.js", async (importActual) => {
+    vi.doMock("../../src/tools/AgentTool/loadAgentsDir.js", async (importActual) => {
       const actual =
         await importActual<
-          typeof import("../tools/AgentTool/loadAgentsDir.js")
+          typeof import("../../src/tools/AgentTool/loadAgentsDir.js")
         >();
       return {
         ...actual,
@@ -192,7 +192,7 @@ describe("app-server-client daemon helpers", () => {
       join(tmpdir(), "agenc-setup-fail-workspace-"),
     );
     try {
-      const module = await import("./index.js");
+      const module = await import("../../src/app-server-client/index.js");
       await expect(
         module.createAgenCDaemonOnlyTuiContext({
           env: { AGENC_HOME: agencHome, HOME: agencHome },
@@ -204,8 +204,8 @@ describe("app-server-client daemon helpers", () => {
       expect(watcherStart).toHaveBeenCalledOnce();
       expect(watcherStop).toHaveBeenCalledOnce();
     } finally {
-      vi.doUnmock("../skills/local-loader.js");
-      vi.doUnmock("../tools/AgentTool/loadAgentsDir.js");
+      vi.doUnmock("../../src/skills/local-loader.js");
+      vi.doUnmock("../../src/tools/AgentTool/loadAgentsDir.js");
       vi.resetModules();
       rmSync(agencHome, { recursive: true, force: true });
       rmSync(workspace, { recursive: true, force: true });
@@ -298,9 +298,9 @@ describe("app-server-client daemon helpers", () => {
       sessionId: "session_resumed",
       params,
     }));
-    vi.doMock("../app-server/agent-cli.js", async (importActual) => {
+    vi.doMock("../../src/app-server/agent-cli.js", async (importActual) => {
       const actual =
-        await importActual<typeof import("../app-server/agent-cli.js")>();
+        await importActual<typeof import("../../src/app-server/agent-cli.js")>();
       return {
         ...actual,
         defaultEnsureDaemonReady: vi.fn(() => vi.fn(async () => {})),
@@ -309,7 +309,7 @@ describe("app-server-client daemon helpers", () => {
     });
 
     try {
-      const { resumeAgenCDaemonPromptAgent } = await import("./index.js");
+      const { resumeAgenCDaemonPromptAgent } = await import("../../src/app-server-client/index.js");
       await resumeAgenCDaemonPromptAgent({
         sessionId: "conv-retained1",
         rolloutPath:
@@ -343,7 +343,7 @@ describe("app-server-client daemon helpers", () => {
         "initialContent",
       );
     } finally {
-      vi.doUnmock("../app-server/agent-cli.js");
+      vi.doUnmock("../../src/app-server/agent-cli.js");
       vi.resetModules();
     }
   });
@@ -360,9 +360,9 @@ describe("app-server-client daemon helpers", () => {
     }));
     const request = vi.fn();
     const close = vi.fn();
-    vi.doMock("../app-server/agent-cli.js", async (importActual) => {
+    vi.doMock("../../src/app-server/agent-cli.js", async (importActual) => {
       const actual =
-        await importActual<typeof import("../app-server/agent-cli.js")>();
+        await importActual<typeof import("../../src/app-server/agent-cli.js")>();
       return {
         ...actual,
         defaultEnsureDaemonReady: vi.fn(() => vi.fn(async () => {})),
@@ -375,7 +375,7 @@ describe("app-server-client daemon helpers", () => {
     });
 
     try {
-      const { startAgenCDaemonPromptAgent } = await import("./index.js");
+      const { startAgenCDaemonPromptAgent } = await import("../../src/app-server-client/index.js");
       await startAgenCDaemonPromptAgent({
         prompt: "describe this",
         cwd: "/workspace",
@@ -451,7 +451,7 @@ describe("app-server-client daemon helpers", () => {
       expect(request).not.toHaveBeenCalled();
       expect(close).not.toHaveBeenCalled();
     } finally {
-      vi.doUnmock("../app-server/agent-cli.js");
+      vi.doUnmock("../../src/app-server/agent-cli.js");
       vi.resetModules();
     }
   });
@@ -466,9 +466,9 @@ describe("app-server-client daemon helpers", () => {
       sessionId: "session_mcp_env",
       params,
     }));
-    vi.doMock("../app-server/agent-cli.js", async (importActual) => {
+    vi.doMock("../../src/app-server/agent-cli.js", async (importActual) => {
       const actual =
-        await importActual<typeof import("../app-server/agent-cli.js")>();
+        await importActual<typeof import("../../src/app-server/agent-cli.js")>();
       return {
         ...actual,
         defaultEnsureDaemonReady: vi.fn(() => vi.fn(async () => {})),
@@ -477,7 +477,7 @@ describe("app-server-client daemon helpers", () => {
     });
 
     try {
-      const { startAgenCDaemonPromptAgent } = await import("./index.js");
+      const { startAgenCDaemonPromptAgent } = await import("../../src/app-server-client/index.js");
       await expect(
         startAgenCDaemonPromptAgent({
           prompt: "use MCP",
@@ -490,7 +490,7 @@ describe("app-server-client daemon helpers", () => {
       ).rejects.toThrow(/obsolete.*AGENC_MCP_SERVERS/u);
       expect(createAgent).not.toHaveBeenCalled();
     } finally {
-      vi.doUnmock("../app-server/agent-cli.js");
+      vi.doUnmock("../../src/app-server/agent-cli.js");
       vi.resetModules();
     }
   });
@@ -502,8 +502,8 @@ describe("app-server-client daemon helpers", () => {
     process.env.NODE_ENV = "development";
     const agencHome = mkdtempSync(join(tmpdir(), "agenc-cold-consent-"));
     const workspace = mkdtempSync(join(tmpdir(), "agenc-cold-consent-workspace-"));
-    const { ConfigStore } = await import("../config/store.js");
-    const { recordBypassPermissionsConsent } = await import("../permissions/bypass-consent-state.js");
+    const { ConfigStore } = await import("../../src/config/store.js");
+    const { recordBypassPermissionsConsent } = await import("../../src/permissions/bypass-consent-state.js");
     let context: Awaited<ReturnType<typeof createAgenCDaemonOnlyTuiContext>> | null = null;
     try {
       if (scenario === "disabled") writeFileSync(join(agencHome, "config.toml"), 'config_version = 2\n[permissions]\nbypassPermissionsMode = "disable"\n');
@@ -517,7 +517,7 @@ describe("app-server-client daemon helpers", () => {
         conversationId: "cold-consent", runtimeOptions: resolveAgentRuntimeOptions({}, { simpleMode: true }) });
       const permission = context.baseSession.services.permissionModeRegistry.current();
       if (scenario === "matching") {
-        const { loadBypassPermissionsConsent } = await import("../permissions/bypass-consent-state.js");
+        const { loadBypassPermissionsConsent } = await import("../../src/permissions/bypass-consent-state.js");
         expect(context.baseSession.services.configStore.agencHome).toBe(agencHome);
         expect(loadBypassPermissionsConsent(context.baseSession.services.configStore.stateRepository, workspace, { reload: true })).toEqual([workspace]);
         expect(permission.bypassPermissionsModeDisabledByPolicy).not.toBe(true);

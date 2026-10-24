@@ -1,26 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { MCPElicitationHandlers, MCPServerConfig } from "./types.js";
+import type { MCPElicitationHandlers, MCPServerConfig } from "../../src/mcp-client/types.js";
 
 // Mock the transport modules so we can assert dispatch
 // without touching the real SDK.
-vi.mock("./transports/stdio.js", () => ({
+vi.mock("../../src/mcp-client/transports/stdio.js", () => ({
   createStdioMCPConnection: vi.fn(),
 }));
-vi.mock("./transports/sse.js", () => ({
+vi.mock("../../src/mcp-client/transports/sse.js", () => ({
   createSseMCPConnection: vi.fn(),
 }));
-vi.mock("./transports/http.js", () => ({
+vi.mock("../../src/mcp-client/transports/http.js", () => ({
   createHttpMCPConnection: vi.fn(),
 }));
-vi.mock("./transports/websocket.js", () => ({
+vi.mock("../../src/mcp-client/transports/websocket.js", () => ({
   createWebSocketMCPConnection: vi.fn(),
 }));
 
-import { createMCPConnection } from "./connection.js";
-import { createStdioMCPConnection } from "./transports/stdio.js";
-import { createSseMCPConnection } from "./transports/sse.js";
-import { createHttpMCPConnection } from "./transports/http.js";
-import { createWebSocketMCPConnection } from "./transports/websocket.js";
+import { createMCPConnection } from "../../src/mcp-client/connection.js";
+import { createStdioMCPConnection } from "../../src/mcp-client/transports/stdio.js";
+import { createSseMCPConnection } from "../../src/mcp-client/transports/sse.js";
+import { createHttpMCPConnection } from "../../src/mcp-client/transports/http.js";
+import { createWebSocketMCPConnection } from "../../src/mcp-client/transports/websocket.js";
 
 const mockCreateStdio = vi.mocked(createStdioMCPConnection);
 const mockCreateSse = vi.mocked(createSseMCPConnection);

@@ -7,7 +7,7 @@ import {
   openStateDatabases,
   type StateSqliteDriver,
   type StateSqliteReader,
-} from "./sqlite-driver.js";
+} from "../../src/state/sqlite-driver.js";
 
 let home = "";
 let cwd = "";

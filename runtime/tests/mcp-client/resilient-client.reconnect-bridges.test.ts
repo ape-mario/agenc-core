@@ -12,19 +12,19 @@
  *      await and closes the new client / tears down the new bridge.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ResilientMCPBridge } from "./resilient-client.js";
-import type { MCPServerConfig, MCPToolBridge } from "./types.js";
+import { ResilientMCPBridge } from "../../src/mcp-client/resilient-client.js";
+import type { MCPServerConfig, MCPToolBridge } from "../../src/mcp-client/types.js";
 
-vi.mock("./connection.js", () => ({
+vi.mock("../../src/mcp-client/connection.js", () => ({
   createMCPConnection: vi.fn(),
 }));
 
-vi.mock("./tools.js", () => ({
+vi.mock("../../src/mcp-client/tools.js", () => ({
   createToolBridge: vi.fn(),
 }));
 
-import { createMCPConnection } from "./connection.js";
-import { createToolBridge } from "./tools.js";
+import { createMCPConnection } from "../../src/mcp-client/connection.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
 
 const mockCreateMCPConnection = vi.mocked(createMCPConnection);
 const mockCreateToolBridge = vi.mocked(createToolBridge);

@@ -8,10 +8,10 @@ import {
   mergeSessionApprovalsIntoContext,
   SessionApprovalCache,
   type ShellApprovalKey,
-} from "./approval-cache.js";
-import { canonicalizeCommandForApproval } from "../shell-command/parser.js";
-import type { ReviewDecision } from "./review-decision.js";
-import { createEmptyToolPermissionContext } from "./types.js";
+} from "../../src/permissions/approval-cache.js";
+import { canonicalizeCommandForApproval } from "../../src/shell-command/parser.js";
+import type { ReviewDecision } from "../../src/permissions/review-decision.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 describe("canonicalJsonKey — stable serialization", () => {
   test("object key order does not matter", () => {

@@ -11,8 +11,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { syncCollabAgentEventToAppState } from "./collabAgentTaskSync.js";
-import type { AppState } from "./AppStateStore.js";
+import { syncCollabAgentEventToAppState } from "../../../src/tui/state/collabAgentTaskSync.js";
+import type { AppState } from "../../../src/tui/state/AppStateStore.js";
 import {
   getVisibleAgentTasks,
 } from "src/tui/components/CoordinatorAgentStatus.js";

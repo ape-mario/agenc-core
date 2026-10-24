@@ -6,20 +6,20 @@ import { describe, expect, test } from "vitest";
 import {
   ConfiguredHooksRuntime,
   type HookInstallTarget,
-} from "../hooks/configured-hooks.js";
-import { createHookExecutionAuthority } from "../hooks/execution-authority.js";
+} from "../../src/hooks/configured-hooks.js";
+import { createHookExecutionAuthority } from "../../src/hooks/execution-authority.js";
 import { explicitDangerBroker } from "../helpers/explicit-danger-boundary.js";
-import { EventLog } from "../session/event-log.js";
-import type { Session } from "../session/session.js";
-import type { TurnContext } from "../session/turn-context.js";
-import type { TurnState } from "../session/turn-state.js";
-import { resolveAgentRuntimeOptions } from "../session/runtime-options.js";
+import { EventLog } from "../../src/session/event-log.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
+import type { TurnState } from "../../src/session/turn-state.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
 import {
   evaluateStopHooks,
   executeStopFailureHooks,
   MAX_STOP_HOOK_BLOCKS,
   type StopHookHandler,
-} from "./stop-hooks.js";
+} from "../../src/phases/stop-hooks.js";
 
 function mkCtx(opts: Partial<TurnContext> = {}): TurnContext {
   return {

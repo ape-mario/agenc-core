@@ -5,9 +5,9 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../../ink/root.js'
-import { SelectMulti } from './SelectMulti.js'
-import type { OptionWithDescription } from './select.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { SelectMulti } from '../../../../src/tui/components/CustomSelect/SelectMulti.js'
+import type { OptionWithDescription } from '../../../../src/tui/components/CustomSelect/select.js'
 
 type InputKey = Partial<{
   ctrl: boolean
@@ -34,8 +34,8 @@ const inputMock = vi.hoisted(() => ({
   current: undefined as CapturedInput | undefined,
 }))
 
-vi.mock('../../ink.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../ink.js')>()
+vi.mock('../../../../src/tui/ink.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../src/tui/ink.js')>()
   return {
     ...actual,
     useInput: (
@@ -47,25 +47,25 @@ vi.mock('../../ink.js', async importOriginal => {
   }
 })
 
-vi.mock('../../../utils/debug.js', () => ({
+vi.mock('../../../../src/utils/debug.js', () => ({
   logForDebugging: () => {},
 }))
-vi.mock('../../../bootstrap/state.js', () => ({
+vi.mock('../../../../src/bootstrap/state.js', () => ({
   flushInteractionTime: () => {},
   getActiveTimeCounter: () => 0,
   markScrollActivity: () => {},
   updateLastInteractionTime: () => {},
 }))
-vi.mock('../../../utils/earlyInput.js', () => ({
+vi.mock('../../../../src/utils/earlyInput.js', () => ({
   stopCapturingEarlyInput: () => {},
 }))
-vi.mock('../../../utils/envUtils.js', () => ({
+vi.mock('../../../../src/utils/envUtils.js', () => ({
   isEnvTruthy: () => false,
 }))
-vi.mock('../../../utils/fullscreen.js', () => ({
+vi.mock('../../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => true,
 }))
-vi.mock('../../../utils/log.js', () => ({
+vi.mock('../../../../src/utils/log.js', () => ({
   logError: () => {},
 }))
 

@@ -5,7 +5,7 @@ import {
   hasNameOrAliasPrefixMatch,
   type RankableMeta,
   type SlashCommandRankableMeta,
-} from "../../../utils/suggestions/sortBySearchPriority.js";
+} from "../../../../src/utils/suggestions/sortBySearchPriority.js";
 
 /**
  * Slash typeahead exact-match highlight gate.

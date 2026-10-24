@@ -12,12 +12,12 @@ import {
   getLiveCoordinatorSystemPrompt,
   isCoordinatorModeEnabled,
   LIVE_COORDINATOR_ALLOWED_TOOLS,
-} from "./coordinatorMode.js";
-import { toolConfigAllowsTool } from "../tools/config.js";
-import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../tools/untrusted-tool-result-framing.js";
-import { coordinatorCommand } from "../commands/coordinator.js";
-import type { Session } from "../session/session.js";
-import type { SlashCommandContext } from "../commands/types.js";
+} from "../../src/coordinator/coordinatorMode.js";
+import { toolConfigAllowsTool } from "../../src/tools/config.js";
+import { UNTRUSTED_TOOL_RESULT_BOUNDARY } from "../../src/tools/untrusted-tool-result-framing.js";
+import { coordinatorCommand } from "../../src/commands/coordinator.js";
+import type { Session } from "../../src/session/session.js";
+import type { SlashCommandContext } from "../../src/commands/types.js";
 
 describe("isCoordinatorModeEnabled", () => {
   it("uses only the final canonical config flag", () => {

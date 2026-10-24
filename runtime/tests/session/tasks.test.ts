@@ -17,21 +17,21 @@
 
 import { describe, expect, it } from "vitest";
 
-import { AsyncQueue } from "../utils/async-queue.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "./session.js";
+} from "../../src/session/session.js";
 import {
   type Config,
   type ManagedFeatures,
   type ModelInfo,
   type SessionConfiguration,
-} from "./turn-context.js";
+} from "../../src/session/turn-context.js";
 import {
   GRACEFUL_INTERRUPTION_TIMEOUT_MS,
   acceptMailboxDeliveryForCurrentTurn,
@@ -44,11 +44,11 @@ import {
   takePendingInput,
   waitForDoneWithin,
   type SessionTask,
-} from "./tasks.js";
-import type { LLMProvider } from "../llm/types.js";
-import { resolveAgentRuntimeOptions } from "./runtime-options.js";
-import { ToolRouter } from "../tools/router.js";
-import type { Tool } from "../tools/types.js";
+} from "../../src/session/tasks.js";
+import type { LLMProvider } from "../../src/llm/types.js";
+import { resolveAgentRuntimeOptions } from "../../src/session/runtime-options.js";
+import { ToolRouter } from "../../src/tools/router.js";
+import type { Tool } from "../../src/tools/types.js";
 
 // ─────────────────────────────────────────────────────────────────────
 // Fixture helpers (mirror session.test.ts)

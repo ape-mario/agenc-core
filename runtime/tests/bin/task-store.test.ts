@@ -14,7 +14,7 @@ import {
   updateOne,
   type StoredTask,
   type TaskStoreOptions,
-} from "./task-store.js";
+} from "../../src/bin/task-store.js";
 
 async function withTempStore<T>(
   fn: (opts: TaskStoreOptions) => Promise<T>,

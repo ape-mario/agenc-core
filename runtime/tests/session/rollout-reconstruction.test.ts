@@ -2,23 +2,23 @@ import { describe, expect, test } from "vitest";
 import {
   buildCompactedHistory,
   reconstructFromRollout,
-} from "./rollout-reconstruction.js";
-import { DEFAULT_MAX_TOOL_RESULT_BYTES } from "../tools/execution.js";
-import { parseRolloutLine, type RolloutItem } from "./rollout-item.js";
-import type { IndexSnapshot } from "./session-store.js";
+} from "../../src/session/rollout-reconstruction.js";
+import { DEFAULT_MAX_TOOL_RESULT_BYTES } from "../../src/tools/execution.js";
+import { parseRolloutLine, type RolloutItem } from "../../src/session/rollout-item.js";
+import type { IndexSnapshot } from "../../src/session/session-store.js";
 import {
   REALTIME_CONVERSATION_CLOSE_TAG,
   REALTIME_CONVERSATION_OPEN_TAG,
-} from "../conversation/realtime/instructions/markers.js";
+} from "../../src/conversation/realtime/instructions/markers.js";
 import {
   PERSONALITY_SPEC_END_MARKER,
   PERSONALITY_SPEC_START_MARKER,
-} from "../context/personality-spec-instructions.js";
+} from "../../src/context/personality-spec-instructions.js";
 import {
   createCsvAgentInvocationEnvelope,
   materializeAgentInvocationMessages,
-} from "../contracts/agent-invocation-envelope.js";
-import { llmMessageToResponseItem } from "./message-history-conversion.js";
+} from "../../src/contracts/agent-invocation-envelope.js";
+import { llmMessageToResponseItem } from "../../src/session/message-history-conversion.js";
 
 describe("rollout-reconstruction", () => {
   test("clear retires legacy compaction context before a fresh turn establishes its own", () => {
@@ -362,7 +362,7 @@ describe("rollout-reconstruction", () => {
           sandboxPolicy: "workspace-write",
           model: "grok-4",
           realtimeActive: true,
-        } as unknown as import("./event-log.js").TurnContextItem,
+        } as unknown as import("../../src/session/event-log.js").TurnContextItem,
       },
       {
         type: "response_item",
@@ -418,7 +418,7 @@ describe("rollout-reconstruction", () => {
           autoCompactTokenLimit: 90_000,
           realtimeActive: true,
           personality: "friendly",
-        } as unknown as import("./event-log.js").TurnContextItem,
+        } as unknown as import("../../src/session/event-log.js").TurnContextItem,
       },
       { type: "response_item", payload: { role: "user", content: "hi" } },
       {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultConfig, mergeConfigs } from "../config/schema.js";
+import { defaultConfig, mergeConfigs } from "../../src/config/schema.js";
 import {
   ModelRegistry,
   modelRegistryEntryToModelInfo,
-} from "./model-registry.js";
+} from "../../src/llm/model-registry.js";
 
 describe("ModelRegistry", () => {
   it("combines provider, metadata, cost, and capabilities for a model", () => {

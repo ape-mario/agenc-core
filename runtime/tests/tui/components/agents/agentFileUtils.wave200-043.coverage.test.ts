@@ -11,8 +11,8 @@ import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 
 import type { AgentDefinition } from 'src/tools/AgentTool/loadAgentsDir.js'
-import { createAgentRoleWorkspace } from '../../../agents/role.js'
-import { runWithCwdOverride } from '../../../utils/cwd.js'
+import { createAgentRoleWorkspace } from '../../../../src/agents/role.js'
+import { runWithCwdOverride } from '../../../../src/utils/cwd.js'
 import {
   deleteAgentFromFile,
   formatAgentAsMarkdown,
@@ -22,7 +22,7 @@ import {
   getNewRelativeAgentFilePath,
   saveAgentToFile,
   updateAgentFile,
-} from './agentFileUtils.js'
+} from '../../../../src/tui/components/agents/agentFileUtils.js'
 
 describe('agent file utilities wave 200 coverage', () => {
   test('formats options and handles custom agent file lifecycle paths', async () => {

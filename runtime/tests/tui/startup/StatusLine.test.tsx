@@ -3,11 +3,11 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import { TEST_REMOTE_AUTH_SESSION_CONTEXT } from '../remoteAuthSessionContext.fixture.js'
-import { StatusLine } from './StatusLine.js'
-import { SessionUsageContext } from '../context/sessionUsageContext.js'
-import { StatusLineExecutionContext, type DaemonStatusLineExecutor } from '../context/statusLineExecutionContext.js'
+import { StatusLine } from '../../../src/tui/startup/StatusLine.js'
+import { SessionUsageContext } from '../../../src/tui/context/sessionUsageContext.js'
+import { StatusLineExecutionContext, type DaemonStatusLineExecutor } from '../../../src/tui/context/statusLineExecutionContext.js'
 
 const mocks = vi.hoisted(() => ({
   appState: {
@@ -26,7 +26,7 @@ vi.mock('bun:bundle', () => ({
   feature: () => false,
 }))
 
-vi.mock('../../constants/outputStyles.js', () => ({
+vi.mock('../../../src/constants/outputStyles.js', () => ({
   DEFAULT_OUTPUT_STYLE_NAME: 'default',
 }))
 
@@ -34,7 +34,7 @@ vi.mock('src/utils/debug.js', () => ({
   logForDebugging: () => {},
 }))
 
-vi.mock('../../bootstrap/state.js', () => ({
+vi.mock('../../../src/bootstrap/state.js', () => ({
   flushInteractionTime: () => {},
   getIsRemoteMode: () => false,
   getKairosActive: () => false,
@@ -44,7 +44,7 @@ vi.mock('../../bootstrap/state.js', () => ({
   updateLastInteractionTime: () => {},
 }))
 
-vi.mock('../../cost/tracker.js', () => ({
+vi.mock('../../../src/cost/tracker.js', () => ({
   getTotalAPIDuration: () => 0,
   getTotalCost: mocks.getTotalCost,
   getTotalDuration: () => 0,
@@ -54,87 +54,87 @@ vi.mock('../../cost/tracker.js', () => ({
   getTotalOutputTokens: () => 0,
 }))
 
-vi.mock('../hooks/useMainLoopModel.js', () => ({
+vi.mock('../../../src/tui/hooks/useMainLoopModel.js', () => ({
   useMainLoopModel: () => 'gpt-5',
 }))
 
-vi.mock('../hooks/useSettings.js', () => ({
+vi.mock('../../../src/tui/hooks/useSettings.js', () => ({
   useSettings: () => ({
     statusLine: { command: 'statusline', padding: 0 },
   }),
 }))
 
-vi.mock('../context/notifications.js', () => ({
+vi.mock('../../../src/tui/context/notifications.js', () => ({
   useNotifications: () => ({
     addNotification: mocks.addNotification,
   }),
 }))
 
-vi.mock('../../permissions/trust/project-trust.js', () => ({
+vi.mock('../../../src/permissions/trust/project-trust.js', () => ({
   checkHasProjectTrustAcceptedSync: () => true,
 }))
 
-vi.mock('../../utils/config.js', () => ({
+vi.mock('../../../src/utils/config.js', () => ({
   getRuntimeState: () => ({ tui: {} }),
 }))
 
-vi.mock('../../utils/settings/canonicalAuthority.js', async importOriginal => ({
+vi.mock('../../../src/utils/settings/canonicalAuthority.js', async importOriginal => ({
   ...(await importOriginal<
-    typeof import('../../utils/settings/canonicalAuthority.js')
+    typeof import('../../../src/utils/settings/canonicalAuthority.js')
   >()),
   getCanonicalSettingsAuthority: () => ({
     current: () => ({ tui: {} }),
   }),
 }))
 
-vi.mock('../../utils/context.js', () => ({
+vi.mock('../../../src/utils/context.js', () => ({
   calculateContextPercentages: () => ({ used: 0, remaining: 100 }),
   getContextWindowForModelForContext: () => 100000,
 }))
 
-vi.mock('../../utils/cwd.js', () => ({
+vi.mock('../../../src/utils/cwd.js', () => ({
   getCwd: () => '/workspace',
 }))
 
-vi.mock('../../utils/debug.js', () => ({
+vi.mock('../../../src/utils/debug.js', () => ({
   logForDebugging: () => {},
 }))
 
-vi.mock('../context/fullscreenModeContext.js', () => ({
+vi.mock('../../../src/tui/context/fullscreenModeContext.js', () => ({
   useFullscreenMode: () => false,
 }))
 
-vi.mock('../../utils/hooks.js', () => ({
+vi.mock('../../../src/utils/hooks.js', () => ({
   createBaseHookInput: () => ({}),
   executeStatusLineCommand: mocks.executeStatusLineCommand,
 }))
 
-vi.mock('../../utils/messages.js', () => ({
+vi.mock('../../../src/utils/messages.js', () => ({
   getLastAssistantMessage: () => null,
 }))
 
-vi.mock('../../utils/model/model.js', () => ({
+vi.mock('../../../src/utils/model/model.js', () => ({
   renderModelName: (model: string) => model,
 }))
 
-vi.mock('../../utils/sessionStorage.js', () => ({
+vi.mock('../../../src/utils/sessionStorage.js', () => ({
   getCurrentSessionTitle: () => undefined,
 }))
 
-vi.mock('../../utils/tokens.js', () => ({
+vi.mock('../../../src/utils/tokens.js', () => ({
   doesMostRecentAssistantMessageExceed200k: () => false,
   getCurrentUsage: () => 0,
 }))
 
-vi.mock('../../utils/worktree.js', () => ({
+vi.mock('../../../src/utils/worktree.js', () => ({
   getCurrentWorktreeSession: () => undefined,
 }))
 
-vi.mock('../ink.js', async importOriginal => {
-  return await importOriginal<typeof import('../ink.js')>()
+vi.mock('../../../src/tui/ink.js', async importOriginal => {
+  return await importOriginal<typeof import('../../../src/tui/ink.js')>()
 })
 
-vi.mock('../state/AppState.js', () => ({
+vi.mock('../../../src/tui/state/AppState.js', () => ({
   useAppState: (selector: (state: Record<string, unknown>) => unknown) =>
     selector(mocks.appState),
   useSetAppState: () => (next: unknown) => {

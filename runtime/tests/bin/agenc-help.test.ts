@@ -4,12 +4,12 @@ import {
   formatCliHelpText,
   formatCliHelpTopicText,
   main,
-} from "./agenc-main.js";
+} from "../../src/bin/agenc-main.js";
 import {
   formatAgenCDaemonCliHelpText,
   parseAgenCDaemonCliArgs,
-} from "../app-server/daemon-cli.js";
-import { VERSION } from "../index.js";
+} from "../../src/app-server/daemon-cli.js";
+import { VERSION } from "../../src/index.js";
 
 describe("agenc CLI help", () => {
   it("formats top-level CLI help with commands and examples", () => {

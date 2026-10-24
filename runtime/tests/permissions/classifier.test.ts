@@ -13,8 +13,8 @@ import {
   formatActionForClassifier,
   isAutoModeAllowlistedTool,
   isAutoModeGateEnabled,
-} from "./classifier.js";
-import { createEmptyToolPermissionContext } from "./types.js";
+} from "../../src/permissions/classifier.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 import { createProvider } from "../../src/llm/provider.js";
 import {
   runWithCurrentRuntimeSession,

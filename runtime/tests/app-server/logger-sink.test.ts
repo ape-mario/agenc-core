@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createSizeCappedFileLogSink } from "../utils/logger.js";
+import { createSizeCappedFileLogSink } from "../../src/utils/logger.js";
 
 describe("size-capped rotating file log sink", () => {
   it("bounds on-disk growth to roughly 2x the configured cap via rotation", async () => {

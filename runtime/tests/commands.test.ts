@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findCommand, type Command } from "./commands.js";
+import { findCommand, type Command } from "../src/commands.js";
 
 describe("findCommand", () => {
   it("prefers exact command names before aliases", () => {

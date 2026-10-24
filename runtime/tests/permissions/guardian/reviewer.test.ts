@@ -1,30 +1,30 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AsyncQueue } from "../../utils/async-queue.js";
-import type { LLMChatOptions, LLMMessage, LLMProvider, LLMResponse } from "../../llm/types.js";
-import type { ApprovalCtx } from "./arbiter.js";
-import type { ToolInvocation } from "../../tools/context.js";
+import { AsyncQueue } from "../../../src/utils/async-queue.js";
+import type { LLMChatOptions, LLMMessage, LLMProvider, LLMResponse } from "../../../src/llm/types.js";
+import type { ApprovalCtx } from "../../../src/permissions/guardian/arbiter.js";
+import type { ToolInvocation } from "../../../src/tools/context.js";
 import {
   createGuardianRejectionCircuitBreaker,
   type GuardianRejectionCircuitBreaker,
-} from "./rejection-circuit-breaker.js";
+} from "../../../src/permissions/guardian/rejection-circuit-breaker.js";
 import {
   createDefaultGuardianApprovalReviewer,
   GUARDIAN_PREFERRED_MODEL,
   parseGuardianAssessment,
   PRODUCTION_GUARDIAN_APPROVAL_REVIEW_TIMEOUT_MS,
-} from "./reviewer.js";
-import { PermissionModeRegistry } from "../permission-mode.js";
-import { createEmptyToolPermissionContext } from "../types.js";
-import { ReviewManager } from "../../session/review.js";
+} from "../../../src/permissions/guardian/reviewer.js";
+import { PermissionModeRegistry } from "../../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../../src/permissions/types.js";
+import { ReviewManager } from "../../../src/session/review.js";
 import { createTestConfigStore } from "../../fixtures.js";
 import {
   Session,
   type Event,
   type SessionOpts,
   type SessionServices,
-} from "../../session/session.js";
-import { resolveAgentRuntimeOptions } from "../../session/runtime-options.js";
+} from "../../../src/session/session.js";
+import { resolveAgentRuntimeOptions } from "../../../src/session/runtime-options.js";
 import {
   newDefaultTurnWithSubId,
   type Config,
@@ -32,7 +32,7 @@ import {
   type ModelInfo,
   type SessionConfiguration,
   type TurnContext,
-} from "../../session/turn-context.js";
+} from "../../../src/session/turn-context.js";
 
 afterEach(() => {
   vi.useRealTimers();

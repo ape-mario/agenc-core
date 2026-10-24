@@ -8,26 +8,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getProjectRoot, setProjectRoot } from "../bootstrap/state.js";
-import { ConfigStore } from "../config/store.js";
-import { REDACTED_SECRET } from "../secrets/index.js";
+import { getProjectRoot, setProjectRoot } from "../../src/bootstrap/state.js";
+import { ConfigStore } from "../../src/config/store.js";
+import { REDACTED_SECRET } from "../../src/secrets/index.js";
 import {
   getGlobalMemoryEntrypoint,
   getGlobalMemoryPath,
   getProjectMemoryEntrypoint,
   getProjectMemoryPath,
-} from "../memory/paths.js";
-import { clearTieredInstructionsCacheForTesting } from "./agenc-md.js";
-import { LIGHT_MEMORY_RECALL_RULES } from "../memory/memdir.js";
-import { LIGHT_LOADED_INSTRUCTIONS_NOTE, resolveLiveInstructionEnvelope } from "./live-instructions.js";
-import { getAttachmentTrackingState, resetRelevantMemoryBudget } from "../session/attachment-state.js";
-import type { Session } from "../session/session.js";
-import type { TurnContext } from "../session/turn-context.js";
+} from "../../src/memory/paths.js";
+import { clearTieredInstructionsCacheForTesting } from "../../src/prompts/agenc-md.js";
+import { LIGHT_MEMORY_RECALL_RULES } from "../../src/memory/memdir.js";
+import { LIGHT_LOADED_INSTRUCTIONS_NOTE, resolveLiveInstructionEnvelope } from "../../src/prompts/live-instructions.js";
+import { getAttachmentTrackingState, resetRelevantMemoryBudget } from "../../src/session/attachment-state.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
 import {
   enterCanonicalSettingsAuthority,
   resetCanonicalSettingsAuthorityForTesting,
   runWithCanonicalSettingsAuthority,
-} from "../utils/settings/canonicalAuthority.js";
+} from "../../src/utils/settings/canonicalAuthority.js";
 
 let root = "";
 let home = "";

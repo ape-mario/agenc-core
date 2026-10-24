@@ -44,19 +44,19 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RolloutItem } from "./rollout-item.js";
-import { RolloutStore } from "./rollout-store.js";
+import type { RolloutItem } from "../../src/session/rollout-item.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
 import {
   FileThreadStore,
   type ThreadSource,
   ThreadNotFoundError,
   ThreadStoreInvalidRequestError,
-} from "../thread-store/store.js";
-import { openStateDatabases } from "../state/sqlite-driver.js";
-import { upsertAgentRun } from "../state/agent-runs.js";
-import { recoverCanonicalRunJournalForRun } from "../state/startup-run-journal-recovery.js";
-import { StateThreadRepository } from "../state/threads.js";
-import { sessionTranscriptV2FromRollout } from "../app-server/background-agent-runner.js";
+} from "../../src/thread-store/store.js";
+import { openStateDatabases } from "../../src/state/sqlite-driver.js";
+import { upsertAgentRun } from "../../src/state/agent-runs.js";
+import { recoverCanonicalRunJournalForRun } from "../../src/state/startup-run-journal-recovery.js";
+import { StateThreadRepository } from "../../src/state/threads.js";
+import { sessionTranscriptV2FromRollout } from "../../src/app-server/background-agent-runner.js";
 import { readDisplayArtifact } from "../../src/session/display-artifact-store.js";
 import { ThreadRegistryLock } from "../../src/thread-store/registry-lock.js";
 

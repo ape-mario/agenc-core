@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { builtInCommandNames, listTuiCommandList } from "../commands.js";
-import { buildDefaultRegistry } from "./registry.js";
+import { builtInCommandNames, listTuiCommandList } from "../../src/commands.js";
+import { buildDefaultRegistry } from "../../src/commands/registry.js";
 
 describe("removed /reload-plugins slash surface", () => {
   it("is absent from the registry, TUI list, and built-in name set", () => {

@@ -2,22 +2,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ResilientMCPBridge,
   toToolCatalogPolicyConfig,
-} from "./resilient-client.js";
-import type { MCPToolBridgePermissionOptions } from "./tools.js";
-import type { MCPServerConfig, MCPToolBridge } from "./types.js";
-import { EMPTY_MCP_REQUEST_ENVIRONMENT } from "./environment.js";
-import { createToolEffectDispositionEvidence } from "../tools/effect-boundary.js";
+} from "../../src/mcp-client/resilient-client.js";
+import type { MCPToolBridgePermissionOptions } from "../../src/mcp-client/tools.js";
+import type { MCPServerConfig, MCPToolBridge } from "../../src/mcp-client/types.js";
+import { EMPTY_MCP_REQUEST_ENVIRONMENT } from "../../src/mcp-client/environment.js";
+import { createToolEffectDispositionEvidence } from "../../src/tools/effect-boundary.js";
 
-vi.mock("./connection.js", () => ({
+vi.mock("../../src/mcp-client/connection.js", () => ({
   createMCPConnection: vi.fn(),
 }));
 
-vi.mock("./tools.js", () => ({
+vi.mock("../../src/mcp-client/tools.js", () => ({
   createToolBridge: vi.fn(),
 }));
 
-import { createMCPConnection } from "./connection.js";
-import { createToolBridge } from "./tools.js";
+import { createMCPConnection } from "../../src/mcp-client/connection.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
 
 const mockCreateMCPConnection = vi.mocked(createMCPConnection);
 const mockCreateToolBridge = vi.mocked(createToolBridge);

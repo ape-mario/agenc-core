@@ -1,11 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { createAgentRoleWorkspace } from "../agents/role.js";
-import { buildAgenCToolUseContext, buildAgenCQueryProjectionContext } from "../session/agenc-tool-use-context.js";
-import { PermissionModeRegistry } from "../permissions/permission-mode.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
-import type { Session } from "../session/session.js";
-import type { TurnContext } from "../session/turn-context.js";
+import { createAgentRoleWorkspace } from "../../src/agents/role.js";
+import { buildAgenCToolUseContext, buildAgenCQueryProjectionContext } from "../../src/session/agenc-tool-use-context.js";
+import { PermissionModeRegistry } from "../../src/permissions/permission-mode.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
+import type { Session } from "../../src/session/session.js";
+import type { TurnContext } from "../../src/session/turn-context.js";
 
 const ROLE_WORKSPACE = createAgentRoleWorkspace("/tmp/agenc-context-test");
 

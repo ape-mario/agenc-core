@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { updateAgentRunStatus, upsertAgentRun } from "./agent-runs.js";
-import { openStateDatabases, type StateSqliteDriver } from "./sqlite-driver.js";
+import { updateAgentRunStatus, upsertAgentRun } from "../../src/state/agent-runs.js";
+import { openStateDatabases, type StateSqliteDriver } from "../../src/state/sqlite-driver.js";
 
 let home = "";
 let cwd = "";

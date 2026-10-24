@@ -14,7 +14,7 @@ import {
   parseRuleFile,
   projectRulesDir,
   ruleMatchesTarget,
-} from "./discovery.js";
+} from "../../../src/prompts/rules/discovery.js";
 
 let dir: string;
 

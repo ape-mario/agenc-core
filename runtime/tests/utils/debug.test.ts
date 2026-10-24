@@ -9,10 +9,10 @@ const tempDirs: string[] = []
 
 async function loadDebugModule(sessionId = 'session-test') {
   vi.resetModules()
-  vi.doMock('../bootstrap/state.js', () => ({
+  vi.doMock('../../src/bootstrap/state.js', () => ({
     getSessionId: () => sessionId,
   }))
-  return import('./debug.js')
+  return import('../../src/utils/debug.js')
 }
 
 async function makeTempDir(): Promise<string> {

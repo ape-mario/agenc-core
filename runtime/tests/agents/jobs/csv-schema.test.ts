@@ -7,7 +7,7 @@ import {
   releaseCsvOutputSchemaValidation,
   validateCsvResultForPersistence,
   validateCsvResultInWorkerPool,
-} from "./csv-schema.js";
+} from "../../../src/agents/jobs/csv-schema.js";
 
 describe("CSV output schema contract", () => {
   it("validates nested Draft-07 subset semantics with Ajv", () => {

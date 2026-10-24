@@ -3,27 +3,27 @@ import { PassThrough } from "node:stream";
 import React, { useEffect } from "react";
 import { describe, expect, test, vi } from "vitest";
 
-import type { AppState } from "./state/AppState.js";
+import type { AppState } from "../../src/tui/state/AppState.js";
 import {
   ABORT,
   APPROVED,
   APPROVED_FOR_SESSION,
   DENIED,
-} from "../permissions/review-decision.js";
-import type { ReviewDecision } from "../permissions/review-decision.js";
+} from "../../src/permissions/review-decision.js";
+import type { ReviewDecision } from "../../src/permissions/review-decision.js";
 import {
   ASK_USER_QUESTION_TOOL_NAME,
   clearAskUserQuestionResponsesForTest,
   createAskUserQuestionTool,
-} from "../tools/ask-user-question/tool.js";
-import type { ApprovalCtx, ApprovalResolver } from "../tools/orchestrator.js";
-import { createRoot, Text } from "./ink.js";
-import type { PendingRequest } from "./permission-requests.js";
+} from "../../src/tools/ask-user-question/tool.js";
+import type { ApprovalCtx, ApprovalResolver } from "../../src/tools/orchestrator.js";
+import { createRoot, Text } from "../../src/tui/ink.js";
+import type { PendingRequest } from "../../src/tui/permission-requests.js";
 import {
   buildToolUseConfirmQueue,
   usePermissionRequests,
-} from "./permission-requests.js";
-import type { AgenCBridgeSession } from "./session-types.js";
+} from "../../src/tui/permission-requests.js";
+import type { AgenCBridgeSession } from "../../src/tui/session-types.js";
 
 type TestStdin = PassThrough & {
   isTTY: boolean;

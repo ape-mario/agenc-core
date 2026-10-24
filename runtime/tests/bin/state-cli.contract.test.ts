@@ -7,12 +7,12 @@ import {
   parseAgenCStateCliArgs,
   runAgenCStateCli,
   type AgenCStateCliIo,
-} from "./state-cli.js";
+} from "../../src/bin/state-cli.js";
 import {
   openStateDatabases,
   type StateSqliteDriver,
-} from "../state/sqlite-driver.js";
-import { StateRecoveryIncidentRepository } from "../state/recovery-incidents.js";
+} from "../../src/state/sqlite-driver.js";
+import { StateRecoveryIncidentRepository } from "../../src/state/recovery-incidents.js";
 
 function createIo(): AgenCStateCliIo & {
   readonly stdoutText: () => string;

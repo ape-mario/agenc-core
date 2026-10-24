@@ -7,11 +7,11 @@ import {
   LOGS_DB_MIGRATIONS,
   STATE_DB_MIGRATIONS,
   type SqlMigration,
-} from "./migrations/index.js";
-import { TOOL_PAIR_PROJECTION_SCHEMA_VERSION } from "./migrations/020_tool_pair_projection_schema.js";
-import { setBasedCancellationIndexesMigration } from "./migrations/023_set_based_cancellation_indexes.js";
-import { applyMigrations } from "./sqlite-driver.js";
-import { StateSchemaMismatchError } from "./errors.js";
+} from "../../src/state/migrations/index.js";
+import { TOOL_PAIR_PROJECTION_SCHEMA_VERSION } from "../../src/state/migrations/020_tool_pair_projection_schema.js";
+import { setBasedCancellationIndexesMigration } from "../../src/state/migrations/023_set_based_cancellation_indexes.js";
+import { applyMigrations } from "../../src/state/sqlite-driver.js";
+import { StateSchemaMismatchError } from "../../src/state/errors.js";
 
 const migrationDir = sourcePath("state");
 

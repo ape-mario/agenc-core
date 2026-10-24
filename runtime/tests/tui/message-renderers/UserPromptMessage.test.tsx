@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   getUserPromptTruncationNotice,
   truncateUserPromptDisplayText,
-} from './UserPromptMessage.js'
+} from '../../../src/tui/message-renderers/UserPromptMessage.js'
 
 describe('UserPromptMessage truncation glyphs', () => {
   test('uses shared ellipsis glyphs for truncation notices', () => {

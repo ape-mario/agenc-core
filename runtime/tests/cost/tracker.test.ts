@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { CostSidecar } from "../session/cost.js";
+import { CostSidecar } from "../../src/session/cost.js";
 import {
   addToTotalDurationState,
   addToTotalSessionCost,
@@ -13,32 +13,32 @@ import {
   getTotalInputTokens,
   getTotalLinesAdded,
   getTotalLinesRemoved,
-} from "./tracker.js";
+} from "../../src/cost/tracker.js";
 
 vi.mock("src/utils/modelCost.js", () => ({
   calculateUSDCost: () => 0.1234,
 }));
-vi.mock("../utils/modelCost.js", () => ({
+vi.mock("../../src/utils/modelCost.js", () => ({
   calculateUSDCost: () => 0.1234,
 }));
-vi.mock("../utils/cwd.js", () => ({
+vi.mock("../../src/utils/cwd.js", () => ({
   getCwd: () => process.cwd(),
 }));
-vi.mock("../utils/env.js", () => ({
+vi.mock("../../src/utils/env.js", () => ({
   env: { isCI: false },
 }));
-vi.mock("../utils/envUtils.js", () => ({
+vi.mock("../../src/utils/envUtils.js", () => ({
   getAgenCHomeDir: () => process.cwd(),
   isEnvTruthy: (value: string | boolean | undefined) =>
     value === true || value === "1" || value === "true",
 }));
-vi.mock("../utils/errors.js", () => ({
+vi.mock("../../src/utils/errors.js", () => ({
   getErrnoCode: (error: { code?: string }) => error.code,
 }));
-vi.mock("../utils/messages.js", () => ({
+vi.mock("../../src/utils/messages.js", () => ({
   normalizeMessagesForAPI: (messages: unknown) => messages,
 }));
-vi.mock("../utils/slowOperations.js", () => ({
+vi.mock("../../src/utils/slowOperations.js", () => ({
   jsonParse: JSON.parse,
   jsonStringify: JSON.stringify,
 }));

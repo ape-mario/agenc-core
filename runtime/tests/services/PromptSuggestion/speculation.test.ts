@@ -16,7 +16,7 @@ import {
 
 const runForkedAgentMock = vi.hoisted(() => vi.fn());
 
-vi.mock("./promptSuggestion.js", () => ({
+vi.mock("../../../src/services/PromptSuggestion/promptSuggestion.js", () => ({
   generateSuggestion: vi.fn(),
   getPromptVariant: () => "user_intent",
   getSuggestionSuppressReason: () => null,
@@ -24,8 +24,8 @@ vi.mock("./promptSuggestion.js", () => ({
   shouldFilterSuggestion: () => false,
 }));
 
-vi.mock("./runtime.js", async () => {
-  const actual = await vi.importActual<typeof import("./runtime.js")>("./runtime.js");
+vi.mock("../../../src/services/PromptSuggestion/runtime.js", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/services/PromptSuggestion/runtime.js")>("../../../src/services/PromptSuggestion/runtime.js");
   return {
     ...actual,
     runForkedAgent: runForkedAgentMock,
@@ -39,7 +39,7 @@ import {
   isSpeculationEnabled,
   prepareMessagesForInjection,
   startSpeculation,
-} from "./speculation.js";
+} from "../../../src/services/PromptSuggestion/speculation.js";
 
 describe("PromptSuggestion speculation", () => {
   const tempDirs: string[] = [];

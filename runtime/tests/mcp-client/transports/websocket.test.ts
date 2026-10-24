@@ -6,7 +6,7 @@ import WebSocket, { WebSocketServer } from "ws";
 import {
   MCPWebSocketClientTransport,
   WEBSOCKET_CLOSE_WAIT_MS,
-} from "./websocket.js";
+} from "../../../src/mcp-client/transports/websocket.js";
 
 const servers = new Set<WebSocketServer>();
 

@@ -6,9 +6,9 @@ import {
   createSessionTranscriptStateForTesting,
   formatStructuredToolError,
   formatStructuredToolResult,
-} from "../session-transcript.js";
-import { pickToolResultDispatch } from "../tool-result-routing.js";
-import { createHistoryReplacedEvent } from "../../session/transcript-replacement.js";
+} from "../../../src/tui/session-transcript.js";
+import { pickToolResultDispatch } from "../../../src/tui/tool-result-routing.js";
+import { createHistoryReplacedEvent } from "../../../src/session/transcript-replacement.js";
 
 describe("AgenC TUI session transcript", () => {
   test.each([
@@ -899,7 +899,7 @@ describe("AgenC TUI session transcript", () => {
   });
 
   test("renders wait_agent mailbox updates with completed subagent findings", async () => {
-    const { formatSubagentNotification } = await import("../../agents/status.js");
+    const { formatSubagentNotification } = await import("../../../src/agents/status.js");
     const transcript = adaptTranscriptEvents([
       {
         id: "wait-end",
@@ -2050,7 +2050,7 @@ describe("AgenC TUI session transcript", () => {
     });
 
     test("renders supervisor subagent notifications as structured status rows", async () => {
-      const { formatSubagentNotification } = await import("../../agents/status.js");
+      const { formatSubagentNotification } = await import("../../../src/agents/status.js");
       const transcript = adaptTranscriptEvents([
         {
           id: "subagent",

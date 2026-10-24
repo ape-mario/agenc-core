@@ -17,32 +17,32 @@ import {
   MaxDepthExceededError,
   ThreadNotFoundError,
   renderInputPreview,
-} from "./control.js";
-import { AgentRegistry, type AgentMetadata } from "./registry.js";
+} from "../../src/agents/control.js";
+import { AgentRegistry, type AgentMetadata } from "../../src/agents/registry.js";
 import {
   _resetAgentRolesForTesting,
   _resetNicknamePoolForTesting,
   createAgentRoleWorkspace,
   registerAgentRole,
-} from "./role.js";
-import { RolloutStore } from "../session/rollout-store.js";
-import { ThreadManager } from "./thread-manager.js";
+} from "../../src/agents/role.js";
+import { RolloutStore } from "../../src/session/rollout-store.js";
+import { ThreadManager } from "../../src/agents/thread-manager.js";
 import {
   SimpleMailbox,
   type InterAgentCommunication,
   type Session,
-} from "../session/session.js";
-import { upsertAgentRun } from "../state/agent-runs.js";
+} from "../../src/session/session.js";
+import { upsertAgentRun } from "../../src/state/agent-runs.js";
 import {
   openStateDatabases,
   resolveStateDatabasePaths,
-} from "../state/sqlite-driver.js";
-import type { ExecutionAdmissionClient } from "../budget/admission-client.js";
+} from "../../src/state/sqlite-driver.js";
+import type { ExecutionAdmissionClient } from "../../src/budget/admission-client.js";
 import {
   createMailboxMetadataRecord,
   isAgentExitedSentinel,
   readMailboxMetadata,
-} from "./mailbox.js";
+} from "../../src/agents/mailbox.js";
 
 let agencHome = "";
 let originalAgencHome = "";

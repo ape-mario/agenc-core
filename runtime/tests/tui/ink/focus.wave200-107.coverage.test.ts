@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest'
 
-import type { DOMElement, DOMNode } from './dom.ts'
-import type { FocusEvent } from './events/focus-event.ts'
-import { FocusManager, getFocusManager, getRootNode } from './focus.ts'
+import type { DOMElement, DOMNode } from '../../../src/tui/ink/dom.js'
+import type { FocusEvent } from '../../../src/tui/ink/events/focus-event.js'
+import { FocusManager, getFocusManager, getRootNode } from '../../../src/tui/ink/focus.js'
 
 type EventRecord = {
   target: string

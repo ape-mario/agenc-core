@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../agents/control.js", () => ({
+vi.mock("../../src/agents/control.js", () => ({
   AgentControl: class AgentControl {
     registerSessionRoot(): void {}
   },
 }));
 
-vi.mock("../agents/registry.js", () => ({
+vi.mock("../../src/agents/registry.js", () => ({
   AgentRegistry: class AgentRegistry {},
 }));
 
-vi.mock("../agents/delegate.js", () => ({
+vi.mock("../../src/agents/delegate.js", () => ({
   delegate: vi.fn(),
 }));
 
-import type { Session } from "../session/session.js";
-import { ConversationThreadManager } from "../conversation/thread-manager.js";
-import { buildDelegateTool, ensureAgentControl } from "./delegate-tool.js";
+import type { Session } from "../../src/session/session.js";
+import { ConversationThreadManager } from "../../src/conversation/thread-manager.js";
+import { buildDelegateTool, ensureAgentControl } from "../../src/bin/delegate-tool.js";
 
 function stubSession(): Session {
   return {

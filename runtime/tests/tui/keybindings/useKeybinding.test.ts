@@ -1,17 +1,17 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { parseBindings } from "./parser.js";
-import { DEFAULT_BINDINGS } from "./defaultBindings.js";
-import { getBindingDisplayText, resolveKeyWithChordState } from "./resolver.js";
-import type { Key } from "../ink.js";
+import { parseBindings } from "../../../src/tui/keybindings/parser.js";
+import { DEFAULT_BINDINGS } from "../../../src/tui/keybindings/defaultBindings.js";
+import { getBindingDisplayText, resolveKeyWithChordState } from "../../../src/tui/keybindings/resolver.js";
+import type { Key } from "../../../src/tui/ink.js";
 import {
   KEYBINDING_ACTION_NAMES,
   KEYBINDING_CONTEXT_NAMES,
   type KeybindingContextName,
   type ParsedKeystroke,
-} from "./types.js";
+} from "../../../src/tui/keybindings/types.js";
 
-vi.mock("../ink.js", () => ({
+vi.mock("../../../src/tui/ink.js", () => ({
   useInput: () => {},
 }));
 
@@ -19,7 +19,7 @@ vi.mock("bun:bundle", () => ({
   feature: () => false,
 }));
 
-vi.mock("./KeybindingContext.js", () => ({
+vi.mock("../../../src/tui/keybindings/KeybindingContext.js", () => ({
   useOptionalKeybindingContext: () => undefined,
 }));
 
@@ -155,7 +155,7 @@ describe("useKeybinding exports and resolver contract", () => {
 
   test("exports singular and aggregate hooks from the canonical module", async () => {
     const { useKeybinding, useKeybindings } =
-      await import("./useKeybinding.js");
+      await import("../../../src/tui/keybindings/useKeybinding.js");
 
     expect(typeof useKeybinding).toBe("function");
     expect(typeof useKeybindings).toBe("function");

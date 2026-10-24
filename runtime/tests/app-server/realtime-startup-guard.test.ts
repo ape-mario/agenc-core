@@ -1,17 +1,17 @@
 import { describe, expect, test } from "vitest";
-import { AsyncQueue } from "../utils/async-queue.js";
+import { AsyncQueue } from "../../src/utils/async-queue.js";
 import {
   RealtimeConversationManager,
   type RealtimeAudioFrame,
   type RealtimeEvent,
   type RealtimeTransportRequest,
   type RealtimeWriter,
-} from "../conversation/realtime/conversation.js";
-import { type JsonObject } from "./protocol/index.js";
+} from "../../src/conversation/realtime/conversation.js";
+import { type JsonObject } from "../../src/app-server/protocol/index.js";
 import {
   AgenCRealtimeRpcService,
   TEST_ONLY_ALLOW_UNADMITTED_REALTIME_START,
-} from "./realtime.js";
+} from "../../src/app-server/realtime.js";
 
 describe("AgenC realtime startup guard", () => {
   test("stop() during deferred startup cancels cleanly without orphaning the session", async () => {

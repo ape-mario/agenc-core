@@ -10,10 +10,10 @@ import {
   INVALID_API_KEY_ERROR_MESSAGE_EXTERNAL,
   PROMPT_TOO_LONG_ERROR_MESSAGE,
   TOKEN_REVOKED_ERROR_MESSAGE,
-} from '../../errors/api.js'
-import { NO_RESPONSE_REQUESTED } from '../../utils/messages.js'
-import { renderToString } from '../../utils/staticRender.js'
-import { AssistantTextMessage } from './AssistantTextMessage.js'
+} from '../../../src/errors/api.js'
+import { NO_RESPONSE_REQUESTED } from '../../../src/utils/messages.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { AssistantTextMessage } from '../../../src/tui/message-renderers/AssistantTextMessage.js'
 
 function renderAssistantText(text: string, verbose = false): Promise<string> {
   return renderToString(

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { hasLocalMcpAccess, withLocalMcpAccess, sessionMcpAttachmentIssue, attachmentLogger, desktopControlEffectReceipt, withDesktopMcpDispatchGuard, assertDesktopMcpDispatchGuard, DesktopMcpPreflightRefusal, redactMcpAttachmentText, redactMcpAttachmentValue } from "./local-control.js";
-import { createToolBridge } from "./tools.js";
-import { toToolCatalogPolicyConfig } from "./resilient-client.js";
-import { freshDenialTracking } from "../permissions/denial-tracking.js";
-import { createEmptyToolPermissionContext } from "../permissions/types.js";
+import { hasLocalMcpAccess, withLocalMcpAccess, sessionMcpAttachmentIssue, attachmentLogger, desktopControlEffectReceipt, withDesktopMcpDispatchGuard, assertDesktopMcpDispatchGuard, DesktopMcpPreflightRefusal, redactMcpAttachmentText, redactMcpAttachmentValue } from "../../src/mcp-client/local-control.js";
+import { createToolBridge } from "../../src/mcp-client/tools.js";
+import { toToolCatalogPolicyConfig } from "../../src/mcp-client/resilient-client.js";
+import { freshDenialTracking } from "../../src/permissions/denial-tracking.js";
+import { createEmptyToolPermissionContext } from "../../src/permissions/types.js";
 
 const token = "a".repeat(48);
 const headers = { Authorization: `Bearer ${token}` };

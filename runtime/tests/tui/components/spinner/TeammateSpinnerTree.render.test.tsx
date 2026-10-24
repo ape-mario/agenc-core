@@ -3,8 +3,8 @@ import React from "react";
 import stripAnsi from "strip-ansi";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { createRoot } from "../../ink/root.js";
-import { TeammateSpinnerTree } from "./TeammateSpinnerTree.js";
+import { createRoot } from "../../../../src/tui/ink/root.js";
+import { TeammateSpinnerTree } from "../../../../src/tui/components/spinner/TeammateSpinnerTree.js";
 
 const TEST_SPINNER_VERBS = ["Working"] as const;
 
@@ -16,7 +16,7 @@ const appStateMock = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../state/AppState.js", () => ({
+vi.mock("../../../../src/tui/state/AppState.js", () => ({
   useAppState: (selector: (state: typeof appStateMock.state) => unknown) =>
     selector(appStateMock.state),
 }));

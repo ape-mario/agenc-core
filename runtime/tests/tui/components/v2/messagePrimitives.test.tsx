@@ -1,8 +1,8 @@
 import React from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { renderToString } from '../../../utils/staticRender.js'
-import { AppStateProvider } from '../../state/AppState.js'
+import { renderToString } from '../../../../src/utils/staticRender.js'
+import { AppStateProvider } from '../../../../src/tui/state/AppState.js'
 import {
   RedactedThinkingMessage,
   ThinkingMessage,
@@ -11,7 +11,7 @@ import {
   UserCommandMessage,
   UserMemoryInputMessage,
   UserResourceUpdateMessage,
-} from './messagePrimitives.js'
+} from '../../../../src/tui/components/v2/messagePrimitives.js'
 
 const previousGlyphMode = process.env.AGENC_TUI_GLYPHS
 

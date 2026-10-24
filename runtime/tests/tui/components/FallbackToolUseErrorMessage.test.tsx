@@ -4,9 +4,9 @@ import React from 'react'
 import stripAnsi from 'strip-ansi'
 import { describe, expect, test } from 'vitest'
 
-import { renderToString } from '../../utils/staticRender.js'
-import { createRoot } from '../ink/root.js'
-import { FallbackToolUseErrorMessage } from './FallbackToolUseErrorMessage.js'
+import { renderToString } from '../../../src/utils/staticRender.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
+import { FallbackToolUseErrorMessage } from '../../../src/tui/components/FallbackToolUseErrorMessage.js'
 
 async function renderError(result: unknown, verbose = false): Promise<string> {
   return renderToString(

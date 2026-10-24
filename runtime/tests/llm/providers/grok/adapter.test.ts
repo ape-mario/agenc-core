@@ -1,12 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
 import { createHash } from "node:crypto";
 
-import type { LLMChatOptions, LLMMessage, LLMTool } from "../../types.js";
+import type { LLMChatOptions, LLMMessage, LLMTool } from "../../../../src/llm/types.js";
 import {
-  LLMRequestRebuiltError, LLMTimeoutError } from "../../errors.js";
-import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY_MARKER } from "../../wire/shared.js";
-import { encodeMcpToolNameForWire } from "../../wire/mcp-tool-naming.js";
-import { DEFAULT_REQUEST_OPEN_TIMEOUT_MS, GrokProvider } from "./adapter.js";
+  LLMRequestRebuiltError, LLMTimeoutError } from "../../../../src/llm/errors.js";
+import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY_MARKER } from "../../../../src/llm/wire/shared.js";
+import { encodeMcpToolNameForWire } from "../../../../src/llm/wire/mcp-tool-naming.js";
+import { DEFAULT_REQUEST_OPEN_TIMEOUT_MS, GrokProvider } from "../../../../src/llm/providers/grok/adapter.js";
 
 function buildXaiResponse(id: string, text: string): Record<string, unknown> {
   return {

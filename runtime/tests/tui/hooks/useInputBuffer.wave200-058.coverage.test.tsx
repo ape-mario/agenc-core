@@ -3,11 +3,11 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { describe, expect, test } from 'vitest'
 
-import { createRoot } from '../ink/root.js'
+import { createRoot } from '../../../src/tui/ink/root.js'
 import {
   type UseInputBufferResult,
   useInputBuffer,
-} from './useInputBuffer.js'
+} from '../../../src/tui/hooks/useInputBuffer.js'
 
 type HarnessOptions = {
   debounceMs: number

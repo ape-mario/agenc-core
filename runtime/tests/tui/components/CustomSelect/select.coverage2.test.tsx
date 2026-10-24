@@ -3,9 +3,9 @@ import { PassThrough } from 'node:stream'
 import React from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { createRoot } from '../../ink/root.js'
-import { Select, type OptionWithDescription } from './select.js'
-import type { UseSelectProps } from './use-select-input.js'
+import { createRoot } from '../../../../src/tui/ink/root.js'
+import { Select, type OptionWithDescription } from '../../../../src/tui/components/CustomSelect/select.js'
+import type { UseSelectProps } from '../../../../src/tui/components/CustomSelect/use-select-input.js'
 
 type CapturedInputOptionProps = {
   inputValue: string
@@ -24,7 +24,7 @@ const selectInputHookMock = vi.hoisted(() => ({
   props: undefined as UseSelectProps<string> | undefined,
 }))
 
-vi.mock('./select-input-option.js', async () => {
+vi.mock('../../../../src/tui/components/CustomSelect/select-input-option.js', async () => {
   const ReactActual = await vi.importActual<typeof import('react')>('react')
 
   return {
@@ -40,31 +40,31 @@ vi.mock('./select-input-option.js', async () => {
   }
 })
 
-vi.mock('./use-select-input.js', () => ({
+vi.mock('../../../../src/tui/components/CustomSelect/use-select-input.js', () => ({
   useSelectInput: (props: UseSelectProps<string>) => {
     selectInputHookMock.props = props
   },
 }))
 
-vi.mock('../../../utils/debug.js', () => ({
+vi.mock('../../../../src/utils/debug.js', () => ({
   logForDebugging: () => {},
 }))
-vi.mock('../../../bootstrap/state.js', () => ({
+vi.mock('../../../../src/bootstrap/state.js', () => ({
   flushInteractionTime: () => {},
   getActiveTimeCounter: () => 0,
   markScrollActivity: () => {},
   updateLastInteractionTime: () => {},
 }))
-vi.mock('../../../utils/earlyInput.js', () => ({
+vi.mock('../../../../src/utils/earlyInput.js', () => ({
   stopCapturingEarlyInput: () => {},
 }))
-vi.mock('../../../utils/envUtils.js', () => ({
+vi.mock('../../../../src/utils/envUtils.js', () => ({
   isEnvTruthy: () => false,
 }))
-vi.mock('../../../utils/fullscreen.js', () => ({
+vi.mock('../../../../src/utils/fullscreen.js', () => ({
   isMouseClicksDisabled: () => true,
 }))
-vi.mock('../../../utils/log.js', () => ({
+vi.mock('../../../../src/utils/log.js', () => ({
   logError: () => {},
 }))
 

@@ -7,7 +7,7 @@ import { describe, expect, test, vi } from "vitest";
 // inside a CommonJS require, so importing the real chain crashes the test
 // host. The stubs here keep the dispatch logic exercisable end-to-end
 // without that resolution chain.
-vi.mock("../tui/ink.js", () => {
+vi.mock("../../src/tui/ink.js", () => {
   function Box(_props: { readonly children?: unknown }) {
     return null;
   }
@@ -17,9 +17,9 @@ vi.mock("../tui/ink.js", () => {
   return { Box, Text };
 });
 
-import { createTuiTool, BashOutputView } from "../tui/tool-rendering.js";
-import { ResultLine } from "../tui/components/v2/primitives.js";
-import { selectAgenCTuiGlyphs } from "../tui/glyphs.js";
+import { createTuiTool, BashOutputView } from "../../src/tui/tool-rendering.js";
+import { ResultLine } from "../../src/tui/components/v2/primitives.js";
+import { selectAgenCTuiGlyphs } from "../../src/tui/glyphs.js";
 
 describe("createTuiTool('Bash').renderToolResultMessage — end-to-end dispatch", () => {
   test("Bash content with <bash-stdout> envelope produces a React element whose type is BashOutputView", () => {
@@ -276,7 +276,7 @@ describe("BashOutputView: result line and verbose body visual contract", () => {
 describe("formatStructuredToolResult ⇄ BashOutputView wire-shape lock", () => {
   test("the tags formatStructuredToolResult emits are the exact tags BashOutputView consumes (so a future flip to the upstream UserBashOutputMessage component requires no shape changes)", async () => {
     const adapterModule = await import(
-      "../tui/session-transcript.js"
+      "../../src/tui/session-transcript.js"
     );
     const blocks = adapterModule.formatStructuredToolResult(
       "Bash",
